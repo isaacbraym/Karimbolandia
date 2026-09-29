@@ -8,6 +8,7 @@ const H: Record<string, Record<Device, string>> = {
   glide: { kb: 'No ar, aperte PULO de novo e segure: as ORELHAS planam!', touch: 'No ar, toque em PULO de novo e segure: as ORELHAS planam!', pad: 'No ar, aperte A de novo e segure: as ORELHAS planam!' },
   nomad: { kb: 'Segure o gatilho: as duas shotguns disparam juntas!', touch: 'FOGO dispara as duas shotguns ao mesmo tempo!', pad: 'X/RT dispara as duas shotguns!' },
   dash: { kb: 'SHIFT: AVANÇO — atropele tudo pela frente!', touch: 'Botão ⚡ : AVANÇO — atropele tudo pela frente!', pad: 'Y: AVANÇO — atropele tudo pela frente!' },
+  mountNomad: { kb: 'Pule em cima do NÔMAD para pilotá-lo!', touch: 'Pule em cima do NÔMAD para pilotá-lo!', pad: 'Pule em cima do NÔMAD para pilotá-lo!' },
   crouch: { kb: 'Segure S / ↓ para engatinhar', touch: 'Empurre o joystick para baixo para engatinhar', pad: 'Analógico para baixo para engatinhar' },
 };
 

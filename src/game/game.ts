@@ -237,6 +237,10 @@ export class Game {
       onBanner: (t, s, d) => this.hud.banner(t, s, d),
       onComplete: () => this.onComplete(),
       onMusic: (s) => this.setMusic(s),
+      onHint: (key) => {
+        const t = hintText(key, this.input.state.device);
+        if (t) this.hud.setHint(t, 6);
+      },
     };
     w.screenToWorldFn = (cx, cy) => {
       const r = this.canvas.getBoundingClientRect();

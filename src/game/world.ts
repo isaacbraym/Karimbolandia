@@ -15,7 +15,7 @@ import { WEAPON_ORDER, type WeaponId } from './weapons';
 import { progress, saveProgress, settings } from '../core/storage';
 import { getArt } from '../art';
 import { drawNomadIdle } from '../art/nomad';
-import { softDot } from '../art/kit';
+import { softDot, drawSpr } from '../art/kit';
 import { Corpse } from './corpse';
 
 export interface Stats {
@@ -87,6 +87,7 @@ export class World {
   checkpointIdx = -1;
   checkpointSnap: ReturnType<Player['snapshot']> | null = null;
   respawnRequested = false;
+  lastJumpHeld = false;
   invulnerable = false; // debug
   screenW = 640;
   screenH = 360;
@@ -508,6 +509,7 @@ export class World {
 
   // ------------------------------------------------------------------ atualização
   update(dt: number, ctl: ControlState) {
+    this.lastJumpHeld = ctl.jump.held;
     this.time += dt;
     this.stats.time = this.time;
     const p = this.player;
@@ -653,15 +655,11 @@ export class World {
 
   private drawWreck(g: CanvasRenderingContext2D, w: Wreck) {
     const art = getArt();
-    // carcaça escurecida do Nômad
-    g.save();
-    g.globalAlpha = 0.95;
-    drawNomadIdle(g, art.nomad, w.x, w.y, 0, 1, 0);
-    g.globalCompositeOperation = 'source-atop';
-    g.restore();
-    if (Math.random() < 0.15) this.fx.smoke(w.x + rand.spread(14), w.y - 30, 1, '#2a2438', 9, 40, 1.1);
-    if (Math.random() < 0.05) this.fx.sparks(w.x + rand.spread(14), w.y - 30, 3, '#ffb347', 120);
-    if (Math.random() < 0.07) this.fx.add(PK.Fire, w.x + rand.spread(12), w.y - 34, 0, -30, 0.5, 8, '#ff7a1a', { size1: 2 });
+    // carcaça escurecida do Nômad, tombada, soltando fumaça e faíscas
+    drawSpr(g, art.nomad.wreck, w.x, w.y, {});
+    if (Math.random() < 0.15) this.fx.smoke(w.x + rand.spread(14), w.y - 40, 1, '#2a2438', 9, 40, 1.1);
+    if (Math.random() < 0.05) this.fx.sparks(w.x + rand.spread(14), w.y - 40, 3, '#ffb347', 120);
+    if (Math.random() < 0.07) this.fx.add(PK.Fire, w.x + rand.spread(12), w.y - 44, 0, -30, 0.5, 8, '#ff7a1a', { size1: 2 });
   }
 }
 

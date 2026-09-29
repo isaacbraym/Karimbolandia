@@ -1,6 +1,21 @@
 import { describe, it, expect } from 'vitest';
 import { makeWorld, armUp, teleport, Bot, run, newCtl } from './helpers/bot';
 import { TILE } from '../src/game/level';
+import type { World } from '../src/game/world';
+import type { ControlState } from '../src/core/input';
+
+/** Roda a apresentação e faz o Karimbo cair em cima do Nômad. */
+function mountNomad(w: World, ctl: ControlState) {
+  run(w, new Bot(w), ctl, 14, () => w.director.nomadMountable);
+  ctl.moveX = 0;
+  ctl.fire.held = false;
+  ctl.jump.held = false;
+  ctl.mouseAim = null;
+  const ns = w.data.nomadSpawn;
+  w.player.reset(ns.x, ns.y - 170);
+  for (let i = 0; i < 180 && !w.player.mounted; i++) w.update(1 / 60, ctl);
+  for (let i = 0; i < 90; i++) w.update(1 / 60, ctl);
+}
 
 describe('Simulação headless (bot invencível)', () => {
   it('percorre cada seção da fase sem exceções nem NaN', () => {
@@ -32,7 +47,18 @@ describe('Simulação headless (bot invencível)', () => {
     teleport(w, 534, 32);
     const bot = new Bot(w, { walk: true });
     const ctl = newCtl();
-    run(w, bot, ctl, 14, () => w.player.mounted);
+    run(w, bot, ctl, 14, () => w.director.nomadMountable);
+    expect(w.director.nomadMountable).toBe(true);
+    expect(w.player.mounted).toBe(false); // não embarca sozinho
+    // pula em cima do Nômad
+    ctl.moveX = 0;
+    ctl.fire.held = false;
+    ctl.jump.held = false;
+    ctl.mouseAim = null;
+    const ns = w.data.nomadSpawn;
+    w.player.reset(ns.x, ns.y - 170);
+    for (let i = 0; i < 90 && !w.player.mounted; i++) w.update(1 / 60, ctl);
+    for (let i = 0; i < 90; i++) w.update(1 / 60, ctl);
     expect(w.player.mounted).toBe(true);
     expect(w.player.nomad!.hp).toBeGreaterThan(0);
   });
@@ -41,7 +67,7 @@ describe('Simulação headless (bot invencível)', () => {
     const w = makeWorld();
     teleport(w, 534, 32);
     const ctl = newCtl();
-    run(w, new Bot(w), ctl, 14, () => w.player.mounted);
+    mountNomad(w, ctl);
     expect(w.player.mounted).toBe(true);
     const n = w.player.nomad!;
     // primeiro avanço
@@ -65,7 +91,7 @@ describe('Simulação headless (bot invencível)', () => {
     const w2 = makeWorld();
     teleport(w2, 534, 32);
     const c2 = newCtl();
-    run(w2, new Bot(w2), c2, 14, () => w2.player.mounted);
+    mountNomad(w2, c2);
     const n2 = w2.player.nomad!;
     c2.special.pressed = true;
     w2.update(1 / 60, c2);
@@ -82,7 +108,7 @@ describe('Simulação headless (bot invencível)', () => {
     w.invulnerable = false;
     teleport(w, 534, 32);
     const ctl = newCtl();
-    run(w, new Bot(w), ctl, 14, () => w.player.mounted);
+    mountNomad(w, ctl);
     w.player.invuln = 0;
     w.player.nomad!.hp = 1;
     w.player.hit(w, 50, 1);
@@ -156,5 +182,43 @@ describe('Reinício e restauração', () => {
     expect(w.checkpointIdx).toBe(-1);
     expect(w.player.x).toBeCloseTo(w.data.playerStart.x, 0);
     expect(w.enemies.length).toBe(w.data.enemies.filter((e) => !e.arena).length);
+  });
+});
+
+describe('Seção 11: desembarque e túnel de engatinhar', () => {
+  it('o Nômad é forçado a estacionar e o Karimbo atravessa o túnel de 1 tile engatinhando', () => {
+    const w = makeWorld();
+    teleport(w, 1042, 32);
+    w.director.remountAtCheckpoint(200);
+    const ctl = newCtl();
+    expect(w.player.mounted).toBe(true);
+    // anda para a direita até o gatilho de desembarque
+    ctl.moveX = 1;
+    for (let i = 0; i < 60 * 3; i++) {
+      w.update(1 / 60, ctl);
+      if (!w.player.mounted) break;
+    }
+    expect(w.player.mounted).toBe(false);
+    expect(w.parkedNomad).not.toBeNull();
+    // engatinha: baixo + direita
+    ctl.moveY = 1;
+    let crossed = false;
+    for (let i = 0; i < 60 * 14; i++) {
+      w.update(1 / 60, ctl);
+      if (w.player.x > 1070 * 32) {
+        crossed = true;
+        break;
+      }
+    }
+    expect(crossed).toBe(true);
+  });
+
+  it('em pé o Karimbo NÃO passa pelo túnel (a passagem exige agachar)', () => {
+    const w = makeWorld();
+    teleport(w, 1046, 32);
+    const ctl = newCtl();
+    ctl.moveX = 1;
+    for (let i = 0; i < 60 * 8; i++) w.update(1 / 60, ctl);
+    expect(w.player.x).toBeLessThan(1053 * 32);
   });
 });

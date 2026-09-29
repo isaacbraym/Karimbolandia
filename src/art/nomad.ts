@@ -3,7 +3,7 @@
  * A arte original "olha" para a ESQUERDA; espelhamos quando o robô olha para a direita.
  * A esfera gira (textura rotacionada) sob o chassi; a torre inclina/recua ao mirar/atirar.
  */
-import { drawSpr, glowSprite, softDot, type Sprite } from './kit';
+import { drawSpr, glowSprite, softDot, bake, type Sprite } from './kit';
 import { imageToSprite, type Photos, type KarimboHeads } from './photo';
 import { PAL } from './palette';
 
@@ -21,6 +21,8 @@ export interface NomadArt {
   sphereCY: number;
   pivot: [number, number]; // pivô da torre (orig px)
   cockpit: [number, number];
+  /** carcaça carbonizada (Nômad destruído) */
+  wreck: Sprite;
 }
 
 export function bakeNomad(p: Photos): NomadArt {
@@ -34,7 +36,33 @@ export function bakeNomad(p: Photos): NomadArt {
   const frame = imageToSprite(p.nomadFrame, W, H, cx, H, px(p.nomadFrame));
   const sw = m.sphere.tex * ls;
   const sphere = imageToSprite(p.nomadSphere, sw, sw, sw / 2, sw / 2, p.nomadSphere.width / sw);
-  return { upper, frame, sphere, ls, W, H, sphereCX: cx, sphereCY: m.sphere.cy * ls, pivot: m.turretPivot, cockpit: m.cockpit };
+  const sphereCY = m.sphere.cy * ls;
+  const wreck = bake(
+    W,
+    H,
+    (g) => {
+      g.translate(0, 0);
+      drawSpr(g, sphere, cx, sphereCY, {});
+      drawSpr(g, frame, cx, H, {});
+      g.save();
+      g.translate(cx, H);
+      g.rotate(0.05);
+      g.translate(-cx, -H);
+      drawSpr(g, upper, cx, H, {});
+      g.restore();
+      // fuligem e queimado
+      g.globalCompositeOperation = 'source-atop';
+      g.fillStyle = 'rgba(18,10,30,0.72)';
+      g.fillRect(0, 0, W, H);
+      const gr = g.createLinearGradient(0, 0, 0, H);
+      gr.addColorStop(0, 'rgba(255,120,30,0.0)');
+      gr.addColorStop(1, 'rgba(255,90,20,0.25)');
+      g.fillStyle = gr;
+      g.fillRect(0, 0, W, H);
+    },
+    { scale: 2.4, ox: cx, oy: H }
+  );
+  return { upper, frame, sphere, ls, W, H, sphereCX: cx, sphereCY, pivot: m.turretPivot, cockpit: m.cockpit, wreck };
 }
 
 export interface NomadPose {

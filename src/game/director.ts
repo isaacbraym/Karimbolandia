@@ -32,6 +32,8 @@ interface Cine {
   stage: number;
 }
 
+const ctlJumpHeld = (w: World) => w.lastJumpHeld;
+
 export class Director {
   w: World;
   arenas: ArenaState[] = [];
@@ -50,6 +52,8 @@ export class Director {
   nomadHintCount = 0;
   hintCooldown = 0;
   zoomOverride: number | null = null;
+  /** depois da apresentação, o jogador embarca pulando em cima do Nômad */
+  nomadMountable = false;
 
   constructor(w: World) {
     this.w = w;
@@ -68,6 +72,7 @@ export class Director {
     this.combatHold = 0;
     this.nomadPower = 0;
     this.nomadWaiting = true;
+    this.nomadMountable = false;
     this.triggered.clear();
     this.bossActive = false;
     this.bossPhase = 1;
@@ -107,6 +112,7 @@ export class Director {
     // gatilhos de cinemática já concluídos permanecem; o que não concluiu recomeça
     if (!this.w.nomadUsed) {
       this.triggered.delete('nomadMeet');
+      this.nomadMountable = false;
       this.nomadWaiting = true;
       this.nomadPower = 0;
     }
@@ -260,6 +266,8 @@ export class Director {
     // cinemática
     if (this.cine) this.updateCine(dt);
 
+    this.updateMountCheck();
+
     // dica sutil do segundo avanço
     this.updateDashHint();
 
@@ -274,6 +282,24 @@ export class Director {
     }
 
     this.updateMusic(dt);
+  }
+
+  /** Karimbo pousando em cima (ou encostando + pulo) do Nômad estacionado → embarca. */
+  private updateMountCheck() {
+    const w = this.w;
+    const p = w.player;
+    if (!this.nomadMountable || w.nomadUsed || p.mode !== 'foot' || this.cine) return;
+    const ns = w.data.nomadSpawn;
+    const dx = Math.abs(p.x - ns.x);
+    const top = ns.y - 96;
+    const feet = p.feetY;
+    const onTop = dx < 40 && feet > top - 10 && feet < top + 46 && p.body.vy >= -80;
+    const touching = dx < 34 && feet > ns.y - 60 && ctlJumpHeld(w);
+    if (onTop || touching) {
+      this.nomadMountable = false;
+      w.audio('nomadEnter', 1, ns.x);
+      p.startMount(w, ns.x, ns.y);
+    }
   }
 
   private fireTrigger(id: string, once: boolean) {
@@ -326,15 +352,15 @@ export class Director {
         w.fx.addShake(3, 0.4);
         w.fx.addFlash(0.25, '#ffe9b0');
       }
-      if (c.stage === 2 && c.t > 3.5) {
-        c.stage = 3;
-        w.audio('nomadEnter', 1, ns.x);
-        p.startMount(w, ns.x, ns.y);
-        w.camera.zoomTarget = 1.1;
-      }
-      if (c.stage === 3) {
-        // mount concluído em Player.finishMount → onNomadMounted limpa a cinemática
-        if (p.mode === 'nomad') this.cine = null;
+      if (c.stage === 2 && c.t > 3.3) {
+        // fim da apresentação: o jogador embarca pulando em cima do Nômad
+        this.cine = null;
+        this.nomadMountable = true;
+        p.lockInput = false;
+        w.camera.focus = null;
+        w.camera.zoomTarget = 1;
+        w.setMusic('explore');
+        w.hooks.onHint?.('mountNomad');
       }
     } else if (c.kind === 'bossDeath') {
       this.updateBossDeath(dt, c);
@@ -615,6 +641,21 @@ export class Director {
         g.drawImage(spr.c, ns.x - 80, ns.y - 100, 160, 120);
         g.globalAlpha = 1;
         g.globalCompositeOperation = 'source-over';
+        if (this.nomadMountable) {
+          // seta pulsante: "pule aqui"
+          const bob = Math.sin(w.time * 6) * 4;
+          const ay = ns.y - 116 + bob;
+          g.fillStyle = '#ffe27a';
+          g.strokeStyle = '#170f2e';
+          g.lineWidth = 2;
+          g.beginPath();
+          g.moveTo(ns.x - 9, ay - 12);
+          g.lineTo(ns.x + 9, ay - 12);
+          g.lineTo(ns.x, ay);
+          g.closePath();
+          g.stroke();
+          g.fill();
+        }
       }
     }
     if (w.player.mode === 'mounting') {
