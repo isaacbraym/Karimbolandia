@@ -64,6 +64,8 @@ export interface DrawOpts {
   flip?: boolean;
   alpha?: number;
   white?: boolean;
+  /** desenha o sprite normal e, por cima, uma máscara branca com este alpha (flash suave) */
+  flash?: number;
   /** pivô extra (em coordenadas lógicas do sprite) — padrão spr.ox/oy */
   px?: number;
   py?: number;
@@ -79,14 +81,24 @@ export function drawSpr(g: CanvasRenderingContext2D, spr: Sprite, x: number, y: 
   const prevA = g.globalAlpha;
   if (o.alpha !== undefined) g.globalAlpha = prevA * o.alpha;
   const src = o.white ? whiteOf(spr) : spr.c;
+  const fl = o.flash && !o.white ? o.flash : 0;
   if (rot === 0 && sx === 1 && sy === 1) {
     g.drawImage(src, x - px, y - py, spr.w, spr.h);
+    if (fl) {
+      g.globalAlpha *= fl;
+      g.drawImage(whiteOf(spr), x - px, y - py, spr.w, spr.h);
+      g.globalAlpha = o.alpha !== undefined ? prevA * o.alpha : prevA;
+    }
   } else {
     g.save();
     g.translate(x, y);
     if (rot) g.rotate(rot);
     g.scale(sx, sy);
     g.drawImage(src, -px, -py, spr.w, spr.h);
+    if (fl) {
+      g.globalAlpha *= fl;
+      g.drawImage(whiteOf(spr), -px, -py, spr.w, spr.h);
+    }
     g.restore();
   }
   if (o.alpha !== undefined) g.globalAlpha = prevA;

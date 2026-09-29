@@ -793,7 +793,7 @@ export class Player {
     };
     fire(ax, ay, 0);
     fire(bx, by, 0.045);
-    this.body.vx -= Math.cos(aim) * 230;
+    this.body.vx -= Math.cos(aim) * 105;
     w.fx.addShake(5, 0.16);
     w.fx.addHitStop(0.035);
     w.noteShot();

@@ -59,6 +59,7 @@ export function section6(b: LevelBuilder) {
   b.crate(532, 28, 'health');
   b.crate(580, 28, 'ammo');
   b.tokens(568, G - 1, 6);
+  for (let x = 530; x < 588; x += 4) b.deco('garageWall', x, G);
   b.deco('spotlight', 552, 24);
   b.deco('spotlight', 566, 24);
   b.deco('pipes', 536, G);

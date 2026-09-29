@@ -12,9 +12,10 @@ import { audio as audioEngine, type SfxName } from '../core/audio';
 import { clamp, rand, type Rect } from '../core/math';
 import type { ControlState } from '../core/input';
 import { WEAPON_ORDER, type WeaponId } from './weapons';
-import { progress, saveProgress } from '../core/storage';
+import { progress, saveProgress, settings } from '../core/storage';
 import { getArt } from '../art';
 import { drawNomadIdle } from '../art/nomad';
+import { softDot } from '../art/kit';
 import { Corpse } from './corpse';
 
 export interface Stats {
@@ -91,17 +92,28 @@ export class World {
   screenH = 360;
   screenToWorldFn: ((sx: number, sy: number) => { x: number; y: number }) | null = null;
   readonly runId = Math.random();
+  /** cópia do mapa original (a arena do chefe desaba; restauramos ao reiniciar/morrer) */
+  private baseTiles: Uint8Array;
+  private baseTheme: Uint8Array;
 
   constructor(data: LevelData) {
     this.data = data;
     this.level = data.level;
+    this.baseTiles = data.level.tiles.slice();
+    this.baseTheme = data.level.theme.slice();
     this.director = new Director(this);
     this.camera.bounds = { x: 0, y: 0, w: this.level.pxW, h: this.level.pxH };
     this.startRun();
   }
 
   // ------------------------------------------------------------------ ciclo
+  restoreTiles() {
+    this.level.tiles.set(this.baseTiles);
+    this.level.theme.set(this.baseTheme);
+  }
+
   startRun() {
+    this.restoreTiles();
     this.time = 0;
     this.score = 0;
     this.tokens = 0;
@@ -165,6 +177,7 @@ export class World {
     const sx = cp ? cp.x : this.data.playerStart.x;
     const sy = cp ? cp.y : this.data.playerStart.y;
     this.director.onRespawn();
+    this.restoreTiles();
     this.populate(false);
     this.director.afterPopulate();
     this.player.reset(sx, sy);
@@ -568,8 +581,7 @@ export class World {
     // câmera
     const cam = this.camera;
     this.director.cameraUpdate(dt);
-    const shakeOn = true;
-    cam.update(dt, p.x, p.y - (p.mode === 'nomad' ? 6 : 14), p.facing, p.body.vx, p.body.onGround, this.fx.shake, shakeOn);
+    cam.update(dt, p.x, p.y - (p.mode === 'nomad' ? 6 : 14), p.facing, p.body.vx, p.body.onGround, this.fx.shake, settings.screenShake);
   }
 
   rebuildSolids() {
@@ -600,6 +612,7 @@ export class World {
     }
     this.director.drawBarriers(g);
     for (const pk of this.pickups) if (cam.visible(pk.x, pk.y, 40)) pk.draw(g, this);
+    this.drawShadows(g);
     this.fx.draw(g, false);
     for (const c of this.corpses) c.render(g);
     for (const e of this.enemies) {
@@ -614,6 +627,28 @@ export class World {
     this.director.drawDecos(g, 'front');
     this.fx.drawPopups(g);
     void art.props;
+  }
+
+  /** Sombras suaves no chão sob personagens (profundidade 2.5D). */
+  private drawShadows(g: CanvasRenderingContext2D) {
+    const sh = softDot('#000000', 16);
+    const cam = this.camera;
+    const put = (x: number, y: number, wd: number, a: number) => {
+      const gy = this.level.groundBelow(x, y - 4, 500);
+      if (gy === null) return;
+      const h = gy - y;
+      if (h < -6 || h > 320) return;
+      const k = 1 - Math.min(0.75, Math.max(0, h) / 380);
+      g.globalAlpha = a * k;
+      g.drawImage(sh.c, x - wd * k, gy - 3, wd * 2 * k, 8 * k + 2);
+    };
+    const p = this.player;
+    if (p.mode === 'foot' || p.mode === 'nomad') put(p.x, p.feetY, p.mounted ? 30 : 15, 0.42);
+    for (const e of this.enemies) {
+      if (!e.alive || e.isBoss || !cam.visible(e.x, e.y, 60)) continue;
+      put(e.x, e.feetY, Math.max(10, e.body.w * 0.6), 0.34);
+    }
+    g.globalAlpha = 1;
   }
 
   private drawWreck(g: CanvasRenderingContext2D, w: Wreck) {

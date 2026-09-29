@@ -48,6 +48,29 @@ export function drawDeco(g: CanvasRenderingContext2D, d: DecoSpawn, t: number) {
       g.fillRect(w / 2 - 14, -h, 14, h);
       break;
     }
+    case 'garageWall': {
+      // parede de fundo da garagem: painéis escuros com faixas de luz
+      const w0 = 128;
+      const h0 = 300;
+      const gr = g.createLinearGradient(0, -h0, 0, 0);
+      gr.addColorStop(0, '#120e2c');
+      gr.addColorStop(1, '#241c52');
+      g.fillStyle = gr;
+      g.fillRect(-w0 / 2, -h0, w0, h0);
+      g.fillStyle = 'rgba(255,255,255,0.05)';
+      for (let x = -w0 / 2 + 8; x < w0 / 2; x += 32) g.fillRect(x, -h0, 2, h0);
+      g.fillStyle = 'rgba(0,0,0,0.25)';
+      for (let y = -h0 + 30; y < 0; y += 60) g.fillRect(-w0 / 2, y, w0, 3);
+      const fl = 0.6 + 0.4 * Math.sin(t * 2 + seed);
+      g.globalCompositeOperation = 'lighter';
+      g.fillStyle = `rgba(255,190,90,${0.18 * fl})`;
+      g.fillRect(-w0 / 2 + 20, -h0 + 24, 6, 90);
+      g.fillRect(w0 / 2 - 26, -h0 + 24, 6, 90);
+      g.fillStyle = `rgba(90,240,255,${0.22 * fl})`;
+      g.fillRect(-40, -110, 80, 3);
+      g.globalCompositeOperation = 'source-over';
+      break;
+    }
     case 'neonSign': {
       const flick = 0.8 + 0.2 * Math.sin(t * 12 + seed) * (Math.sin(t * 1.3 + seed) > 0.85 ? 0.3 : 1) + (Math.sin(t * 0.7 + seed) > 0.96 ? -0.6 : 0);
       const colors = ['#ff3fb4', '#39f0ff', '#b6ff3a', '#ffb83a'];

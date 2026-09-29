@@ -206,9 +206,9 @@ export class Hud {
     // ------------------------------------------------ Chefe
     const boss = w.director.bossRef as Felipao | null;
     if (boss && (boss.alive || boss.dyingT > 0) && w.director.bossActive) {
-      const bw = Math.min(420, W - 160);
+      const bw = Math.max(150, Math.min(420, W - 2 * 205));
       const bx2 = cx - bw / 2;
-      const byy = T + 36;
+      const byy = T + 34;
       this.bossShown += (boss.hp / boss.maxHp - this.bossShown) * 0.12;
       pill(g, bx2 - 6, byy - 4, bw + 12, 34, 10, 'rgba(23,15,46,0.82)', 'rgba(255,255,255,0.25)');
       text(g, 'FELIPÃO', bx2 + 4, byy + 12, 13, '#ff9ad0', 'left', DISPLAY, '400');
@@ -229,7 +229,7 @@ export class Hud {
     }
 
     // ------------------------------------------------ banners
-    let by2 = H * 0.28;
+    let by2 = H * 0.34;
     for (const b of this.banners) {
       const t = b.t;
       const inT = clamp(t / 0.4, 0, 1);

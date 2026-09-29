@@ -9,6 +9,7 @@ import { PK } from './fx';
 import { getArt } from '../art';
 import { drawNomadIdle } from '../art/nomad';
 import { newNomad } from './player';
+import { NOMAD_W, NOMAD_H, FOOT_H } from './movement';
 import { glowSprite } from '../art/kit';
 import { drawDeco } from '../art/decor';
 
@@ -123,10 +124,13 @@ export class Director {
     const s = newNomad();
     s.hp = Math.max(hp, s.maxHp * 0.6);
     p.nomad = s;
-    p.body.w = 52;
-    p.body.h = 62;
-    p.body.y = p.body.y + 50 / 2 - 62 / 2 - 1;
+    const feet = p.body.y + p.body.h / 2;
+    p.body.w = NOMAD_W;
+    p.body.h = NOMAD_H;
+    p.body.y = feet - NOMAD_H / 2 - 0.5;
+    p.invuln = 0.4;
     p.mode = 'nomad';
+    void FOOT_H;
     this.nomadWaiting = false;
     this.w.nomadUsed = true;
   }
@@ -565,15 +569,24 @@ export class Director {
     const w = this.w;
     const cam = w.camera;
     cam.lock = this.currentLock();
-    if (!this.cine && !this.bossActive) {
-      // zoom padrão: um pouco mais aberto ao pilotar o Nômad
-      cam.zoomTarget = this.zoomOverride ?? (w.player.mounted ? 0.94 : 1);
-      cam.focus = null;
-    }
+    if (this.cine) return; // a cinemática controla a câmera
     if (this.bossActive) {
-      cam.zoomTarget = 0.96;
-      cam.focus = null;
+      // enquadra jogador e chefe juntos (o chefe nunca deve sair da tela)
+      const p = w.player;
+      const spawn = w.data.enemies.find((e) => e.type === 'boss')!;
+      const b = this.bossRef;
+      const zoom = 0.9;
+      cam.zoomTarget = zoom;
+      const vw = cam.viewW / zoom;
+      if (b && (b.alive || b.hp > 0)) {
+        const mid = p.x + clamp((b.x - p.x) * 0.5, -vw * 0.28, vw * 0.28);
+        cam.focus = { x: mid, y: spawn.y - 76, rate: 4.2 };
+      } else cam.focus = { x: spawn.x - 200, y: spawn.y - 76, rate: 3 };
+      return;
     }
+    // zoom padrão: um pouco mais aberto ao pilotar o Nômad
+    cam.zoomTarget = this.zoomOverride ?? (w.player.mounted ? 0.94 : 1);
+    cam.focus = null;
   }
 
   // ------------------------------------------------------------------ desenho

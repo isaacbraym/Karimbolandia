@@ -81,7 +81,7 @@ export class AudioEngine {
     if (!this.ctx) return;
     const t = this.ctx.currentTime;
     this.sfxBus.gain.setTargetAtTime(this.muted ? 0 : this.sfxVol, t, 0.02);
-    this.musicBus.gain.setTargetAtTime(this.muted ? 0 : this.musicVol * 0.5 * this.duck, t, 0.05);
+    this.musicBus.gain.setTargetAtTime(this.muted ? 0 : this.musicVol * 0.34 * this.duck, t, 0.05);
   }
   /** Abaixa a música (pausa/menus) sem parar o contexto. */
   setDuck(v: number) {

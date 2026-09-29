@@ -63,7 +63,7 @@ export class Felipao extends Enemy {
   critFlash = 0;
 
   constructor(spawn: EnemySpawn) {
-    super(spawn, { hp: 1500, w: 84, h: 140, score: 5000, wake: 2000, tokens: [0, 0], metal: false });
+    super(spawn, { hp: 3600, w: 84, h: 140, score: 5000, wake: 2000, tokens: [0, 0], metal: false });
     this.isBoss = true;
     this.flying = true;
     this.gravity = 0;
@@ -128,7 +128,10 @@ export class Felipao extends Enemy {
     }
     if (this.state === 'stun') d *= 1.3;
     this.hp -= d;
-    this.flash = 0.06;
+    if (this.flashCd <= 0) {
+      this.flash = 0.05;
+      this.flashCd = 0.16;
+    }
     this.awake = true;
     w.audio('bossHit', 0.5, this.x);
     w.fx.sparks(info.x, info.y, 4, '#ffe0a0', 200, -info.dir, 0, 1.6);
@@ -290,9 +293,12 @@ export class Felipao extends Enemy {
 
   private doIdle(w: World, dt: number) {
     const p = w.player;
-    // paira, oscilando entre pontos do palco
-    const tx = this.homeX + Math.sin(this.swayT * 0.55) * 130;
-    this.body.vx = approach(this.body.vx, clamp((tx - this.bx) * 1.4, -70, 70) * (this.phase === 3 ? 1.35 : 1), 300 * dt);
+    // paira mantendo distância de combate do jogador (sempre visível na câmera)
+    const side = this.bx >= p.x ? 1 : -1;
+    const keep = clamp(w.camera.w * 0.5 - 40, 250, 430);
+    let tx = p.x + side * (keep + Math.sin(this.swayT * 0.7) * 60);
+    tx = clamp(tx, this.rect.x + 150, this.rect.x + this.rect.w - 150);
+    this.body.vx = approach(this.body.vx, clamp((tx - this.bx) * 1.2, -95, 95) * (this.phase === 3 ? 1.35 : 1), 320 * dt);
     this.body.x += this.body.vx * dt;
     this.hover = 6 + Math.sin(this.swayT * 2.4) * 3;
     this.restT -= dt;

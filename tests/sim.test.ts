@@ -124,3 +124,37 @@ describe('Simulação headless (bot invencível)', () => {
     expect(w.stats.deaths).toBe(1);
   });
 });
+
+describe('Reinício e restauração', () => {
+  it('restaurar o mapa desfaz o piso desabado da arena do chefe', () => {
+    const w = makeWorld();
+    const boss = w.data.arenas.find((a) => a.id === 'boss')!;
+    const cc = Math.round((boss.rect.x + boss.rect.w / 2) / TILE);
+    const before = w.level.get(cc, 14);
+    expect(before).toBe(1);
+    w.level.set(cc, 14, 0);
+    expect(w.level.get(cc, 14)).toBe(0);
+    w.restart();
+    expect(w.level.get(cc, 14)).toBe(1);
+  });
+
+  it('reiniciar a fase zera progresso: inimigos, itens, arenas, Nômad e checkpoints', () => {
+    const w = makeWorld();
+    armUp(w);
+    teleport(w, 100, 32);
+    run(w, new Bot(w, { hold: true }), newCtl(), 8);
+    w.score = 999;
+    w.emblems.add(3);
+    w.nomadUsed = true;
+    w.director.arenas[0].status = 'cleared';
+    w.restart();
+    expect(w.score).toBe(0);
+    expect(w.emblems.size).toBe(0);
+    expect(w.killedEnemies.size).toBe(0);
+    expect(w.nomadUsed).toBe(false);
+    expect(w.director.arenas.every((a) => a.status === 'idle')).toBe(true);
+    expect(w.checkpointIdx).toBe(-1);
+    expect(w.player.x).toBeCloseTo(w.data.playerStart.x, 0);
+    expect(w.enemies.length).toBe(w.data.enemies.filter((e) => !e.arena).length);
+  });
+});

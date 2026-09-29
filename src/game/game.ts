@@ -50,12 +50,14 @@ export class Game {
   private orientationBlocked = false;
   private hintsShown = new Set<string>();
   private lastMounted = false;
+  /** tempos médios (ms) de simulação/render — útil para depurar desempenho */
+  prof = { update: 0, render: 0 };
 
   constructor(canvas: HTMLCanvasElement, ui: HTMLElement) {
     this.canvas = canvas;
     this.ui = ui;
     this.g = canvas.getContext('2d', { alpha: false }) as CanvasRenderingContext2D;
-    this.isTouch = (typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches) || 'ontouchstart' in window;
+    this.isTouch = (typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches) || 'ontouchstart' in window || new URLSearchParams(location.search).get('touch') === '1';
   }
 
   // ------------------------------------------------------------------ boot
@@ -412,6 +414,7 @@ export class Game {
     this.input.poll();
     const w = this.world;
 
+    const t0 = performance.now();
     if (this.state === 'playing' && w) {
       if (this.input.state.pause.pressed) {
         this.input.clearEdges();
@@ -425,7 +428,11 @@ export class Game {
     } else if (this.state === 'menu' && this.menuScene) {
       this.menuScene.update(dt, this.viewW);
     }
+    const t1 = performance.now();
     this.render(dt);
+    const t2 = performance.now();
+    this.prof.update += (t1 - t0 - this.prof.update) * 0.05;
+    this.prof.render += (t2 - t1 - this.prof.render) * 0.05;
   }
 
   private step(w: World, dt: number) {

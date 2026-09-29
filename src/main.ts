@@ -19,6 +19,7 @@ async function boot() {
   const ui = document.getElementById('ui') as HTMLElement;
   const game = new Game(canvas, ui);
   (window as unknown as { __karim: Game }).__karim = game;
+  void import('./core/audio').then((a) => import('./core/music').then((m) => ((window as unknown as Record<string, unknown>).__snd = { audio: a.audio, music: m.music, MIX: m.MIX })));
   await game.boot(base);
   if ('serviceWorker' in navigator && import.meta.env.PROD) {
     window.addEventListener('load', () => {

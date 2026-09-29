@@ -264,7 +264,8 @@ export function drawFelipao(g: CanvasRenderingContext2D, a: FelipaoArt, x: numbe
   const taunt = 1 + p.taunt * 0.045 * Math.sin(p.t * 40);
   g.rotate(p.lean);
   g.scale(taunt, p.squashY * taunt);
-  const w = p.flash;
+  const w = false;
+  const fa = p.flash ? 0.55 : 0;
 
   // propulsores nos pés (com chama)
   for (const [fx, fy] of [a.footL, a.footR]) {
@@ -283,8 +284,8 @@ export function drawFelipao(g: CanvasRenderingContext2D, a: FelipaoArt, x: numbe
   drawSpr(g, a.rack, a.rackPos[0], a.rackPos[1] - p.rackOpen * 4, { white: w, sy: 1 + p.rackOpen * 0.1 });
 
   // corpo (foto)
-  drawSpr(g, a.body, 0, 0, { white: w });
-  drawSpr(g, a.straps, 0, 0, { white: w });
+  drawSpr(g, a.body, 0, 0, { flash: fa });
+  drawSpr(g, a.straps, 0, 0, { flash: fa });
   // reator do peito
   {
     const [rx, ry] = a.reactorPos;

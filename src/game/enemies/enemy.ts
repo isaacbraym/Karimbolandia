@@ -52,6 +52,7 @@ export abstract class Enemy {
   lastHurt = 0;
   deadT = 0;
   contactDmg = 0;
+  flashCd = 0;
 
   constructor(spawn: EnemySpawn, stats: EnemyStats) {
     this.spawn = spawn;
@@ -89,7 +90,10 @@ export abstract class Enemy {
   hurt(w: World, dmg: number, info: HurtInfo): number {
     if (!this.alive || this.invulnerable) return 0;
     this.hp -= dmg;
-    this.flash = 0.07;
+    if (this.flashCd <= 0) {
+      this.flash = 0.05;
+      this.flashCd = 0.14;
+    }
     this.lastHurt = this.t;
     this.awake = true;
     this.kbx += info.kx * (this.stats.hp > 150 ? 0.25 : 1);
@@ -174,6 +178,7 @@ export abstract class Enemy {
   tickCommon(dt: number) {
     this.t += dt;
     if (this.flash > 0) this.flash -= dt;
+    if (this.flashCd > 0) this.flashCd -= dt;
   }
 
   /** Empurrão de corpo (inimigos não se sobrepõem totalmente). */
