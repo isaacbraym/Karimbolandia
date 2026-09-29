@@ -16,6 +16,9 @@ export interface TouchState {
   active: boolean; // controles de toque visíveis/em uso
   stickX: number;
   stickY: number;
+  /** analógico de tiro (botão FOGO arrastável): vetor de mira, 0,0 quando parado */
+  aimX: number;
+  aimY: number;
   held: Record<ActionName, boolean>;
 }
 
@@ -23,6 +26,8 @@ export const newTouchState = (): TouchState => ({
   active: false,
   stickX: 0,
   stickY: 0,
+  aimX: 0,
+  aimY: 0,
   held: { jump: false, fire: false, grenade: false, special: false, next: false, prev: false, pause: false },
 });
 
@@ -255,6 +260,7 @@ export class Input {
       s.aimVecX = s.moveX;
       s.aimVecY = s.moveY;
     }
+    if (t.active && Math.hypot(t.aimX, t.aimY) > 0.32 && t.held.fire) padAim = { x: t.aimX, y: t.aimY };
     s.padAim = padAim;
     s.mouseAim = !t.active && this.now() - this.mouseLastMove < 3500 && s.device === 'kb' ? { x: this.mouseX, y: this.mouseY } : null;
 

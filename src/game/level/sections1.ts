@@ -19,6 +19,7 @@ export function section1(b: LevelBuilder) {
   b.trigger('hint:move', 6, 0, 3, 46);
   b.trigger('hint:shoot', 26, 0, 3, 46);
   b.trigger('hint:jump', 46, 0, 3, 46);
+  b.trigger('hint:swap', 96, 0, 3, 46);
 
   b.tokens(14, G - 1, 8);
   b.crate(30, G, 'tokens');
@@ -76,7 +77,7 @@ export function section2(b: LevelBuilder) {
   b.plat(156, 26, 14);
   b.plat(172, 26, 6);
   b.tokens(157, 25, 12);
-  b.crate(160, 26, 'health');
+  b.crate(160, 26, 'random');
   b.enemy('rifle', 164, 26, { patrol: 30, facing: -1 });
   b.enemy('rifle', 174, 26, { facing: -1, idle: true });
   b.deco('neonSign', 168, 24);
@@ -117,7 +118,7 @@ export function section3(b: LevelBuilder) {
   b.enemy('rifle', 262, 24, { patrol: 40 });
   b.enemy('rifle', 270, 24, { facing: -1 });
   b.enemy('drone', 266, 19, { patrol: 100 });
-  b.crate(274, 24, 'health');
+  b.crate(274, 24, 'random');
   // rota baixa
   b.prop('barrel', 246, G);
   b.prop('barrel', 247, G);
@@ -165,7 +166,7 @@ export function section4(b: LevelBuilder) {
   b.tokens(361, 29, 2);
   b.tokens(365, 27, 2);
   b.tokens(369, 25, 2);
-  b.crate(377, 22, 'health');
+  b.crate(377, 22, 'random');
   // K0 — ORELHA DOURADA: ilha vista do ninho do sniper, só alcançável planando
   b.plat(393, 22, 5);
   b.secret(0, 395, 21);

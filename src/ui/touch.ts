@@ -35,7 +35,7 @@ export class TouchUI {
     this.root.innerHTML = `
       <div class="stick-zone"><div class="stick-ghost"></div><div class="stick-base"><div class="stick-knob"></div></div></div>
       <button class="tbtn t-jump" data-act="jump" aria-label="Pular">${ICONS.jump}<span>PULO</span></button>
-      <button class="tbtn t-fire" data-act="fire" aria-label="Atirar">${ICONS.fire}<span>FOGO</span></button>
+      <button class="tbtn t-fire" data-act="fire" aria-label="Atirar e mirar">${ICONS.fire}<span>FOGO</span><i class="fire-knob"></i></button>
       <button class="tbtn t-nade" data-act="grenade" aria-label="Granada">${ICONS.grenade}</button>
       <button class="tbtn t-special" data-act="special" aria-label="Especial">${ICONS.special}</button>
       <button class="tbtn t-swap" data-act="next" aria-label="Trocar arma">${ICONS.switch}</button>
@@ -48,7 +48,8 @@ export class TouchUI {
     this.ghost = this.root.querySelector('.stick-ghost') as HTMLElement;
     this.root.querySelectorAll<HTMLElement>('.tbtn').forEach((el) => {
       this.buttons.set(el.dataset.act as ActionName, el);
-      this.bindButton(el, el.dataset.act as ActionName);
+      if (el.dataset.act === 'fire') this.bindFireStick(el);
+      else this.bindButton(el, el.dataset.act as ActionName);
     });
     this.bindStick();
     // bloqueia gestos/menus nativos
@@ -108,6 +109,67 @@ export class TouchUI {
       }, 45);
     };
     el.addEventListener('pointerdown', down);
+    el.addEventListener('pointerup', up);
+    el.addEventListener('pointercancel', up);
+    el.addEventListener('lostpointercapture', up);
+  }
+
+  /** FOGO = analógico de tiro: segurar atira; arrastar mira em 360° (o vetor sai do centro do botão). */
+  private bindFireStick(el: HTMLElement) {
+    const t = this.input.touch;
+    const knob = el.querySelector('.fire-knob') as HTMLElement;
+    let pid = -1;
+    const setAim = (e: PointerEvent) => {
+      const r = el.getBoundingClientRect();
+      const cx = r.left + r.width / 2;
+      const cy = r.top + r.height / 2;
+      const R = r.width * 0.5;
+      const dx = e.clientX - cx;
+      const dy = e.clientY - cy;
+      const d = Math.hypot(dx, dy);
+      const m = Math.min(1, d / (R * 1.1));
+      const a = Math.atan2(dy, dx);
+      // zona morta central: toque simples atira para onde o Karimbo olha
+      t.aimX = m < 0.3 ? 0 : Math.cos(a) * m;
+      t.aimY = m < 0.3 ? 0 : Math.sin(a) * m;
+      const k = Math.min(d, R * 0.95);
+      knob.style.transform = `translate(calc(-50% + ${Math.cos(a) * k}px), calc(-50% + ${Math.sin(a) * k}px))`;
+      knob.classList.toggle('aiming', m >= 0.3);
+    };
+    const down = (e: PointerEvent) => {
+      if (pid !== -1) return;
+      e.preventDefault();
+      try {
+        el.setPointerCapture(e.pointerId);
+      } catch {
+        /* ok */
+      }
+      pid = e.pointerId;
+      this.markActive();
+      this.input.onGesture?.();
+      t.held.fire = true;
+      el.classList.add('down');
+      setAim(e);
+    };
+    const move = (e: PointerEvent) => {
+      if (e.pointerId !== pid) return;
+      e.preventDefault();
+      setAim(e);
+    };
+    const up = (e: PointerEvent) => {
+      if (e.pointerId !== pid) return;
+      e.preventDefault();
+      pid = -1;
+      el.classList.remove('down');
+      t.aimX = t.aimY = 0;
+      knob.style.transform = 'translate(-50%,-50%)';
+      knob.classList.remove('aiming');
+      window.setTimeout(() => {
+        if (pid === -1) t.held.fire = false;
+      }, 45);
+    };
+    el.addEventListener('pointerdown', down);
+    el.addEventListener('pointermove', move);
     el.addEventListener('pointerup', up);
     el.addEventListener('pointercancel', up);
     el.addEventListener('lostpointercapture', up);
@@ -185,6 +247,7 @@ export class TouchUI {
     const t = this.input.touch;
     for (const k of Object.keys(t.held) as ActionName[]) t.held[k] = false;
     t.stickX = t.stickY = 0;
+    t.aimX = t.aimY = 0;
     this.stickId = -1;
     this.base.classList.remove('on');
     this.ghost.classList.remove('off');

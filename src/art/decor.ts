@@ -1,7 +1,8 @@
 /** Decoração de cenário (atrás e na frente do gameplay). Tudo procedural e barato. */
-import { glowSprite, softDot } from './kit';
+import { glowSprite, softDot, drawSpr } from './kit';
 import { Rng, clamp } from '../core/math';
 import type { DecoSpawn } from '../game/level';
+import { getArt } from './index';
 
 const rngCache = new Map<string, Rng>();
 const seedOf = (d: DecoSpawn) => Math.floor(d.x * 7.13 + d.y * 3.1);
@@ -46,6 +47,42 @@ export function drawDeco(g: CanvasRenderingContext2D, d: DecoSpawn, t: number) {
       g.globalAlpha = 1;
       g.fillStyle = 'rgba(0,0,0,0.25)';
       g.fillRect(w / 2 - 14, -h, 14, h);
+      break;
+    }
+    case 'bossPoster': {
+      const art = getArt().felipao;
+      const flick = 0.75 + 0.25 * Math.sin(t * 5 + seed);
+      // postes
+      g.fillStyle = '#20233a';
+      g.fillRect(-26, -30, 4, 30);
+      g.fillRect(22, -30, 4, 30);
+      // painel
+      g.fillStyle = '#0d0722';
+      g.fillRect(-38, -128, 76, 100);
+      g.save();
+      g.beginPath();
+      g.rect(-34, -112, 68, 70);
+      g.clip();
+      const bg = g.createLinearGradient(0, -112, 0, -42);
+      bg.addColorStop(0, '#5a1240');
+      bg.addColorStop(1, '#a8341f');
+      g.fillStyle = bg;
+      g.fillRect(-34, -112, 68, 70);
+      drawSpr(g, art.upper, 0, -34, { sx: 0.5, sy: 0.5 });
+      g.restore();
+      g.strokeStyle = '#ff3a4a';
+      g.globalAlpha = flick;
+      g.lineWidth = 2.4;
+      g.strokeRect(-36, -126, 72, 96);
+      g.globalAlpha = 1;
+      g.fillStyle = '#ffd23a';
+      g.font = '400 11px "Lilita One", Impact, sans-serif';
+      g.textAlign = 'center';
+      g.fillText('PROCURADO', 0, -116);
+      g.fillStyle = '#ffffff';
+      g.font = '400 13px "Lilita One", Impact, sans-serif';
+      g.fillText('FELIPÃO', 0, -32);
+      neon(g, -36, -126, 72, 96, '#ff3a4a', flick * 0.6);
       break;
     }
     case 'garageWall': {

@@ -9,6 +9,8 @@ export interface MenuCallbacks {
   onRestart(): void;
   onQuitToMenu(): void;
   onPlayAgain(): void;
+  onContinueYes(): void;
+  onContinueNo(): void;
   onClick(): void;
 }
 
@@ -48,9 +50,14 @@ export class Menus {
   panel: HTMLElement;
   pause: HTMLElement;
   results: HTMLElement;
+  cont: HTMLElement;
+  over: HTMLElement;
   rotate: HTMLElement;
   toastEl: HTMLElement;
   fadeEl: HTMLElement;
+  private contNum!: HTMLElement;
+  private contRing!: HTMLElement;
+  private contLives!: HTMLElement;
   private bar!: HTMLElement;
   private lbl!: HTMLElement;
   private panelReturn: 'main' | 'pause' = 'main';
@@ -66,12 +73,14 @@ export class Menus {
     this.pause = this.buildPause();
     this.results = el('div', 'overlay hidden');
     this.results.id = 'results';
+    this.cont = this.buildContinue();
+    this.over = this.buildGameOver();
     this.rotate = this.buildRotate();
     this.toastEl = el('div');
     this.toastEl.id = 'toast';
     this.fadeEl = el('div');
     this.fadeEl.id = 'fade';
-    root.append(this.loading, this.main, this.panel, this.pause, this.results, this.rotate, this.toastEl, this.fadeEl);
+    root.append(this.loading, this.main, this.panel, this.pause, this.results, this.cont, this.over, this.rotate, this.toastEl, this.fadeEl);
   }
 
   // ------------------------------------------------------------------ construção
@@ -129,6 +138,35 @@ export class Menus {
     );
     p.append(btns);
     o.append(p);
+    return o;
+  }
+
+  private buildContinue() {
+    const o = el('div', 'overlay hidden');
+    o.id = 'continue';
+    const wrap = el('div', 'wrap');
+    wrap.append(el('div', 'title', 'CONTINUAR?'));
+    const ring = el('div', 'cring');
+    this.contNum = el('b', '', '10');
+    ring.append(this.contNum);
+    this.contRing = ring;
+    this.contLives = el('div', 'clives', '');
+    const btns = el('div', 'btns');
+    btns.append(this.btn('SIM! GASTAR 1 VIDA', 'primary', () => this.cb.onContinueYes()), this.btn('VOLTAR AO CHECKPOINT', 'alt small', () => this.cb.onContinueNo()));
+    wrap.append(ring, this.contLives, btns);
+    o.append(wrap);
+    return o;
+  }
+
+  private buildGameOver() {
+    const o = el('div', 'overlay hidden');
+    o.id = 'gameover';
+    const wrap = el('div', 'wrap');
+    wrap.append(el('div', 'title', 'FIM DE JOGO'), el('div', 'sub', 'As 3 vidas desta fase acabaram'));
+    const btns = el('div', 'btns');
+    btns.append(this.btn('RECOMEÇAR A FASE', 'primary', () => this.cb.onRestart()), this.btn('MENU PRINCIPAL', 'alt', () => this.cb.onQuitToMenu()));
+    wrap.append(btns);
+    o.append(wrap);
     return o;
   }
 
@@ -311,6 +349,8 @@ export class Menus {
     this.panel.classList.add('hidden');
     this.pause.classList.add('hidden');
     this.results.classList.add('hidden');
+    this.cont.classList.add('hidden');
+    this.over.classList.add('hidden');
     this.focusable = [];
     this.focusIdx = -1;
   }
@@ -325,6 +365,23 @@ export class Menus {
   }
   get pauseOpen() {
     return !this.pause.classList.contains('hidden') || this.panelOpen;
+  }
+
+  showContinue(livesLeft: number) {
+    this.cont.classList.remove('hidden');
+    const after = livesLeft - 1;
+    this.contLives.textContent = `Vidas: ${livesLeft}  →  ${after}`;
+    this.setContinueCount(10, 10);
+    this.collectFocus(this.cont);
+  }
+  setContinueCount(left: number, total: number) {
+    this.contNum.textContent = String(Math.max(0, Math.ceil(left)));
+    this.contRing.style.setProperty('--p', String(Math.max(0, Math.min(1, left / total))));
+    this.contRing.classList.toggle('urgent', left <= 3);
+  }
+  showGameOver() {
+    this.over.classList.remove('hidden');
+    this.collectFocus(this.over);
   }
 
   showResults(d: ResultData) {

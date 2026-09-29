@@ -9,16 +9,20 @@ Run-and-gun **2.5D moderno** que roda direto no navegador (celular e PC) — uma
 | Ação | Teclado / mouse | Celular | Gamepad |
 |---|---|---|---|
 | Mover | `A` `D` / `←` `→` | joystick (esquerda) | analógico esq. |
-| Mirar | mouse (ou `W` p/ cima) | joystick p/ cima/diagonal | analógico dir. |
+| Mirar | mouse (ou `W` p/ cima) | **arrastar o botão FOGO** (analógico de tiro 360°) ou joystick p/ cima/diagonal | analógico dir. |
 | Pular | `ESPAÇO` | **PULO** | A |
 | **EAR GLIDE** (planar) | pular de novo no ar e segurar | tocar PULO de novo no ar | idem |
-| Atirar | clique / `J` | **FOGO** | X / RT |
+| Atirar | clique / `J` | **FOGO** (segurar; arraste para mirar) | X / RT |
 | Granada | `G` / botão direito | botão granada | B |
 | Trocar arma | `Q` `E` / roda | botão de troca | LB / RB |
 | Especial (Nômad) | `SHIFT` | botão ⚡ (só pilotando) | Y |
 | Agachar / engatinhar | `S` / `↓` | joystick p/ baixo | analógico p/ baixo |
 | Pausa | `ESC` | botão de pausa | Start |
 
+* **Armas com munição limitada:** pistola (∞), metralhadora, shotgun, lança-granadas e canhão de plasma — varie as armas! Caixas e inimigos soltam munição.
+* **3 vidas por fase** (fichas de fliperama): ao morrer aparece **CONTINUAR?** com contagem regressiva de 10 s; confirmar gasta 1 vida e você continua *de onde parou* (inimigos, arena e chefe seguem como estavam). Sem confirmar, volta ao último checkpoint. Sem vidas: **FIM DE JOGO** (recomeçar a fase ou menu).
+* **Vida com critério:** corações fixos após combates duros, caixas sorteadas (nem toda caixa tem item) e drops que aparecem mais quando você está ferido.
+* **Nômad de apoio:** depois de ~1,5 min de jogo aparece uma entrega aérea de um segundo Nômad, emprestado por 50 s — pule em cima para pilotá-lo.
 * Multitouch real: dá para mover, pular e atirar ao mesmo tempo.
 * Em retrato o jogo pede para girar o celular; ao tocar em JOGAR ele tenta fullscreen + `orientation.lock('landscape')`.
 * O Nômad é encontrado numa garagem: **pule em cima dele** para pilotá-lo. Ele tem barra de vida própria; ao chegar a zero o Karimbo é ejetado e segue a pé.

@@ -189,7 +189,7 @@ export abstract class Enemy {
     const [a, b] = this.stats.tokens;
     const n = rand.int(a, b);
     for (let i = 0; i < n; i++) w.spawnDrop('token', this.x, this.y - 8);
-    if (rand.chance(0.17)) w.spawnDrop('health', this.x, this.y - 8);
+    if (w.wantsHealthDrop()) w.spawnDrop('health', this.x, this.y - 8);
     else if (rand.chance(0.2)) w.spawnDrop('ammo', this.x, this.y - 8);
     else if (rand.chance(0.07)) w.spawnDrop('nade', this.x, this.y - 8);
   }

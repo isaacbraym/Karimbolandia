@@ -46,7 +46,7 @@ export function section10(b: LevelBuilder) {
     ],
   });
   b.checkpoint('Depois da guerra', 1000, G);
-  b.crate(1004, G, 'health');
+  b.crate(1004, G, 'random');
   b.crate(1006, G, 'ammo');
   b.pickup('repair', 1008, G - 1);
   b.tokens(996, G - 1, 10);
@@ -92,7 +92,7 @@ export function section12(b: LevelBuilder) {
   b.tokens(1130, 37, 5);
   b.tokens(1146, 37, 5);
   b.prop('barricade', 1122, 38);
-  b.crate(1150, 38, 'health');
+  b.crate(1150, 38, 'random');
   b.enemy('spider', 1112, 38, {});
   // escalada: degraus de 2 linhas
   b.plat(1108, 30, 4);
@@ -145,6 +145,11 @@ export function section13(b: LevelBuilder) {
   b.deco('hologram', 1192, 14);
   b.deco('hologram', 1266, 14);
   b.deco('banner', 1204, 14);
+  // cartazes do chefe: anunciam quem vem por aí
+  b.deco('bossPoster', 1228, 14);
+  b.deco('bossPoster', 1262, 14);
+  b.deco('bossPoster', 1289, 14);
+  b.trigger('bossWarn', 1266, 0, 2, 46);
   b.deco('banner', 1250, 14);
   b.deco('antenna', 1198, 14);
   b.deco('antenna', 1262, 14);
@@ -155,7 +160,7 @@ export function section13(b: LevelBuilder) {
   b.crate(1200, 14, 'energy');
   b.crate(1208, 14, 'ammo');
   b.crate(1216, 14, 'nade');
-  b.crate(1224, 14, 'health');
+  b.crate(1224, 14, 'random');
   b.crate(1232, 14, 'launcher');
   b.crate(1270, 14, 'ammo');
   b.crate(1272, 14, 'health');
@@ -207,6 +212,6 @@ export function section14(b: LevelBuilder) {
     waves: [{ delay: 0, e: [] }],
   });
   // o próprio Felipão
-  b.enemy('boss', cc + 12, 14, { facing: -1, arena: 'boss' });
+  b.enemy('boss', cc + 8, 14, { facing: -1, arena: 'boss' });
   b.finishX = 1340 * 32;
 }

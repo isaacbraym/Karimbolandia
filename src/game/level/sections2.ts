@@ -56,7 +56,7 @@ export function section6(b: LevelBuilder) {
   b.clear(526, 24, 62, 8); // interior livre
   b.plat(530, 28, 4);
   b.plat(578, 28, 4);
-  b.crate(532, 28, 'health');
+  b.crate(532, 28, 'random');
   b.crate(580, 28, 'ammo');
   b.tokens(568, G - 1, 6);
   for (let x = 530; x < 588; x += 4) b.deco('garageWall', x, G);
@@ -156,7 +156,7 @@ export function section8(b: LevelBuilder) {
   b.enemy('turret', 733, G, { facing: -1 });
   b.enemy('minimech', 736, G, { facing: -1 });
   b.prop('barricade', 719, G, { loot: 'ammo' });
-  b.crate(738, G, 'health');
+  b.crate(738, G, 'random');
   b.crate(716, G, 'ammo');
   // abismo (8 tiles): Nômad atravessa com salto + avanço; Karimbo, planando
   b.pit(740, 748);
@@ -214,6 +214,6 @@ export function section9(b: LevelBuilder) {
   b.enemy('rifle', 886, G, { patrol: 30, facing: -1 });
   b.enemy('shield', 892, G, {});
   b.crate(884, G, 'ammo');
-  b.crate(896, G, 'health');
+  b.crate(896, G, 'random');
   b.checkpoint('Ruínas verdes', 897, G);
 }

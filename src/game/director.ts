@@ -33,6 +33,8 @@ interface Cine {
   stage: number;
 }
 
+const SUPPORT_AT = 90; // s de jogo (a pé, fora de arenas) até a entrega do Nômad de apoio
+const SUPPORT_TIME = 50; // s de uso
 const ctlJumpHeld = (w: World) => w.lastJumpHeld;
 
 export class Director {
@@ -55,6 +57,11 @@ export class Director {
   zoomOverride: number | null = null;
   /** depois da apresentação, o jogador embarca pulando em cima do Nômad */
   nomadMountable = false;
+  /** Nômad de apoio: cai do céu após ~1,5 min de jogo e dura ~50 s */
+  support: { x: number; y: number; t: number; ready: boolean } | null = null;
+  supportClock = 0;
+  supportUsed = false;
+  supportMounting = false;
 
   constructor(w: World) {
     this.w = w;
@@ -74,6 +81,10 @@ export class Director {
     this.nomadPower = 0;
     this.nomadWaiting = true;
     this.nomadMountable = false;
+    this.support = null;
+    this.supportClock = 0;
+    this.supportUsed = false;
+    this.supportMounting = false;
     this.triggered.clear();
     this.bossActive = false;
     this.bossPhase = 1;
@@ -101,6 +112,11 @@ export class Director {
       }
     }
     this.cine = null;
+    if (!this.supportUsed) {
+      this.support = null;
+      this.supportClock = Math.max(this.supportClock, SUPPORT_AT - 25);
+    }
+    this.supportMounting = false;
     this.bossActive = false;
     this.bossRef = null;
     this.bossIntroDone = false;
@@ -183,20 +199,38 @@ export class Director {
     if (this.cine) this.cine = null;
     this.w.camera.focus = null;
   }
+  onRevive() {
+    this.cine = null;
+    this.w.camera.focus = null;
+    this.w.music(this.w.player.mounted ? 'nomad' : 'combat');
+  }
   onPropBroken(p: Prop) {
     void p;
   }
   onNomadMounted() {
     this.nomadWaiting = false;
     this.w.setMusic('nomad');
-    this.banner('NÔMAD ONLINE', 'Robô de guerra', 2.6);
     this.w.camera.focus = null;
     this.zoomOverride = null;
     this.cine = null;
+    if (this.supportMounting) {
+      this.supportMounting = false;
+      this.supportUsed = true;
+      this.support = null;
+      const n = this.w.player.nomad;
+      if (n) {
+        n.timeLeft = n.maxTime = SUPPORT_TIME;
+        n.hp = n.maxHp = 200;
+      }
+      this.banner('NÔMAD DE APOIO', `Emprestado por ${SUPPORT_TIME}s`, 2.6);
+      return;
+    }
+    this.banner('NÔMAD ONLINE', 'Robô de guerra', 2.6);
     this.saveCheckpointHere();
   }
-  onNomadLost() {
-    this.banner('NÔMAD DESTRUÍDO', 'Continue a pé!', 2.4);
+  onNomadLost(temp = false, expired = false) {
+    if (temp) this.banner(expired ? 'APOIO ENCERRADO' : 'NÔMAD DE APOIO PERDIDO', 'Continue a pé!', 2.4);
+    else this.banner('NÔMAD DESTRUÍDO', 'Continue a pé!', 2.4);
     this.w.setAlarm(false);
     this.w.rollSound(0);
     this.w.setMusic('explore');
@@ -268,6 +302,7 @@ export class Director {
     if (this.cine) this.updateCine(dt);
 
     this.updateMountCheck();
+    this.updateSupport(dt);
 
     // dica sutil do segundo avanço
     this.updateDashHint();
@@ -303,6 +338,84 @@ export class Director {
     }
   }
 
+  /** Nômad de apoio: entrega aérea depois de ~90 s; embarca-se pulando em cima, como o principal. */
+  private updateSupport(dt: number) {
+    const w = this.w;
+    const p = w.player;
+    // tempo limitado do Nômad emprestado
+    if (p.nomad && p.nomad.timeLeft !== Infinity && p.mode === 'nomad') {
+      const n = p.nomad;
+      const before = n.timeLeft;
+      n.timeLeft -= dt;
+      if (n.timeLeft < 8 && Math.floor(n.timeLeft) !== Math.floor(before)) w.audio('warning', 0.35);
+      if (n.timeLeft <= 0) p.ejectNomad(w, true);
+    }
+    if (this.supportUsed) return;
+    const s = this.support;
+    if (!s) {
+      const passed = w.nomadUsed || w.nomadLost;
+      if (p.mode === 'foot' && !this.cine && !this.insideActiveArena(p.x) && passed) this.supportClock += dt;
+      if (this.supportClock < SUPPORT_AT || p.mode !== 'foot' || !p.body.onGround || this.cine || this.insideActiveArena(p.x)) return;
+      // longe do chefe (a arena final tem seu próprio ritmo)
+      const boss = w.data.arenas.find((a) => a.id === 'boss');
+      if (boss && p.x > boss.rect.x - 200) return;
+      const spot = this.findSupportSpot();
+      if (!spot) return;
+      this.support = { x: spot.x, y: spot.y, t: 0, ready: false };
+      w.audio('warning', 0.8);
+      this.banner('NÔMAD DE APOIO', 'Entrega aérea a caminho!', 2.6);
+      return;
+    }
+    if (!s.ready) {
+      if (s.t >= 50) return; // montagem em andamento
+      s.t += dt;
+      if (s.t >= 1.1) {
+        s.ready = true;
+        w.audio('nomadEnter', 0.9, s.x);
+        w.audio('explosion', 0.5, s.x);
+        w.fx.addShake(5, 0.35);
+        w.fx.smoke(s.x, s.y - 4, 8, '#8b84a3', 26);
+        w.fx.sparks(s.x, s.y - 10, 18, '#ffe27a', 300);
+        this.banner('PULE EM CIMA!', 'Nômad de apoio pronto', 2.2);
+      }
+      return;
+    }
+    // embarque (mesma regra do Nômad principal)
+    if (p.mode !== 'foot' || this.cine) return;
+    const dx = Math.abs(p.x - s.x);
+    const top = s.y - 106;
+    const feet = p.feetY;
+    const onTop = dx < 40 && feet > top - 10 && feet < top + 46 && p.body.vy >= -80;
+    const touching = dx < 38 && feet > s.y - 66 && ctlJumpHeld(w);
+    if (onTop || touching) {
+      this.supportMounting = true;
+      w.audio('nomadEnter', 1, s.x);
+      p.startMount(w, s.x, s.y);
+      this.support = { ...s, ready: false, t: 99 }; // fica visível durante a montagem
+    }
+  }
+
+  private findSupportSpot(): { x: number; y: number } | null {
+    const w = this.w;
+    const p = w.player;
+    const L = w.level;
+    const hw = NOMAD_W / 2 + 8;
+    for (const off of [120, -120, 170, -170, 90, -90]) {
+      const x = p.x + off;
+      const gy = L.groundBelow(x, p.feetY - 30, 200);
+      if (gy === null) continue;
+      if (Math.abs(gy - p.feetY) > 40) continue;
+      let ok = true;
+      for (const ox of [-hw, 0, hw]) {
+        const g2 = L.groundBelow(x + ox, gy - 40, 120);
+        if (g2 === null || Math.abs(g2 - gy) > 2) ok = false;
+        for (const oy of [10, 40, 76, 110]) if (L.solidAtPx(x + ox, gy - oy)) ok = false;
+      }
+      if (ok) return { x, y: gy };
+    }
+    return null;
+  }
+
   private fireTrigger(id: string, once: boolean) {
     const w = this.w;
     if (once) this.triggered.add(id);
@@ -313,6 +426,11 @@ export class Director {
           w.player.lockInput = true;
           w.player.body.vx = 0;
         }
+        break;
+      case 'bossWarn':
+        w.audio('warning', 1);
+        this.banner('ALERTA!', 'Algo enorme se aproxima...', 3);
+        w.fx.addShake(3, 0.5);
         break;
       case 'dismount':
         if (w.player.mode === 'nomad') {
@@ -363,6 +481,15 @@ export class Director {
         w.setMusic('explore');
         w.hooks.onHint?.('mountNomad');
       }
+    } else if (c.kind === 'bossIntro') {
+      // câmera mostra a entrada do chefe (jogador e chefe no quadro)
+      const spawn = w.data.enemies.find((e) => e.type === 'boss')!;
+      w.camera.focus = { x: (spawn.x + p.x) / 2, y: spawn.y - 86, rate: 2.6 };
+      w.camera.zoomTarget = 0.95;
+      if (c.t > 3.8) {
+        this.cine = null;
+        w.camera.focus = null;
+      }
     } else if (c.kind === 'bossDeath') {
       this.updateBossDeath(dt, c);
     }
@@ -387,6 +514,7 @@ export class Director {
     a.alive = a.alive.filter((e) => e.alive);
     if (a.alive.length === 0 && !(a.def.id === 'boss' && !this.bossIntroDone)) {
       a.wave++;
+      if (a.wave < a.def.waves.length && a.def.id !== 'boss') this.dropSupplies(false);
       if (a.wave >= a.def.waves.length) {
         if (a.def.id !== 'boss') this.clearArena(a);
       } else {
@@ -469,15 +597,21 @@ export class Director {
     this.banner('ÁREA LIMPA', undefined, 1.2);
     w.score += 500;
     this.combatHold = 0;
-    // suprimentos
-    const r = a.def.rect;
-    const cx = r.x + r.w / 2;
-    w.spawnDrop('health', cx, r.y + r.h - 60);
-    w.spawnDrop('ammo', cx + 24, r.y + r.h - 60);
+    this.dropSupplies(true);
     w.setMusic(w.player.mounted ? 'nomad' : 'explore');
   }
 
   // ------------------------------------------------------------------ boss
+  /** Suprimentos caem do alto perto do jogador (vida + munição). */
+  private dropSupplies(big: boolean) {
+    const w = this.w;
+    const p = w.player;
+    // vida só quando faz falta (ou ao fim da arena)
+    if (big) w.spawnDrop('healthBig', p.x - 40, p.y - 100);
+    else if (p.hp < p.maxHp * 0.7) w.spawnDrop('health', p.x - 40, p.y - 100);
+    w.spawnDrop('ammo', p.x + 40, p.y - 100);
+  }
+
   private startBoss(a: ArenaState) {
     const w = this.w;
     this.bossActive = true;
@@ -486,7 +620,8 @@ export class Director {
     w.setMusic('silence');
     w.player.lockInput = true;
     w.player.body.vx = 0;
-    w.camera.zoomTarget = 0.98;
+    this.cine = { kind: 'bossIntro', t: 0, stage: 0 };
+    w.camera.zoomTarget = 0.95;
     w.after(0.8, () => {
       const sp = w.data.enemies.find((e) => e.type === 'boss')!;
       const e = w.spawnEnemy({ ...sp, arena: 'boss' });
@@ -659,9 +794,49 @@ export class Director {
         }
       }
     }
-    if (w.player.mode === 'mounting') {
+    if (w.player.mode === 'mounting' && !this.supportMounting) {
       const ns = w.data.nomadSpawn;
       drawNomadIdle(g, art.nomad, ns.x, ns.y, w.time, 1, 1);
+    }
+    const sp = this.support;
+    if (sp && w.camera.visible(sp.x, sp.y, 200)) {
+      if (!sp.ready && sp.t < 50) {
+        // casulo em queda livre, com rastro
+        const k = Math.min(1, sp.t / 1.1);
+        const y = sp.y - (1 - k * k) * 520;
+        drawNomadIdle(g, art.nomad, sp.x, y, w.time, 1, 1);
+        const spr = glowSprite('#ff8a3a', 32);
+        g.globalCompositeOperation = 'lighter';
+        g.globalAlpha = 0.6;
+        g.drawImage(spr.c, sp.x - 60, y - 190, 120, 160);
+        g.globalAlpha = 0.25;
+        g.fillStyle = '#ffb060';
+        g.fillRect(sp.x - 3, y - 520, 6, 420);
+        g.globalAlpha = 1;
+        g.globalCompositeOperation = 'source-over';
+        // marca no chão
+        g.strokeStyle = 'rgba(255,90,60,0.8)';
+        g.lineWidth = 2;
+        g.beginPath();
+        g.ellipse(sp.x, sp.y - 1, 46 * (0.5 + k * 0.5), 7, 0, 0, 6.283);
+        g.stroke();
+      } else {
+        drawNomadIdle(g, art.nomad, sp.x, sp.y, w.time, 1, 1);
+        if (sp.ready) {
+          const bob = Math.sin(w.time * 6) * 4;
+          const ay = sp.y - 128 + bob;
+          g.fillStyle = '#7ff9ff';
+          g.strokeStyle = '#170f2e';
+          g.lineWidth = 2;
+          g.beginPath();
+          g.moveTo(sp.x - 9, ay - 12);
+          g.lineTo(sp.x + 9, ay - 12);
+          g.lineTo(sp.x, ay);
+          g.closePath();
+          g.stroke();
+          g.fill();
+        }
+      }
     }
     if (w.parkedNomad) {
       const pn = w.parkedNomad;

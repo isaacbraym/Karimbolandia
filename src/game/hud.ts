@@ -1,4 +1,4 @@
-import type { World } from './world';
+import { MAX_LIVES, type World } from './world';
 import { getArt } from '../art';
 import { WEAPONS } from './weapons';
 import { clamp, easeOutBack, formatTime } from '../core/math';
@@ -89,31 +89,39 @@ export class Hud {
     // ------------------------------------------------ retrato + vida
     const pr = art.karimbo.heads.portrait;
     const shake = p.invuln > 0.9 ? Math.sin(this.time * 90) * 1.2 : 0;
-    drawSpr(g, pr, L + 24 + shake, T + 26, {});
+    drawSpr(g, pr, L + 26 + shake, T + 28, {});
+    text(g, 'KARIMBO', L + 26, T + 64, 10, '#ffffff', 'center', DISPLAY, '400');
+    // vidas (3 mini-retratos): as apagadas já foram gastas
+    for (let i = 0; i < MAX_LIVES; i++) {
+      const on = i < w.lives;
+      g.globalAlpha = on ? 1 : 0.22;
+      drawSpr(g, pr, L + 68 + i * 19, T + 62, { sx: 0.32, sy: 0.32 });
+    }
+    g.globalAlpha = 1;
     // barra de vida (5 segmentos de 20)
     this.hpShown += (p.hp - this.hpShown) * 0.2;
-    const bx = L + 54;
+    const bx = L + 60;
     const by = T + 7;
     for (let i = 0; i < 5; i++) {
-      const sx = bx + i * 22;
+      const sx = bx + i * 19;
       const segHp = clamp(p.hp - i * 20, 0, 20) / 20;
       const segShown = clamp(this.hpShown - i * 20, 0, 20) / 20;
-      pill(g, sx, by, 20, 10, 3, 'rgba(23,15,46,0.85)', '#170f2e');
+      pill(g, sx, by, 17, 10, 3, 'rgba(23,15,46,0.85)', '#170f2e');
       if (segShown > segHp) {
-        pill(g, sx + 1, by + 1, Math.max(0, 18 * segShown), 8, 2.4, '#ffffff');
+        pill(g, sx + 1, by + 1, Math.max(0, 15 * segShown), 8, 2.4, '#ffffff');
       }
       if (segHp > 0) {
         const low = p.hp <= 30;
         const col = low && Math.floor(this.time * 6) % 2 === 0 ? '#ff5a5a' : '#ff3f7a';
-        pill(g, sx + 1, by + 1, 18 * segHp, 8, 2.4, col);
+        pill(g, sx + 1, by + 1, 15 * segHp, 8, 2.4, col);
         g.fillStyle = 'rgba(255,255,255,0.35)';
-        g.fillRect(sx + 2, by + 2, 18 * segHp - 2, 2);
+        g.fillRect(sx + 2, by + 2, 15 * segHp - 2, 2);
       }
     }
     // arma + munição + granadas
     const wp = art.karimbo.weapons[p.cur];
     const def = WEAPONS[p.cur];
-    pill(g, bx, by + 14, 108, 22, 6, 'rgba(23,15,46,0.7)', 'rgba(255,255,255,0.15)');
+    pill(g, bx, by + 14, 96, 22, 6, 'rgba(23,15,46,0.7)', 'rgba(255,255,255,0.15)');
     const s = Math.min(1, 26 / wp.w);
     g.save();
     g.translate(bx + 5, by + 25);
@@ -121,7 +129,7 @@ export class Hud {
     g.drawImage(wp.c, -wp.ox, -wp.oy, wp.w, wp.h);
     g.restore();
     const ammo = p.weapons.get(p.cur) ?? 0;
-    text(g, ammo === Infinity ? '∞' : String(ammo), bx + 104, by + 31.5, 14, ammo !== Infinity && ammo < 10 ? '#ff8a8a' : '#ffffff', 'right');
+    text(g, ammo === Infinity ? '∞' : String(ammo), bx + 92, by + 31.5, 14, ammo !== Infinity && ammo < 10 ? '#ff8a8a' : '#ffffff', 'right');
     // granadas
     for (let i = 0; i < p.maxGrenades; i++) {
       const gx = bx + 4 + i * 8;
@@ -141,7 +149,7 @@ export class Hud {
     if (p.nomad) {
       const n = p.nomad;
       this.nomadShown += (n.hp - this.nomadShown) * 0.2;
-      const ny = T + 62;
+      const ny = T + 74;
       pill(g, L, ny, 172, 30, 8, 'rgba(23,15,46,0.78)', 'rgba(255,255,255,0.2)');
       text(g, 'NÔMAD', L + 8, ny + 12, 11, '#ffe27a', 'left', DISPLAY, '400');
       const w0 = 156;
@@ -152,6 +160,13 @@ export class Hud {
       const low = f < 0.25;
       const col = low ? (Math.floor(this.time * 8) % 2 ? '#ff4a4a' : '#ff9a3a') : f < 0.5 ? '#ffb83a' : '#8fe05a';
       if (f > 0) pill(g, L + 9, ny + 17, (w0 - 2) * f, 7, 2.4, col);
+      if (n.timeLeft !== Infinity) {
+        const tf = clamp(n.timeLeft / n.maxTime, 0, 1);
+        const blink = n.timeLeft < 8 && Math.floor(this.time * 6) % 2 === 0;
+        pill(g, L + 8, ny + 27, w0, 4, 2, '#0e0a22');
+        if (tf > 0) pill(g, L + 9, ny + 27.5, (w0 - 2) * tf, 3, 1.5, blink ? '#ff5a5a' : '#7ff9ff');
+        text(g, `APOIO ${Math.ceil(n.timeLeft)}s`, L + 8 + w0, ny + 12, 10, blink ? '#ff8a8a' : '#7ff9ff', 'right', DISPLAY, '400');
+      }
       // ícone do avanço + anel sutil da janela de 5 s
       const ix = L + 176 + 12;
       const iy = ny + 15;

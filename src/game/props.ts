@@ -141,14 +141,15 @@ export class Prop {
 export function pickLoot(kind: LootKind, hasWeapons: Set<string>): string | null {
   if (kind === 'none') return null;
   if (kind === 'random') {
+    // nem toda caixa tem algo: ~25% vazias; o resto varia entre moedas, munição, granada e armas
     const r = rand.next();
-    if (r < 0.34) return 'tokens';
-    if (r < 0.55) return 'ammo';
-    if (r < 0.7) return 'health';
-    if (r < 0.82) return 'nade';
-    if (r < 0.93) return 'points';
-    // arma rara
-    const pool = ['shotgun', 'rifle', 'launcher', 'energy'].filter((w) => !hasWeapons.has(w) || rand.chance(0.25));
+    if (r < 0.25) return null;
+    if (r < 0.42) return 'tokens';
+    if (r < 0.58) return 'ammo';
+    if (r < 0.68) return 'health';
+    if (r < 0.77) return 'nade';
+    if (r < 0.83) return 'points';
+    const pool = ['shotgun', 'rifle', 'launcher', 'energy'].filter((w) => !hasWeapons.has(w) || rand.chance(0.35));
     return pool.length ? rand.pick(pool) : 'ammo';
   }
   return kind;

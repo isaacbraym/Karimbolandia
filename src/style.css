@@ -588,11 +588,33 @@ kbd {
   width: calc(84px * var(--ts));
   height: calc(84px * var(--ts));
 }
+.fire-knob {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 34%;
+  height: 34%;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(255, 255, 255, 0.35);
+  border: 2px solid rgba(255, 255, 255, 0.7);
+  pointer-events: none;
+  opacity: 0;
+}
+.tbtn.down .fire-knob {
+  opacity: 1;
+}
+.fire-knob.aiming {
+  background: rgba(255, 210, 58, 0.9);
+  border-color: #fff;
+}
 .t-fire {
-  right: calc(var(--sar) + 116px * var(--ts));
-  bottom: calc(var(--sab) + 34px * var(--ts));
-  width: calc(96px * var(--ts));
-  height: calc(96px * var(--ts));
+  right: calc(var(--sar) + 112px * var(--ts));
+  bottom: calc(var(--sab) + 26px * var(--ts));
+  width: calc(112px * var(--ts));
+  height: calc(112px * var(--ts));
+  border-style: double;
+  border-width: 5px;
   background: radial-gradient(circle at 35% 30%, rgba(255, 255, 255, calc(var(--to) * 0.4)), rgba(255, 63, 122, calc(var(--to) * 0.75)) 72%);
 }
 .t-nade {
@@ -603,7 +625,7 @@ kbd {
 }
 .t-special {
   right: calc(var(--sar) + 118px * var(--ts));
-  bottom: calc(var(--sab) + 140px * var(--ts));
+  bottom: calc(var(--sab) + 150px * var(--ts));
   width: calc(64px * var(--ts));
   height: calc(64px * var(--ts));
   background: radial-gradient(circle at 35% 30%, rgba(255, 255, 255, calc(var(--to) * 0.4)), rgba(60, 220, 255, calc(var(--to) * 0.75)) 72%);
@@ -614,7 +636,7 @@ kbd {
 }
 .t-swap {
   right: calc(var(--sar) + 196px * var(--ts));
-  bottom: calc(var(--sab) + 134px * var(--ts));
+  bottom: calc(var(--sab) + 148px * var(--ts));
   width: calc(46px * var(--ts));
   height: calc(46px * var(--ts));
 }
@@ -647,7 +669,7 @@ kbd {
 }
 .touch.lefty .t-fire {
   right: auto;
-  left: calc(var(--sal) + 116px * var(--ts));
+  left: calc(var(--sal) + 112px * var(--ts));
 }
 .touch.lefty .t-nade {
   right: auto;
@@ -665,4 +687,64 @@ kbd {
   :root {
     --ts: 0.85;
   }
+}
+
+/* continuar (fichas) e fim de jogo */
+#continue,
+#gameover {
+  z-index: 34;
+  background: radial-gradient(ellipse at 50% 45%, rgba(20, 8, 50, 0.25), rgba(6, 2, 20, 0.6));
+  text-align: center;
+}
+#continue .wrap,
+#gameover .wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(4px, 1.6vh, 12px);
+  width: min(380px, 92vw);
+}
+#continue .title,
+#gameover .title {
+  font-size: clamp(30px, 10vh, 64px);
+}
+.cring {
+  --p: 1;
+  width: clamp(74px, 22vh, 130px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: conic-gradient(#ffe27a calc(var(--p) * 360deg), rgba(255, 255, 255, 0.14) 0);
+  position: relative;
+}
+.cring::before {
+  content: '';
+  position: absolute;
+  inset: 9px;
+  border-radius: 50%;
+  background: #1a0f42;
+}
+.cring b {
+  position: relative;
+  font-family: var(--display);
+  font-weight: 400;
+  font-size: clamp(34px, 11vh, 72px);
+  color: #fff;
+  text-shadow: 0 3px 0 var(--ink);
+}
+.cring.urgent b {
+  color: #ff6a6a;
+  animation: cpulse 0.5s infinite alternate;
+}
+@keyframes cpulse {
+  to {
+    transform: scale(1.12);
+  }
+}
+.clives {
+  font-family: var(--display);
+  font-size: clamp(14px, 3.6vh, 22px);
+  color: #cfc6ee;
+  letter-spacing: 1px;
 }

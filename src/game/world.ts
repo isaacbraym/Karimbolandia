@@ -30,12 +30,17 @@ export interface Stats {
 
 export type MusicState = 'explore' | 'combat' | 'nomad' | 'nomadCombat' | 'boss1' | 'boss2' | 'boss3' | 'silence' | 'calm' | 'victory';
 
+export const MAX_LIVES = 3;
+
 export interface Hooks {
   onRespawn?: () => void;
   onBanner?: (title: string, sub?: string, dur?: number) => void;
   onComplete?: () => void;
   onMusic?: (s: MusicState) => void;
   onHint?: (key: string) => void;
+  /** o jogador morreu e ainda tem vidas: perguntar se quer continuar de onde parou */
+  onContinue?: (livesLeft: number) => void;
+  onGameOver?: () => void;
 }
 
 export interface Wreck {
@@ -63,6 +68,9 @@ export class World {
   lastCrumbleTime = -99;
   parkedNomad: { x: number; y: number; facing: 1 | -1; hp: number } | null = null;
   nomadLost = false;
+  lastHealthDrop = -99;
+  /** vidas da fase (estilo fichas de fliperama) */
+  lives = MAX_LIVES;
   nomadUsed = false;
 
   time = 0;
@@ -130,6 +138,7 @@ export class World {
     this.nomadLost = false;
     this.nomadUsed = false;
     this.parkedNomad = null;
+    this.lives = MAX_LIVES;
     this.finished = false;
     this.player.resetInventory();
     this.director.reset();
@@ -198,8 +207,41 @@ export class World {
   }
 
   requestRespawn() {
+    if (this.hooks.onContinue) {
+      if (this.lives > 0) {
+        this.hooks.onContinue(this.lives);
+        return;
+      }
+      if (this.hooks.onGameOver) {
+        this.hooks.onGameOver();
+        return;
+      }
+    }
     this.respawnRequested = true;
     this.hooks.onRespawn?.();
+  }
+
+  /** Continuar de onde parou: gasta 1 vida, mantém inimigos/arena/chefe e o inventário. */
+  reviveInPlace() {
+    if (this.lives <= 0) return;
+    this.lives--;
+    const p = this.player;
+    p.revive(this);
+    // munição mínima para não continuar sem nada
+    for (const id of WEAPON_ORDER) {
+      const have = p.weapons.get(id);
+      if (have !== undefined && have !== Infinity) p.weapons.set(id, Math.max(have, Math.ceil(WEAPON_AMMO_FLOOR[id])));
+    }
+    p.grenades = Math.max(p.grenades, 3);
+    // limpa tiros inimigos ao redor
+    this.bullets = this.bullets.filter((b) => b.team === 0 || Math.hypot(b.x - p.x, b.y - p.y) > 220);
+    this.grenades = this.grenades.filter((g) => g.team === 0 || Math.hypot(g.x - p.x, g.y - p.y) > 160);
+    this.cameraSnap();
+    this.fx.addFlash(0.6, '#ffffff');
+    this.fx.sparks(p.x, p.y - 20, 22, '#9dfcff', 320);
+    this.audio('checkpoint', 1);
+    this.hooks.onBanner?.('DE VOLTA!', this.lives > 0 ? `${this.lives} ${this.lives === 1 ? 'vida restante' : 'vidas restantes'}` : 'Última vida!', 2);
+    this.director.onRevive();
   }
 
   // ------------------------------------------------------------------ helpers de serviço
@@ -369,6 +411,17 @@ export class World {
     }
   }
 
+  /** Drop de vida adaptativo: raro com vida cheia, frequente quando o jogador está ferido. */
+  wantsHealthDrop() {
+    const pl = this.player;
+    const hp = pl.nomad ? Math.min(pl.hp / pl.maxHp, 1) : pl.hp / pl.maxHp;
+    const missing = 1 - clamp(hp, 0, 1);
+    if (this.time - this.lastHealthDrop < 14) return false;
+    if (!rand.chance(0.015 + 0.3 * missing * missing)) return false;
+    this.lastHealthDrop = this.time;
+    return true;
+  }
+
   dropLoot(p: Prop) {
     const kind = pickLoot(p.loot, new Set(this.player.weapons.keys()));
     const x = p.x;
@@ -503,8 +556,8 @@ export class World {
     this.nomadUsed = true;
     this.director.onNomadMounted();
   }
-  onNomadLost() {
-    this.director.onNomadLost();
+  onNomadLost(temp = false, expired = false) {
+    this.director.onNomadLost(temp, expired);
   }
 
   // ------------------------------------------------------------------ atualização

@@ -13,7 +13,9 @@ import { TouchUI } from '../ui/touch';
 import { hintText } from './hints';
 import { VIEW_H } from './level';
 
-type State = 'loading' | 'menu' | 'playing' | 'paused' | 'complete';
+type State = 'loading' | 'menu' | 'playing' | 'paused' | 'complete' | 'continue' | 'gameover';
+
+const CONTINUE_SECS = 10;
 
 const MAX_H: Record<Quality, number> = { low: 540, medium: 720, high: 1080 };
 const CAPS: Record<Quality, { parts: number; density: number }> = {
@@ -46,6 +48,8 @@ export class Game {
   private lastFpsUpdate = 0;
   private frames = 0;
   private respawnPending = false;
+  private continueLeft = 0;
+  private continueTick = 0;
   private wasMusic: MusicState | 'menu' | null = null;
   private orientationBlocked = false;
   private hintsShown = new Set<string>();
@@ -72,6 +76,8 @@ export class Game {
       onRestart: () => this.restartLevel(),
       onQuitToMenu: () => this.toMenu(),
       onPlayAgain: () => this.play(true),
+      onContinueYes: () => this.confirmContinue(),
+      onContinueNo: () => this.declineContinue(),
       onClick: () => audio.play('uiClick', 0.8),
     });
     this.input.onGesture = () => audio.init();
@@ -239,6 +245,8 @@ export class Game {
   private bindWorld(w: World) {
     w.hooks = {
       onRespawn: () => this.beginRespawn(),
+      onContinue: (lives) => this.askContinue(lives),
+      onGameOver: () => this.gameOver(),
       onBanner: (t, s, d) => this.hud.banner(t, s, d),
       onComplete: () => this.onComplete(),
       onMusic: (s) => this.setMusic(s),
@@ -282,6 +290,7 @@ export class Game {
   restartLevel() {
     if (!this.world) return;
     this.menus.hidePause();
+    this.menus.hideAll();
     this.world.restart();
     this.hud.banners = [];
     this.hintsShown.clear();
@@ -313,6 +322,58 @@ export class Game {
     if (document.fullscreenElement && !first) {
       /* mantém fullscreen ao voltar ao menu */
     }
+  }
+
+  /** Metal Slug: morreu com vidas sobrando → contagem regressiva para gastar uma vida e continuar. */
+  private askContinue(lives: number) {
+    if (this.state !== 'playing') return;
+    this.state = 'continue';
+    this.input.enabled = false;
+    this.touch.show(false);
+    this.continueLeft = CONTINUE_SECS;
+    this.continueTick = CONTINUE_SECS;
+    audio.setDuck(0.45);
+    audio.loop('glide', false);
+    audio.loop('roll', false);
+    audio.loop('alarm', false);
+    this.menus.showContinue(lives);
+  }
+
+  private confirmContinue() {
+    if (this.state !== 'continue' || !this.world) return;
+    if (this.continueLeft > CONTINUE_SECS - 0.6) return; // evita confirmar sem querer (botões apertados na morte)
+    this.menus.hideAll();
+    this.state = 'playing';
+    this.input.enabled = true;
+    this.touch.show(this.isTouch || this.input.touch.active);
+    audio.setDuck(1);
+    audio.play('uiStart', 0.8);
+    this.world.reviveInPlace();
+    this.wasMusic = null;
+    this.setMusic(this.world.musicState);
+    this.last = performance.now();
+  }
+
+  /** Sem confirmar (ou tempo esgotado): volta ao último checkpoint, sem gastar vida. */
+  private declineContinue() {
+    if (this.state !== 'continue' || !this.world) return;
+    this.menus.hideAll();
+    this.state = 'playing';
+    this.input.enabled = true;
+    this.touch.show(this.isTouch || this.input.touch.active);
+    audio.setDuck(1);
+    this.world.respawnRequested = true;
+    this.beginRespawn();
+    this.last = performance.now();
+  }
+
+  private gameOver() {
+    if (this.state !== 'playing') return;
+    this.state = 'gameover';
+    this.input.enabled = false;
+    this.touch.show(false);
+    audio.setDuck(0.5);
+    this.menus.showGameOver();
   }
 
   private beginRespawn() {
@@ -382,6 +443,7 @@ export class Game {
   private applyDebugParams(w: World) {
     const q = new URLSearchParams(location.search);
     if (q.get('god') === '1') w.invulnerable = true;
+    if (q.get('qa') === '1') (window as unknown as { __kg?: unknown }).__kg = { game: this, world: w }; // QA no navegador
     const tp = q.get('tp');
     if (tp) {
       const tx = parseFloat(tp);
@@ -434,6 +496,17 @@ export class Game {
         this.step(w, dt);
       }
       this.updateTouchState(w);
+    } else if (this.state === 'continue' && w) {
+      // mundo congelado; contagem regressiva + confirmação por gamepad
+      this.continueLeft -= dt;
+      if (Math.ceil(this.continueLeft) < this.continueTick) {
+        this.continueTick = Math.ceil(this.continueLeft);
+        if (this.continueTick >= 0) audio.play('uiClick', this.continueTick <= 3 ? 0.9 : 0.4);
+      }
+      this.menus.setContinueCount(this.continueLeft, CONTINUE_SECS);
+      const s = this.input.state;
+      if (s.device === 'pad' && (s.jump.pressed || s.fire.pressed)) this.confirmContinue();
+      else if (this.continueLeft <= 0) this.declineContinue();
     } else if (this.state === 'menu' && this.menuScene) {
       this.menuScene.update(dt, this.viewW);
     }

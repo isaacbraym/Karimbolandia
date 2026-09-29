@@ -39,6 +39,9 @@ export interface NomadState {
   turretTilt: number;
   smokeT: number;
   hintShown: boolean;
+  /** Nômad de apoio (temporário): segundos restantes; Infinity = o Nômad principal */
+  timeLeft: number;
+  maxTime: number;
 }
 
 export type PlayerMode = 'foot' | 'mounting' | 'nomad' | 'dead';
@@ -87,6 +90,8 @@ export class Player {
   mountTo = { x: 0, y: 0 };
   // morte
   deadT = 0;
+  /** onde morreu (para continuar de onde parou) */
+  deathPos: { x: number; y: number } | null = null;
   deadVy = 0;
   deadRot = 0;
   respawnQueued = false;
@@ -165,7 +170,7 @@ export class Player {
   }
 
   snapshot() {
-    return { weapons: [...this.weapons.entries()], cur: this.cur, grenades: this.grenades, nomad: this.nomad ? this.nomad.hp : -1 };
+    return { weapons: [...this.weapons.entries()], cur: this.cur, grenades: this.grenades, nomad: this.nomad && this.nomad.timeLeft === Infinity ? this.nomad.hp : -1 };
   }
   restore(s: ReturnType<Player['snapshot']>) {
     this.weapons = new Map(s.weapons as [WeaponId, number][]);
@@ -291,6 +296,7 @@ export class Player {
 
   die(w: World) {
     if (this.mode === 'dead') return;
+    this.deathPos = { x: this.x, y: this.feetY };
     this.mode = 'dead';
     this.deadT = 0;
     this.deadVy = -520;
@@ -303,6 +309,27 @@ export class Player {
     w.fx.smoke(this.x, this.y, 4, '#6b6480', 10);
     w.onPlayerDied();
     w.music('silence');
+  }
+
+  /** Gasta uma vida: revive no ponto da morte (ou no último ponto seguro se o local for inválido). */
+  revive(w: World) {
+    const L = w.level;
+    let x = this.lastSafe.x;
+    let y = this.lastSafe.y;
+    const d = this.deathPos;
+    if (d) {
+      const inside = L.solidAtPx(d.x, d.y - 8) || L.solidAtPx(d.x, d.y - 30) || L.solidAtPx(d.x, d.y - 50);
+      const gy = L.groundBelow(d.x, d.y - 40, 260);
+      if (!inside && gy !== null && d.y < w.deathY() - 40) {
+        x = d.x;
+        y = Math.min(d.y, gy);
+      }
+    }
+    const facing = this.facing;
+    this.reset(x, y);
+    this.facing = facing;
+    this.invuln = 3;
+    this.deathPos = null;
   }
 
   // ------------------------------------------------------------------ Nômad
@@ -332,9 +359,10 @@ export class Player {
     w.onNomadMounted();
   }
 
-  ejectNomad(w: World) {
+  ejectNomad(w: World, expired = false) {
     const n = this.nomad;
     if (!n) return;
+    const temp = n.timeLeft !== Infinity;
     const x = this.x;
     const y = this.y;
     w.fx.explosion(x, y - 10, 46);
@@ -355,8 +383,8 @@ export class Player {
     this.invuln = 2.2;
     this.glideFuel = GLIDE_FUEL;
     this.hurtT = 0.2;
-    w.nomadLost = true;
-    w.onNomadLost();
+    if (!temp) w.nomadLost = true;
+    w.onNomadLost(temp, expired);
   }
 
   /** Karimbo salta para fora e o Nômad fica estacionado (evento de seção 11). */
@@ -1156,6 +1184,8 @@ export const newNomad = (): NomadState => ({
   turretTilt: 0,
   smokeT: 0,
   hintShown: false,
+  timeLeft: Infinity,
+  maxTime: Infinity,
 });
 
 /**

@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { makeWorld, armUp, teleport, Bot, run, newCtl } from './helpers/bot';
 import { TILE } from '../src/game/level';
+import { pickLoot } from '../src/game/props';
 import type { World } from '../src/game/world';
 import type { ControlState } from '../src/core/input';
 
@@ -255,5 +256,82 @@ describe('Agachar desvia de tiros retos', () => {
     expect(r.crouched).toBe(true);
     expect(r.hits).toBe(0);
     expect(r.hp).toBe(100);
+  });
+  it('Nômad de apoio: cai após ~90 s, embarca por cima, dura 50 s e some sem marcar o principal como perdido', () => {
+    const w = makeWorld();
+    teleport(w, 200, 32);
+    w.nomadLost = true; // já passou pelo Nômad principal
+    const ctl = newCtl();
+    const d = w.director;
+    d.supportClock = 89.5;
+    for (let i = 0; i < 60 * 4 && !d.support?.ready; i++) w.update(1 / 60, ctl);
+    expect(d.support?.ready).toBe(true);
+    const s = d.support!;
+    w.player.reset(s.x, s.y - 170);
+    for (let i = 0; i < 240 && !w.player.mounted; i++) w.update(1 / 60, ctl);
+    expect(w.player.mounted).toBe(true);
+    expect(w.player.nomad!.timeLeft).toBeLessThanOrEqual(50);
+    expect(w.player.nomad!.timeLeft).toBeGreaterThan(40);
+    expect(d.supportUsed).toBe(true);
+    // não vira o Nômad "principal" do checkpoint
+    expect(w.player.snapshot().nomad).toBe(-1);
+    for (let i = 0; i < 60 * 52 && w.player.mounted; i++) w.update(1 / 60, ctl);
+    expect(w.player.mounted).toBe(false);
+    expect(w.player.mode).not.toBe('dead');
+  });
+
+  it('caixas: nem todas dão item e o sorteio varia', () => {
+    const kinds = new Set<string>();
+    let empty = 0;
+    for (let i = 0; i < 400; i++) {
+      const k = pickLoot('random', new Set(['pistol', 'rifle', 'shotgun']));
+      if (k === null) empty++;
+      else kinds.add(k);
+    }
+    expect(empty).toBeGreaterThan(40);
+    expect(empty).toBeLessThan(200);
+    expect(kinds.size).toBeGreaterThanOrEqual(5);
+  });
+  it('3 vidas por fase: continua de onde morreu; sem vidas vira fim de jogo', () => {
+    const w = makeWorld();
+    w.invulnerable = false;
+    teleport(w, 200, 32);
+    const ctl = newCtl();
+    let asked = 0;
+    let over = 0;
+    w.hooks.onContinue = () => {
+      asked++;
+    };
+    w.hooks.onGameOver = () => {
+      over++;
+    };
+    expect(w.lives).toBe(3);
+    const die = () => {
+      w.player.invuln = 0;
+      w.player.hit(w, 999, 1, { ignoreInvuln: true });
+      for (let i = 0; i < 60 * 3 && asked + over === before; i++) w.update(1 / 60, ctl);
+    };
+    let before = 0;
+    const startX = w.player.x;
+    for (let n = 1; n <= 3; n++) {
+      before = asked + over;
+      die();
+      expect(asked).toBe(n);
+      w.reviveInPlace();
+      expect(w.lives).toBe(3 - n);
+      expect(w.player.mode).toBe('foot');
+      expect(w.player.hp).toBe(w.player.maxHp);
+      expect(Math.abs(w.player.x - startX)).toBeLessThan(120); // continuou onde parou (não voltou ao checkpoint)
+      for (let i = 0; i < 30; i++) w.update(1 / 60, ctl);
+    }
+    before = asked + over;
+    die();
+    expect(over).toBe(1);
+    expect(w.lives).toBe(0);
+    w.reviveInPlace(); // sem vidas: nada acontece
+    expect(w.lives).toBe(0);
+    // reiniciar a fase devolve as vidas
+    w.restart();
+    expect(w.lives).toBe(3);
   });
 });

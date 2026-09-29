@@ -167,34 +167,39 @@ export function bakeKarimboHeads(p: Photos, scale = 3): KarimboHeads {
     { scale, ox: fw / 2, oy: headH * 0.94 }
   );
 
-  // retrato circular (HUD): rosto com orelhas
+  // retrato circular (HUD): cabeça inteira (com orelhas) centralizada, nada cortado
+  const PR = 26; // raio do medalhão
   const portrait = bake(
-    48,
-    48,
+    PR * 2 + 4,
+    PR * 2 + 4,
     (g) => {
+      const c = PR + 2;
       g.save();
       g.beginPath();
-      g.arc(24, 24, 22, 0, Math.PI * 2);
+      g.arc(c, c, PR, 0, Math.PI * 2);
       g.clip();
-      g.fillStyle = '#26124a';
-      g.fillRect(0, 0, 48, 48);
-      const ph = 62;
+      const bgr = g.createRadialGradient(c, c - 6, 4, c, c, PR);
+      bgr.addColorStop(0, '#5a2f9a');
+      bgr.addColorStop(1, '#26124a');
+      g.fillStyle = bgr;
+      g.fillRect(0, 0, c * 2, c * 2);
+      const ph = PR * 2 - 3; // altura total da cabeça cabe no medalhão
       const pw = ph * (p.head.width / p.head.height);
       g.imageSmoothingQuality = 'high';
-      g.drawImage(p.head, 24 - pw / 2 + 0.5, 24 - ph * 0.5 + 1, pw, ph);
+      g.drawImage(p.head, c - pw / 2, c - ph / 2 + 1, pw, ph);
       g.restore();
       g.beginPath();
-      g.arc(24, 24, 22, 0, Math.PI * 2);
-      g.lineWidth = 2.4;
+      g.arc(c, c, PR, 0, Math.PI * 2);
+      g.lineWidth = 2.6;
       g.strokeStyle = '#ffffff';
       g.stroke();
       g.lineWidth = 1;
       g.strokeStyle = '#170f2e';
       g.beginPath();
-      g.arc(24, 24, 23.4, 0, Math.PI * 2);
+      g.arc(c, c, PR + 1.5, 0, Math.PI * 2);
       g.stroke();
     },
-    { scale: 2, ox: 24, oy: 24 }
+    { scale: 2, ox: PR + 2, oy: PR + 2 }
   );
 
   // ---- orelhas independentes (pivô no lóbulo, lado do rosto)
