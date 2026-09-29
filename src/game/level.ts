@@ -161,6 +161,8 @@ export interface Arena {
   music?: 'combat' | 'boss';
   /** sem barreiras físicas (só trava câmera) */
   soft?: boolean;
+  /** y (px) onde inimigos "caem" (arenas com teto); padrão: topo da câmera */
+  dropY?: number;
 }
 
 export interface CamZone {

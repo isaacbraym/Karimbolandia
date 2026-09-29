@@ -3,7 +3,7 @@ import type { World } from '../world';
 import type { EnemySpawn } from '../level';
 import { clamp, rand, approach, angleDiff, TAU } from '../../core/math';
 import { getArt } from '../../art';
-import { drawSoldier, soldierMuzzle, type SoldierStyle, type SState } from '../../art/soldiers';
+import { drawSoldier, soldierMuzzle, GUN_LEN, type SoldierStyle, type SState } from '../../art/soldiers';
 import { PK } from '../fx';
 import { moveBody } from '../physics';
 import { Corpse } from '../corpse';
@@ -52,8 +52,7 @@ abstract class Soldier extends Enemy {
 
   protected muzzlePos(w: World): [number, number] {
     void w;
-    const art = getArt().soldiers[this.style];
-    const [mx, my] = soldierMuzzle(this.facing, this.aim, art, this.crouch, this.kick);
+    const [mx, my] = soldierMuzzle(this.facing, this.aim, GUN_LEN[this.style], this.crouch, this.kick);
     return [this.x + mx, this.feetY + my];
   }
 

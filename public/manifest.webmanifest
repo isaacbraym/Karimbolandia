@@ -1,0 +1,19 @@
+{
+  "name": "Karimbolândia",
+  "short_name": "Karimbolândia",
+  "description": "Run-and-gun 2.5D moderno: jogue direto no navegador, no celular ou no PC.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "fullscreen",
+  "display_override": ["fullscreen", "standalone"],
+  "orientation": "landscape",
+  "background_color": "#0d0724",
+  "theme_color": "#120a2e",
+  "lang": "pt-BR",
+  "categories": ["games"],
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

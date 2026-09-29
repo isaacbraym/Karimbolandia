@@ -10,34 +10,12 @@ import { getArt } from '../art';
 import { drawKarimbo, karimboMuzzle, type KState } from '../art/karimbo';
 import { drawNomad } from '../art/nomad';
 import { settings } from '../core/storage';
+import {
+  FOOT_W, FOOT_H, CROUCH_H, NOMAD_W, NOMAD_H, RUN, RUN_ACC, RUN_DEC, AIR_ACC, AIR_DEC, GRAV, JUMP_V, FALL_MAX, COYOTE, JUMP_BUF,
+  GLIDE_FALL, GLIDE_FUEL, GLIDE_SPEED, CROUCH_SPEED, N_RUN, N_ACC, N_DEC, N_GRAV, N_JUMP,
+} from './movement';
 
-// ---- constantes de movimento (px, s)
-export const FOOT_W = 22;
-export const FOOT_H = 50;
-export const CROUCH_H = 30;
-export const NOMAD_W = 52;
-export const NOMAD_H = 62;
-
-const RUN = 196;
-const RUN_ACC = 2300;
-const RUN_DEC = 2700;
-const AIR_ACC = 1500;
-const AIR_DEC = 700;
-const GRAV = 1780;
-const JUMP_V = 630;
-const FALL_MAX = 820;
-const COYOTE = 0.11;
-const JUMP_BUF = 0.13;
-const GLIDE_FALL = 64;
-const GLIDE_FUEL = 2.7;
-const GLIDE_SPEED = 218;
-
-const N_RUN = 236;
-const N_ACC = 820;
-const N_DEC = 620;
-const N_GRAV = 1650;
-const N_JUMP = 560;
-
+export { FOOT_W, FOOT_H, CROUCH_H, NOMAD_W, NOMAD_H };
 export interface NomadState {
   hp: number;
   maxHp: number;
@@ -152,7 +130,7 @@ export class Player {
     return !!this.nomad && this.nomad.dashT > 0;
   }
   get shoulder(): [number, number] {
-    if (this.nomad) return [this.x + this.facing * 4, this.y - 18];
+    if (this.nomad) return [this.x + this.facing * 4, this.y - 22];
     return [this.x + this.facing * 2.5, this.feetY - 28.5 + (this.crouch ? 10 : 0)];
   }
 
@@ -538,7 +516,7 @@ export class Player {
 
     // horizontal
     let tx = 0;
-    if (!hurt) tx = ctl.moveX * (this.crouch ? 74 : this.glide ? GLIDE_SPEED : RUN);
+    if (!hurt) tx = ctl.moveX * (this.crouch ? CROUCH_SPEED : this.glide ? GLIDE_SPEED : RUN);
     const grounded = b.onGround;
     const acc = grounded ? (Math.abs(tx) > 0 ? RUN_ACC : RUN_DEC) : Math.abs(tx) > 0 ? AIR_ACC : AIR_DEC;
     if (!hurt || grounded) b.vx = approach(b.vx, tx, acc * dt);
@@ -835,7 +813,7 @@ export class Player {
 
     // ---- dano contínuo visual e alarme
     if (lowFrac < 0.4 && Math.random() < dt * (lowFrac < 0.2 ? 18 : 8)) {
-      w.fx.smoke(this.x + rand.spread(14), this.y - 12, 1, lowFrac < 0.2 ? '#231d30' : '#4d4560', 8, 34, 0.9);
+      w.fx.smoke(this.x + rand.spread(16), this.y - 14, 1, lowFrac < 0.2 ? '#231d30' : '#4d4560', 8, 34, 0.9);
       if (lowFrac < 0.25) w.fx.sparks(this.x + rand.spread(16), this.y - 10, 2, '#ffd27a', 140);
     }
     if (lowFrac < 0.25) {
@@ -903,7 +881,7 @@ export class Player {
     }
 
     // rolagem da esfera
-    n.roll += (b.vx * dt) / 19;
+    n.roll += (b.vx * dt) / 22;
     // partículas de poeira/faíscas
     const sp = Math.abs(b.vx);
     if (grounded && sp > 60) {
@@ -917,7 +895,7 @@ export class Player {
     w.rollSound(grounded ? sp / N_RUN : 0);
 
     // mira
-    const [sx, sy] = [this.x, this.y - 12];
+    const [sx, sy] = [this.x, this.y - 16];
     this.aim = this.computeAim(w, ctl, sx, sy);
     n.turretTilt = damp(n.turretTilt, -clamp(Math.atan2(Math.sin(this.aim), Math.abs(Math.cos(this.aim)) + 0.05), -1.0, 1.0) * 0.5, 14, dt);
     if (ctl.fire.held && !dashing) this.shoot(w);
@@ -982,7 +960,7 @@ export class Player {
     w.fx.add(PK.Spark, this.x - n.dashDir * 20, this.feetY - 2, -n.dashDir * rand.range(60, 220), -rand.range(20, 120), 0.3, 8, '#fff2b0', { size1: 1.4, g: 500, front: true });
     w.speedLines = 0.25;
     // dano/empurrão em quem toca
-    const hb = { x: this.x - 34, y: this.y - 36, w: 68, h: 74 };
+    const hb = { x: this.x - 38, y: this.y - 42, w: 76, h: 88 };
     const kbx = n.dashDir * (n.dashKind === 1 ? 640 : 900);
     for (const e of w.enemies) {
       if (!e.alive || !e.canBeHit || n.hitThisDash.includes(e)) continue;
@@ -1186,8 +1164,8 @@ export const newNomad = (): NomadState => ({
  */
 export function nomadMuzzle(facing: 1 | -1, aim: number, which: 0 | 1): [number, number] {
   const a = facing === 1 ? aim : Math.PI - aim;
-  const base = which === 0 ? [34, -35] : [-6, -39];
-  const len = which === 0 ? 8 : 20;
+  const base = which === 0 ? [43, -44] : [-10, -49];
+  const len = which === 0 ? 9 : 22;
   const lx = base[0] + Math.cos(a) * len;
   const ly = base[1] + Math.sin(a) * len * 0.9;
   return [lx * facing, ly];

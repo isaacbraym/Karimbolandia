@@ -2,6 +2,10 @@
 import { loadPhotos, bakeKarimboHeads } from '../art/photo';
 import { bakeKarimbo, drawKarimbo, type KState } from '../art/karimbo';
 import type { WeaponId } from '../game/weapons';
+import { bakeNomad, drawNomad } from '../art/nomad';
+import { bakeFelipao, drawFelipao } from '../art/felipao';
+import { bakeSoldier, drawSoldier, type SoldierStyle } from '../art/soldiers';
+import { bakeRobots, drawDrone, drawTurret, drawHeavy, drawSpider, drawMiniMech } from '../art/robots';
 
 export async function runSpriteDebug(base: string) {
   document.body.style.background = '#20143d';
@@ -18,6 +22,58 @@ export async function runSpriteDebug(base: string) {
   let t = 0;
   const q = new URLSearchParams(location.search);
   const single = q.get('single');
+  const view = q.get('view');
+  if (view) {
+    const nomad = bakeNomad(photos);
+    const feli = bakeFelipao(photos);
+    const styles: SoldierStyle[] = ['rifle', 'shotgun', 'shield', 'jetpack', 'sniper'];
+    const soldiers = styles.map((st) => bakeSoldier(st));
+    const robots = bakeRobots();
+    const loop2 = () => {
+      t += 0.016;
+      g.fillStyle = '#2a1d56';
+      g.fillRect(0, 0, W, H);
+      g.fillStyle = '#3b2a6b';
+      g.fillRect(0, 700, W, 100);
+      if (view === 'nomad') {
+        g.save();
+        g.translate(300, 700);
+        g.scale(6, 6);
+        drawNomad(g, nomad, art.heads, 0, 0, { facing: 1, roll: t * 3, tilt: Math.sin(t) * 0.3, aim: 0, recoil: (Math.sin(t * 4) + 1) / 2, flash: false, t, vx: 200, vy: 0, onGround: true, dashing: 0, alpha: 1, hp01: 1, pilot: true, earFlap: 0.8, ready: true });
+        g.restore();
+        g.save();
+        g.translate(800, 700);
+        g.scale(6, 6);
+        drawNomad(g, nomad, art.heads, 0, 0, { facing: -1, roll: t * 3, tilt: 0.2, aim: Math.PI, recoil: 0, flash: false, t, vx: -600, vy: 0, onGround: true, dashing: 1, alpha: 1, hp01: 1, pilot: true, earFlap: 1, ready: true });
+        g.restore();
+      } else if (view === 'feli') {
+        for (let i = 0; i < 3; i++) {
+          g.save();
+          g.translate(220 + i * 420, 720);
+          g.scale(2.6, 2.6);
+          drawFelipao(g, feli, 0, 0, { facing: i === 1 ? -1 : 1, t, flash: false, alpha: 1, lean: 0, squashY: 1, aimL: -0.4, aimR: -0.4, charge: i === 1 ? 1 : 0, reactor: 0.5, phase: (i + 1) as 1 | 2 | 3, thrust: 0.4, rackOpen: i === 2 ? 1 : 0, hover: 10, taunt: 0, shake: 0, hp01: 1, kickL: 0, kickR: 0 });
+          g.restore();
+        }
+      } else if (view === 'foes') {
+        soldiers.forEach((a, i) => {
+          g.save();
+          g.translate(90 + i * 140, 430);
+          g.scale(3.2, 3.2);
+          drawSoldier(g, a, 0, 0, { facing: 1, state: i === 3 ? 'fly' : 'run', t, runPhase: t * 10, aim: 0, aiming: true, flash: false, alpha: 1, kick: 0, charge: (Math.sin(t * 3) + 1) / 2, style: styles[i], jet: 1 });
+          g.restore();
+        });
+        const base = { facing: 1 as const, t, flash: false, alpha: 1, aim: 0, charge: 0.5, kick: 0, phase: t * 8, moving: true, extra: 0, hp01: 1 };
+        g.save(); g.translate(90, 740); g.scale(3, 3); drawDrone(g, robots, 0, -30, base); g.restore();
+        g.save(); g.translate(260, 740); g.scale(3, 3); drawTurret(g, robots, 0, 0, base, false, 0); g.restore();
+        g.save(); g.translate(470, 740); g.scale(2.2, 2.2); drawHeavy(g, robots, 0, 0, base); g.restore();
+        g.save(); g.translate(720, 740); g.scale(3, 3); drawSpider(g, robots, 0, 0, base); g.restore();
+        g.save(); g.translate(950, 740); g.scale(2.6, 2.6); drawMiniMech(g, robots, 0, 0, base); g.restore();
+      }
+      requestAnimationFrame(loop2);
+    };
+    loop2();
+    return;
+  }
   const loop = () => {
     t += 0.016;
     if (single) {

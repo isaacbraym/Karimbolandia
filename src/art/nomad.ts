@@ -7,8 +7,8 @@ import { drawSpr, glowSprite, softDot, type Sprite } from './kit';
 import { imageToSprite, type Photos, type KarimboHeads } from './photo';
 import { PAL } from './palette';
 
-/** logical px por px do recorte original (altura total do robô ≈ 84px) */
-export const NOMAD_LS = 84 / 766;
+/** logical px por px do recorte original (altura total do robô ≈ 100px) */
+export const NOMAD_LS = 100 / 766;
 
 export interface NomadArt {
   upper: Sprite;
@@ -64,7 +64,7 @@ export function drawNomad(g: CanvasRenderingContext2D, art: NomadArt, heads: Kar
   // sombra no chão
   const sh = softDot('#000000', 16);
   g.globalAlpha = prevA * p.alpha * 0.45;
-  g.drawImage(sh.c, x - 24, feetY - 6, 48, 12);
+  g.drawImage(sh.c, x - 30, feetY - 7, 60, 14);
   g.globalAlpha = prevA * p.alpha;
 
   g.save();
@@ -172,8 +172,8 @@ export function drawNomadIdle(g: CanvasRenderingContext2D, art: NomadArt, x: num
   // luzes de "energia" pulsando
   const spr = glowSprite('#ffd23a', 24);
   g.globalCompositeOperation = 'lighter';
-  g.globalAlpha = 0.25 + 0.35 * power * (0.5 + 0.5 * Math.sin(t * 6));
-  g.drawImage(spr.c, x - 14 - facing * 3, feetY - 66, 28, 28);
+  g.globalAlpha = 0.08 + 0.2 * power * (0.5 + 0.5 * Math.sin(t * 6));
+  g.drawImage(spr.c, x - 12 - facing * 4, feetY - 82, 24, 24);
   g.globalAlpha = 1;
   g.globalCompositeOperation = 'source-over';
 }

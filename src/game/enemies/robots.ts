@@ -226,7 +226,7 @@ export class HeavyRobot extends Enemy {
   gap = 0;
   alert = false;
   constructor(spawn: EnemySpawn) {
-    super(spawn, { hp: 260, w: 52, h: 72, score: 500, wake: 620, tokens: [5, 8], metal: true });
+    super(spawn, { hp: 280, w: 62, h: 88, score: 500, wake: 620, tokens: [5, 8], metal: true });
   }
   hurt(w: World, dmg: number, info: HurtInfo): number {
     const armor = info.type === 'bullet' ? 0.72 : 1;
@@ -243,7 +243,7 @@ export class HeavyRobot extends Enemy {
     const dist = Math.abs(dx);
     const see = this.canSee(w, 560);
     if (!this.alert && (see || this.lastHurt > 0)) this.alert = true;
-    this.aim = this.aimAngleTo(w, this.x + this.facing * 16, this.feetY - 50, 0.05);
+    this.aim = this.aimAngleTo(w, this.x + this.facing * 20, this.feetY - 61, 0.05);
     if (this.mode === 'walk' || this.mode === 'rest') this.faceToward(p.x);
     switch (this.mode) {
       case 'walk': {
@@ -272,8 +272,8 @@ export class HeavyRobot extends Enemy {
         this.gap -= dt;
         if (this.burst > 0 && this.gap <= 0) {
           const mx = this.x + Math.cos(this.aim) * 40 * this.facing * this.facing + 0;
-          const mxx = this.x + this.facing * 34;
-          const my = this.feetY - 50 + Math.sin(this.aim) * 26;
+          const mxx = this.x + this.facing * 42;
+          const my = this.feetY - 61 + Math.sin(this.aim) * 30;
           void mx;
           const a = this.aim + (this.burst - 3) * 0.1;
           this.fireBullet(w, mxx, my, a, 330, 9);

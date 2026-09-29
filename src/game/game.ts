@@ -54,7 +54,7 @@ export class Game {
   constructor(canvas: HTMLCanvasElement, ui: HTMLElement) {
     this.canvas = canvas;
     this.ui = ui;
-    this.g = canvas.getContext('2d', { alpha: false, desynchronized: true }) as CanvasRenderingContext2D;
+    this.g = canvas.getContext('2d', { alpha: false }) as CanvasRenderingContext2D;
     this.isTouch = (typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches) || 'ontouchstart' in window;
   }
 
@@ -374,13 +374,19 @@ export class Game {
     const tp = q.get('tp');
     if (tp) {
       const tx = parseFloat(tp);
-      const sec = w.data.sections.find((s) => Math.abs(s.x / 32 - tx) < 30) ?? null;
       const sx = tx * 32 + 16;
-      let y = sec ? sec.y : w.data.playerStart.y;
-      // acha o chão sob a coordenada
-      const gy = w.level.groundBelow(sx, 0, w.level.pxH);
-      if (gy !== null) y = gy;
+      // seção mais próxima define a altura (evita cair em "tetos" ao procurar o chão)
+      let sec = w.data.sections[0];
+      for (const s of w.data.sections) if (Math.abs(s.x - sx) < Math.abs(sec.x - sx)) sec = s;
+      const gy = w.level.groundBelow(sx, sec.y - 100, 900);
+      const y = gy ?? sec.y;
+      // marca o último checkpoint antes do ponto (sem repetir avisos)
+      const cps = w.data.checkpoints;
+      let idx = -1;
+      for (let i = 0; i < cps.length; i++) if (cps[i].x <= sx) idx = i;
+      w.checkpointIdx = idx;
       w.player.reset(sx, y);
+      w.checkpointSnap = w.player.snapshot();
       w.cameraSnap();
     }
     if (q.get('arms') === '1') {

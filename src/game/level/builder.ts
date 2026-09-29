@@ -160,6 +160,7 @@ export class LevelBuilder {
     trigger: number; // tile x de ativação
     banner?: string;
     soft?: boolean;
+    dropRow?: number;
     waves: { delay: number; e: [EnemyType, number, number, EOpts?][] }[];
   }) {
     const waves: Wave[] = o.waves.map((w, wi) => ({
@@ -173,6 +174,7 @@ export class LevelBuilder {
       triggerX: o.trigger * TILE,
       banner: o.banner,
       soft: o.soft,
+      dropY: o.dropRow !== undefined ? o.dropRow * TILE : undefined,
     });
   }
 

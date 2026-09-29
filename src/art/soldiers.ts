@@ -21,6 +21,9 @@ export interface SoldierArt {
 
 const S = 2;
 
+/** Comprimento da arma por estilo (usado pela simulação, sem depender dos sprites). */
+export const GUN_LEN: Record<SoldierStyle, number> = { rifle: 22, shotgun: 24, shield: 22, jetpack: 22, sniper: 34 };
+
 interface StyleDef {
   armor: string;
   armorDark: string;
@@ -168,7 +171,7 @@ export function bakeSoldier(style: SoldierStyle): SoldierArt {
 
   // arma (mesma família visual do jogador, cores da Legião)
   const gunDef = style === 'shotgun' ? WEAPONS.shotgun : style === 'sniper' ? WEAPONS.rifle : WEAPONS.rifle;
-  const gunLen = style === 'sniper' ? 34 : style === 'shotgun' ? 24 : 22;
+  const gunLen = GUN_LEN[style];
   const gun = bake(
     gunLen + 6,
     11,
@@ -277,15 +280,15 @@ export interface SPose {
   squash?: number;
 }
 
-const SHOULDER: [number, number] = [2.2, -27];
+const SHOULDER: [number, number] = [2.2, -24.5];
 
-export function soldierMuzzle(facing: 1 | -1, aim: number, art: SoldierArt, crouch: boolean, kick = 0): [number, number] {
+export function soldierMuzzle(facing: 1 | -1, aim: number, gunLen: number, crouch: boolean, kick = 0): [number, number] {
   let a = facing === 1 ? aim : Math.PI - aim;
   while (a > Math.PI) a -= Math.PI * 2;
   while (a < -Math.PI) a += Math.PI * 2;
   a = Math.max(-Math.PI * 0.6, Math.min(Math.PI * 0.6, a));
   const sy = SHOULDER[1] + (crouch ? 9 : 0);
-  const d = 12 + art.gunLen - 6 - kick * 2.6;
+  const d = 12 + gunLen - 6 - kick * 2.6;
   return [(SHOULDER[0] + Math.cos(a) * d) * facing, sy + Math.sin(a) * d - 0.4];
 }
 
@@ -352,7 +355,7 @@ export function drawSoldier(g: CanvasRenderingContext2D, art: SoldierArt, x: num
   drawSpr(g, S0.legB, -2, hipY + bob * 0.5, { rot: legB, sy: legSy, white: w });
   drawSpr(g, S0.torso, 0, -13 + drop + bob, { white: w, rot: running ? 0.07 : 0 });
   drawSpr(g, S0.legF, 2, hipY + bob * 0.5, { rot: legF, sy: legSy, white: w });
-  drawSpr(g, S0.head, 1.4, -26 + drop + bob * 1.1, { white: w, rot: p.state === 'hurt' ? -0.25 : 0 });
+  drawSpr(g, S0.head, 1.4, -29.5 + drop + bob * 1.1, { white: w, rot: p.state === 'hurt' ? -0.25 : 0, sx: 0.88, sy: 0.88 });
 
   // braço da frente + arma
   let a = p.facing === 1 ? p.aim : Math.PI - p.aim;

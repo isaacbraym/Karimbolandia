@@ -28,7 +28,7 @@ export function section5(b: LevelBuilder) {
   b.enemy('turret', 438, 19, { ceiling: true });
   b.enemy('turret', 462, 19, { ceiling: true });
   b.arena({
-    id: 'a1', x0: 430, x1: 470, top: 14, bottom: 36, trigger: 434, banner: 'EMBOSCADA!',
+    id: 'a1', x0: 430, x1: 470, top: 14, bottom: 36, trigger: 434, banner: 'EMBOSCADA!', dropRow: 20,
     waves: [
       { delay: 0.8, e: [['rifle', 434, G, { fromSide: -1 }], ['rifle', 466, G, { fromSide: 1 }], ['rifle', 436, G, { fromSide: -1 }], ['shotgun', 464, G, { fromSide: 1 }]] },
       { delay: 1.6, e: [['shield', 434, G, { fromSide: -1 }], ['shield', 466, G, { fromSide: 1 }], ['rifle', 450, G, { drop: true }], ['drone', 444, 22, { drop: true }], ['drone', 456, 22, { drop: true }]] },

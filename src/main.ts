@@ -10,6 +10,11 @@ async function boot() {
     await runSpriteDebug(base);
     return;
   }
+  if (params.get('debug') === 'map') {
+    const { runLevelMap } = await import('./debug/levelmap');
+    runLevelMap();
+    return;
+  }
   const canvas = document.getElementById('game') as HTMLCanvasElement;
   const ui = document.getElementById('ui') as HTMLElement;
   const game = new Game(canvas, ui);

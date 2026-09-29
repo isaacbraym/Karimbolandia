@@ -467,6 +467,7 @@ export function drawHeavy(g: CanvasRenderingContext2D, a: RobotArt, x: number, f
   g.globalAlpha *= p.alpha;
   g.translate(x, feetY);
   if (p.facing === -1) g.scale(-1, 1);
+  g.scale(1.22, 1.22);
   const c = p.phase;
   const w = p.flash;
   const bob = p.moving ? -Math.abs(Math.sin(c)) * 1.6 : Math.sin(p.t * 2) * 0.5;

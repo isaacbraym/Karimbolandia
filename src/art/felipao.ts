@@ -9,8 +9,22 @@ import { PAL } from './palette';
 import { shade } from '../core/math';
 
 export const FELI_H = 158; // altura lógica do sprite
+const IMG_W = 560; // dimensões do recorte exportado (public/assets/img/felipao.webp)
 const IMG_H = 885;
 const K = FELI_H / IMG_H;
+const LW = IMG_W * K;
+const at0 = (x: number, y: number): [number, number] => [x * K - LW / 2, y * K - FELI_H];
+
+/** Pontos de referência do corpo (px lógicos; x=0 no centro, y=0 no chão) — usados pela IA do chefe. */
+export const FELI_LAYOUT = {
+  head: at0(301, 90),
+  shoulderL: at0(48, 225),
+  shoulderR: at0(478, 140),
+  reactorPos: at0(282, 400),
+  footL: at0(129, 860),
+  footR: at0(473, 868),
+  rackPos: at0(300, 118),
+};
 
 export interface FelipaoArt {
   body: Sprite;
@@ -201,13 +215,7 @@ export function bakeFelipao(p: Photos): FelipaoArt {
 
   return {
     body, rack, pod, straps, reactor, cannon: mkCannon(false), cannonBroken: mkCannon(true), w: W, h: H,
-    head: at(301, 90),
-    shoulderL: at(48, 225),
-    shoulderR: at(478, 140),
-    reactorPos: at(282, 400),
-    footL: at(129, 860),
-    footR: at(473, 868),
-    rackPos: at(300, 118),
+    ...FELI_LAYOUT,
   };
 }
 

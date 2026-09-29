@@ -4,7 +4,7 @@ import type { EnemySpawn } from '../level';
 import { TILE, T } from '../level';
 import { clamp, rand, approach, angleDiff, damp } from '../../core/math';
 import { getArt } from '../../art';
-import { drawFelipao } from '../../art/felipao';
+import { drawFelipao, FELI_LAYOUT } from '../../art/felipao';
 import { PK } from '../fx';
 
 type BState =
@@ -91,16 +91,16 @@ export class Felipao extends Enemy {
     return getArt().felipao;
   }
   private shoulder(which: 'L' | 'R'): [number, number] {
-    const a = this.art();
+    const a = FELI_LAYOUT;
     const p = which === 'L' ? a.shoulderL : a.shoulderR;
     return [this.bx + this.facing * p[0], this.floorY - this.hover + p[1] - 4];
   }
   private reactorPos(): [number, number] {
-    const a = this.art();
+    const a = FELI_LAYOUT;
     return [this.bx + this.facing * a.reactorPos[0], this.floorY - this.hover + a.reactorPos[1] - 4];
   }
   private rackPos(): [number, number] {
-    const a = this.art();
+    const a = FELI_LAYOUT;
     return [this.bx + this.facing * a.rackPos[0], this.floorY - this.hover + a.rackPos[1] - 4];
   }
   private get tempo() {
@@ -233,7 +233,7 @@ export class Felipao extends Enemy {
     this.body.x = clamp(this.body.x, this.rect.x + 60, this.rect.x + this.rect.w - 60);
     // partículas do propulsor
     if (this.thrust > 0.3 && w.fx.opt() && Math.random() < dt * 40) {
-      for (const f of [this.art().footL, this.art().footR]) {
+      for (const f of [FELI_LAYOUT.footL, FELI_LAYOUT.footR]) {
         w.fx.add(PK.Fire, this.bx + this.facing * f[0], this.floorY - this.hover + 6, rand.spread(20), 80, 0.25, 8, '#ffb347', { size1: 2 });
       }
     }

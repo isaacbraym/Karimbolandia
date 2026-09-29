@@ -410,7 +410,7 @@ export class Director {
       const r = a.def.rect;
       // entrada: cair do céu / correr pela lateral
       if (s.drop) {
-        s.y = Math.max(cam.y - 40, r.y + 10);
+        s.y = a.def.dropY ?? Math.max(cam.y - 40, r.y + 10);
       } else if (s.fromSide) {
         s.x = s.fromSide === -1 ? Math.max(r.x + 30, cam.x - 30) : Math.min(r.x + r.w - 30, cam.x + cam.w + 30);
       }
@@ -419,7 +419,7 @@ export class Director {
       a.alive.push(e);
       if (s.drop) {
         e.body.vy = 100;
-        w.fx.add(PK.Fire, e.x, cam.y + 6, 0, 0, 0.3, 16, '#ffb347', { size1: 3 });
+        w.fx.add(PK.Fire, e.x, s.y, 0, 0, 0.3, 16, '#ffb347', { size1: 3 });
       }
     }
     w.audio('alarm', 0.5);
@@ -598,8 +598,8 @@ export class Director {
         // aura/holofote
         const spr = glowSprite('#ffe27a', 32);
         g.globalCompositeOperation = 'lighter';
-        g.globalAlpha = 0.18 + this.nomadPower * 0.25;
-        g.drawImage(spr.c, ns.x - 60, ns.y - 80, 120, 100);
+        g.globalAlpha = 0.05 + this.nomadPower * 0.1;
+        g.drawImage(spr.c, ns.x - 80, ns.y - 100, 160, 120);
         g.globalAlpha = 1;
         g.globalCompositeOperation = 'source-over';
       }
