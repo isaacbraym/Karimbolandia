@@ -527,6 +527,9 @@ export class World {
 
     this.director.update(dt, ctl);
     p.update(this, dt, ctl);
+    // BZZZ do pernilongo enquanto plana (tom varia com velocidade e subida/descida)
+    if (p.glide && p.mode === 'foot') audioEngine.loop('glide', true, clamp(Math.abs(p.body.vx) / 218, 0, 1), clamp(-p.body.vy / 220, -1, 1));
+    else audioEngine.loop('glide', false);
     if (this.invulnerable && p.mode !== 'dead') {
       p.hp = p.maxHp;
       if (p.nomad) p.nomad.hp = p.nomad.maxHp;

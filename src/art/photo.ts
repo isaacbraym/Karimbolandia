@@ -24,9 +24,13 @@ export interface NomadMeta {
 
 export interface Photos {
   head: HTMLImageElement;
+  headNoEars: HTMLImageElement;
   earL: HTMLImageElement;
   earR: HTMLImageElement;
   felipao: HTMLImageElement;
+  felipaoUpper: HTMLImageElement;
+  felipaoLegL: HTMLImageElement;
+  felipaoLegR: HTMLImageElement;
   nomadUpper: HTMLImageElement;
   nomadFrame: HTMLImageElement;
   nomadSphere: HTMLImageElement;
@@ -46,7 +50,7 @@ function loadImage(src: string): Promise<HTMLImageElement> {
 
 export async function loadPhotos(base: string, onProgress?: (p: number) => void): Promise<Photos> {
   const u = (n: string) => `${base}assets/img/${n}`;
-  const names = ['karimbo_head.webp', 'karimbo_ear_l.webp', 'karimbo_ear_r.webp', 'felipao.webp', 'nomad_upper.webp', 'nomad_frame.webp', 'nomad_sphere.webp'];
+  const names = ['karimbo_head.webp', 'karimbo_ear_l.webp', 'karimbo_ear_r.webp', 'felipao.webp', 'nomad_upper.webp', 'nomad_frame.webp', 'nomad_sphere.webp', 'karimbo_head_noears.webp', 'felipao_upper.webp', 'felipao_legL.webp', 'felipao_legR.webp'];
   let done = 0;
   const imgs = await Promise.all(
     names.map((n) =>
@@ -70,6 +74,10 @@ export async function loadPhotos(base: string, onProgress?: (p: number) => void)
     nomadUpper: imgs[4],
     nomadFrame: imgs[5],
     nomadSphere: imgs[6],
+    headNoEars: imgs[7],
+    felipaoUpper: imgs[8],
+    felipaoLegL: imgs[9],
+    felipaoLegR: imgs[10],
     meta,
     nomadMeta,
   };
@@ -86,57 +94,39 @@ export function imageToSprite(img: HTMLImageElement, w: number, h: number, ox: n
 }
 
 // ------------------------------------------------------------------------------------------
-export const KARIMBO_HEAD_H = 36; // altura lógica da cabeça no jogo (px)
+export const KARIMBO_HEAD_H = 41; // altura lógica da cabeça (rosto em destaque)
 
 export interface KarimboHeads {
-  right: Sprite; // olhando para a direita (perspectiva), espelhar p/ esquerda
-  front: Sprite; // frontal (retrato/HUD/menu)
+  right: Sprite; // cabeça SEM orelhas, em perspectiva p/ a direita (espelhar p/ esquerda)
+  front: Sprite; // frontal com orelhas (menu/debug)
   portrait: Sprite; // recorte circular p/ HUD
-  /** Orelhas gigantes do EAR GLIDE (sprites com raiz de fixação) */
-  earL: Sprite;
-  earR: Sprite;
-  /** raiz das orelhas na cabeça `right` (coordenadas lógicas relativas ao pivô do sprite) */
+  /** orelhas como camadas independentes (pivô no lóbulo/raiz): crescem no EAR GLIDE */
+  earNear: Sprite;
+  earFar: Sprite;
+  /** raiz das orelhas (relativa ao pivô do sprite `right`) */
   earRootNear: [number, number];
   earRootFar: [number, number];
-  /** tamanho lógico da orelha em repouso, p/ escala de glide */
   earH: number;
 }
 
 /**
- * Monta a cabeça: (1) foto + orelhas ampliadas 1.3x (ênfase); (2) perspectiva por projeção cilíndrica.
+ * Cabeça: foto sem orelhas + perspectiva por projeção cilíndrica. As orelhas são sprites à parte
+ * (mesma textura da foto), posicionadas na raiz; assim o EAR GLIDE as faz crescer de verdade.
  */
 export function bakeKarimboHeads(p: Photos, scale = 3): KarimboHeads {
-  const src = p.head;
+  const src = p.headNoEars;
   const W = src.width;
   const H = src.height;
-  const k = W / p.meta.head.w; // px imagem reduzida / px original
-  const PAD = Math.round(W * 0.12);
+  const k = W / p.meta.head.w; // px reduzido / px original
+  const PAD = 4;
 
-  // ---- (1) foto + orelhas enfatizadas
   const comp = makeCanvas(W + PAD * 2, H);
   const cg = comp.getContext('2d')!;
   cg.imageSmoothingQuality = 'high';
   cg.drawImage(src, PAD, 0);
-  const EAR_UP = 1.32;
-  const EAR_ROOT = 0.8; // fração da altura onde a orelha 'dobra' (lóbulo)
-  const drawEar = (img: HTMLImageElement, m: CharMeta['earL'], left: boolean) => {
-    const ew = m.w * k;
-    const eh = m.h * k;
-    const ex = PAD + m.x * k;
-    const ey = m.y * k;
-    const rootX = left ? ex + ew : ex; // raiz fica do lado do rosto
-    const rootY = ey + eh * EAR_ROOT;
-    cg.save();
-    cg.translate(rootX, rootY);
-    cg.scale(EAR_UP, EAR_UP);
-    cg.drawImage(img, ex - rootX, ey - rootY, ew, eh);
-    cg.restore();
-  };
-  drawEar(p.earL, p.meta.earL, true);
-  drawEar(p.earR, p.meta.earR, false);
 
-  // ---- (2) yaw cilíndrico
-  const yaw = 0.34; // ~19.5°
+  // projeção cilíndrica (cabeça virada ~20° para a direita)
+  const yaw = 0.34;
   const cx = comp.width / 2;
   const R = comp.width * 0.5 * 0.985;
   const yawed = makeCanvas(comp.width, H);
@@ -145,16 +135,16 @@ export function bakeKarimboHeads(p: Photos, scale = 3): KarimboHeads {
   const f = (x: number) => cx + R * Math.sin(Math.asin(Math.max(-1, Math.min(1, (x - cx) / R))) + yaw);
   for (let x = 0; x < comp.width; x++) {
     const th = Math.asin(Math.max(-1, Math.min(1, (x + 0.5 - cx) / R)));
-    if (th + yaw >= Math.PI / 2 - 0.01) continue; // parte de trás (ocluída)
+    if (th + yaw >= Math.PI / 2 - 0.01) continue;
     const d0 = f(x);
     const d1 = f(x + 1);
     const dw = Math.max(1.2, Math.abs(d1 - d0) + 0.6);
     yg.drawImage(comp, x, 0, 1, H, d0, 0, dw, H);
   }
-  // reduz levemente a largura (perspectiva) e encaixa no sprite lógico
   const headH = KARIMBO_HEAD_H;
   const sc = headH / H;
-  const logicalW = comp.width * sc * 0.93;
+  const wsc = 0.94; // estreitamento p/ perspectiva
+  const logicalW = comp.width * sc * wsc;
   const right = bake(
     logicalW,
     headH,
@@ -165,18 +155,19 @@ export function bakeKarimboHeads(p: Photos, scale = 3): KarimboHeads {
     { scale, ox: logicalW / 2 + 0.6, oy: headH * 0.94 }
   );
 
-  const frontW = comp.width * sc;
+  // frontal com orelhas (foto original)
+  const fw = (p.head.width / p.head.height) * headH;
   const front = bake(
-    frontW,
+    fw,
     headH,
     (g) => {
       g.imageSmoothingQuality = 'high';
-      g.drawImage(comp, 0, 0, frontW, headH);
+      g.drawImage(p.head, 0, 0, fw, headH);
     },
-    { scale, ox: frontW / 2, oy: headH * 0.94 }
+    { scale, ox: fw / 2, oy: headH * 0.94 }
   );
 
-  // ---- retrato circular (HUD): rosto sem orelhas gigantes
+  // retrato circular (HUD): rosto com orelhas
   const portrait = bake(
     48,
     48,
@@ -187,11 +178,10 @@ export function bakeKarimboHeads(p: Photos, scale = 3): KarimboHeads {
       g.clip();
       g.fillStyle = '#26124a';
       g.fillRect(0, 0, 48, 48);
-      // enquadra do cabelo ao queixo, com orelhas
       const ph = 62;
-      const pw = ph * (src.width / src.height) * 1.0;
+      const pw = ph * (p.head.width / p.head.height);
       g.imageSmoothingQuality = 'high';
-      g.drawImage(src, 24 - pw / 2 + 0.5, 24 - ph * 0.5 + 1, pw, ph * 1.0);
+      g.drawImage(p.head, 24 - pw / 2 + 0.5, 24 - ph * 0.5 + 1, pw, ph);
       g.restore();
       g.beginPath();
       g.arc(24, 24, 22, 0, Math.PI * 2);
@@ -207,11 +197,11 @@ export function bakeKarimboHeads(p: Photos, scale = 3): KarimboHeads {
     { scale: 2, ox: 24, oy: 24 }
   );
 
-  // ---- orelhas gigantes do glide (raiz = pivô)
-  const earHLogical = ((p.meta.earL.h * k) / H) * headH * EAR_UP;
+  // ---- orelhas independentes (pivô no lóbulo, lado do rosto)
+  const EAR_ROOT = 0.8;
   const mkEar = (img: HTMLImageElement, m: CharMeta['earL'], left: boolean): Sprite => {
-    const ew = m.w * k * sc * EAR_UP;
-    const eh = m.h * k * sc * EAR_UP;
+    const ew = m.w * k * sc;
+    const eh = m.h * k * sc;
     return bake(
       ew,
       eh,
@@ -219,25 +209,25 @@ export function bakeKarimboHeads(p: Photos, scale = 3): KarimboHeads {
         g.imageSmoothingQuality = 'high';
         g.drawImage(img, 0, 0, ew, eh);
       },
-      { scale, ox: left ? ew * 0.97 : ew * 0.03, oy: eh * 0.8 }
+      { scale, ox: left ? ew * 0.985 : ew * 0.015, oy: eh * EAR_ROOT }
     );
   };
-  const earL = mkEar(p.earL, p.meta.earL, true);
-  const earR = mkEar(p.earR, p.meta.earR, false);
-
-  // raízes das orelhas no espaço do sprite `right` (relativo ao pivô)
-  const rootYLogical = (p.meta.earL.y * k + p.meta.earL.h * k * 0.8) * sc - right.oy;
-  const nearX = (PAD + (p.meta.earL.x + p.meta.earL.w) * k) * sc * 0.93 - right.ox + 0.5;
-  const farX = (PAD + p.meta.earR.x * k) * sc * 0.93 - right.ox - 0.5;
+  const earNear = mkEar(p.earL, p.meta.earL, true);
+  const earFar = mkEar(p.earR, p.meta.earR, false);
+  const rootY = (p.meta.earL.y * k + p.meta.earL.h * k * EAR_ROOT) * sc - right.oy;
+  const rootYr = (p.meta.earR.y * k + p.meta.earR.h * k * EAR_ROOT) * sc - right.oy;
+  const nearSrcX = PAD + (p.meta.earL.x + p.meta.earL.w * 0.985) * k;
+  const farSrcX = PAD + (p.meta.earR.x + p.meta.earR.w * 0.015) * k;
+  const toLog = (x: number) => f(x) * (logicalW / comp.width) - right.ox;
 
   return {
     right,
     front,
     portrait,
-    earL,
-    earR,
-    earRootNear: [nearX, rootYLogical],
-    earRootFar: [farX, rootYLogical],
-    earH: earHLogical,
+    earNear,
+    earFar,
+    earRootNear: [toLog(nearSrcX), rootY],
+    earRootFar: [toLog(farSrcX), rootYr],
+    earH: earNear.h,
   };
 }

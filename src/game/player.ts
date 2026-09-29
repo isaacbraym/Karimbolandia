@@ -131,7 +131,7 @@ export class Player {
   }
   get shoulder(): [number, number] {
     if (this.nomad) return [this.x + this.facing * 4, this.y - 22];
-    return [this.x + this.facing * 2.5, this.feetY - 28.5 + (this.crouch ? 10 : 0)];
+    return [this.x + this.facing * 2.5, this.feetY - 21.5 + (this.crouch ? 10 : 0)];
   }
 
   // ------------------------------------------------------------------ ciclo de vida

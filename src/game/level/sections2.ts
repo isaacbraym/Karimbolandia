@@ -85,6 +85,17 @@ export function section7(b: LevelBuilder) {
   b.dress(600, 700, G, { seed: 7 });
   b.trigger('hint:nomad', 601, 0, 3, 46);
 
+  // telhados (rota alta para o Nômad: saltos de 2 linhas + propulsor)
+  b.plat(606, 30, 9);
+  b.plat(618, 28, 9);
+  b.plat(630, 26, 9);
+  b.plat(642, 28, 8);
+  b.tokens(607, 29, 7);
+  b.tokens(619, 27, 7);
+  b.tokens(631, 25, 7);
+  b.crate(634, 26, 'ammo');
+  b.enemy('jetpack', 622, 22, {});
+  b.enemy('rifle', 646, 28, { patrol: 20, facing: -1 });
   // A — pelotão de infantaria
   b.prop('barricade', 608, G);
   b.prop('barricade', 612, G);

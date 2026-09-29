@@ -34,9 +34,13 @@ def save(name, path, width=None, scale=None, q=90):
 
 
 save("karimbo_head.webp", "karimbo_head_full.png", width=512, q=92)
-save("karimbo_ear_l.webp", "karimbo_ear_l.png", scale=0.55, q=92)
-save("karimbo_ear_r.webp", "karimbo_ear_r.png", scale=0.55, q=92)
+save("karimbo_head_noears.webp", "karimbo_head_noears.png", width=512, q=92)
+save("karimbo_ear_l.webp", "karimbo_ear_l.png", scale=0.9, q=92)
+save("karimbo_ear_r.webp", "karimbo_ear_r.png", scale=0.9, q=92)
 save("felipao.webp", "felipao_full.png", width=560, q=90)
+save("felipao_upper.webp", "felipao_upper.png", width=560, q=90)
+save("felipao_legL.webp", "felipao_legL.png", width=560, q=90)
+save("felipao_legR.webp", "felipao_legR.png", width=560, q=90)
 s = save("nomad_upper.webp", "nomad_upper.png", scale=0.6, q=90)
 save("nomad_frame.webp", "nomad_frame.png", scale=0.6, q=90)
 save("nomad_sphere.webp", "nomad_sphere.png", scale=0.6, q=90)

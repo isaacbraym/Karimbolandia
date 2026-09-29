@@ -189,7 +189,11 @@ export class Game {
   private async requestFullscreenLandscape() {
     try {
       const el = document.documentElement;
-      if (!document.fullscreenElement && el.requestFullscreen) await el.requestFullscreen({ navigationUI: 'hide' } as FullscreenOptions);
+      const anyEl = el as HTMLElement & { webkitRequestFullscreen?: () => Promise<void> | void };
+      if (!document.fullscreenElement) {
+        if (el.requestFullscreen) await el.requestFullscreen({ navigationUI: 'hide' } as FullscreenOptions);
+        else if (anyEl.webkitRequestFullscreen) await anyEl.webkitRequestFullscreen();
+      }
     } catch {
       /* iOS / bloqueado */
     }

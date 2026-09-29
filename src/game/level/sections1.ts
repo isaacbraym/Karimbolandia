@@ -70,6 +70,16 @@ export function section2(b: LevelBuilder) {
   b.tokens(169, 28, 4);
   b.emblem(2, 174, 28); // emblema visível em cima da plataforma
   b.enemy('shotgun', 176, G, { patrol: 30, facing: -1 });
+  // rota alta opcional pelos telhados (grupos B–C): moedas, caixa e dois atiradores
+  b.plat(146, 30, 3);
+  b.plat(150, 28, 4);
+  b.plat(156, 26, 14);
+  b.plat(172, 26, 6);
+  b.tokens(157, 25, 12);
+  b.crate(160, 26, 'health');
+  b.enemy('rifle', 164, 26, { patrol: 30, facing: -1 });
+  b.enemy('rifle', 174, 26, { facing: -1, idle: true });
+  b.deco('neonSign', 168, 24);
   // grupo D
   b.prop('barricade', 184, G);
   b.prop('barricade', 192, G);

@@ -22,11 +22,9 @@ async function boot() {
   void import('./core/audio').then((a) => import('./core/music').then((m) => ((window as unknown as Record<string, unknown>).__snd = { audio: a.audio, music: m.music, MIX: m.MIX })));
   await game.boot(base);
   if ('serviceWorker' in navigator && import.meta.env.PROD) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register(`${base}sw.js`).catch(() => {
-        /* offline opcional */
-      });
-    });
+    const reg = () => navigator.serviceWorker.register(`${base}sw.js`).catch(() => undefined);
+    if (document.readyState === 'complete') void reg();
+    else window.addEventListener('load', () => void reg());
   }
   if (params.get('autoplay') === '1') game.play();
 }

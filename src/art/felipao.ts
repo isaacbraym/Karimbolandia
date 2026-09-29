@@ -24,10 +24,15 @@ export const FELI_LAYOUT = {
   footL: at0(129, 860),
   footR: at0(473, 868),
   rackPos: at0(300, 118),
+  hipL: at0(190, 640),
+  hipR: at0(430, 652),
 };
 
 export interface FelipaoArt {
-  body: Sprite;
+  body: Sprite; // (legado) foto inteira
+  upper: Sprite;
+  legL: Sprite;
+  legR: Sprite;
   rack: Sprite;
   pod: Sprite;
   straps: Sprite;
@@ -53,6 +58,9 @@ export function bakeFelipao(p: Photos): FelipaoArt {
   const H = FELI_H;
   const k = FELI_H / ih;
   const body = imageToSprite(p.felipao, W, H, W / 2, H, p.felipao.width / W);
+  const upper = imageToSprite(p.felipaoUpper, W, H, W / 2, H, p.felipaoUpper.width / W);
+  const legL = imageToSprite(p.felipaoLegL, W, H, W / 2, H, p.felipaoLegL.width / W);
+  const legR = imageToSprite(p.felipaoLegR, W, H, W / 2, H, p.felipaoLegR.width / W);
   const at = (x: number, y: number): [number, number] => [x * k - W / 2, y * k - H];
   const F = PAL.foe;
 
@@ -214,7 +222,7 @@ export function bakeFelipao(p: Photos): FelipaoArt {
     );
 
   return {
-    body, rack, pod, straps, reactor, cannon: mkCannon(false), cannonBroken: mkCannon(true), w: W, h: H,
+    body, upper, legL, legR, rack, pod, straps, reactor, cannon: mkCannon(false), cannonBroken: mkCannon(true), w: W, h: H,
     ...FELI_LAYOUT,
   };
 }
@@ -239,13 +247,17 @@ export interface FPose {
   hp01: number;
   kickL: number;
   kickR: number;
+  /** virada de lado contínua: 1 = olhando p/ a direita da arte, -1 = esquerda (passa por ~0) */
+  faceX: number;
+  walk: number; // fase do passo (rad)
+  walking: number; // 0..1 quanto está andando
 }
 
 export function drawFelipao(g: CanvasRenderingContext2D, a: FelipaoArt, x: number, feetY: number, p: FPose) {
   if (p.alpha <= 0.01) return;
   const prevA = g.globalAlpha;
   g.globalAlpha = prevA * p.alpha;
-  // sombra no chão (fixa no chão, não acompanha o hover)
+  // sombra no chão (fixa no chão, não acompanha o pulo)
   {
     const sh = softDot('#000000', 16);
     const s = 1 - Math.min(0.5, p.hover / 220);
@@ -253,38 +265,66 @@ export function drawFelipao(g: CanvasRenderingContext2D, a: FelipaoArt, x: numbe
     g.drawImage(sh.c, x - 62 * s, feetY - 6, 124 * s, 14);
     g.globalAlpha = prevA * p.alpha;
   }
-  const bob = Math.sin(p.t * 2.2) * 2.4;
-  const sx = (Math.random() - 0.5) * p.shake;
-  const sy = (Math.random() - 0.5) * p.shake;
-  const gy = feetY - p.hover - 4 + bob * 0.5;
+  const fa = p.flash ? 0.55 : 0;
+  const walk = p.walk;
+  const wk = p.walking;
+  // ciclo de caminhada: pernas alternadas, corpo sobe/desce e balança
+  const sL = Math.sin(walk);
+  const sR = -sL;
+  const air = p.hover > 4;
+  const angL = air ? 0.22 : sL * 0.3 * wk;
+  const angR = air ? -0.14 : sR * 0.3 * wk;
+  const liftL = air ? 0 : Math.max(0, Math.cos(walk)) * 6.5 * wk;
+  const liftR = air ? 0 : Math.max(0, -Math.cos(walk)) * 6.5 * wk;
+  const bob = (air ? 0 : -Math.abs(sL) * 3.2 * wk) + Math.sin(p.t * 2.2) * 0.8 * (1 - wk);
+  const sway = sL * 0.028 * wk;
+  // virada de lado: escala horizontal contínua (passa por uma "fatia" fina)
+  const fx = Math.abs(p.faceX) < 0.16 ? 0.16 * (p.faceX < 0 ? -1 : 1) : p.faceX;
+  const turning = 1 - Math.min(1, Math.abs(p.faceX));
+  const gy = feetY - p.hover - (air ? 4 : 0);
 
   g.save();
-  g.translate(x + sx, gy + sy);
-  if (p.facing === -1) g.scale(-1, 1);
-  const taunt = 1 + p.taunt * 0.045 * Math.sin(p.t * 40);
-  g.rotate(p.lean);
-  g.scale(taunt, p.squashY * taunt);
+  g.translate(x, gy);
+  g.scale(fx, 1);
   const w = false;
-  const fa = p.flash ? 0.55 : 0;
+  const taunt = 1 + p.taunt * 0.045 * Math.sin(p.t * 40);
+  g.rotate(p.lean * (fx < 0 ? -1 : 1) * 0 + p.lean);
+  g.scale(taunt, p.squashY * taunt * (1 - turning * 0.04));
+  const shx = (Math.random() - 0.5) * p.shake;
+  const shy = (Math.random() - 0.5) * p.shake;
+  g.translate(shx, shy);
 
-  // propulsores nos pés (com chama)
-  for (const [fx, fy] of [a.footL, a.footR]) {
+  // pernas (atrás do tronco); botas/propulsores acompanham a perna
+  const drawLeg = (spr: Sprite, hip: [number, number], foot: [number, number], ang: number, lift: number) => {
+    g.save();
+    g.translate(hip[0], hip[1] - lift);
+    g.rotate(ang);
+    g.translate(-hip[0], -hip[1]);
     if (p.thrust > 0.02) {
-      const spr = glowSprite('#ffb347', 32);
+      const glow = glowSprite('#ffb347', 32);
       g.globalCompositeOperation = 'lighter';
-      const len = 22 + p.thrust * 26 + Math.sin(p.t * 45) * 3;
+      const len = 20 + p.thrust * 26 + Math.sin(p.t * 45) * 3;
       g.globalAlpha = prevA * p.alpha * (0.5 + p.thrust * 0.5);
-      g.drawImage(spr.c, fx - 13, fy - 2, 26, len);
+      g.drawImage(glow.c, foot[0] - 13, foot[1] - 2, 26, len);
       g.globalCompositeOperation = 'source-over';
       g.globalAlpha = prevA * p.alpha;
     }
-    drawSpr(g, a.pod, fx, fy + 2, { white: w });
-  }
-  // rack de mísseis (atrás)
-  drawSpr(g, a.rack, a.rackPos[0], a.rackPos[1] - p.rackOpen * 4, { white: w, sy: 1 + p.rackOpen * 0.1 });
+    drawSpr(g, spr, 0, 0, { flash: fa });
+    drawSpr(g, a.pod, foot[0], foot[1] + 2, { flash: fa, sx: 0.8, sy: 0.8 });
+    g.restore();
+  };
+  drawLeg(a.legL, FELI_LAYOUT.hipL, FELI_LAYOUT.footL, angL, liftL);
+  drawLeg(a.legR, FELI_LAYOUT.hipR, FELI_LAYOUT.footR, angR, liftR);
 
-  // corpo (foto)
-  drawSpr(g, a.body, 0, 0, { flash: fa });
+  // tronco e armadura
+  g.save();
+  g.translate(0, bob);
+  g.translate(FELI_LAYOUT.hipL[0] * 0.5 + FELI_LAYOUT.hipR[0] * 0.5, FELI_LAYOUT.hipL[1]);
+  g.rotate(sway);
+  g.translate(-(FELI_LAYOUT.hipL[0] * 0.5 + FELI_LAYOUT.hipR[0] * 0.5), -FELI_LAYOUT.hipL[1]);
+
+  drawSpr(g, a.rack, a.rackPos[0], a.rackPos[1] - p.rackOpen * 4, { flash: fa, sy: 1 + p.rackOpen * 0.1 });
+  drawSpr(g, a.upper, 0, 0, { flash: fa });
   drawSpr(g, a.straps, 0, 0, { flash: fa });
   // reator do peito
   {
@@ -297,18 +337,16 @@ export function drawFelipao(g: CanvasRenderingContext2D, a: FelipaoArt, x: numbe
     g.drawImage(glow.c, rx - r, ry - r, r * 2, r * 2);
     g.globalCompositeOperation = 'source-over';
     g.globalAlpha = prevA * p.alpha;
-    drawSpr(g, a.reactor, rx, ry, { white: w, sx: 1 + p.reactor * 0.12, sy: 1 + p.reactor * 0.12 });
+    drawSpr(g, a.reactor, rx, ry, { flash: fa, sx: 1 + p.reactor * 0.12, sy: 1 + p.reactor * 0.12 });
   }
   // canhões de ombro
-  const cannonFor = (pos: [number, number], aim: number, kick: number) => {
+  const cannonFor = (pos: [number, number], aim: number, kick: number, broken: boolean) => {
     g.save();
     g.translate(pos[0], pos[1]);
-    // no espaço local (possivelmente espelhado) o ângulo tem que ser convertido
     let ang = p.facing === 1 ? aim : Math.PI - aim;
-    ang -= p.lean * (p.facing === 1 ? 1 : -1) * 0;
     ang = Math.max(-Math.PI * 0.95, Math.min(Math.PI * 0.95, ang));
     g.rotate(ang);
-    drawSpr(g, p.phase >= 2 && pos === a.shoulderR ? a.cannonBroken : a.cannon, -kick * 5, 0, { white: w });
+    drawSpr(g, broken ? a.cannonBroken : a.cannon, -kick * 5, 0, { flash: fa });
     if (p.charge > 0.03) {
       const spr = glowSprite('#ffb347', 24);
       g.globalCompositeOperation = 'lighter';
@@ -317,11 +355,8 @@ export function drawFelipao(g: CanvasRenderingContext2D, a: FelipaoArt, x: numbe
     }
     g.restore();
   };
-  // (com o espelhamento, o canhão "esquerdo" da arte fica no lado oposto — trocamos os alvos)
-  cannonFor(a.shoulderL, p.facing === 1 ? p.aimL : p.aimR, p.facing === 1 ? p.kickL : p.kickR);
-  cannonFor(a.shoulderR, p.facing === 1 ? p.aimR : p.aimL, p.facing === 1 ? p.kickR : p.kickL);
-
-  // danos: fumaça/faíscas nos estágios avançados
+  cannonFor(a.shoulderL, p.facing === 1 ? p.aimL : p.aimR, p.facing === 1 ? p.kickL : p.kickR, false);
+  cannonFor(a.shoulderR, p.facing === 1 ? p.aimR : p.aimL, p.facing === 1 ? p.kickR : p.kickL, p.phase >= 2);
   if (p.phase >= 2) {
     g.globalCompositeOperation = 'lighter';
     if (Math.sin(p.t * 17) > 0.75) {
@@ -331,7 +366,9 @@ export function drawFelipao(g: CanvasRenderingContext2D, a: FelipaoArt, x: numbe
     g.globalCompositeOperation = 'source-over';
   }
   g.restore();
+  g.restore();
   g.globalAlpha = prevA;
   void shade;
   void rrPath;
+  void w;
 }

@@ -165,14 +165,13 @@ export function drawNomad(g: CanvasRenderingContext2D, art: NomadArt, heads: Kar
     g.save();
     g.translate(hx, hy);
     g.scale(-s, s); // cabeça olhando p/ a frente do robô (esquerda no espaço da arte)
+    // orelhas ao vento (atrás da cabeça): crescem e batem conforme a velocidade
+    const fl = p.earFlap > 0.05 ? Math.sin(p.t * 50) * 0.1 * p.earFlap : 0;
+    const open = 0.12 + p.earFlap * 0.65;
+    const k = 1.3 + p.earFlap * 0.9;
+    drawSpr(g, heads.earFar, heads.earRootFar[0], heads.earRootFar[1], { rot: open - fl, sx: k * 0.6, sy: k, white: w });
+    drawSpr(g, heads.earNear, heads.earRootNear[0], heads.earRootNear[1], { rot: -open + fl, sx: k * 0.95, sy: k, white: w });
     drawSpr(g, heads.right, 0, 0, { white: w });
-    if (p.earFlap > 0.05) {
-      const fl = Math.sin(p.t * 50) * 0.12 * p.earFlap;
-      const open = 0.45 + p.earFlap * 0.6;
-      const k = 1.7 + p.earFlap * 0.5;
-      drawSpr(g, heads.earL, heads.earRootNear[0], heads.earRootNear[1], { rot: -open + fl, sx: k * 0.92, sy: k, white: w });
-      drawSpr(g, heads.earR, heads.earRootFar[0], heads.earRootFar[1], { rot: open - fl, sx: k * 0.92, sy: k, white: w });
-    }
     g.restore();
   }
   drawSpr(g, art.upper, 0, 0, { white: w });

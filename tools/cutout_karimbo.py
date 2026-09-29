@@ -95,6 +95,7 @@ print("bbox", x0, y0, x1, y1)
 head = rgba[y0:y1, x0:x1]
 cv2.imwrite(os.path.join(out_dir, "karimbo_head_full.png"), head)
 
+
 # --- orelhas: caixa em torno de cada orelha, com fade no lado do rosto
 ear_pos = {}
 
@@ -123,6 +124,19 @@ def ear(x_a, x_b, y_a, y_b, side):
     ear_pos[side] = (int(x_a + xs2.min() - x0), int(y_a + ys2.min() - y0))
     return box
 
+
+# --- cabeça SEM orelhas (as orelhas viram camadas independentes p/ crescer no EAR GLIDE)
+noears = rgba.copy()
+yy_all = np.arange(H, dtype=np.float32)
+xx_all = np.arange(W, dtype=np.float32)[None, :]
+band = ((yy_all >= 520) & (yy_all <= 1010))[:, None]
+eL = np.interp(yy_all, [p[0] for p in EAR_L_EDGE], [p[1] for p in EAR_L_EDGE]).astype(np.float32)[:, None]
+eR = np.interp(yy_all, [p[0] for p in EAR_R_EDGE], [p[1] for p in EAR_R_EDGE]).astype(np.float32)[:, None]
+fl = np.clip((xx_all - eL) / 3.5, 0, 1)
+fr = np.clip((eR - xx_all) / 3.5, 0, 1)
+mult = np.where(band, fl * fr, 1.0)
+noears[..., 3] = (noears[..., 3].astype(np.float32) * mult).astype(np.uint8)
+cv2.imwrite(os.path.join(out_dir, "karimbo_head_noears.png"), noears[y0:y1, x0:x1])
 
 cv2.imwrite(os.path.join(out_dir, "karimbo_ear_l.png"), ear(0, 180, 560, 990, "l"))
 cv2.imwrite(os.path.join(out_dir, "karimbo_ear_r.png"), ear(815, 960, 560, 990, "r"))

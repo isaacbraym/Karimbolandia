@@ -61,6 +61,12 @@ export class Felipao extends Enemy {
   transitionTo: 2 | 3 = 2;
   vulnerableMul = 1;
   critFlash = 0;
+  faceVis = -1; // virada contínua (1 = direita, -1 = esquerda)
+  walkPhase = 0;
+  walking = 0;
+  prevX = 0;
+  prevSin = 0;
+  stepCd = 0;
 
   constructor(spawn: EnemySpawn) {
     super(spawn, { hp: 3600, w: 84, h: 140, score: 5000, wake: 2000, tokens: [0, 0], metal: false });
@@ -205,7 +211,9 @@ export class Felipao extends Enemy {
       if (this.phase === 3 && Math.random() < 0.5) w.fx.sparks(this.x + rand.spread(30), this.y - rand.range(20, 60), 3, '#ffd27a', 180);
     }
     // olha para o jogador (exceto durante alguns estados)
-    if (this.state !== 'dash' && this.state !== 'enter' && this.state !== 'dying' && this.state !== 'pound') this.facing = p.x >= this.bx ? 1 : -1;
+    if (this.state !== 'dash' && this.state !== 'enter' && this.state !== 'dying' && this.state !== 'pound' && Math.abs(p.x - this.bx) > 40) this.facing = p.x >= this.bx ? 1 : -1;
+    // virada de lado animada (passa por uma "fatia" fina)
+    this.faceVis += clamp(this.facing - this.faceVis, -dt * 8, dt * 8);
     // canhões acompanham o jogador
     const [lx, ly] = this.shoulder('L');
     const [rx, ry] = this.shoulder('R');
@@ -232,6 +240,7 @@ export class Felipao extends Enemy {
     this.thrust = damp(this.thrust, this.targetThrust(), 10, dt);
     this.rackOpen = damp(this.rackOpen, this.state === 'missiles' ? 1 : 0, 10, dt);
     this.setBody();
+    this.stepCycle(w, dt);
     // estabilidade do corpo dentro do palco
     this.body.x = clamp(this.body.x, this.rect.x + 60, this.rect.x + this.rect.w - 60);
     // partículas do propulsor
@@ -240,6 +249,26 @@ export class Felipao extends Enemy {
         w.fx.add(PK.Fire, this.bx + this.facing * f[0], this.floorY - this.hover + 6, rand.spread(20), 80, 0.25, 8, '#ffb347', { size1: 2 });
       }
     }
+  }
+
+  /** Ciclo de caminhada: pernas alternadas e cada passo faz o chão (e a tela) tremer. */
+  private stepCycle(w: World, dt: number) {
+    const spd = Math.abs(this.bx - this.prevX) / Math.max(dt, 1e-4);
+    this.prevX = this.bx;
+    const grounded = this.hover < 4 && this.state !== 'enter' && this.state !== 'transition';
+    this.walking += ((grounded ? Math.min(1, spd / 55) : 0) - this.walking) * Math.min(1, dt * 10);
+    this.walkPhase += Math.min(spd, 320) * dt * 0.052;
+    this.stepCd -= dt;
+    const sn = Math.sin(this.walkPhase);
+    if (sn * this.prevSin < 0 && this.walking > 0.3 && grounded && this.stepCd <= 0) {
+      this.stepCd = 0.16;
+      w.fx.addShake(this.state === 'dash' ? 3.4 : 2.6, 0.17);
+      w.audio('stomp', this.state === 'dash' ? 0.5 : 0.7, this.bx);
+      const fx = this.bx + (sn > 0 ? -1 : 1) * 34 * this.faceVis;
+      for (let i = 0; i < 5; i++) w.fx.add(PK.Dust, fx + rand.spread(14), this.floorY - 2, rand.spread(70), -rand.range(6, 26), 0.5, 8, '#b9b0c8', { size1: 3, a0: 0.6 });
+      if (w.fx.opt()) w.fx.add(PK.Ring, fx, this.floorY - 3, 0, 0, 0.25, 6, '#e8e0ff', { size1: 26, a0: 0.4, front: true });
+    }
+    this.prevSin = sn;
   }
 
   private targetReactor() {
@@ -279,7 +308,7 @@ export class Felipao extends Enemy {
     this.hover = Math.max(0, this.hover - Math.max(60, this.hoverVy) * dt * 0.9);
     this.shake = 2;
     if (this.hover <= 0 && this.st > 0.3) {
-      this.hover = 4;
+      this.hover = 0;
       this.hoverVy = 0;
       w.fx.addShake(12, 0.6);
       w.audio('slam', 1);
@@ -298,9 +327,9 @@ export class Felipao extends Enemy {
     const keep = clamp(w.camera.w * 0.5 - 40, 250, 430);
     let tx = p.x + side * (keep + Math.sin(this.swayT * 0.7) * 60);
     tx = clamp(tx, this.rect.x + 150, this.rect.x + this.rect.w - 150);
-    this.body.vx = approach(this.body.vx, clamp((tx - this.bx) * 1.2, -95, 95) * (this.phase === 3 ? 1.35 : 1), 320 * dt);
+    this.body.vx = approach(this.body.vx, clamp((tx - this.bx) * 1.2, -115, 115) * (this.phase === 3 ? 1.3 : 1), 380 * dt);
     this.body.x += this.body.vx * dt;
-    this.hover = 6 + Math.sin(this.swayT * 2.4) * 3;
+    this.hover = approach(this.hover, 0, 40 * dt);
     this.restT -= dt;
     if (this.restT <= 0 && p.targetable) this.pickAttack(w);
   }
@@ -328,7 +357,7 @@ export class Felipao extends Enemy {
 
   private doCannon(w: World, dt: number) {
     const tele = 0.85 * this.tempo;
-    this.hover = 8 + Math.sin(this.swayT * 3) * 2;
+    this.hover = approach(this.hover, 0, 40 * dt);
     if (this.st < tele) {
       this.charge = clamp(this.st / tele, 0, 1);
       return;
@@ -359,7 +388,7 @@ export class Felipao extends Enemy {
   }
 
   private doMissiles(w: World, dt: number) {
-    this.hover = 10 + Math.sin(this.swayT * 3) * 2;
+    this.hover = approach(this.hover, 0, 40 * dt);
     const tele = 0.75 * this.tempo;
     if (this.st < tele) return;
     const total = this.phase === 1 ? 4 : this.phase === 2 ? 5 : 7;
@@ -378,8 +407,7 @@ export class Felipao extends Enemy {
   }
 
   private doSummon(w: World, dt: number) {
-    void dt;
-    this.hover = 12;
+    this.hover = approach(this.hover, 0, 40 * dt);
     if (this.st > 0.9 && !this.summoned) {
       this.summoned = true;
       const r = this.rect;
@@ -407,7 +435,7 @@ export class Felipao extends Enemy {
     const tele = 0.95 * this.tempo;
     const speed = this.phase === 3 ? 760 : 640;
     if (!this.dashGo) {
-      this.hover = 2;
+      this.hover = 0;
       this.charge = clamp(this.st / tele, 0, 1);
       this.shake = 1.4;
       this.facing = this.dir;
@@ -422,7 +450,7 @@ export class Felipao extends Enemy {
     }
     this.charge = 0;
     this.body.x += this.dir * speed * dt;
-    this.hover = 2;
+    this.hover = 0;
     this.facing = this.dir;
     w.fx.add(PK.Dust, this.bx - this.dir * 40, this.floorY - 2, -this.dir * 40, -12, 0.5, 10, '#b9b0c8', { size1: 3, a0: 0.7 });
     if (Math.random() < 0.6) w.fx.add(PK.Spark, this.bx - this.dir * 34, this.floorY - 2, -this.dir * rand.range(100, 260), -rand.range(30, 150), 0.3, 8, '#ffd27a', { size1: 1.4, g: 500, front: true });
@@ -577,7 +605,7 @@ export class Felipao extends Enemy {
     const tele = 1.5;
     const sweep = 1.75;
     const [rx, ry] = this.reactorPos();
-    this.hover = 24 + Math.sin(this.swayT * 3) * 2;
+    this.hover = approach(this.hover, 0, 40 * dt);
     if (this.st === dt) {
       w.audio('laserCharge', 1);
       // varredura: começa apontando para o chão à frente e sobe até quase horizontal
@@ -648,7 +676,7 @@ export class Felipao extends Enemy {
       this.roared = false;
       this.phase = this.transitionTo;
       this.hp = Math.min(this.hp, this.maxHp * (this.phase === 2 ? 0.66 : 0.33));
-      this.hover = 6;
+      this.hover = 0;
       this.go('idle');
       this.restT = 1.0;
     }
@@ -687,6 +715,9 @@ export class Felipao extends Enemy {
       hp01: this.hp / this.maxHp,
       kickL: this.kickL,
       kickR: this.kickR,
+      faceX: this.faceVis,
+      walk: this.walkPhase,
+      walking: this.walking,
     });
     if (this.beamOn && this.alive) this.drawBeam(g);
   }

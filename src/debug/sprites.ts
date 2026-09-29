@@ -51,7 +51,7 @@ export async function runSpriteDebug(base: string) {
           g.save();
           g.translate(220 + i * 420, 720);
           g.scale(2.6, 2.6);
-          drawFelipao(g, feli, 0, 0, { facing: i === 1 ? -1 : 1, t, flash: false, alpha: 1, lean: 0, squashY: 1, aimL: -0.4, aimR: -0.4, charge: i === 1 ? 1 : 0, reactor: 0.5, phase: (i + 1) as 1 | 2 | 3, thrust: 0.4, rackOpen: i === 2 ? 1 : 0, hover: 10, taunt: 0, shake: 0, hp01: 1, kickL: 0, kickR: 0 });
+          drawFelipao(g, feli, 0, 0, { facing: i === 1 ? -1 : 1, t, flash: false, alpha: 1, lean: 0, squashY: 1, aimL: -0.4, aimR: -0.4, charge: i === 1 ? 1 : 0, reactor: 0.5, phase: (i + 1) as 1 | 2 | 3, thrust: 0.4, rackOpen: i === 2 ? 1 : 0, hover: 10, taunt: 0, shake: 0, hp01: 1, kickL: 0, kickR: 0, faceX: i === 1 ? -1 : 1, walk: t * 6, walking: 1 });
           g.restore();
         }
       } else if (view === 'foes') {
