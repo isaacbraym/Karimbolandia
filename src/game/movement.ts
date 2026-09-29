@@ -1,9 +1,9 @@
 /** Constantes de movimento (compartilhadas com o validador de fase). Unidades: px, s. */
-export const FOOT_W = 22;
-export const FOOT_H = 50;
-export const CROUCH_H = 30;
-export const NOMAD_W = 58;
-export const NOMAD_H = 74;
+export const FOOT_W = 24;
+export const FOOT_H = 56;
+export const CROUCH_H = 26; // agachado: por baixo de tiros retos dos inimigos
+export const NOMAD_W = 64;
+export const NOMAD_H = 82;
 
 export const RUN = 196;
 export const RUN_ACC = 2300;

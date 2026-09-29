@@ -146,7 +146,9 @@ export abstract class Enemy {
   aimAngleTo(w: World, ox: number, oy: number, lead = 0) {
     const p = w.player;
     const tx = p.x + p.body.vx * lead;
-    const ty = p.y - p.body.h * 0.15 + p.body.vy * lead * 0.5;
+    // mira na altura do peito EM PÉ: agachar desvia de tiros retos (como nos clássicos)
+    const chest = p.mounted ? p.y : p.feetY - 42;
+    const ty = chest + p.body.vy * lead * 0.5;
     return Math.atan2(ty - oy, tx - ox);
   }
 
@@ -187,9 +189,9 @@ export abstract class Enemy {
     const [a, b] = this.stats.tokens;
     const n = rand.int(a, b);
     for (let i = 0; i < n; i++) w.spawnDrop('token', this.x, this.y - 8);
-    if (rand.chance(0.11)) w.spawnDrop('health', this.x, this.y - 8);
-    else if (rand.chance(0.1)) w.spawnDrop('ammo', this.x, this.y - 8);
-    else if (rand.chance(0.05)) w.spawnDrop('nade', this.x, this.y - 8);
+    if (rand.chance(0.17)) w.spawnDrop('health', this.x, this.y - 8);
+    else if (rand.chance(0.2)) w.spawnDrop('ammo', this.x, this.y - 8);
+    else if (rand.chance(0.07)) w.spawnDrop('nade', this.x, this.y - 8);
   }
 
   fireBullet(w: World, x: number, y: number, ang: number, speed: number, dmg: number, kind: 'enemy' | 'orb' | 'sniper' | 'missile' | 'bossShell' | 'bossOrb' = 'enemy', extra: Partial<{ life: number; homing: number; gravity: number; explode: { radius: number; dmg: number } | null; turnDelay: number; r: number; color: string; trail: string }> = {}) {

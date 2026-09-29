@@ -85,11 +85,12 @@ export class Game {
     this.resize();
     window.addEventListener('resize', () => this.resize());
     window.addEventListener('orientationchange', () => window.setTimeout(() => this.resize(), 250));
+    const noPause = new URLSearchParams(location.search).get('nopause') === '1'; // QA
     document.addEventListener('visibilitychange', () => {
-      if (document.hidden && this.state === 'playing') this.pause();
+      if (document.hidden && this.state === 'playing' && !noPause) this.pause();
     });
     window.addEventListener('blur', () => {
-      if (this.state === 'playing') this.pause();
+      if (this.state === 'playing' && !noPause) this.pause();
     });
     for (const ev of ['gesturestart', 'gesturechange']) document.addEventListener(ev, (e) => e.preventDefault());
     document.addEventListener('dblclick', (e) => e.preventDefault());

@@ -362,65 +362,51 @@ export function bakePickups(): Record<PickupKind, Sprite> {
     g.fill();
   }, { scale: 3, ox: 15, oy: 17 });
 
-  // coxinha (cura pequena)
-  out.health = bake(22, 24, (g) => {
+  // CORAÇÃO (cura pequena) — bem evidente
+  const heart = (g: CanvasRenderingContext2D, cx: number, cy: number, sz: number, c0: string, c1: string) => {
     g.beginPath();
-    g.moveTo(11, 1.6);
-    g.bezierCurveTo(19, 6, 21, 15, 15, 21);
-    g.bezierCurveTo(12, 24, 8, 23, 6.6, 20.6);
-    g.bezierCurveTo(1.2, 14, 4, 6, 11, 1.6);
+    g.moveTo(cx, cy + sz * 0.92);
+    g.bezierCurveTo(cx - sz * 1.35, cy + sz * 0.1, cx - sz * 0.95, cy - sz * 0.95, cx, cy - sz * 0.32);
+    g.bezierCurveTo(cx + sz * 0.95, cy - sz * 0.95, cx + sz * 1.35, cy + sz * 0.1, cx, cy + sz * 0.92);
     g.closePath();
-    const gr = g.createRadialGradient(8, 8, 1, 11, 13, 13);
-    gr.addColorStop(0, '#ffdd88');
-    gr.addColorStop(0.55, '#e39b34');
-    gr.addColorStop(1, '#a5581a');
+    const gr = g.createLinearGradient(0, cy - sz, 0, cy + sz);
+    gr.addColorStop(0, c0);
+    gr.addColorStop(1, c1);
     g.fillStyle = gr;
     g.fill();
-    g.lineWidth = 1.4;
+  };
+  out.health = bake(30, 28, (g) => {
+    heart(g, 15, 13.5, 11.5, '#ff7a96', '#d81e4a');
+    g.lineWidth = 1.8;
     g.strokeStyle = OUT;
     g.stroke();
-    g.fillStyle = 'rgba(255,255,255,0.5)';
+    g.fillStyle = 'rgba(255,255,255,0.75)';
     g.beginPath();
-    g.ellipse(8.6, 9, 2, 4.4, -0.4, 0, Math.PI * 2);
+    g.ellipse(9.4, 8.4, 3.2, 2, -0.6, 0, Math.PI * 2);
     g.fill();
-    // cruz de vida
-    g.fillStyle = '#e2384a';
-    g.fillRect(10, 12.4, 6, 2);
-    g.fillRect(12, 10.4, 2, 6);
-  }, { scale: 3, ox: 11, oy: 12 });
+    g.fillStyle = 'rgba(255,255,255,0.35)';
+    g.beginPath();
+    g.arc(20.4, 8, 1.1, 0, Math.PI * 2);
+    g.fill();
+  }, { scale: 3, ox: 15, oy: 14 });
 
-  // açaí (cura grande)
-  out.healthBig = bake(26, 24, (g) => {
-    g.beginPath();
-    g.moveTo(2, 9);
-    g.quadraticCurveTo(13, 6, 24, 9);
-    g.quadraticCurveTo(22, 22, 13, 22);
-    g.quadraticCurveTo(4, 22, 2, 9);
-    g.closePath();
-    g.fillStyle = '#e8e0f5';
-    g.fill();
-    g.lineWidth = 1.4;
+  // CORAÇÃO GRANDE (cura grande): dourado com cruz
+  out.healthBig = bake(42, 38, (g) => {
+    heart(g, 21, 18.5, 16.5, '#ffd0e0', '#ff2f6a');
+    g.lineWidth = 2.4;
+    g.strokeStyle = '#ffd23a';
+    g.stroke();
+    g.lineWidth = 1.2;
     g.strokeStyle = OUT;
     g.stroke();
+    g.fillStyle = '#ffffff';
+    g.fillRect(19, 12, 4, 13);
+    g.fillRect(14.5, 16.5, 13, 4);
+    g.fillStyle = 'rgba(255,255,255,0.7)';
     g.beginPath();
-    g.ellipse(13, 8, 11.4, 5.4, 0, 0, Math.PI * 2);
-    const gr = g.createLinearGradient(0, 3, 0, 13);
-    gr.addColorStop(0, '#7a3ab5');
-    gr.addColorStop(1, '#4a1f80');
-    g.fillStyle = gr;
+    g.ellipse(12.5, 10.5, 4, 2.4, -0.6, 0, Math.PI * 2);
     g.fill();
-    g.stroke();
-    g.fillStyle = '#ffd23a';
-    g.beginPath();
-    g.ellipse(9, 5.6, 3.4, 1.4, -0.3, 0, Math.PI * 2);
-    g.fill();
-    g.beginPath();
-    g.ellipse(16, 5.6, 3.4, 1.4, 0.3, 0, Math.PI * 2);
-    g.fill();
-    g.fillStyle = '#e2384a';
-    g.fillRect(11.6, 13.4, 3, 6);
-    g.fillRect(9.9, 15, 6.4, 3);
-  }, { scale: 3, ox: 13, oy: 12 });
+  }, { scale: 3, ox: 21, oy: 19 });
 
   out.ammo = bake(24, 20, (g) => {
     shadedRR(g, 1.5, 4, 21, 14.5, 2.4, '#5c6a34');

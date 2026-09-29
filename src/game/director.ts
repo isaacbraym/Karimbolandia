@@ -10,6 +10,7 @@ import { getArt } from '../art';
 import { drawNomadIdle } from '../art/nomad';
 import { newNomad } from './player';
 import { NOMAD_W, NOMAD_H, FOOT_H } from './movement';
+import { BASE_ZOOM } from './camera';
 import { glowSprite } from '../art/kit';
 import { drawDeco } from '../art/decor';
 
@@ -83,7 +84,7 @@ export class Director {
     this.zoomOverride = null;
     this.w.camera.focus = null;
     this.w.camera.lock = null;
-    this.w.camera.zoomTarget = 1;
+    this.w.camera.zoomTarget = BASE_ZOOM;
   }
 
   // ------------------------------------------------------------------ respawn
@@ -106,7 +107,7 @@ export class Director {
     this.zoomOverride = null;
     this.w.camera.focus = null;
     this.w.camera.lock = null;
-    this.w.camera.zoomTarget = 1;
+    this.w.camera.zoomTarget = BASE_ZOOM;
     this.w.setAlarm(false);
     this.w.rollSound(0);
     // gatilhos de cinemática já concluídos permanecem; o que não concluiu recomeça
@@ -291,10 +292,10 @@ export class Director {
     if (!this.nomadMountable || w.nomadUsed || p.mode !== 'foot' || this.cine) return;
     const ns = w.data.nomadSpawn;
     const dx = Math.abs(p.x - ns.x);
-    const top = ns.y - 96;
+    const top = ns.y - 106;
     const feet = p.feetY;
     const onTop = dx < 40 && feet > top - 10 && feet < top + 46 && p.body.vy >= -80;
-    const touching = dx < 34 && feet > ns.y - 60 && ctlJumpHeld(w);
+    const touching = dx < 38 && feet > ns.y - 66 && ctlJumpHeld(w);
     if (onTop || touching) {
       this.nomadMountable = false;
       w.audio('nomadEnter', 1, ns.x);
@@ -335,7 +336,7 @@ export class Director {
     if (c.kind === 'nomad') {
       const ns = w.data.nomadSpawn;
       w.camera.focus = { x: ns.x - 20, y: ns.y - 64, rate: 3.2 };
-      w.camera.zoomTarget = 1.22;
+      w.camera.zoomTarget = 1.4;
       p.body.vx = 0;
       if (c.stage === 0 && c.t > 0.7) {
         c.stage = 1;
@@ -358,7 +359,7 @@ export class Director {
         this.nomadMountable = true;
         p.lockInput = false;
         w.camera.focus = null;
-        w.camera.zoomTarget = 1;
+        w.camera.zoomTarget = BASE_ZOOM;
         w.setMusic('explore');
         w.hooks.onHint?.('mountNomad');
       }
@@ -485,7 +486,7 @@ export class Director {
     w.setMusic('silence');
     w.player.lockInput = true;
     w.player.body.vx = 0;
-    w.camera.zoomTarget = 0.96;
+    w.camera.zoomTarget = 0.98;
     w.after(0.8, () => {
       const sp = w.data.enemies.find((e) => e.type === 'boss')!;
       const e = w.spawnEnemy({ ...sp, arena: 'boss' });
@@ -516,7 +517,7 @@ export class Director {
     w.player.lockInput = true;
     w.setMusic('silence');
     w.camera.focus = { x: e.x, y: e.y - 40, rate: 3 };
-    w.camera.zoomTarget = 1.08;
+    w.camera.zoomTarget = 1.1;
     w.fx.slowmo = 2.6;
     w.fx.slowScale = 0.3;
     for (const en of w.enemies) if (en.alive && en !== e) en.kill(w);
@@ -601,7 +602,7 @@ export class Director {
       const p = w.player;
       const spawn = w.data.enemies.find((e) => e.type === 'boss')!;
       const b = this.bossRef;
-      const zoom = 0.9;
+      const zoom = 0.98;
       cam.zoomTarget = zoom;
       const vw = cam.viewW / zoom;
       if (b && (b.alive || b.hp > 0)) {
@@ -611,7 +612,7 @@ export class Director {
       return;
     }
     // zoom padrão: um pouco mais aberto ao pilotar o Nômad
-    cam.zoomTarget = this.zoomOverride ?? (w.player.mounted ? 0.94 : 1);
+    cam.zoomTarget = this.zoomOverride ?? (w.player.mounted ? BASE_ZOOM - 0.1 : BASE_ZOOM);
     cam.focus = null;
   }
 
@@ -644,7 +645,7 @@ export class Director {
         if (this.nomadMountable) {
           // seta pulsante: "pule aqui"
           const bob = Math.sin(w.time * 6) * 4;
-          const ay = ns.y - 116 + bob;
+          const ay = ns.y - 128 + bob;
           g.fillStyle = '#ffe27a';
           g.strokeStyle = '#170f2e';
           g.lineWidth = 2;

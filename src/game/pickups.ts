@@ -37,7 +37,7 @@ export class Pickup {
   }
 
   get radius() {
-    return this.kind === 'token' ? 13 : this.kind === 'emblem' || this.kind === 'secret' ? 18 : 16;
+    return this.kind === 'token' ? 13 : this.kind === 'emblem' || this.kind === 'secret' ? 18 : this.kind === 'healthBig' ? 22 : 18;
   }
 
   update(w: World, dt: number) {
@@ -96,6 +96,20 @@ export class Pickup {
       g.globalAlpha = 1;
       g.globalCompositeOperation = 'source-over';
       if (Math.random() < 0.06) w.fx.add(PK.Glint, x + (Math.random() - 0.5) * 22, y + (Math.random() - 0.5) * 22, 0, -6, 0.45, 5, '#fff2a0', { front: true });
+    }
+    if (this.kind === 'health' || this.kind === 'healthBig') {
+      const big = this.kind === 'healthBig';
+      const glow = glowSprite('#ff4a7a', 32);
+      const pulse = 1 + 0.09 * Math.sin(this.t * 6);
+      const r = (big ? 34 : 24) * pulse;
+      g.globalCompositeOperation = 'lighter';
+      g.globalAlpha = 0.5 + 0.2 * Math.sin(this.t * 4);
+      g.drawImage(glow.c, x - r, y - r, r * 2, r * 2);
+      g.globalAlpha = 1;
+      g.globalCompositeOperation = 'source-over';
+      if (Math.random() < 0.05) w.fx.add(PK.Glint, x + (Math.random() - 0.5) * 18, y + (Math.random() - 0.5) * 16, 0, -8, 0.4, 4, '#ffd0e0', { front: true });
+      drawSpr(g, art[this.kind], x, y, { sx: pulse, sy: pulse });
+      return;
     }
     const spr = art[this.kind];
     if (spr) drawSpr(g, spr, x, y);

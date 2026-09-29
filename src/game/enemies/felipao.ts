@@ -53,7 +53,7 @@ export class Felipao extends Enemy {
   beamOn = false;
   beamEndPt: [number, number] = [0, 0];
   dashGo = false;
-  supplyT = 18;
+  supplyT = 10;
   dyingT = 0;
   minionId = 90000;
   crumbledCenter = false;
@@ -200,9 +200,9 @@ export class Felipao extends Enemy {
     this.beamHitCd -= dt;
     this.supplyT -= dt;
     if (this.supplyT <= 0 && this.state !== 'enter' && this.state !== 'transition') {
-      this.supplyT = 24;
+      this.supplyT = 15;
       w.spawnDrop('ammo', this.rect.x + rand.range(200, this.rect.w - 200), this.rect.y + 20);
-      if (rand.chance(0.5)) w.spawnDrop('health', this.rect.x + rand.range(200, this.rect.w - 200), this.rect.y + 20);
+      if (rand.chance(0.85)) w.spawnDrop('health', this.rect.x + rand.range(200, this.rect.w - 200), this.rect.y + 20);
     }
     // fumaça/faíscas conforme o dano
     if (this.phase >= 2 && this.state !== 'dying' && Math.random() < dt * (this.phase === 3 ? 12 : 5)) {
@@ -372,7 +372,7 @@ export class Felipao extends Enemy {
       const a = aim + rand.spread(0.03);
       const mx = sx + Math.cos(aim) * 34;
       const my = sy + Math.sin(aim) * 34;
-      this.fireBullet(w, mx, my, a, 400, 9, 'bossShell');
+      this.fireBullet(w, mx, my, a, 400, 8, 'bossShell');
       this.muzzleFlash(w, mx, my, a, 1.8);
       if (side === 'L') this.kickL = 1;
       else this.kickR = 1;
@@ -397,7 +397,7 @@ export class Felipao extends Enemy {
       const [rx, ry] = this.rackPos();
       const i = this.missilesLeft;
       const spreadA = -Math.PI / 2 + (i - (total - 1) / 2) * 0.32 + rand.spread(0.08);
-      this.fireBullet(w, rx + (i - total / 2) * 8, ry - 6, spreadA, 250, 22, 'missile', { homing: 1.3 + this.phase * 0.2, turnDelay: 0.45, life: 4.2, explode: { radius: 58, dmg: 24 } });
+      this.fireBullet(w, rx + (i - total / 2) * 8, ry - 6, spreadA, 250, 20, 'missile', { homing: 1.3 + this.phase * 0.2, turnDelay: 0.45, life: 4.2, explode: { radius: 58, dmg: 21 } });
       w.audio('missile', 0.7, this.x);
       w.fx.smoke(rx, ry - 8, 2, '#8b8499', 8, 30, 0.6);
       this.missilesLeft++;

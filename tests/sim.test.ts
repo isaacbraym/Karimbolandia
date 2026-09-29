@@ -222,3 +222,38 @@ describe('Seção 11: desembarque e túnel de engatinhar', () => {
     expect(w.player.x).toBeLessThan(1053 * 32);
   });
 });
+
+describe('Agachar desvia de tiros retos', () => {
+  const setup = (crouch: boolean) => {
+    const w = makeWorld();
+    w.invulnerable = false;
+    teleport(w, 60, 32);
+    w.director.arenas.length = 0;
+    const px = w.player.x;
+    // atirador e jogador no mesmo nível, a ~7 tiles
+    w.spawnEnemy({ id: 99991, type: 'rifle', x: px + 7 * TILE, y: 32 * TILE, facing: -1 });
+    const ctl = newCtl();
+    ctl.moveY = crouch ? 1 : 0;
+    let hits = 0;
+    let lastHp = w.player.hp;
+    for (let i = 0; i < 60 * 12; i++) {
+      w.update(1 / 60, ctl);
+      if (w.player.hp < lastHp) hits++;
+      lastHp = w.player.hp;
+      if (!w.enemies.some((e) => e.alive)) break;
+    }
+    return { hits, crouched: w.player.crouch, hp: w.player.hp };
+  };
+
+  it('em pé o jogador é atingido', () => {
+    const r = setup(false);
+    expect(r.hits).toBeGreaterThan(0);
+  });
+
+  it('agachado, os tiros retos passam por cima', () => {
+    const r = setup(true);
+    expect(r.crouched).toBe(true);
+    expect(r.hits).toBe(0);
+    expect(r.hp).toBe(100);
+  });
+});

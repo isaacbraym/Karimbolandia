@@ -46,7 +46,7 @@ abstract class Soldier extends Enemy {
     const b = this.body;
     const feet = b.y + b.h / 2;
     this.crouch = c;
-    b.h = c ? 28 : this.stats.h;
+    b.h = c ? 36 : this.stats.h;
     b.y = feet - b.h / 2;
   }
 
@@ -127,7 +127,7 @@ abstract class Soldier extends Enemy {
     w.fx.smoke(this.x, this.y, 3, '#6b6480', 9, 26, 0.7);
     w.corpses.push(new Corpse(this.x, this.y, dir * rand.range(120, 240) + (info?.kx ?? 0) * 0.3, -rand.range(280, 420), (g, x, y, rot, alpha) => {
       const art = getArt().soldiers[this.style];
-      drawSoldier(g, art, x, y + 22, { facing: this.facing, state: 'hurt', t: 0, runPhase: 0, aim: this.aim, aiming: false, flash: false, alpha, kick: 0, charge: 0, style: this.style, rot });
+      drawSoldier(g, art, x, y + this.stats.h / 2, { facing: this.facing, state: 'hurt', t: 0, runPhase: 0, aim: this.aim, aiming: false, flash: false, alpha, kick: 0, charge: 0, style: this.style, rot });
     }));
     w.fx.explosion(this.x, this.y - 6, 9);
   }
@@ -167,7 +167,7 @@ abstract class Soldier extends Enemy {
 export class RifleSoldier extends Soldier {
   coverT = 0;
   constructor(spawn: EnemySpawn) {
-    super(spawn, 'rifle', { hp: 30, w: 22, h: 46, score: 100, wake: 560, tokens: [1, 2] });
+    super(spawn, 'rifle', { hp: 30, w: 28, h: 60, score: 100, wake: 560, tokens: [1, 2] });
   }
 
   update(w: World, dt: number) {
@@ -186,7 +186,7 @@ export class RifleSoldier extends Soldier {
       const dx = p.x - this.x;
       const dist = Math.abs(dx);
       this.faceToward(p.x);
-      this.aim = this.aimAngleTo(w, this.x, this.feetY - 28, 0.05);
+      this.aim = this.aimAngleTo(w, this.x, this.feetY - 36, 0.05);
       this.aiming = true;
       switch (this.mode) {
         case 'move': {
@@ -216,7 +216,7 @@ export class RifleSoldier extends Soldier {
           b.vx = approach(b.vx, 0, 1400 * dt);
           this.burstGap -= dt;
           if (this.burstLeft > 0 && this.burstGap <= 0) {
-            this.fireAt(w, 380, 8, 0.05);
+            this.fireAt(w, 380, 7, 0.05);
             this.burstLeft--;
             this.burstGap = 0.17;
           }
@@ -246,7 +246,7 @@ export class RifleSoldier extends Soldier {
 // ------------------------------------------------------------------------------------------
 export class ShotgunSoldier extends Soldier {
   constructor(spawn: EnemySpawn) {
-    super(spawn, 'shotgun', { hp: 46, w: 24, h: 46, score: 130, wake: 540, tokens: [1, 3] });
+    super(spawn, 'shotgun', { hp: 46, w: 31, h: 60, score: 130, wake: 540, tokens: [1, 3] });
   }
   update(w: World, dt: number) {
     this.commonUpdate(w, dt);
@@ -263,7 +263,7 @@ export class ShotgunSoldier extends Soldier {
       const p = w.player;
       const dist = Math.abs(p.x - this.x);
       this.faceToward(p.x);
-      this.aim = this.aimAngleTo(w, this.x, this.feetY - 28, 0);
+      this.aim = this.aimAngleTo(w, this.x, this.feetY - 36, 0);
       this.aiming = true;
       switch (this.mode) {
         case 'rush':
@@ -280,7 +280,7 @@ export class ShotgunSoldier extends Soldier {
             const [mx, my] = this.muzzlePos(w);
             for (let i = 0; i < 5; i++) {
               const a = this.aim + (i - 2) * 0.13 + rand.spread(0.03);
-              this.fireBullet(w, mx, my, a, rand.range(330, 400), 7, 'enemy', { life: 0.45 });
+              this.fireBullet(w, mx, my, a, rand.range(330, 400), 6, 'enemy', { life: 0.45 });
             }
             this.muzzleFlash(w, mx, my, this.aim, 1.6);
             w.fx.smoke(mx, my, 2, '#8b8499', 6, 16, 0.5);
@@ -309,7 +309,7 @@ export class ShotgunSoldier extends Soldier {
 export class ShieldSoldier extends Soldier {
   shield = true;
   constructor(spawn: EnemySpawn) {
-    super(spawn, 'shield', { hp: 58, w: 26, h: 46, score: 180, wake: 520, tokens: [2, 3] });
+    super(spawn, 'shield', { hp: 58, w: 34, h: 60, score: 180, wake: 520, tokens: [2, 3] });
   }
   protected shieldUp() {
     return this.shield;
@@ -397,7 +397,7 @@ export class JetpackSoldier extends Soldier {
   flyOsc = Math.random() * 6;
   contactWhileDive = false;
   constructor(spawn: EnemySpawn) {
-    super(spawn, 'jetpack', { hp: 24, w: 22, h: 40, score: 200, wake: 640, tokens: [2, 3] });
+    super(spawn, 'jetpack', { hp: 24, w: 28, h: 52, score: 200, wake: 640, tokens: [2, 3] });
     this.flying = true;
     this.gravity = 0;
     this.body.y = spawn.y;
@@ -450,7 +450,7 @@ export class JetpackSoldier extends Soldier {
       case 'burst':
         this.burstGap -= dt;
         if (this.burstLeft > 0 && this.burstGap <= 0) {
-          this.fireAt(w, 340, 8, 0.04);
+          this.fireAt(w, 340, 7, 0.04);
           this.burstLeft--;
           this.burstGap = 0.2;
         }
@@ -513,7 +513,7 @@ export class Sniper extends Soldier {
   lasered = false;
   laserEnd: [number, number] = [0, 0];
   constructor(spawn: EnemySpawn) {
-    super(spawn, 'sniper', { hp: 22, w: 22, h: 46, score: 220, wake: 700, tokens: [2, 4] });
+    super(spawn, 'sniper', { hp: 22, w: 28, h: 60, score: 220, wake: 700, tokens: [2, 4] });
     this.spawn.idle = true;
   }
   update(w: World, dt: number) {
@@ -524,7 +524,7 @@ export class Sniper extends Soldier {
     this.aiming = true;
     this.faceToward(p.x);
     this.reload -= dt;
-    const target = this.aimAngleTo(w, this.x, this.feetY - 30, 0);
+    const target = this.aimAngleTo(w, this.x, this.feetY - 39, 0);
     if (see && this.reload <= 0) {
       this.alert = true;
       // rastreia devagar até travar
@@ -537,7 +537,7 @@ export class Sniper extends Soldier {
       this.lasered = true;
       if (this.lock >= 1.35) {
         const [mx, my] = this.muzzlePos(w);
-        this.fireBullet(w, mx, my, this.aim, 1100, 26, 'sniper');
+        this.fireBullet(w, mx, my, this.aim, 1100, 20, 'sniper');
         this.muzzleFlash(w, mx, my, this.aim, 2);
         w.audio('sniperShot', 0.8, this.x);
         this.kick = 1.6;

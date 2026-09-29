@@ -1,12 +1,15 @@
 import { clamp, damp, lerp, type Rect } from '../core/math';
 import { VIEW_H } from './level';
 
+/** Zoom base do jogo (aproxima levemente a ação). */
+export const BASE_ZOOM = 1.14;
+
 /** Câmera com suavização, look-ahead, zoom, travas de arena e shake. */
 export class Camera {
   x = 0;
   y = 0;
-  zoom = 1;
-  zoomTarget = 1;
+  zoom = BASE_ZOOM;
+  zoomTarget = BASE_ZOOM;
   viewW = 640; // largura lógica visível (com zoom 1)
   viewH = VIEW_H;
   bounds: Rect | null = null; // limites do mundo (px)

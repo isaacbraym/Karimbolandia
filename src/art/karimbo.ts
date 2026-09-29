@@ -312,10 +312,12 @@ export function karimboMuzzle(facing: 1 | -1, aim: number, weapon: WeaponId, cro
   const d = ARM_LEN + def.muzzle - kick * 3.5;
   const lx = SHOULDER_STAND[0] + Math.cos(a) * d;
   const ly = sy + Math.sin(a) * d - 0.5;
-  return [lx * facing, ly];
+  return [lx * facing * KSCALE, ly * KSCALE];
 }
 
 export const KARIMBO_SHOULDER_Y = SHOULDER_STAND[1];
+/** Escala visual do herói (sprites maiores; hitbox acompanha em movement.ts). */
+export const KSCALE = 1.2;
 
 export function drawKarimbo(g: CanvasRenderingContext2D, art: KarimboArt, x: number, y: number, p: KPose) {
   if (p.alpha <= 0.01) return;
@@ -324,6 +326,7 @@ export function drawKarimbo(g: CanvasRenderingContext2D, art: KarimboArt, x: num
   g.save();
   g.translate(x, y);
   if (p.facing === -1) g.scale(-1, 1);
+  g.scale(KSCALE, KSCALE);
 
   const w = p.flash;
   const running = p.state === 'run';

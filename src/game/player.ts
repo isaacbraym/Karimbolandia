@@ -130,8 +130,8 @@ export class Player {
     return !!this.nomad && this.nomad.dashT > 0;
   }
   get shoulder(): [number, number] {
-    if (this.nomad) return [this.x + this.facing * 4, this.y - 22];
-    return [this.x + this.facing * 2.5, this.feetY - 21.5 + (this.crouch ? 10 : 0)];
+    if (this.nomad) return [this.x + this.facing * 4, this.y - 26];
+    return [this.x + this.facing * 2.5 * 1.2, this.feetY - 21.5 * 1.2 + (this.crouch ? 12 : 0)];
   }
 
   // ------------------------------------------------------------------ ciclo de vida
@@ -158,9 +158,10 @@ export class Player {
   }
 
   resetInventory() {
-    this.weapons = new Map([['pistol', Infinity]]);
-    this.cur = 'pistol';
-    this.grenades = 3;
+    // começa com pistola + metralhadora + shotgun (munição LIMITADA: varie as armas!)
+    this.weapons = new Map<WeaponId, number>([['pistol', Infinity], ['rifle', 110], ['shotgun', 16]]);
+    this.cur = 'rifle';
+    this.grenades = 4;
   }
 
   snapshot() {
@@ -185,23 +186,22 @@ export class Player {
     w.audio('weapon', 0.8, this.x);
   }
 
+  /** Caixa de munição: reabastece TODAS as armas que você tem (metade da carga de cada). */
   addAmmo(w: World): boolean {
-    // adiciona munição à arma atual (ou à melhor que tiver, se for pistola)
-    let target: WeaponId = this.cur;
-    if (target === 'pistol') {
-      const owned = WEAPON_ORDER.filter((id) => id !== 'pistol' && this.weapons.has(id));
-      if (!owned.length) {
-        // sem armas: dá granadas em vez disso
-        if (this.grenades >= this.maxGrenades) return false;
-        this.grenades = Math.min(this.maxGrenades, this.grenades + 2);
-        return true;
-      }
-      target = owned[owned.length - 1];
+    let gained = false;
+    for (const id of WEAPON_ORDER) {
+      if (id === 'pistol') continue;
+      const have = this.weapons.get(id);
+      if (have === undefined) continue;
+      const d = WEAPONS[id];
+      if (have >= d.ammoMax) continue;
+      this.weapons.set(id, Math.min(d.ammoMax, have + Math.ceil(d.ammoPickup * 0.6)));
+      gained = true;
     }
-    const d = WEAPONS[target];
-    const have = this.weapons.get(target) ?? 0;
-    if (have >= d.ammoMax) return false;
-    this.weapons.set(target, Math.min(d.ammoMax, have + d.ammoPickup));
+    if (!gained) {
+      if (this.grenades >= this.maxGrenades) return false;
+      this.grenades = Math.min(this.maxGrenades, this.grenades + 2);
+    }
     w.fx.popup(this.x, this.y - 40, '+MUNIÇÃO', '#9dff7a');
     return true;
   }
@@ -274,7 +274,7 @@ export class Player {
       return;
     }
     this.hp -= dmg;
-    this.invuln = 1.35;
+    this.invuln = 1.7;
     this.hurtT = 0.28;
     this.body.vx = dir * (o.kx ? Math.min(o.kx, 240) : 160);
     this.body.vy = o.ky ?? -230;
@@ -881,7 +881,7 @@ export class Player {
     }
 
     // rolagem da esfera
-    n.roll += (b.vx * dt) / 22;
+    n.roll += (b.vx * dt) / 24;
     // partículas de poeira/faíscas
     const sp = Math.abs(b.vx);
     if (grounded && sp > 60) {
@@ -960,7 +960,7 @@ export class Player {
     w.fx.add(PK.Spark, this.x - n.dashDir * 20, this.feetY - 2, -n.dashDir * rand.range(60, 220), -rand.range(20, 120), 0.3, 8, '#fff2b0', { size1: 1.4, g: 500, front: true });
     w.speedLines = 0.25;
     // dano/empurrão em quem toca
-    const hb = { x: this.x - 38, y: this.y - 42, w: 76, h: 88 };
+    const hb = { x: this.x - 42, y: this.y - 46, w: 84, h: 96 };
     const kbx = n.dashDir * (n.dashKind === 1 ? 640 : 900);
     for (const e of w.enemies) {
       if (!e.alive || !e.canBeHit || n.hitThisDash.includes(e)) continue;
@@ -1124,9 +1124,9 @@ export class Player {
       const f = clamp(this.glideFuel / GLIDE_FUEL, 0, 1);
       g.globalAlpha = 0.75;
       g.fillStyle = '#170f2e';
-      g.fillRect(this.x - 11, this.feetY - 72, 22, 3);
+      g.fillRect(this.x - 11, this.feetY - 84, 22, 3);
       g.fillStyle = f > 0.3 ? '#9dfcff' : '#ff8a8a';
-      g.fillRect(this.x - 10, this.feetY - 71.2, 20 * f, 1.4);
+      g.fillRect(this.x - 10, this.feetY - 83.2, 20 * f, 1.4);
       g.globalAlpha = 1;
     }
     void w;
@@ -1134,8 +1134,8 @@ export class Player {
 }
 
 export const newNomad = (): NomadState => ({
-  hp: 220,
-  maxHp: 220,
+  hp: 300,
+  maxHp: 300,
   dashT: 0,
   dashKind: 0,
   dashDir: 1,
@@ -1164,8 +1164,8 @@ export const newNomad = (): NomadState => ({
  */
 export function nomadMuzzle(facing: 1 | -1, aim: number, which: 0 | 1): [number, number] {
   const a = facing === 1 ? aim : Math.PI - aim;
-  const base = which === 0 ? [43, -44] : [-10, -49];
-  const len = which === 0 ? 9 : 22;
+  const base = which === 0 ? [47, -48] : [-11, -54];
+  const len = which === 0 ? 10 : 24;
   const lx = base[0] + Math.cos(a) * len;
   const ly = base[1] + Math.sin(a) * len * 0.9;
   return [lx * facing, ly];

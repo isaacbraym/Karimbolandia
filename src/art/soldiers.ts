@@ -280,6 +280,7 @@ export interface SPose {
   squash?: number;
 }
 
+export const SOLDIER_SCALE = 1.3;
 const SHOULDER: [number, number] = [2.2, -24.5];
 
 export function soldierMuzzle(facing: 1 | -1, aim: number, gunLen: number, crouch: boolean, kick = 0): [number, number] {
@@ -289,7 +290,7 @@ export function soldierMuzzle(facing: 1 | -1, aim: number, gunLen: number, crouc
   a = Math.max(-Math.PI * 0.6, Math.min(Math.PI * 0.6, a));
   const sy = SHOULDER[1] + (crouch ? 9 : 0);
   const d = 12 + gunLen - 6 - kick * 2.6;
-  return [(SHOULDER[0] + Math.cos(a) * d) * facing, sy + Math.sin(a) * d - 0.4];
+  return [(SHOULDER[0] + Math.cos(a) * d) * facing * SOLDIER_SCALE, (sy + Math.sin(a) * d - 0.4) * SOLDIER_SCALE];
 }
 
 export function drawSoldier(g: CanvasRenderingContext2D, art: SoldierArt, x: number, y: number, p: SPose) {
@@ -299,6 +300,7 @@ export function drawSoldier(g: CanvasRenderingContext2D, art: SoldierArt, x: num
   g.save();
   g.translate(x, y);
   if (p.facing === -1) g.scale(-1, 1);
+  g.scale(SOLDIER_SCALE, SOLDIER_SCALE);
   if (p.rot) g.rotate(p.rot);
   const w = p.flash;
   const running = p.state === 'run';

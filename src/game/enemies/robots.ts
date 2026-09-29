@@ -35,7 +35,7 @@ export class Drone extends Enemy {
   aim = 0;
   tilt = 0;
   constructor(spawn: EnemySpawn) {
-    super(spawn, { hp: 12, w: 26, h: 22, score: 120, wake: 620, tokens: [1, 2], metal: true });
+    super(spawn, { hp: 12, w: 33, h: 28, score: 120, wake: 620, tokens: [1, 2], metal: true });
     this.flying = true;
     this.gravity = 0;
     this.body.y = spawn.y;
@@ -91,10 +91,10 @@ export class Drone extends Enemy {
       case 'fire':
         this.gap -= dt;
         if (this.burst > 0 && this.gap <= 0) {
-          const mx = this.x + this.facing * 12;
-          const my = this.y + 8;
+          const mx = this.x + this.facing * 15;
+          const my = this.y + 10;
           const a = Math.atan2(p.y - 8 - my, p.x - mx);
-          this.fireBullet(w, mx, my, a, 250, 8, 'orb');
+          this.fireBullet(w, mx, my, a, 250, 7, 'orb');
           this.muzzleFlash(w, mx, my, a, 0.8);
           w.audio('enemyShot', 0.6, this.x);
           this.burst--;
@@ -139,12 +139,12 @@ export class Turret extends Enemy {
   ceiling: boolean;
   headY: number;
   constructor(spawn: EnemySpawn) {
-    super(spawn, { hp: 46, w: 32, h: 28, score: 200, wake: 600, tokens: [2, 3], metal: true });
+    super(spawn, { hp: 46, w: 38, h: 34, score: 200, wake: 600, tokens: [2, 3], metal: true });
     this.ceiling = !!spawn.ceiling;
     this.gravity = 0;
     if (this.ceiling) this.body.y = spawn.y + this.stats.h / 2;
     this.aim = this.ceiling ? Math.PI / 2 : -Math.PI / 2;
-    this.headY = this.ceiling ? this.body.y - this.stats.h / 2 + 13 : spawn.y - 13;
+    this.headY = this.ceiling ? this.body.y - this.stats.h / 2 + 16 : spawn.y - 16;
     this.facing = spawn.facing ?? 1;
   }
   get feetAnchor() {
@@ -185,9 +185,9 @@ export class Turret extends Enemy {
       case 'fire':
         this.gap -= dt;
         if (this.burst > 0 && this.gap <= 0) {
-          const mx = this.x + Math.cos(this.aim) * 24;
-          const my = this.headY + Math.sin(this.aim) * 24;
-          this.fireBullet(w, mx, my, this.aim + rand.spread(0.03), 330, 8);
+          const mx = this.x + Math.cos(this.aim) * 29;
+          const my = this.headY + Math.sin(this.aim) * 29;
+          this.fireBullet(w, mx, my, this.aim + rand.spread(0.03), 330, 7);
           this.muzzleFlash(w, mx, my, this.aim);
           this.kick = 1;
           w.audio('turretShot', 0.6, this.x);
@@ -276,7 +276,7 @@ export class HeavyRobot extends Enemy {
           const my = this.feetY - 61 + Math.sin(this.aim) * 30;
           void mx;
           const a = this.aim + (this.burst - 3) * 0.1;
-          this.fireBullet(w, mxx, my, a, 330, 9);
+          this.fireBullet(w, mxx, my, a, 330, 8);
           this.muzzleFlash(w, mxx, my, a, 1.4);
           this.kick = 1;
           w.audio('enemyShot', 0.9, this.x);
@@ -339,7 +339,7 @@ export class SpiderBot extends Enemy {
   crouch = 0;
   cd = 1;
   constructor(spawn: EnemySpawn) {
-    super(spawn, { hp: 30, w: 38, h: 22, score: 150, wake: 560, tokens: [1, 2], metal: true });
+    super(spawn, { hp: 30, w: 47, h: 28, score: 150, wake: 560, tokens: [1, 2], metal: true });
     this.contactDmg = 9;
   }
   update(w: World, dt: number) {
@@ -417,7 +417,7 @@ export class MiniMech extends Enemy {
   pod = 0;
   alert = false;
   constructor(spawn: EnemySpawn) {
-    super(spawn, { hp: 120, w: 40, h: 54, score: 400, wake: 620, tokens: [4, 6], metal: true });
+    super(spawn, { hp: 120, w: 48, h: 65, score: 400, wake: 620, tokens: [4, 6], metal: true });
   }
   update(w: World, dt: number) {
     this.tickCommon(dt);
@@ -430,7 +430,7 @@ export class MiniMech extends Enemy {
     const dist = Math.abs(p.x - this.x);
     const see = this.canSee(w, 560);
     if (!this.alert && (see || this.lastHurt > 0)) this.alert = true;
-    this.aim = this.aimAngleTo(w, this.x + this.facing * 20, this.feetY - 27, 0.05);
+    this.aim = this.aimAngleTo(w, this.x + this.facing * 24, this.feetY - 32, 0.05);
     if (this.mode === 'walk') this.faceToward(p.x);
     switch (this.mode) {
       case 'walk': {
@@ -460,9 +460,9 @@ export class MiniMech extends Enemy {
       case 'burst':
         this.gap -= dt;
         if (this.burst > 0 && this.gap <= 0) {
-          const mx = this.x + this.facing * 42;
-          const my = this.feetY - 27 + Math.sin(this.aim) * 16;
-          this.fireBullet(w, mx, my, this.aim, 340, 10);
+          const mx = this.x + this.facing * 50;
+          const my = this.feetY - 32 + Math.sin(this.aim) * 19;
+          this.fireBullet(w, mx, my, this.aim, 340, 9);
           this.muzzleFlash(w, mx, my, this.aim, 1.4);
           this.kick = 1;
           w.audio('enemyShot', 0.8, this.x);
@@ -479,8 +479,8 @@ export class MiniMech extends Enemy {
         b.vx = approach(b.vx, 0, 900 * dt);
         this.pod = clamp(this.modeT / 0.7, 0, 1);
         if (this.modeT >= 0.7) {
-          const mx = this.x - this.facing * 12;
-          const my = this.feetY - 50;
+          const mx = this.x - this.facing * 14;
+          const my = this.feetY - 60;
           for (let i = 0; i < 2; i++) {
             const a = -Math.PI / 2 + (this.facing === 1 ? -0.5 : 0.5) + i * (this.facing === 1 ? 0.6 : -0.6);
             this.fireBullet(w, mx, my, a, 250, 22, 'missile', { homing: 1.7, turnDelay: 0.35, life: 3.4, explode: { radius: 60, dmg: 26 } });

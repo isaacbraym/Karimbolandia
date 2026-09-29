@@ -414,6 +414,7 @@ export function drawDrone(g: CanvasRenderingContext2D, a: RobotArt, x: number, y
   g.globalAlpha *= p.alpha;
   g.translate(x, y);
   if (p.facing === -1) g.scale(-1, 1);
+  g.scale(1.25, 1.25);
   const bob = Math.sin(p.t * 3.4) * 1.2;
   g.rotate(Math.sin(p.t * 2) * 0.05 + p.extra * 0.35);
   drawSpr(g, a.drone, 0, bob, { white: p.flash });
@@ -439,6 +440,7 @@ export function drawTurret(g: CanvasRenderingContext2D, a: RobotArt, x: number, 
   g.save();
   g.globalAlpha *= p.alpha;
   g.translate(x, feetY);
+  g.scale(1.2, 1.2);
   if (ceiling) g.scale(1, -1);
   if (wall) g.rotate(wall === 1 ? -Math.PI / 2 : Math.PI / 2);
   drawSpr(g, a.turretBase, 0, 0, { white: p.flash });
@@ -499,6 +501,7 @@ export function drawSpider(g: CanvasRenderingContext2D, a: RobotArt, x: number, 
   g.globalAlpha *= p.alpha;
   g.translate(x, feetY);
   if (p.facing === -1) g.scale(-1, 1);
+  g.scale(1.25, 1.25);
   const c = p.phase;
   const crouch = p.extra; // 0..1 agachando para o salto
   const bodyY = -12 + crouch * 6 + (p.moving ? Math.sin(c * 2) * 0.8 : 0);
@@ -549,6 +552,7 @@ export function drawMiniMech(g: CanvasRenderingContext2D, a: RobotArt, x: number
   g.globalAlpha *= p.alpha;
   g.translate(x, feetY);
   if (p.facing === -1) g.scale(-1, 1);
+  g.scale(1.2, 1.2);
   const c = p.phase;
   const w = p.flash;
   const bob = p.moving ? -Math.abs(Math.sin(c)) * 1.6 : Math.sin(p.t * 2.4) * 0.4;

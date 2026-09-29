@@ -8,7 +8,7 @@ import { imageToSprite, type Photos, type KarimboHeads } from './photo';
 import { PAL } from './palette';
 
 /** logical px por px do recorte original (altura total do robô ≈ 100px) */
-export const NOMAD_LS = 100 / 766;
+export const NOMAD_LS = 110 / 766;
 
 export interface NomadArt {
   upper: Sprite;

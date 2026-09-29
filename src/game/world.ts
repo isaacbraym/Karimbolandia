@@ -452,11 +452,11 @@ export class World {
         this.hooks.onBanner?.('ORELHA DOURADA!', `Segredo ${this.secrets.size} de 3`, 2.4);
         break;
       case 'health':
-        if (!pl.heal(25, this)) return false;
+        if (!pl.heal(30, this)) return false;
         a('heal');
         break;
       case 'healthBig':
-        if (!pl.heal(60, this)) return false;
+        if (!pl.heal(80, this)) return false;
         a('heal');
         break;
       case 'ammo':
