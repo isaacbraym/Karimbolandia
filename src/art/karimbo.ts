@@ -422,18 +422,20 @@ const easeOutBack = (t: number) => {
 function drawEars(g: CanvasRenderingContext2D, art: KarimboArt, p: KPose, white: boolean) {
   const hd = art.heads;
   const eg = Math.max(0, Math.min(1, p.earGlide));
-  const grow = 1.3 + (3.6 - 1.3) * Math.max(0, easeOutBack(eg));
-  const lift = Math.max(-0.4, Math.min(0.4, -p.vy / 600));
-  const flap = eg > 0.03 ? (Math.sin(p.t * 15) * 0.13 + Math.sin(p.t * 52) * 0.035) * eg : 0;
-  const open = 0.1 + eg * (0.95 + lift * 0.35);
-  // ondulação de "membrana": o comprimento pulsa um pouco
-  const pulse = 1 + (eg > 0.5 ? Math.sin(p.t * 30) * 0.025 : 0);
+  const e = Math.max(0, easeOutBack(eg));
+  // cresce PARA OS LADOS (largura muito maior que a altura): a base continua parecendo orelha
+  const sx = 1.3 + (4.1 - 1.3) * e;
+  const sy = 1.3 + (1.85 - 1.3) * e;
+  const lift = Math.max(-0.3, Math.min(0.3, -p.vy / 700));
+  const flap = eg > 0.03 ? (Math.sin(p.t * 15) * 0.09 + Math.sin(p.t * 52) * 0.03) * eg : 0;
+  const tilt = 0.06 + eg * (0.1 + lift * 0.25); // quase horizontais, levemente para cima
+  const wob = 1 + (eg > 0.5 ? Math.sin(p.t * 30) * 0.02 : 0);
   const [nx, ny] = hd.earRootNear;
   const [fx, fy] = hd.earRootFar;
-  // orelha de trás (lado oposto ao rosto): mais fina pela perspectiva, cresce até ~0.95
-  const farW = 0.55 + eg * 0.4;
-  drawSpr(g, hd.earFar, fx, fy, { rot: open + flap * 0.9, sx: grow * farW * pulse, sy: grow * pulse, white });
-  drawSpr(g, hd.earNear, nx, ny, { rot: -open + flap, sx: grow * 0.95 * pulse, sy: grow * pulse, white });
+  // orelha de trás: mais fina pela perspectiva
+  const farW = 0.55 + eg * 0.35;
+  drawSpr(g, hd.earFar, fx, fy, { rot: tilt + flap * 0.9, sx: sx * farW * wob, sy, white });
+  drawSpr(g, hd.earNear, nx, ny, { rot: -tilt + flap, sx: sx * 0.95 * wob, sy, white });
 }
 
 export { glowSprite };

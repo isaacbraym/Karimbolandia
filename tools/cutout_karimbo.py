@@ -105,6 +105,8 @@ EAR_R_EDGE = [(560, 850), (590, 840), (680, 838), (760, 845), (840, 842), (900, 
 
 
 def ear(x_a, x_b, y_a, y_b, side):
+    """Recorta a orelha COM uma faixa extra para dentro do rosto (fica atrás da cabeça no jogo).
+    Assim, ao crescer, a base continua ligada ao rosto e não aparece borda reta."""
     box = rgba[y_a:y_b, x_a:x_b].copy()
     h, w = box.shape[:2]
     ys = np.arange(y_a, y_b, dtype=np.float32)
@@ -113,15 +115,20 @@ def ear(x_a, x_b, y_a, y_b, side):
     ex = np.array([p[1] for p in edge_tbl], np.float32)
     edge = np.interp(ys, ey, ex)[:, None]
     xs = np.arange(x_a, x_b, dtype=np.float32)[None, :]
-    feather = 3.5
+    extra = 48.0
     if side == "l":
-        f = np.clip((edge - xs) / feather, 0, 1)
+        f = np.clip((edge + extra - xs) / extra, 0, 1)
     else:
-        f = np.clip((xs - edge) / feather, 0, 1)
+        f = np.clip((xs - (edge - extra)) / extra, 0, 1)
     box[..., 3] = (box[..., 3].astype(np.float32) * f).astype(np.uint8)
     ys2, xs2 = np.where(box[..., 3] > 4)
     box = box[ys2.min():ys2.max() + 1, xs2.min():xs2.max() + 1]
-    ear_pos[side] = (int(x_a + xs2.min() - x0), int(y_a + ys2.min() - y0))
+    xb = x_a + xs2.min()
+    yb = y_a + ys2.min()
+    ry = yb + box.shape[0] * 0.5
+    e_at = float(np.interp(ry, ey, ex))
+    root_frac = (e_at - xb) / box.shape[1]
+    ear_pos[side] = (int(xb - x0), int(yb - y0), float(root_frac))
     return box
 
 
@@ -138,8 +145,8 @@ mult = np.where(band, fl * fr, 1.0)
 noears[..., 3] = (noears[..., 3].astype(np.float32) * mult).astype(np.uint8)
 cv2.imwrite(os.path.join(out_dir, "karimbo_head_noears.png"), noears[y0:y1, x0:x1])
 
-cv2.imwrite(os.path.join(out_dir, "karimbo_ear_l.png"), ear(0, 180, 560, 990, "l"))
-cv2.imwrite(os.path.join(out_dir, "karimbo_ear_r.png"), ear(815, 960, 560, 990, "r"))
+cv2.imwrite(os.path.join(out_dir, "karimbo_ear_l.png"), ear(0, 235, 560, 990, "l"))
+cv2.imwrite(os.path.join(out_dir, "karimbo_ear_r.png"), ear(760, 960, 560, 990, "r"))
 import json
 json.dump(ear_pos, open(os.path.join(out_dir, "ears.json"), "w"))
 

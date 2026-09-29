@@ -7,8 +7,8 @@ import { bake, makeCanvas, type Sprite } from './kit';
 
 export interface CharMeta {
   head: { w: number; h: number };
-  earL: { w: number; h: number; x: number; y: number };
-  earR: { w: number; h: number; x: number; y: number };
+  earL: { w: number; h: number; x: number; y: number; rootX: number };
+  earR: { w: number; h: number; x: number; y: number; rootX: number };
   felipao: { w: number; h: number };
 }
 export interface NomadMeta {
@@ -198,8 +198,8 @@ export function bakeKarimboHeads(p: Photos, scale = 3): KarimboHeads {
   );
 
   // ---- orelhas independentes (pivô no lóbulo, lado do rosto)
-  const EAR_ROOT = 0.8;
-  const mkEar = (img: HTMLImageElement, m: CharMeta['earL'], left: boolean): Sprite => {
+  const EAR_ROOT = 0.5; // base no meio da orelha (altura do rosto): cresce para os lados a partir daqui
+  const mkEar = (img: HTMLImageElement, m: CharMeta['earL']): Sprite => {
     const ew = m.w * k * sc;
     const eh = m.h * k * sc;
     return bake(
@@ -209,15 +209,15 @@ export function bakeKarimboHeads(p: Photos, scale = 3): KarimboHeads {
         g.imageSmoothingQuality = 'high';
         g.drawImage(img, 0, 0, ew, eh);
       },
-      { scale, ox: left ? ew * 0.985 : ew * 0.015, oy: eh * EAR_ROOT }
+      { scale, ox: ew * m.rootX, oy: eh * EAR_ROOT }
     );
   };
-  const earNear = mkEar(p.earL, p.meta.earL, true);
-  const earFar = mkEar(p.earR, p.meta.earR, false);
+  const earNear = mkEar(p.earL, p.meta.earL);
+  const earFar = mkEar(p.earR, p.meta.earR);
   const rootY = (p.meta.earL.y * k + p.meta.earL.h * k * EAR_ROOT) * sc - right.oy;
   const rootYr = (p.meta.earR.y * k + p.meta.earR.h * k * EAR_ROOT) * sc - right.oy;
-  const nearSrcX = PAD + (p.meta.earL.x + p.meta.earL.w * 0.985) * k;
-  const farSrcX = PAD + (p.meta.earR.x + p.meta.earR.w * 0.015) * k;
+  const nearSrcX = PAD + (p.meta.earL.x + p.meta.earL.w * p.meta.earL.rootX) * k;
+  const farSrcX = PAD + (p.meta.earR.x + p.meta.earR.w * p.meta.earR.rootX) * k;
   const toLog = (x: number) => f(x) * (logicalW / comp.width) - right.ox;
 
   return {

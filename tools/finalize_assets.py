@@ -58,8 +58,8 @@ ears = json.load(open(os.path.join(work, "ears.json")))
 json.dump(
     {
         "head": {"w": hd.shape[1], "h": hd.shape[0]},
-        "earL": {"w": el.shape[1], "h": el.shape[0], "x": ears["l"][0], "y": ears["l"][1]},
-        "earR": {"w": er.shape[1], "h": er.shape[0], "x": ears["r"][0], "y": ears["r"][1]},
+        "earL": {"w": el.shape[1], "h": el.shape[0], "x": ears["l"][0], "y": ears["l"][1], "rootX": ears["l"][2]},
+        "earR": {"w": er.shape[1], "h": er.shape[0], "x": ears["r"][0], "y": ears["r"][1], "rootX": ears["r"][2]},
         "felipao": {"w": fe.shape[1], "h": fe.shape[0]},
     },
     open(os.path.join(out, "characters_meta.json"), "w"),
