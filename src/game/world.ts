@@ -75,6 +75,8 @@ export class World {
   lastHealthDrop = -99;
   /** 0..1 intensidade da chuva (definida pelo jogo a cada quadro) — chão molhado, respingos */
   rainLevel = 0;
+  /** buracos sem fundo (queda = dano): x0..x1 em px e y = altura da borda */
+  pits: { x0: number; x1: number; y: number }[] = [];
   /** cenário urbano destrutível (carros, hidrantes, lixeiras…) */
   smash!: Smasher;
   /** combo: abates em sequência (janela de 3 s) multiplicam a pontuação */
@@ -126,6 +128,7 @@ export class World {
     this.baseTiles = data.level.tiles.slice();
     this.baseTheme = data.level.theme.slice();
     this.director = new Director(this);
+    this.computePits();
     this.smash = new Smasher(this);
     this.camera.bounds = { x: 0, y: 0, w: this.level.pxW, h: this.level.pxH };
     this.startRun();
@@ -136,6 +139,7 @@ export class World {
     this.level.tiles.set(this.baseTiles);
     this.level.theme.set(this.baseTheme);
     this.level.rev++;
+    this.computePits();
   }
 
   startRun() {
@@ -656,6 +660,7 @@ export class World {
     this.time += dt;
     this.stats.time = this.time;
     this.smash.update(dt);
+    this.updatePits(dt);
     if (this.comboT > 0) {
       this.comboT -= dt;
       if (this.comboT <= 0) this.combo = 0;
@@ -762,6 +767,7 @@ export class World {
     // tiles
     art.tiles.render(g, L, cam.x, cam.y, cam.w, cam.h, this.time);
     this.drawWet(g);
+    this.drawPits(g);
     // destroços do Nômad
     for (const w of this.wrecks) if (cam.visible(w.x, w.y, 160)) this.drawWreck(g, w);
     // Nômad estacionado / aguardando
@@ -805,6 +811,104 @@ export class World {
   }
 
   /** Sombras suaves no chão sob personagens (profundidade 2.5D). */
+  /**
+   * Encontra os buracos sem fundo: colunas sem nenhum chão até o fim do mapa, entre duas bordas.
+   * Chamado ao montar a fase e sempre que o mapa muda (chão do chefe desaba / reinício).
+   */
+  computePits() {
+    const L = this.level;
+    const noFloor = (tx: number) => {
+      for (let ty = 8; ty < L.h; ty++) {
+        const t = L.get(tx, ty);
+        if (t === T.SOLID || t === T.ONEWAY) return false;
+      }
+      return true;
+    };
+    const topAt = (tx: number) => {
+      for (let ty = 1; ty < L.h; ty++) if (L.get(tx, ty) === T.SOLID && L.get(tx, ty - 1) !== T.SOLID) return ty;
+      return -1;
+    };
+    const pits: { x0: number; x1: number; y: number }[] = [];
+    let tx = 1;
+    while (tx < L.w - 1) {
+      if (!noFloor(tx)) {
+        tx++;
+        continue;
+      }
+      const s = tx;
+      while (tx < L.w - 1 && noFloor(tx)) tx++;
+      const e = tx - 1;
+      const lt = topAt(s - 1);
+      const rt = topAt(e + 1);
+      const edge = lt >= 0 && rt >= 0 ? Math.max(lt, rt) : lt >= 0 ? lt : rt;
+      if (edge >= 0 && e - s + 1 >= 2 && s > 3 && e < L.w - 4) pits.push({ x0: s * TILE, x1: (e + 1) * TILE, y: edge * TILE });
+    }
+    this.pits = pits;
+  }
+
+  /** Fumaça e brasas subindo dos buracos (ajuda a enxergar o perigo). */
+  private updatePits(dt: number) {
+    const cam = this.camera;
+    for (const p of this.pits) {
+      if (p.x1 < cam.x - 60 || p.x0 > cam.x + cam.w + 60) continue;
+      if (p.y < cam.y - 80 || p.y > cam.y + cam.h + 200) continue;
+      const wdt = p.x1 - p.x0;
+      const k = (wdt / 100) * dt * this.fx.density;
+      let ns = k * 5;
+      while (ns > 0) {
+        if (Math.random() < ns) {
+          this.fx.add(PK.Smoke, p.x0 + Math.random() * wdt, p.y + 16, rand.spread(14), -rand.range(34, 64), rand.range(1.8, 2.8), rand.range(16, 24), rand.pick(['#b8a4b0', '#9c8aa0', '#c9a89a']), { size1: 44, a0: 0.5, drag: 0.35 });
+        }
+        ns -= 1;
+      }
+      let ne = k * 14;
+      while (ne > 0) {
+        if (Math.random() < ne) {
+          const ex = p.x0 + Math.random() * wdt;
+          const ey = p.y + rand.range(0, 30);
+          const evx = rand.spread(30);
+          const evy = -rand.range(80, 190);
+          const el = rand.range(1.1, 2.1);
+          this.fx.add(PK.Ember, ex, ey, evx, evy, el, rand.range(2.6, 4.2), rand.pick(['#ffd27a', '#ffb347', '#ff7a2a']), { a0: 1, drag: 0.5 });
+          // halo da brasa (brilho que o bloom realça)
+          if (Math.random() < 0.5) this.fx.add(PK.Fire, ex, ey, evx, evy, el * 0.8, rand.range(6, 10), '#ff7a2a', { size1: 3, a0: 0.55, drag: 0.5 });
+        }
+        ne -= 1;
+      }
+    }
+  }
+
+  /** Brilho alaranjado pulsando no fundo dos buracos + borda de aviso. */
+  private drawPits(g: CanvasRenderingContext2D) {
+    const cam = this.camera;
+    for (const p of this.pits) {
+      if (p.x1 < cam.x - 20 || p.x0 > cam.x + cam.w + 20) continue;
+      if (p.y < cam.y - 40 || p.y > cam.y + cam.h + 160) continue;
+      const fl = 0.75 + 0.25 * Math.sin(this.time * 3.1 + p.x0 * 0.01) + 0.08 * Math.sin(this.time * 11 + p.x0);
+      // calor subindo: brilho forte no fundo do buraco e um "véu" acima da borda (visível na altura do jogador)
+      const gr = g.createLinearGradient(0, p.y + 160, 0, p.y - 110);
+      gr.addColorStop(0, `rgba(255,120,40,${0.9 * fl})`);
+      gr.addColorStop(0.55, `rgba(255,90,30,${0.45 * fl})`);
+      gr.addColorStop(0.72, `rgba(255,100,40,${0.26 * fl})`);
+      gr.addColorStop(1, 'rgba(255,60,30,0)');
+      g.save();
+      // fundo escuro do buraco (contraste com o chão)
+      const dk = g.createLinearGradient(0, p.y, 0, p.y + 120);
+      dk.addColorStop(0, 'rgba(8,2,16,0.75)');
+      dk.addColorStop(1, 'rgba(8,2,16,0)');
+      g.fillStyle = dk;
+      g.fillRect(p.x0, p.y, p.x1 - p.x0, 120);
+      g.globalCompositeOperation = 'lighter';
+      g.fillStyle = gr;
+      g.fillRect(p.x0 + 2, p.y - 110, p.x1 - p.x0 - 4, 270);
+      // bordas incandescentes
+      g.fillStyle = `rgba(255,150,70,${0.55 * fl})`;
+      g.fillRect(p.x0 - 1, p.y, 3, 14);
+      g.fillRect(p.x1 - 2, p.y, 3, 14);
+      g.restore();
+    }
+  }
+
   /** Chuva: borda molhada nas superfícies e poças refletindo o neon (ciano/magenta). */
   private drawWet(g: CanvasRenderingContext2D) {
     const r = this.rainLevel;

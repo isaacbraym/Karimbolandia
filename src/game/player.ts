@@ -21,9 +21,9 @@ const SLAM_V = 980; // velocidade do mergulho
 const SLAM_R = 96; // raio da onda de choque
 const SLAM_DMG = 48;
 const MELEE_DMG = 55;
-const SHOTGUN_KICK = 250; // px/s para trás
-const SHOTGUN_HOP = 230; // pulinho do coice
-const SHOTGUN_POGO = 470; // tiro para baixo: impulso para cima
+const SHOTGUN_KICK = 340; // px/s para trás
+const SHOTGUN_HOP = 400; // pulinho do coice (~45 px)
+const SHOTGUN_POGO = 600; // tiro para baixo: impulso para cima (~100 px)
 const SLIDE_V = 430; // px/s no início do deslize
 
 export { FOOT_W, FOOT_H, CROUCH_H, NOMAD_W, NOMAD_H };

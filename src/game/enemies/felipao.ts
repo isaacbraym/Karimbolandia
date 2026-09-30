@@ -680,6 +680,7 @@ export class Felipao extends Enemy {
     }
     w.fx.addShake(9, 0.6);
     w.lastCrumbleTime = w.time;
+    w.computePits();
   }
   private crumblePlatforms(w: World) {
     const cc = Math.round((this.rect.x + this.rect.w / 2) / TILE);
