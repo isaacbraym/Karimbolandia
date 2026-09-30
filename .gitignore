@@ -8,3 +8,4 @@ tools/__pycache__
 coverage
 .claude
 graphify-out
+.serena/
