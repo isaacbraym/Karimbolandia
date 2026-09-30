@@ -255,7 +255,7 @@ describe('Agachar desvia de tiros retos', () => {
     const r = setup(true);
     expect(r.crouched).toBe(true);
     expect(r.hits).toBe(0);
-    expect(r.hp).toBe(140);
+    expect(r.hp).toBe(119);
   });
   it('Nômad de apoio: cai após ~90 s, embarca por cima, dura 50 s e some sem marcar o principal como perdido', () => {
     const w = makeWorld();
@@ -383,7 +383,7 @@ describe('Agachar desvia de tiros retos', () => {
 
   it('vida +40% e +3 vidas ao chegar no chefe (uma vez)', () => {
     const w = makeWorld();
-    expect(w.player.maxHp).toBe(140);
+    expect(w.player.maxHp).toBe(119);
     expect(w.lives).toBe(3);
     const d = w.director as unknown as { startBoss: (a: unknown) => void; arenas: { def: { id: string } }[] };
     const a = d.arenas.find((x) => x.def.id === 'boss');

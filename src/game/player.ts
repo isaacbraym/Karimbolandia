@@ -61,8 +61,8 @@ export class Player {
   body: Body = newBody(FOOT_W, FOOT_H);
   mode: PlayerMode = 'foot';
   facing: 1 | -1 = 1;
-  hp = 140; // +40% (aguenta mais tiros)
-  maxHp = 140;
+  hp = 119; // 140 − 15% (o jogo já distribui bastante vida)
+  maxHp = 119;
   invuln = 0;
   hurtT = 0;
   crouch = false;

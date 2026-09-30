@@ -21,7 +21,7 @@ Run-and-gun **2.5D moderno** que roda direto no navegador (celular e PC) — uma
 
 * **Deslizar:** agache correndo (`S`/`↓` ou joystick p/ baixo) para deslizar por baixo dos tiros.
 * **Combo:** abates em sequência (janela de 3 s) multiplicam os pontos até x5.
-* **Vida:** o Karimbo aguenta 40% a mais (140). Ao chegar no **Felipão** você ganha **+3 vidas**.
+* **Vida:** o Karimbo tem 119 de vida. Ao chegar no **Felipão** você ganha **+3 vidas**.
 * **Nômad:** é um robô grande — caixas, barris, barricadas e carros **quebram só de encostar/pousar** (sem atirar) e cair em cima de inimigos os esmaga. A cabeça do Karimbo fica em destaque na cabine.
 * **Câmera dinâmica:** na exploração fica mais perto do personagem; se alguém atira de fora da tela ela abre o zoom e desloca o quadro para mostrar o atirador.
 * **Felipão** anda arrotando como um monstro, e antes do chão desabar os blocos **piscam por 2 s** com contagem regressiva.
