@@ -5,6 +5,7 @@
  */
 import type { Input, ActionName } from '../core/input';
 import { settings } from '../core/storage';
+import { toLocal, localRect } from '../core/orient';
 
 const ICONS: Record<string, string> = {
   fire: '<svg viewBox="0 0 48 48"><circle cx="24" cy="24" r="9" fill="none" stroke="currentColor" stroke-width="3.4"/><path d="M24 4v10M24 34v10M4 24h10M34 24h10" stroke="currentColor" stroke-width="3.6" stroke-linecap="round"/><circle cx="24" cy="24" r="2.6" fill="currentColor"/></svg>',
@@ -120,12 +121,13 @@ export class TouchUI {
     const knob = el.querySelector('.fire-knob') as HTMLElement;
     let pid = -1;
     const setAim = (e: PointerEvent) => {
-      const r = el.getBoundingClientRect();
+      const r = localRect(el);
       const cx = r.left + r.width / 2;
       const cy = r.top + r.height / 2;
       const R = r.width * 0.5;
-      const dx = e.clientX - cx;
-      const dy = e.clientY - cy;
+      const pt = toLocal(e.clientX, e.clientY);
+      const dx = pt.x - cx;
+      const dy = pt.y - cy;
       const d = Math.hypot(dx, dy);
       const m = Math.min(1, d / (R * 1.1));
       const a = Math.atan2(dy, dx);
@@ -188,21 +190,24 @@ export class TouchUI {
         /* ok */
       }
       this.stickId = e.pointerId;
-      const r = z.getBoundingClientRect();
+      const r = localRect(z);
+      const pt = toLocal(e.clientX, e.clientY);
       // origem flutuante (limitada à zona, para o polegar não ficar em cima da borda)
       const m = this.radius + 10;
-      this.ox = Math.min(Math.max(e.clientX, r.left + m), r.right - m);
-      this.oy = Math.min(Math.max(e.clientY, r.top + m), r.bottom - m);
+      this.ox = Math.min(Math.max(pt.x, r.left + m), r.right - m);
+      this.oy = Math.min(Math.max(pt.y, r.top + m), r.bottom - m);
       this.base.style.left = `${this.ox - r.left}px`;
       this.base.style.top = `${this.oy - r.top}px`;
       this.base.classList.add('on');
       this.ghost.classList.add('off');
-      this.move(e.clientX, e.clientY);
+      const p0 = toLocal(e.clientX, e.clientY);
+      this.move(p0.x, p0.y);
     });
     z.addEventListener('pointermove', (e) => {
       if (e.pointerId !== this.stickId) return;
       e.preventDefault();
-      this.move(e.clientX, e.clientY);
+      const p1 = toLocal(e.clientX, e.clientY);
+      this.move(p1.x, p1.y);
     });
     const end = (e: PointerEvent) => {
       if (e.pointerId !== this.stickId) return;
@@ -230,7 +235,7 @@ export class TouchUI {
       this.oy += dy * k;
       dx = cx - this.ox;
       dy = cy - this.oy;
-      const r = this.stickZone.getBoundingClientRect();
+      const r = localRect(this.stickZone);
       this.base.style.left = `${this.ox - r.left}px`;
       this.base.style.top = `${this.oy - r.top}px`;
     }

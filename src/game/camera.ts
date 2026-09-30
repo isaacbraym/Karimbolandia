@@ -15,6 +15,8 @@ export class Camera {
   bounds: Rect | null = null; // limites do mundo (px)
   lock: Rect | null = null; // trava de arena (px)
   private lookX = 0;
+  /** direção de avanço (pelo movimento, não pela mira): a câmera mostra ~75% à frente */
+  private leadDir = 1;
   private vy = 0;
   sx = 0; // offset de shake atual
   sy = 0;
@@ -29,8 +31,10 @@ export class Camera {
     return this.viewH / this.zoom;
   }
 
-  snapTo(cx: number, cy: number) {
-    this.x = cx - this.w / 2;
+  snapTo(cx: number, cy: number, facing = 1) {
+    this.leadDir = facing >= 0 ? 1 : -1;
+    this.lookX = this.leadDir * this.w * 0.25;
+    this.x = cx + this.lookX - this.w / 2;
     this.y = cy - this.h * 0.58;
     this.clampToBounds();
   }
@@ -54,9 +58,12 @@ export class Camera {
       cy = this.focus.y;
       rate = this.focus.rate;
     } else {
-      // look-ahead depende da direção e velocidade
-      const targetLook = facing * 46 + clamp(vx, -420, 420) * 0.12;
-      this.lookX = damp(this.lookX, targetLook, 2.6, dt);
+      // enquadramento 25|75: o personagem fica a ~25% da borda de trás e a visão fica à frente.
+      // Segue a direção do MOVIMENTO (atirar para trás não balança a câmera) com transição suave.
+      if (Math.abs(vx) > 70) this.leadDir = vx > 0 ? 1 : -1;
+      else if (this.lookX === 0) this.leadDir = facing;
+      const targetLook = this.leadDir * this.w * 0.25 + clamp(vx, -420, 420) * 0.05;
+      this.lookX = damp(this.lookX, targetLook, 1.7, dt);
       cx = tx + this.lookX;
       cy = ty;
     }

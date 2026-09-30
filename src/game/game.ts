@@ -1,3 +1,4 @@
+import { orient } from '../core/orient';
 import { Input } from '../core/input';
 import { audio } from '../core/audio';
 import { music, MIX, type ThemeName } from '../core/music';
@@ -153,8 +154,17 @@ export class Game {
 
   // ------------------------------------------------------------------ tamanho
   resize() {
-    const cssW = window.innerWidth;
-    const cssH = window.innerHeight;
+    // celular em retrato: gira o jogo 90° para já abrir deitado (sem pedir para girar o aparelho)
+    const rot = this.isTouch && window.innerHeight > window.innerWidth;
+    orient.rot = rot;
+    document.documentElement.classList.toggle('rot', rot);
+    const app = document.getElementById('app');
+    if (app) {
+      app.style.width = rot ? `${window.innerHeight}px` : '';
+      app.style.height = rot ? `${window.innerWidth}px` : '';
+    }
+    const cssW = rot ? window.innerHeight : window.innerWidth;
+    const cssH = rot ? window.innerWidth : window.innerHeight;
     const aspect = cssW / cssH;
     this.viewH = VIEW_H;
     this.viewW = clamp(Math.round(aspect * VIEW_H), 520, 820);
@@ -183,7 +193,7 @@ export class Game {
     this.hud.safeL = 0;
     this.hud.safeR = 0;
     this.hud.safeT = 0;
-    this.orientationBlocked = this.isTouch && cssH > cssW;
+    this.orientationBlocked = false;
     this.updateRotate();
   }
 
@@ -216,6 +226,7 @@ export class Game {
     audio.init();
     audio.play('uiStart', 1);
     void this.requestFullscreenLandscape();
+    if (orient.rot) this.menus.toast('Vire o celular de lado para jogar em tela cheia');
     this.menus.hideAll();
     this.menus.fade(false);
     if (!this.world || again || this.state === 'complete') {

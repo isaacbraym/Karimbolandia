@@ -54,6 +54,15 @@ body {
   background: radial-gradient(ellipse at 50% 40%, #1b1046, #070316);
 }
 
+/* celular em retrato: o jogo gira 90° e já abre deitado (largura/altura definidas por JS) */
+html.rot #app {
+  inset: auto;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+  transform: rotate(90deg) translateY(-100%);
+}
+
 #game {
   display: block;
   background: #0d0724;

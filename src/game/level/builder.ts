@@ -215,6 +215,13 @@ export class LevelBuilder {
     for (let x = x0 + 16; x < x1 - 2; x += Math.round(r.range(34, 50) / d)) {
       this.deco(r.pick(['steam', 'fireBarrel', 'pipes', 'crateStack', 'wreckCar']), x, row, 'back');
     }
+    // ---- vida de cidade: ruas com carros, mobiliário urbano, lojas e fiação
+    const street: string[] = o.ruin
+      ? ['parkedCar', 'dumpster', 'trashCans', 'roadBarrier', 'wreckCar', 'crateStack', 'streetTree', 'hydrant']
+      : ['parkedCar', 'parkedCar', 'bench', 'dumpster', 'trashCans', 'hydrant', 'streetTree', 'vending', 'roadBarrier', 'kiosk'];
+    for (let x = x0 + 3; x < x1 - 2; x += Math.round(r.range(9, 15) / d)) this.deco(r.pick(street), x, row, 'back', { flip: r.chance(0.5) });
+    for (let x = x0 + 10; x < x1 - 2; x += Math.round(r.range(30, 46) / d)) this.deco(r.pick(['shopFront', 'shopFront', 'busStop', 'billboard']), x, row, 'back');
+    for (let x = x0 + 18; x < x1 - 2; x += Math.round(r.range(36, 54) / d)) this.deco(r.pick(['trafficLight', 'powerPole', 'powerPole']), x, row, 'back');
     if (o.ruin) {
       for (let x = x0 + 5; x < x1 - 2; x += Math.round(r.range(9, 16) / d)) this.deco(r.pick(['plant', 'plant', 'vine']), x, row, 'back');
     }

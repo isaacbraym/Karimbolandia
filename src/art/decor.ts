@@ -16,8 +16,27 @@ function neon(g: CanvasRenderingContext2D, x: number, y: number, w: number, h: n
   g.globalCompositeOperation = 'source-over';
 }
 
+/** Escala por tipo: os personagens cresceram, o cenário acompanha. */
+const DECO_SCALE: Record<string, number> = {
+  lampPost: 1.55,
+  wreckCar: 1.7,
+  crateStack: 1.45,
+  fireBarrel: 1.4,
+  pipes: 1.3,
+  steam: 1.3,
+  plant: 1.45,
+  neonSign: 1.3,
+  hologram: 1.3,
+  banner: 1.25,
+  facade: 1.35,
+  fgFence: 1.5,
+  fgPillar: 1.2,
+  antenna: 1.25,
+  vine: 1.2,
+};
+
 export function drawDeco(g: CanvasRenderingContext2D, d: DecoSpawn, t: number) {
-  const s = d.scale ?? 1;
+  const s = (d.scale ?? 1) * (DECO_SCALE[d.kind] ?? 1);
   const seed = seedOf(d);
   g.save();
   g.translate(d.x, d.y);
@@ -467,6 +486,291 @@ export function drawDeco(g: CanvasRenderingContext2D, d: DecoSpawn, t: number) {
       g.moveTo(-64, -8);
       g.lineTo(64, -8);
       g.stroke();
+      break;
+    }
+
+    case 'parkedCar': {
+      // carro inteiro estacionado (cor pela semente)
+      const cols = ['#d94a7a', '#3aa6d9', '#e0a02a', '#6a5ad9', '#3ad9a0'];
+      const col = cols[Math.abs(seed) % cols.length];
+      g.fillStyle = '#120d2a';
+      g.beginPath();
+      g.ellipse(0, 0, 62, 4, 0, 0, 6.283);
+      g.fill();
+      g.fillStyle = col;
+      g.beginPath();
+      g.moveTo(-58, -8);
+      g.lineTo(-56, -26);
+      g.lineTo(-30, -30);
+      g.lineTo(-16, -50);
+      g.lineTo(26, -50);
+      g.lineTo(44, -30);
+      g.lineTo(58, -26);
+      g.lineTo(58, -8);
+      g.closePath();
+      g.fill();
+      g.strokeStyle = '#170f2e';
+      g.lineWidth = 1.8;
+      g.stroke();
+      g.fillStyle = '#243a5a';
+      g.beginPath();
+      g.moveTo(-12, -32);
+      g.lineTo(-2, -46);
+      g.lineTo(22, -46);
+      g.lineTo(34, -32);
+      g.closePath();
+      g.fill();
+      g.fillStyle = 'rgba(255,255,255,0.18)';
+      g.fillRect(-8, -44, 6, 10);
+      g.fillStyle = '#111';
+      for (const wx of [-36, 34]) {
+        g.beginPath();
+        g.arc(wx, -8, 10, 0, 6.283);
+        g.fill();
+        g.fillStyle = '#8a86a8';
+        g.beginPath();
+        g.arc(wx, -8, 4.5, 0, 6.283);
+        g.fill();
+        g.fillStyle = '#111';
+      }
+      g.fillStyle = '#ffe9a8';
+      g.fillRect(54, -24, 5, 5);
+      g.fillStyle = '#ff4a5a';
+      g.fillRect(-59, -24, 4, 5);
+      break;
+    }
+    case 'bench': {
+      g.fillStyle = '#3a2f5c';
+      g.fillRect(-30, -20, 60, 6);
+      g.fillRect(-30, -38, 60, 5);
+      g.fillStyle = '#2a2244';
+      g.fillRect(-27, -14, 4, 14);
+      g.fillRect(23, -14, 4, 14);
+      g.fillRect(-27, -38, 4, 20);
+      g.fillRect(23, -38, 4, 20);
+      g.strokeStyle = '#170f2e';
+      g.lineWidth = 1.2;
+      g.strokeRect(-30, -20, 60, 6);
+      break;
+    }
+    case 'dumpster': {
+      g.fillStyle = '#2f7a5a';
+      g.fillRect(-36, -44, 72, 40);
+      g.fillStyle = '#245f46';
+      g.fillRect(-38, -50, 76, 8);
+      g.fillStyle = '#1c4a37';
+      for (let x = -28; x < 34; x += 14) g.fillRect(x, -40, 3, 32);
+      g.fillStyle = '#111';
+      g.fillRect(-30, -4, 8, 4);
+      g.fillRect(22, -4, 8, 4);
+      g.strokeStyle = '#170f2e';
+      g.lineWidth = 1.6;
+      g.strokeRect(-36, -44, 72, 40);
+      break;
+    }
+    case 'hydrant': {
+      g.fillStyle = '#e0453a';
+      g.fillRect(-7, -32, 14, 32);
+      g.beginPath();
+      g.arc(0, -32, 8, Math.PI, 0);
+      g.fill();
+      g.fillRect(-12, -22, 24, 6);
+      g.fillStyle = '#ffd23a';
+      g.fillRect(-9, -8, 18, 3);
+      g.strokeStyle = '#170f2e';
+      g.lineWidth = 1.2;
+      g.strokeRect(-7, -32, 14, 32);
+      break;
+    }
+    case 'trafficLight': {
+      g.fillStyle = '#2c2560';
+      g.fillRect(-2.5, -120, 5, 120);
+      g.fillRect(-2.5, -120, 34, 4);
+      g.fillStyle = '#17112f';
+      g.fillRect(24, -118, 16, 40);
+      const ph = Math.floor((t * 0.5 + seed * 0.13) % 3);
+      const cols = ['#ff3a4a', '#ffd23a', '#3aff8a'];
+      for (let i = 0; i < 3; i++) {
+        g.fillStyle = i === ph ? cols[i] : '#2a2444';
+        g.beginPath();
+        g.arc(32, -108 + i * 12, 4.5, 0, 6.283);
+        g.fill();
+      }
+      const spr = glowSprite(cols[ph], 32);
+      g.globalCompositeOperation = 'lighter';
+      g.globalAlpha = 0.6;
+      g.drawImage(spr.c, 12, -128 + ph * 12, 40, 40);
+      g.globalAlpha = 1;
+      g.globalCompositeOperation = 'source-over';
+      break;
+    }
+    case 'busStop': {
+      g.fillStyle = '#2c2560';
+      g.fillRect(-52, -104, 4, 104);
+      g.fillRect(48, -104, 4, 104);
+      g.fillStyle = '#3a3378';
+      g.fillRect(-58, -112, 116, 8);
+      g.fillStyle = 'rgba(120,220,255,0.10)';
+      g.fillRect(-48, -104, 96, 84);
+      const flick = 0.75 + 0.25 * Math.sin(t * 4 + seed);
+      g.fillStyle = '#ff3fb4';
+      g.globalAlpha = flick;
+      g.fillRect(24, -98, 22, 60);
+      g.fillStyle = '#ffe9a8';
+      g.fillRect(28, -92, 14, 4);
+      g.fillRect(28, -84, 14, 3);
+      g.globalAlpha = 1;
+      neon(g, 24, -98, 22, 60, '#ff3fb4', flick * 0.6);
+      g.fillStyle = '#3a2f5c';
+      g.fillRect(-40, -22, 50, 5);
+      g.fillRect(-36, -17, 4, 17);
+      g.fillRect(2, -17, 4, 17);
+      break;
+    }
+    case 'vending': {
+      g.fillStyle = '#2a4a9a';
+      g.fillRect(-20, -70, 40, 70);
+      g.strokeStyle = '#170f2e';
+      g.lineWidth = 1.6;
+      g.strokeRect(-20, -70, 40, 70);
+      g.fillStyle = '#9fe9ff';
+      g.globalAlpha = 0.8 + 0.15 * Math.sin(t * 5 + seed);
+      g.fillRect(-15, -64, 22, 44);
+      g.globalAlpha = 1;
+      const r = new Rng(seed);
+      for (let i = 0; i < 12; i++) {
+        g.fillStyle = r.pick(['#ff5a7a', '#ffd23a', '#7aff9a', '#ff9a3a']);
+        g.fillRect(-13 + (i % 3) * 7, -62 + Math.floor(i / 3) * 10, 5, 7);
+      }
+      g.fillStyle = '#111a3a';
+      g.fillRect(-15, -14, 22, 8);
+      g.fillStyle = '#ffd23a';
+      g.fillRect(11, -60, 5, 4);
+      neon(g, -15, -64, 22, 44, '#7feaff', 0.6);
+      break;
+    }
+    case 'powerPole': {
+      g.fillStyle = '#3a2f5c';
+      g.fillRect(-3, -170, 6, 170);
+      g.fillRect(-22, -160, 44, 4);
+      g.fillRect(-16, -140, 32, 3);
+      g.strokeStyle = '#0d0a22';
+      g.lineWidth = 1.4;
+      for (const [x, y] of [[-20, -160], [20, -160], [-14, -140], [14, -140]]) {
+        g.beginPath();
+        g.moveTo(x, y);
+        g.quadraticCurveTo(x + 90, y + 34, x + 180, y + 4);
+        g.stroke();
+      }
+      break;
+    }
+    case 'trashCans': {
+      for (const [x, h] of [[-12, 30], [12, 26]] as const) {
+        g.fillStyle = x < 0 ? '#5a6a8a' : '#4a5a7a';
+        g.fillRect(x - 9, -h, 18, h);
+        g.fillStyle = '#7a8aaa';
+        g.fillRect(x - 11, -h - 4, 22, 5);
+        g.strokeStyle = '#170f2e';
+        g.lineWidth = 1.2;
+        g.strokeRect(x - 9, -h, 18, h);
+      }
+      break;
+    }
+    case 'shopFront': {
+      // fachada de loja com toldo listrado e vitrine acesa
+      const r = new Rng(seed);
+      const c1 = r.pick(['#ff5a7a', '#3aa6d9', '#ffb83a', '#7a5ad9']);
+      g.fillStyle = '#231a52';
+      g.fillRect(-60, -110, 120, 110);
+      g.fillStyle = '#ffe9a8';
+      g.globalAlpha = 0.85;
+      g.fillRect(-46, -66, 60, 48);
+      g.globalAlpha = 1;
+      g.fillStyle = '#120d33';
+      g.fillRect(24, -70, 26, 70);
+      for (let i = 0; i < 8; i++) {
+        g.fillStyle = i % 2 ? '#ffffff' : c1;
+        g.fillRect(-64 + i * 16, -92, 16, 18);
+      }
+      g.fillStyle = 'rgba(0,0,0,0.25)';
+      g.fillRect(-64, -76, 128, 3);
+      g.fillStyle = c1;
+      g.fillRect(-40, -106, 80, 10);
+      g.fillStyle = '#fff';
+      g.font = '400 9px "Lilita One", Impact, sans-serif';
+      g.textAlign = 'center';
+      g.fillText(r.pick(['LOJA', 'PIZZA', 'CAFÉ', 'MERCADO', 'FARMÁCIA', 'BAR']), 0, -98);
+      neon(g, -46, -66, 60, 48, '#ffd7a0', 0.5);
+      break;
+    }
+    case 'billboard': {
+      g.fillStyle = '#2c2560';
+      g.fillRect(-30, -60, 5, 60);
+      g.fillRect(25, -60, 5, 60);
+      g.fillStyle = '#0d0722';
+      g.fillRect(-52, -120, 104, 60);
+      const flick = 0.8 + 0.2 * Math.sin(t * 3 + seed);
+      const gr = g.createLinearGradient(-48, -116, 48, -64);
+      gr.addColorStop(0, '#ff3fb4');
+      gr.addColorStop(1, '#39f0ff');
+      g.fillStyle = gr;
+      g.globalAlpha = flick;
+      g.fillRect(-48, -116, 96, 52);
+      g.globalAlpha = 1;
+      g.fillStyle = '#fff';
+      g.font = '400 16px "Lilita One", Impact, sans-serif';
+      g.textAlign = 'center';
+      g.fillText('KARIMBO', 0, -86);
+      g.font = '400 8px "Lilita One", Impact, sans-serif';
+      g.fillText('A CIDADE É NOSSA', 0, -72);
+      neon(g, -48, -116, 96, 52, '#ff3fb4', flick * 0.5);
+      break;
+    }
+    case 'roadBarrier': {
+      g.fillStyle = '#e8e8f0';
+      g.fillRect(-34, -30, 68, 14);
+      g.fillStyle = '#ff7a2a';
+      for (let x = -34; x < 30; x += 16) g.fillRect(x, -30, 8, 14);
+      g.fillStyle = '#5a5674';
+      g.fillRect(-28, -16, 5, 16);
+      g.fillRect(23, -16, 5, 16);
+      g.strokeStyle = '#170f2e';
+      g.lineWidth = 1.2;
+      g.strokeRect(-34, -30, 68, 14);
+      const spr = glowSprite('#ffb83a', 32);
+      g.globalCompositeOperation = 'lighter';
+      g.globalAlpha = 0.5 + 0.5 * Math.max(0, Math.sin(t * 6 + seed));
+      g.drawImage(spr.c, -44, -52, 20, 20);
+      g.globalAlpha = 1;
+      g.globalCompositeOperation = 'source-over';
+      break;
+    }
+    case 'streetTree': {
+      g.fillStyle = '#3a2a4a';
+      g.fillRect(-4, -46, 8, 46);
+      const r = new Rng(seed);
+      for (let i = 0; i < 7; i++) {
+        g.fillStyle = r.pick(['#2f8a6a', '#3aa87a', '#256e58', '#4ac08a']);
+        g.beginPath();
+        g.arc(-18 + r.range(0, 36), -62 - r.range(0, 34), r.range(14, 22), 0, 6.283);
+        g.fill();
+      }
+      break;
+    }
+    case 'kiosk': {
+      g.fillStyle = '#2a2058';
+      g.fillRect(-32, -70, 64, 70);
+      g.fillStyle = '#ffd7a0';
+      g.globalAlpha = 0.9;
+      g.fillRect(-26, -52, 52, 26);
+      g.globalAlpha = 1;
+      for (let i = 0; i < 6; i++) {
+        g.fillStyle = i % 2 ? '#fff' : '#3aa6d9';
+        g.fillRect(-36 + i * 12, -78, 12, 12);
+      }
+      g.fillStyle = '#ff5a7a';
+      for (let i = 0; i < 5; i++) g.fillRect(-22 + i * 10, -48, 6, 8);
+      neon(g, -26, -52, 52, 26, '#ffd7a0', 0.5);
       break;
     }
     default:

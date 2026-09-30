@@ -20,7 +20,7 @@ export const GLIDE_FUEL = 2.7;
 export const GLIDE_SPEED = 218;
 export const CROUCH_SPEED = 74;
 
-export const N_RUN = 236;
+export const N_RUN = 262;
 export const N_ACC = 820;
 export const N_DEC = 620;
 export const N_GRAV = 1650;

@@ -288,7 +288,7 @@ export class World {
   cameraSnap() {
     const p = this.player;
     this.camera.lock = this.director.currentLock();
-    this.camera.snapTo(p.x, p.y);
+    this.camera.snapTo(p.x, p.y, p.facing);
   }
   isSafeSpot(x: number, feetY: number) {
     const L = this.level;

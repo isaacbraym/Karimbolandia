@@ -334,4 +334,23 @@ describe('Agachar desvia de tiros retos', () => {
     w.restart();
     expect(w.lives).toBe(3);
   });
+  it('Nômad obrigatório: o portão da garagem só abre depois de embarcar; depois vêm hordas', () => {
+    const w = makeWorld();
+    teleport(w, 586, 32);
+    w.director.triggered.add('nomadMeet');
+    const ctl = newCtl();
+    ctl.moveX = 1;
+    for (let i = 0; i < 60 * 8; i++) w.update(1 / 60, ctl);
+    expect(w.nomadUsed).toBe(false);
+    expect(w.player.x).toBeLessThan(597 * TILE); // barrado pelo portão
+    expect(w.director.nomadGate?.alive).toBe(true);
+    ctl.moveX = 0;
+    mountNomad(w, ctl);
+    expect(w.player.mounted).toBe(true);
+    expect(w.director.nomadGate).toBeNull();
+    // trecho de guerra: chegam levas contínuas enquanto pilota
+    w.player.body.x = 650 * TILE;
+    for (let i = 0; i < 60 * 8; i++) w.update(1 / 60, ctl);
+    expect(w.enemies.filter((e) => e.alive && e.spawnedByArena === false && e.spawn.id <= -5000).length).toBeGreaterThan(0);
+  });
 });

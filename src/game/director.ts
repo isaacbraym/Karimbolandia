@@ -33,6 +33,9 @@ interface Cine {
   stage: number;
 }
 
+const GATE_TILE = 596; // portão da garagem (tile)
+const HORDE_FROM = 600; // início do trecho de guerra (Nômad)
+const HORDE_TO = 1040;
 const SUPPORT_AT = 90; // s de jogo (a pé, fora de arenas) até a entrega do Nômad de apoio
 const SUPPORT_TIME = 50; // s de uso
 const ctlJumpHeld = (w: World) => w.lastJumpHeld;
@@ -62,6 +65,14 @@ export class Director {
   supportClock = 0;
   supportUsed = false;
   supportMounting = false;
+  /** portão da garagem: só abre depois de embarcar no Nômad (ele é obrigatório) */
+  nomadGate: PropClass | null = null;
+  gateHintCd = 0;
+  /** hordas frenéticas enquanto se pilota o Nômad */
+  hordeT = 0;
+  hordeSeq = 0;
+  streak = 0;
+  streakT = 0;
 
   constructor(w: World) {
     this.w = w;
@@ -85,6 +96,9 @@ export class Director {
     this.supportClock = 0;
     this.supportUsed = false;
     this.supportMounting = false;
+    this.nomadGate = null;
+    this.hordeT = 0;
+    this.streak = 0;
     this.triggered.clear();
     this.bossActive = false;
     this.bossPhase = 1;
@@ -189,6 +203,17 @@ export class Director {
   // ------------------------------------------------------------------ eventos
   onEnemyKilled(e: Enemy, info?: HurtInfo) {
     void info;
+    const pl = this.w.player;
+    if (pl.mounted && pl.nomad && !e.isBoss) {
+      // frenesi: cada abate recupera um pouco do Nômad e alimenta a sequência
+      pl.nomad.hp = Math.min(pl.nomad.maxHp, pl.nomad.hp + 4);
+      this.streak++;
+      this.streakT = 3.2;
+      if (this.streak >= 5 && this.streak % 5 === 0) {
+        this.w.score += this.streak * 20;
+        this.w.fx.popup(pl.x, pl.y - 60, `SEQUÊNCIA x${this.streak}!`, '#ffe27a', 11);
+      }
+    }
     for (const a of this.arenas) {
       const i = a.alive.indexOf(e);
       if (i >= 0) a.alive.splice(i, 1);
@@ -225,7 +250,8 @@ export class Director {
       this.banner('NÔMAD DE APOIO', `Emprestado por ${SUPPORT_TIME}s`, 2.6);
       return;
     }
-    this.banner('NÔMAD ONLINE', 'Robô de guerra', 2.6);
+    this.banner('NÔMAD ONLINE', 'Destrua tudo!', 2.6);
+    this.openNomadGate();
     this.saveCheckpointHere();
   }
   onNomadLost(temp = false, expired = false) {
@@ -301,8 +327,10 @@ export class Director {
     // cinemática
     if (this.cine) this.updateCine(dt);
 
+    this.updateNomadGate(dt);
     this.updateMountCheck();
     this.updateSupport(dt);
+    this.updateHorde(dt);
 
     // dica sutil do segundo avanço
     this.updateDashHint();
@@ -414,6 +442,85 @@ export class Director {
       if (ok) return { x, y: gy };
     }
     return null;
+  }
+
+  /** O portão da garagem fica fechado até o jogador embarcar no Nômad. */
+  private updateNomadGate(dt: number) {
+    const w = this.w;
+    const p = w.player;
+    if (this.gateHintCd > 0) this.gateHintCd -= dt;
+    // cinemática interrompida (morte/continuar): garante que o Nômad continue embarcável
+    if (!w.nomadUsed && !w.nomadLost && this.triggered.has('nomadMeet') && !this.cine && !this.nomadMountable && p.mode === 'foot') {
+      this.nomadMountable = true;
+      this.nomadPower = 1;
+    }
+    const need = !w.nomadUsed && !w.nomadLost;
+    if (!need) return;
+    const g = this.nomadGate;
+    if (!g || !g.alive || !w.props.includes(g)) {
+      const gx = GATE_TILE * 32 + 16;
+      const gy = 32 * 32; // chão principal
+      const pr = new PropClass({ id: -900, kind: 'door', x: gx, y: gy, w: 20, h: gy, solid: true, critical: true });
+      pr.barrier = true;
+      pr.hittable = false;
+      w.props.push(pr);
+      w.solidsDirty = true;
+      this.nomadGate = pr;
+    }
+    // aviso quando o jogador chega no portão
+    if (p.mode === 'foot' && p.x > (GATE_TILE - 9) * 32 && this.gateHintCd <= 0 && !this.cine) {
+      this.gateHintCd = 6;
+      this.banner('NÔMAD NECESSÁRIO', 'Pule em cima dele para abrir o portão', 2.2);
+      w.hooks.onHint?.('mountNomad');
+    }
+  }
+
+  private openNomadGate() {
+    const g = this.nomadGate;
+    if (!g) return;
+    g.alive = false;
+    this.w.fx.sparks(g.x, g.y - 60, 24, '#ffe27a', 380);
+    this.w.audio('unlock', 1);
+    this.w.solidsDirty = true;
+    this.nomadGate = null;
+  }
+
+  /** Frenesi: enquanto pilota o Nômad no trecho de guerra, novas levas chegam sem parar. */
+  private updateHorde(dt: number) {
+    const w = this.w;
+    const p = w.player;
+    if (this.streakT > 0) {
+      this.streakT -= dt;
+      if (this.streakT <= 0) this.streak = 0;
+    }
+    if (p.mode !== 'nomad' || this.cine || this.activeArenaRect() || p.nomad?.timeLeft !== Infinity) return;
+    if (p.x < HORDE_FROM * 32 || p.x > HORDE_TO * 32) return;
+    this.hordeT -= dt;
+    if (this.hordeT > 0) return;
+    this.hordeT = 2.3;
+    const alive = w.enemies.filter((e) => e.alive && e.spawnedByArena === false && Math.abs(e.x - p.x) < 800).length;
+    if (alive >= 9) return;
+    const cam = w.camera;
+    const n = alive < 4 ? 3 : 2;
+    const kinds: EnemySpawn['type'][] = ['rifle', 'rifle', 'shotgun', 'drone', 'spider', 'shield', 'minimech'];
+    for (let i = 0; i < n; i++) {
+      const type = kinds[(this.hordeSeq * 3 + i * 5 + Math.floor(w.time)) % kinds.length];
+      // três quartos da leva chegam pela frente
+      const ahead = (this.hordeSeq + i) % 4 !== 0 ? p.facing : -p.facing;
+      const x = ahead === 1 ? cam.x + cam.w + 50 + i * 26 : cam.x - 50 - i * 26;
+      const flying = type === 'drone';
+      let y: number;
+      if (flying) y = cam.y + 50 + i * 24;
+      else {
+        const gy = w.level.groundBelow(x, p.feetY - 120, 500);
+        if (gy === null) continue;
+        y = gy;
+      }
+      const s: EnemySpawn = { id: -5000 - (this.hordeSeq++ % 4000), type, x, y, facing: (ahead === 1 ? -1 : 1) as -1 | 1 };
+      const e = w.spawnEnemy(s);
+      e.spawnedByArena = false;
+    }
+    this.combatHold = Math.max(this.combatHold, 2.5);
   }
 
   private fireTrigger(id: string, once: boolean) {
@@ -846,8 +953,11 @@ export class Director {
 
   drawBarriers(g: CanvasRenderingContext2D) {
     const t = this.w.time;
-    for (const a of this.arenas) {
-      for (const b of a.barriers) {
+    const all: PropClass[] = [];
+    for (const a of this.arenas) all.push(...a.barriers);
+    if (this.nomadGate && this.nomadGate.alive) all.push(this.nomadGate);
+    {
+      for (const b of all) {
         const x = b.x;
         const top = b.y - b.h / 2;
         g.globalCompositeOperation = 'lighter';

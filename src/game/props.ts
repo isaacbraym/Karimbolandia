@@ -35,6 +35,16 @@ const DEFS: Record<PropKind, PropDef> = {
   speaker: { w: 28, h: 40, hp: 20, solid: true, debris: ['#3a3f55', '#ff3fb4', '#20233a'] },
 };
 
+/** Objetos de cenário quebráveis cresceram junto com os personagens. */
+const PROP_SCALE: Partial<Record<PropKind, number>> = {
+  crate: 1.3, crateBig: 1.3, barrel: 1.3, barricade: 1.3, container: 1.3, terminal: 1.25, sign: 1.25, lamp: 1.3, vehicle: 1.35, pipe: 1.2, generator: 1.3, speaker: 1.3,
+};
+for (const k of Object.keys(PROP_SCALE) as PropKind[]) {
+  const f = PROP_SCALE[k]!;
+  DEFS[k].w = Math.round(DEFS[k].w * f);
+  DEFS[k].h = Math.round(DEFS[k].h * f);
+}
+
 export class Prop {
   spawn: PropSpawn;
   kind: PropKind;
@@ -130,7 +140,8 @@ export class Prop {
     const spr = art[this.kind];
     if (!spr) return;
     const sh = this.shake > 0 ? Math.sin(this.shake * 90) * 1.2 : 0;
-    drawSpr(g, spr, this.x + sh, this.y + this.h / 2, { white: this.flash > 0, px: spr.w / 2, py: spr.h - 1 });
+    const k = PROP_SCALE[this.kind] ?? 1;
+    drawSpr(g, spr, this.x + sh, this.y + this.h / 2, { white: this.flash > 0, px: spr.w / 2, py: spr.h - 1, sx: k, sy: k });
     if (this.explosive && this.kind === 'barrel' && Math.sin(t * 6 + this.seed) > 0.6) {
       g.fillStyle = '#ffd23a';
       g.fillRect(this.x - 1, this.y - this.h / 2 + 5, 2, 2);

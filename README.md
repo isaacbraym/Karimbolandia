@@ -24,8 +24,9 @@ Run-and-gun **2.5D moderno** que roda direto no navegador (celular e PC) — uma
 * **Vida com critério:** corações fixos após combates duros, caixas sorteadas (nem toda caixa tem item) e drops que aparecem mais quando você está ferido.
 * **Nômad de apoio:** depois de ~1,5 min de jogo aparece uma entrega aérea de um segundo Nômad, emprestado por 50 s — pule em cima para pilotá-lo.
 * Multitouch real: dá para mover, pular e atirar ao mesmo tempo.
-* Em retrato o jogo pede para girar o celular; ao tocar em JOGAR ele tenta fullscreen + `orientation.lock('landscape')`.
-* O Nômad é encontrado numa garagem: **pule em cima dele** para pilotá-lo. Ele tem barra de vida própria; ao chegar a zero o Karimbo é ejetado e segue a pé.
+* No celular em retrato o jogo **já abre deitado** (a tela gira 90° sozinha); é só virar o aparelho de lado e ele preenche a tela. Ao tocar em JOGAR ele também tenta fullscreen + `orientation.lock('landscape')`.
+* Câmera 25|75: o personagem fica a ~25% da borda de trás e você vê 75% do que vem à frente (inverte suavemente ao andar para trás).
+* O Nômad é **obrigatório**: o portão da garagem só abre depois que você **pula em cima dele** para pilotá-lo. No trecho de guerra seguinte chegam hordas contínuas (frenesi): cada abate recupera um pouco do Nômad e sequências de 5 dão bônus. Ele tem barra de vida própria; ao chegar a zero o Karimbo é ejetado e segue a pé.
 * Existe uma mecânica secreta no avanço do Nômad. Só os atentos vão descobrir. 😉
 
 ## A fase
