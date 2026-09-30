@@ -271,7 +271,7 @@ export function bakeWeapons(): Record<WeaponId, Sprite> {
 }
 
 // ------------------------------------------------------------------------------------------
-export type KState = 'idle' | 'run' | 'jump' | 'fall' | 'glide' | 'crouch' | 'hurt';
+export type KState = 'idle' | 'run' | 'jump' | 'fall' | 'glide' | 'crouch' | 'hurt' | 'slide' | 'slam';
 
 export interface KPose {
   facing: 1 | -1;
@@ -289,7 +289,19 @@ export interface KPose {
   hasGun: boolean;
   scarf?: number; // (legado, sem uso)
   blink?: boolean;
-  squash?: number; // -1..1 (aterrissagem)
+  squash?: number; // -1..1 (aterrissagem +, esticado no ar −)
+  /** inclinação do corpo (rad, + = para a frente), vinda de mola (velocidade + aceleração) */
+  lean?: number;
+  /** atraso da cabeça (follow-through), px no rig */
+  headLag?: [number, number];
+  /** mola das orelhas: + = pontas para cima */
+  earSpring?: number;
+  /** 0..1 achatamento da virada */
+  turn?: number;
+  /** segundos parado (respiração / olhar em volta) */
+  idleT?: number;
+  /** 0..1 progresso do golpe corpo a corpo */
+  melee?: number;
 }
 
 // ombro abaixo do queixo: o braço/arma nunca cobre o rosto
@@ -327,13 +339,22 @@ export function drawKarimbo(g: CanvasRenderingContext2D, art: KarimboArt, x: num
   g.translate(x, y);
   if (p.facing === -1) g.scale(-1, 1);
   g.scale(KSCALE, KSCALE);
+  // corpo inteiro: inclinação (pivô nos pés) e achatamento da virada
+  if (p.lean) g.rotate(p.lean);
+  const turnK = p.turn ?? 0;
+  if (turnK > 0.001) g.scale(1 - turnK * 0.42, 1 + turnK * 0.06);
 
   const w = p.flash;
   const running = p.state === 'run';
   const crouch = p.state === 'crouch';
   const glide = p.state === 'glide';
   const c = p.runPhase;
-  const bob = running ? -Math.abs(Math.sin(c)) * 1.7 : p.state === 'idle' ? Math.sin(p.t * 3) * 0.5 : 0;
+  const idle = p.state === 'idle';
+  // corrida: dois "quiques" por ciclo; parado: respiração
+  const bob = running ? -Math.abs(Math.sin(c)) * 2.1 : idle ? Math.sin(p.t * 2.6) * 0.55 : 0;
+  const breath = idle ? Math.sin(p.t * 2.6) * 0.022 : 0;
+  const recoil = (p.kick ?? 0) * 1.1; // o tronco recua com o disparo
+  const [lagX, lagY] = p.headLag ?? [0, 0];
   const squash = p.squash ?? 0;
   const sqY = 1 - squash * 0.14;
   const sqX = 1 + squash * 0.1;
@@ -365,27 +386,48 @@ export function drawKarimbo(g: CanvasRenderingContext2D, art: KarimboArt, x: num
   } else if (p.state === 'hurt') {
     legF = 0.5;
     legB = -0.5;
+  } else if (p.state === 'slide') {
+    // deslize: pernas esticadas para a frente, corpo baixo e jogado para trás
+    legF = 1.45;
+    legB = 1.05;
+    legSy = 0.92;
+    hipY = -8;
+    torsoDrop = 10;
+  } else if (p.state === 'slam') {
+    // ORELHADA: pernas encolhidas, corpo compacto
+    legF = 1.2;
+    legB = -1.05;
+    legSy = 0.8;
+    hipY = -11;
+    torsoDrop = 3;
   }
+  const bodyRot = p.state === 'slide' ? -0.34 : p.state === 'slam' ? 0.14 : 0;
 
   g.save();
-  g.rotate(hurtRot);
+  g.rotate(hurtRot + bodyRot);
   g.scale(sqX, sqY);
 
   const sh = SHOULDER_STAND;
-  const shY = sh[1] + torsoDrop + bob;
+  const shY = sh[1] + torsoDrop + bob - breath * 10;
   // braço de trás (só quando sem arma)
   if (!p.hasGun) drawSpr(g, art.armBack, sh[0] - 4, shY + 0.5, { rot: 1.1 + Math.sin(c) * (running ? 0.5 : 0), white: w });
   // pernas + shorts + tronco (barriga por cima do shorts)
   drawSpr(g, art.legBack, -2.6, hipY + bob * 0.5, { rot: legB, sy: legSy, white: w });
   drawSpr(g, art.legFront, 2.6, hipY + bob * 0.5, { rot: legF, sy: legSy, white: w });
   drawSpr(g, art.shorts, 0, hipY - 1 + bob * 0.5, { white: w, sy: legSy > 0.9 ? 1 : 0.85 });
-  drawSpr(g, art.torso, 0, -12 + torsoDrop + bob, { white: w, rot: glide ? -0.1 : running ? 0.05 : 0 });
+  drawSpr(g, art.torso, -recoil * 0.6, -12 + torsoDrop + bob, { white: w, rot: glide ? -0.1 : running ? 0.07 : 0, sy: 1 + breath, sx: 1 - breath * 0.4 });
 
   // braço da frente + arma (ANTES da cabeça: nada cobre o rosto)
   if (p.hasGun) {
-    const a = localAim(p.aim, p.facing);
+    let a = localAim(p.aim, p.facing);
+    const m = p.melee ?? 0;
+    if (m > 0) {
+      // golpe: a arma varre em arco de cima para baixo (com antecipação)
+      const k = m < 0.25 ? -m / 0.25 : (m - 0.25) / 0.75;
+      a = k < 0 ? -0.6 + k * 0.7 : -1.3 + 2.4 * (1 - Math.pow(1 - k, 3));
+    }
     g.save();
-    g.translate(sh[0], shY);
+    g.translate(sh[0] - recoil, shY);
     g.rotate(a);
     drawSpr(g, art.armFront, 0, 0, { white: w });
     drawSpr(g, art.weapons[p.weapon], ARM_LEN - 1.5 - p.kick * 3.2, 0.3, { white: w });
@@ -397,9 +439,11 @@ export function drawKarimbo(g: CanvasRenderingContext2D, art: KarimboArt, x: num
   // cabeça (rosto sempre em destaque, por cima de tudo) + orelhas atrás dela
   const hd = art.heads;
   const aimLocal = localAim(p.aim, p.facing);
-  const headRot = hurtRot * 1.4 + (glide ? -0.06 : 0) + Math.sin(p.t * 2.2) * 0.012 + (running ? Math.sin(c) * 0.03 : 0) + (p.hasGun ? aimLocal * 0.1 : 0);
-  const hx = 1.0;
-  const hy = -26.5 + torsoDrop + bob * 1.15;
+  const lookAround = idle && (p.idleT ?? 0) > 3.5 ? Math.sin(((p.idleT ?? 0) - 3.5) * 1.1) * 0.07 : 0;
+  const headRot =
+    hurtRot * 1.4 + (glide ? -0.06 : 0) + Math.sin(p.t * 2.2) * 0.012 + (running ? Math.sin(c - 0.5) * 0.035 : 0) + (p.hasGun ? aimLocal * 0.1 : 0) + lookAround - lagX * 0.02;
+  const hx = 1.0 + lagX - recoil * 0.8;
+  const hy = -26.5 + torsoDrop + bob * 1.15 + lagY - breath * 12;
   g.save();
   g.translate(hx, hy);
   g.rotate(headRot);
@@ -435,10 +479,13 @@ function drawEars(g: CanvasRenderingContext2D, art: KarimboArt, p: KPose, white:
   const wob = 1 + (eg > 0.5 ? Math.sin(p.t * 30) * 0.02 : 0);
   const [nx, ny] = hd.earRootNear;
   const [fx, fy] = hd.earRootFar;
+  // mola: sobem na queda, caem na subida, quicam ao pousar; tremidinha ocasional parado
+  const twitch = p.state === 'idle' && Math.sin(p.t * 0.9) > 0.985 ? Math.sin(p.t * 60) * 0.08 : 0;
+  const spring = (p.earSpring ?? 0) + twitch;
   // orelha de trás: mais fina pela perspectiva
   const farW = 0.55 + eg * 0.35;
-  drawSpr(g, hd.earFar, fx, fy, { rot: tilt + flap * 0.9, sx: sx * farW * wob, sy, white });
-  drawSpr(g, hd.earNear, nx, ny, { rot: -tilt + flap, sx: sx * 0.95 * wob, sy, white });
+  drawSpr(g, hd.earFar, fx, fy, { rot: tilt + flap * 0.9 + spring, sx: sx * farW * wob, sy, white });
+  drawSpr(g, hd.earNear, nx, ny, { rot: -tilt + flap - spring, sx: sx * 0.95 * wob, sy, white });
 }
 
 export { glowSprite };

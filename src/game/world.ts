@@ -778,7 +778,21 @@ export class World {
     for (const c of this.corpses) if (cam.visible(c.x, c.y, 140)) c.render(g);
     for (const e of this.enemies) {
       if (!e.isBoss && e.spawn.type !== 'sniper' && !cam.visible(e.x, e.y, 160)) continue; // fora da tela: não desenha (a mira laser do sniper sempre aparece)
-      e.draw(g, this);
+      const r = e.isBoss ? 0 : e.react;
+      const pop = e.spawnedByArena && e.age < 0.28 ? e.age / 0.28 : 1;
+      if (Math.abs(r) > 0.004 || pop < 1) {
+        // tranco do impacto (achata + inclina para trás do golpe) e "pop" de entrada com overshoot
+        const px = e.x;
+        const py = e.flying ? e.y : e.feetY;
+        const ps = pop < 1 ? 0.55 + 0.45 * (1 + 2.2 * Math.pow(pop - 1, 3) + 1.2 * Math.pow(pop - 1, 2)) : 1;
+        g.save();
+        g.translate(px + e.reactDir * r * 3, py);
+        g.rotate(e.reactDir * r * 0.14);
+        g.scale((1 + r * 0.1) * ps, (1 - r * 0.09) * ps);
+        g.translate(-px, -py);
+        e.draw(g, this);
+        g.restore();
+      } else e.draw(g, this);
     }
     this.player.draw(g, this);
     for (const gr of this.grenades) gr.draw(g);

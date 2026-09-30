@@ -96,6 +96,10 @@ export abstract class Enemy {
     }
     this.lastHurt = this.t;
     this.awake = true;
+    // reação a impacto: tranco na direção do golpe (mola amortecida)
+    const force = info.type === 'explosion' || info.type === 'dash' ? 1 : info.type === 'melee' ? 0.9 : 0.55;
+    this.reactV += force * 9;
+    this.reactDir = Math.sign(info.dir || info.kx || 1) || 1;
     this.kbx += info.kx * (this.stats.hp > 150 ? 0.25 : 1);
     if (!this.flying && this.body.onGround && info.ky < 0 && this.stats.hp < 100) this.body.vy = Math.min(this.body.vy, info.ky * 2.2);
     if (this.flying) {
@@ -177,8 +181,18 @@ export abstract class Enemy {
     return groundAt(w.level, this.x + this.facing * (this.body.w / 2 + dist), this.feetY, 3);
   }
 
+  /** mola da reação a impacto (0 = parado) */
+  react = 0;
+  reactV = 0;
+  reactDir = 1;
+  /** segundos desde que surgiu (animação de entrada) */
+  age = 0;
+
   tickCommon(dt: number) {
     this.t += dt;
+    this.age += dt;
+    this.reactV += (-260 * this.react - 14 * this.reactV) * dt;
+    this.react = Math.max(-0.6, Math.min(1.2, this.react + this.reactV * dt));
     if (this.flash > 0) this.flash -= dt;
     if (this.flashCd > 0) this.flashCd -= dt;
   }

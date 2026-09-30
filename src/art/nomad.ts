@@ -82,6 +82,8 @@ export interface NomadPose {
   pilot: boolean;
   earFlap: number;
   ready: boolean;
+  /** mola da suspensão: + = comprimido (pouso), − = esticado (pulo) */
+  susp?: number;
 }
 
 export function drawNomad(g: CanvasRenderingContext2D, art: NomadArt, heads: KarimboHeads | null, x: number, feetY: number, p: NomadPose) {
@@ -142,7 +144,8 @@ export function drawNomad(g: CanvasRenderingContext2D, art: NomadArt, heads: Kar
   // chassi
   g.save();
   g.rotate(lean);
-  g.translate(0, bob * 0.3);
+  const sus = p.susp ?? 0;
+  g.translate(0, bob * 0.3 + sus * 4);
   drawSpr(g, art.frame, 0, 0, { white: w });
   g.restore();
 
@@ -153,7 +156,7 @@ export function drawNomad(g: CanvasRenderingContext2D, art: NomadArt, heads: Kar
   const recoilBack = p.recoil * 3.4;
   const tilt = p.tilt;
   g.save();
-  g.translate(pivX, pivY + bob);
+  g.translate(pivX, pivY + bob + sus * 6.5);
   g.rotate(tilt - lean * 0.6);
   g.translate(recoilBack, 0); // recuo: torre vai para trás (direita na arte espelhada = trás)
   g.translate(-pivX, -pivY);

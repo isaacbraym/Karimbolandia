@@ -72,6 +72,21 @@ export class Player {
   recoilT = 0;
   /** animação do golpe corpo a corpo */
   meleeT = 0;
+  // ---- rig de animação (molas de movimento secundário)
+  private animLean = 0;
+  private animLeanV = 0;
+  private headLagX = 0;
+  private headLagY = 0;
+  private headLagVX = 0;
+  private headLagVY = 0;
+  private earSpr = 0;
+  private earSprV = 0;
+  private turnT = 0;
+  private lastFacing: 1 | -1 = 1;
+  private idleT = 0;
+  private prevVx = 0;
+  private susp = 0;
+  private suspV = 0;
   /** ORELHADA: mergulho do ar com onda de choque ao pousar */
   slam = false;
   private ramHits = new WeakMap<object, number>();
@@ -436,6 +451,10 @@ export class Player {
     if (this.reviveGrace > 0) this.reviveGrace -= dt;
     if (this.recoilT > 0) this.recoilT -= dt;
     if (this.meleeT > 0) this.meleeT -= dt;
+    this.updateRig(dt);
+    // suspensão do Nômad (mola)
+    this.suspV += (-240 * this.susp - 12 * this.suspV) * Math.min(dt, 1 / 30);
+    this.susp = clamp(this.susp + this.suspV * Math.min(dt, 1 / 30), -1.2, 1.6);
     if (this.hurtT > 0) this.hurtT -= dt;
     if (this.fireCd > 0) this.fireCd -= dt;
     if (this.nadeCd > 0) this.nadeCd -= dt;
@@ -626,6 +645,7 @@ export class Player {
       b.onGround = false;
       this.setCrouch(false, w);
       w.audio('jump', 0.7, this.x);
+      this.rigKick(-40, 2.5);
       w.fx.add(PK.Dust, this.x, this.feetY, -b.vx * 0.1, -6, 0.35, 8, '#b9b0c8', { size1: 2, a0: 0.5 });
     }
     // altura variável
@@ -715,6 +735,48 @@ export class Player {
    * atirando para baixo ele é jogado para cima (no ar vira um impulso extra).
    */
   /** Golpe corpo a corpo quando há inimigo encostado à frente (atravessa escudos). */
+  /** Molas de animação: inclinação, atraso da cabeça, orelhas, virada e tempo parado. */
+  private updateRig(dt: number) {
+    if (dt <= 0) return;
+    const b = this.body;
+    const d = Math.min(dt, 1 / 30);
+    const lv = b.vx * this.facing; // velocidade "para a frente"
+    const acc = clamp((b.vx - this.prevVx) / d, -4000, 4000) * this.facing;
+    this.prevVx = b.vx;
+    const onFoot = !this.nomad && this.mode === 'foot';
+    // inclinação: para a frente correndo, extra ao acelerar, para trás ao frear
+    const leanT = onFoot && b.onGround && !this.crouch ? clamp(lv / RUN, -1, 1) * 0.075 + clamp(acc * 0.00003, -0.09, 0.09) : 0;
+    this.animLeanV += (160 * (leanT - this.animLean) - 16 * this.animLeanV) * d;
+    this.animLean += this.animLeanV * d;
+    // cabeça atrasada (follow-through): segue o corpo com mola sub-amortecida
+    const hxT = clamp(-lv * 0.005, -2.2, 2.2);
+    const hyT = clamp(-b.vy * 0.0035, -2.4, 2.4);
+    this.headLagVX += (220 * (hxT - this.headLagX) - 13 * this.headLagVX) * d;
+    this.headLagVY += (220 * (hyT - this.headLagY) - 13 * this.headLagVY) * d;
+    this.headLagX += this.headLagVX * d;
+    this.headLagY += this.headLagVY * d;
+    // orelhas: mais moles (balançam mais)
+    const eT = onFoot && !b.onGround ? clamp(b.vy / 1100, -0.32, 0.38) : 0;
+    this.earSprV += (95 * (eT - this.earSpr) - 5.5 * this.earSprV) * d;
+    this.earSpr = clamp(this.earSpr + this.earSprV * d, -0.6, 0.6);
+    // virada
+    if (this.facing !== this.lastFacing) {
+      this.lastFacing = this.facing;
+      this.turnT = 0.11;
+      this.headLagVX += 30;
+    }
+    if (this.turnT > 0) this.turnT -= d;
+    // parado
+    if (onFoot && b.onGround && Math.abs(b.vx) < 10 && !this.crouch) this.idleT += d;
+    else this.idleT = 0;
+  }
+
+  /** Impulso nas molas (pouso, pulo, tiro forte). */
+  private rigKick(headY: number, ears: number) {
+    this.headLagVY += headY;
+    this.earSprV += ears;
+  }
+
   private tryMelee(w: World) {
     const hb = this.hitbox;
     let target: (typeof w.enemies)[number] | null = null;
@@ -819,6 +881,7 @@ export class Player {
   }
 
   private onLand(w: World, vy: number) {
+    this.rigKick(clamp(vy * 0.09, 0, 70), -clamp(vy * 0.006, 0, 5.5));
     this.landSquash = clamp(vy / 700, 0.25, 1);
     this.justLanded = 0.1;
     w.audio('land', clamp(vy / 600, 0.3, 1), this.x);
@@ -1039,6 +1102,7 @@ export class Player {
       }
       if (this.jumpBuf > 0 && this.coyote > 0) {
         b.vy = -N_JUMP;
+        this.suspV -= 9;
         this.jumpBuf = 0;
         this.coyote = 0;
         this.jumping = true;
@@ -1065,6 +1129,7 @@ export class Player {
     const preVy = b.vy;
     moveBody(b, dt, w.level, w.solidRects, true);
     if (b.onGround && !wasGround && preVy > 200) {
+      this.suspV += clamp(preVy * 0.02, 0, 16);
       w.audio('land', 1, this.x);
       w.fx.addShake(2, 0.12);
       for (let i = 0; i < 8; i++) w.fx.add(PK.Dust, this.x + rand.spread(20), this.feetY - 1, rand.spread(110), -rand.range(6, 30), 0.5, 9, '#b9b0c8', { size1: 3, a0: 0.6 });
@@ -1175,6 +1240,7 @@ export class Player {
   }
 
   private startDash(w: World, n: NomadState, kind: 1 | 2) {
+    this.suspV -= kind === 1 ? 5 : 8; // arranque estica a suspensão
     n.dashKind = kind;
     n.dashT = kind === 1 ? 0.3 : 0.44;
     n.dashTime = n.dashT;
@@ -1365,6 +1431,7 @@ export class Player {
         pilot: true,
         earFlap: Math.min(1, Math.abs(b.vx) / 400 + (n.dashT > 0 ? 1 : 0)),
         ready: n.cooldown <= 0 && n.window <= 0,
+        susp: this.susp,
       });
       return;
     }
@@ -1388,6 +1455,8 @@ export class Player {
     }
     let st: KState = 'idle';
     if (this.hurtT > 0) st = 'hurt';
+    else if (this.slam) st = 'slam';
+    else if (this.slideT > 0 && this.crouch) st = 'slide';
     else if (this.glide) st = 'glide';
     else if (!b.onGround) st = b.vy < 0 ? 'jump' : 'fall';
     else if (this.crouch) st = 'crouch';
@@ -1407,7 +1476,13 @@ export class Player {
       alpha,
       hasGun: true,
       scarf: this.scarfT,
-      squash: this.landSquash * (b.onGround ? 1 : 0),
+      squash: b.onGround ? this.landSquash : this.slam ? -0.45 : -clamp(Math.abs(b.vy) / 1700, 0, 0.3),
+      lean: this.animLean,
+      headLag: [this.headLagX, this.headLagY],
+      earSpring: this.earSpr,
+      turn: this.turnT > 0 ? Math.sin((this.turnT / 0.11) * Math.PI) : 0,
+      idleT: this.idleT,
+      melee: this.meleeT > 0 ? 1 - this.meleeT / 0.22 : 0,
     });
     // barra de "combustível" do glide (sutil)
     if (this.glide || (this.glideUsed && !b.onGround && this.glideFuel < GLIDE_FUEL * 0.999 && this.glideFuel > 0)) {

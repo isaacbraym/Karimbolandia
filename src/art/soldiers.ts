@@ -279,6 +279,10 @@ export interface SPose {
   rot?: number;
   style: SoldierStyle;
   squash?: number;
+  /** inclinação do corpo (rad, + = frente) */
+  lean?: number;
+  /** 0..1 braço erguido (transição suave de mira) */
+  raise?: number;
 }
 
 /** Humanoides na altura do Karimbo (tiro reto sai na altura do peito: agachar desvia). */
@@ -304,12 +308,15 @@ export function drawSoldier(g: CanvasRenderingContext2D, art: SoldierArt, x: num
   if (p.facing === -1) g.scale(-1, 1);
   g.scale(SOLDIER_SCALE, SOLDIER_SCALE);
   if (p.rot) g.rotate(p.rot);
+  if (p.lean) g.rotate(p.lean);
   const w = p.flash;
   const running = p.state === 'run';
   const crouch = p.state === 'crouch';
   const fly = p.state === 'fly';
   const c = p.runPhase;
-  const bob = running ? -Math.abs(Math.sin(c)) * 1.5 : p.state === 'idle' ? Math.sin(p.t * 2.6) * 0.4 : 0;
+  const bob = running ? -Math.abs(Math.sin(c)) * 1.9 : p.state === 'idle' ? Math.sin(p.t * 2.6) * 0.45 : 0;
+  const breath = p.state === 'idle' ? Math.sin(p.t * 2.6) * 0.02 : 0;
+  const rec = p.kick * 0.9; // recuo do disparo no tronco
   let legF = 0;
   let legB = 0;
   let hipY = -13;
@@ -357,18 +364,19 @@ export function drawSoldier(g: CanvasRenderingContext2D, art: SoldierArt, x: num
   // braço de trás
   drawSpr(g, S0.armB, sx - 4.5, sy + 0.5, { rot: p.aiming ? 0.15 : 1.0 + Math.sin(c) * (running ? 0.5 : 0), white: w });
   drawSpr(g, S0.legB, -2, hipY + bob * 0.5, { rot: legB, sy: legSy, white: w });
-  drawSpr(g, S0.torso, 0, -13 + drop + bob, { white: w, rot: running ? 0.07 : 0 });
+  drawSpr(g, S0.torso, -rec * 0.6, -13 + drop + bob, { white: w, rot: running ? 0.08 : 0, sy: 1 + breath, sx: 1 - breath * 0.4 });
   drawSpr(g, S0.legF, 2, hipY + bob * 0.5, { rot: legF, sy: legSy, white: w });
-  drawSpr(g, S0.head, 1.4, -29.5 + drop + bob * 1.1, { white: w, rot: p.state === 'hurt' ? -0.25 : 0, sx: 0.88, sy: 0.88 });
+  drawSpr(g, S0.head, 1.4 - rec, -29.5 + drop + bob * 1.1 - breath * 10 + (running ? Math.sin(c * 2 - 0.6) * 0.5 : 0), { white: w, rot: p.state === 'hurt' ? -0.25 : running ? Math.sin(c - 0.4) * 0.04 : 0, sx: 0.88, sy: 0.88 });
 
   // braço da frente + arma
   let a = p.facing === 1 ? p.aim : Math.PI - p.aim;
   while (a > Math.PI) a -= Math.PI * 2;
   while (a < -Math.PI) a += Math.PI * 2;
   a = Math.max(-Math.PI * 0.6, Math.min(Math.PI * 0.6, a));
-  if (!p.aiming) a = 0.55;
+  const raise = p.raise ?? (p.aiming ? 1 : 0);
+  a = 0.55 + (a - 0.55) * raise;
   g.save();
-  g.translate(sx, sy);
+  g.translate(sx - rec, sy);
   g.rotate(a);
   drawSpr(g, S0.armF, 0, 0, { white: w });
   const kx = 11 - p.kick * 2.6;

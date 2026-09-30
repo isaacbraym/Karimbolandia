@@ -15,6 +15,9 @@ abstract class Soldier extends Enemy {
   aiming = false;
   state: SState = 'idle';
   runPhase = 0;
+  /** animação: braço erguido (0..1) e inclinação */
+  raise = 0;
+  leanA = 0;
   crouch = false;
   kick = 0;
   charge = 0;
@@ -101,6 +104,9 @@ abstract class Soldier extends Enemy {
 
   protected animate(dt: number) {
     const b = this.body;
+    this.raise = approach(this.raise, this.aiming ? 1 : 0, dt * 7);
+    const lt = b.onGround && !this.crouch ? clamp((b.vx * this.facing) / 160, -1, 1) * 0.09 : 0;
+    this.leanA += (lt - this.leanA) * Math.min(1, dt * 10);
     if (!b.onGround && !this.flying) this.state = 'jump';
     else if (this.crouch) this.state = 'crouch';
     else if (this.flying) this.state = 'fly';
@@ -149,6 +155,8 @@ abstract class Soldier extends Enemy {
       charge: this.charge,
       style: this.style,
       shieldUp: this.shieldUp(),
+      raise: this.raise,
+      lean: this.leanA,
       shieldBroken: this.shieldBroken(),
       jet: this.flying ? 0.5 + Math.min(0.5, Math.abs(b.vy) / 200) : 0,
     });
