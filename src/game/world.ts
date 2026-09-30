@@ -1,4 +1,4 @@
-import { Level, TILE, type LevelData, type EnemySpawn, type PickupKind } from './level';
+import { Level, T, TILE, type LevelData, type EnemySpawn, type PickupKind } from './level';
 import { Fx, PK } from './fx';
 import { Camera } from './camera';
 import { Player } from './player';
@@ -221,6 +221,12 @@ export class World {
     this.director.afterRespawn();
   }
 
+  /** Posição (pés) do último checkpoint ou do início. */
+  checkpointPos() {
+    const cp = this.checkpointIdx >= 0 ? this.data.checkpoints[this.checkpointIdx] : null;
+    return cp ? { x: cp.x, y: cp.y } : { x: this.data.playerStart.x, y: this.data.playerStart.y };
+  }
+
   requestRespawn() {
     if (this.hooks.onContinue) {
       if (this.lives > 0) {
@@ -305,6 +311,39 @@ export class World {
     this.camera.lock = this.director.currentLock();
     this.camera.snapTo(p.x, p.y, p.facing);
   }
+  /** Tile (tx,ty) é chão firme AGORA (3 tiles sólidos, sem espinho, com espaço para ficar em pé)? */
+  standableAt(tx: number, ty: number) {
+    const L = this.level;
+    for (let dx = -1; dx <= 1; dx++) {
+      if (L.get(tx + dx, ty) !== T.SOLID) return false;
+      if (L.get(tx + dx, ty - 1) === T.SOLID || L.get(tx + dx, ty - 1) === T.HAZARD) return false;
+    }
+    if (L.get(tx, ty - 2) === T.SOLID) return false;
+    return true;
+  }
+
+  /**
+   * Ponto seguro válido no mapa ATUAL mais próximo de (x, feetY): o chão pode ter desabado
+   * (arena do chefe) desde que o ponto foi memorizado. Dentro de arena ativa, fica dentro dela.
+   */
+  findSafeSpot(x: number, feetY: number): { x: number; y: number } | null {
+    const tx0 = Math.floor(x / TILE);
+    const ty0 = Math.floor(feetY / TILE);
+    const a = this.director.activeArenaRect();
+    for (let r = 0; r <= 40; r++) {
+      for (const s of r === 0 ? [1] : [-1, 1]) {
+        const tx = tx0 + s * r;
+        const px = tx * TILE + TILE / 2;
+        if (a && (px < a.x + 40 || px > a.x + a.w - 40)) continue;
+        for (const dy of [0, -1, 1, -2, 2, -3, 3, -4, 4, -5, 5, -6, 6, 7, 8]) {
+          const ty = ty0 + dy;
+          if (this.standableAt(tx, ty)) return { x: px, y: ty * TILE };
+        }
+      }
+    }
+    return null;
+  }
+
   isSafeSpot(x: number, feetY: number) {
     const L = this.level;
     const tx = Math.floor(x / TILE);

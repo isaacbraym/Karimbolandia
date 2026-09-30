@@ -1,4 +1,4 @@
-import { T } from '../level';
+import { T, TILE } from '../level';
 import type { LevelBuilder } from './builder';
 
 /**
@@ -43,4 +43,87 @@ export function addSupplies(b: LevelBuilder) {
   // armas raras em cápsulas visíveis, no caminho
   put('launcher', 422, 26);
   put('energy', 903, 26);
+}
+
+/**
+ * Alturas ao alcance do pulo: plataformas que ficavam 4–5 tiles acima do chão de onde se pula
+ * (inalcançáveis sem planar) descem para 3 tiles, levando junto o que está em cima delas
+ * (moedas, caixas, inimigos, decoração). Paredes sólidas de 4 tiles ganham um degrau no meio.
+ */
+export function easeClimbs(b: LevelBuilder) {
+  const L = b.level;
+  const standable = (x: number, y: number) => {
+    const t = L.get(x, y);
+    return (t === T.SOLID || t === T.ONEWAY) && L.get(x, y - 1) !== T.SOLID && L.get(x, y - 2) !== T.SOLID;
+  };
+  // 1) plataformas one-way altas demais (várias passadas: escadinhas descem em cadeia)
+  for (let pass = 0; pass < 3; pass++) lowerPass(b, standable);
+  stepWalls(b);
+}
+
+function lowerPass(b: LevelBuilder, standable: (x: number, y: number) => boolean) {
+  const L = b.level;
+  const runs: { x0: number; x1: number; y: number; rise: number }[] = [];
+  for (let y = 1; y < L.h; y++) {
+    let x = 0;
+    while (x < L.w) {
+      if (L.get(x, y) !== T.ONEWAY) {
+        x++;
+        continue;
+      }
+      const x0 = x;
+      while (x < L.w && L.get(x, y) === T.ONEWAY) x++;
+      const x1 = x - 1;
+      let rise = 99;
+      for (let sx = x0 - 4; sx <= x1 + 4; sx++) {
+        for (let sy = y + 1; sy < Math.min(L.h, y + 12); sy++) {
+          if (standable(sx, sy)) {
+            rise = Math.min(rise, sy - y);
+            break;
+          }
+        }
+      }
+      if (rise === 4 || rise === 5) runs.push({ x0, x1, y, rise });
+    }
+  }
+  for (const r of runs) {
+    const d = r.rise - 3;
+    const ny = r.y + d;
+    let free = true;
+    for (let x = r.x0; x <= r.x1 && free; x++) for (let y = r.y + 1; y <= ny; y++) if (L.get(x, y) !== T.EMPTY) free = false;
+    if (!free) continue;
+    const theme = L.theme[r.y * L.w + r.x0];
+    for (let x = r.x0; x <= r.x1; x++) {
+      L.set(x, r.y, T.EMPTY, 0);
+      L.set(x, ny, T.ONEWAY, theme);
+    }
+    // o que estava apoiado em cima acompanha
+    const px0 = r.x0 * TILE - 8;
+    const px1 = (r.x1 + 1) * TILE + 8;
+    const on = (x: number, y: number) => x >= px0 && x <= px1 && y <= r.y * TILE + 2 && y >= (r.y - 4) * TILE;
+    const dy = d * TILE;
+    for (const p of b.pickups) if (on(p.x, p.y)) p.y += dy;
+    for (const p of b.props) if (on(p.x, p.y)) p.y += dy;
+    for (const e of b.enemies) if (!e.arena && on(e.x, e.y) && e.type !== 'drone' && e.type !== 'jetpack') e.y += dy;
+    for (const dc of b.decos) if (on(dc.x, dc.y)) dc.y += dy;
+  }
+}
+
+function stepWalls(b: LevelBuilder) {
+  const L = b.level;
+  // 2) paredes sólidas de 4 tiles: degrau one-way na metade, do lado de baixo
+  const top = (x: number) => {
+    for (let y = 1; y < L.h; y++) if (L.get(x, y) === T.SOLID && L.get(x, y - 1) !== T.SOLID) return y;
+    return -1;
+  };
+  for (let x = 2; x < L.w - 1; x++) {
+    const a = top(x);
+    const c = top(x + 1);
+    if (a < 0 || c < 0 || a - c < 4 || a - c > 5) continue;
+    const sy = a - 2;
+    if (L.get(x, sy) === T.EMPTY && L.get(x - 1, sy) === T.EMPTY) {
+      L.set(x - 1, sy, T.ONEWAY, L.theme[a * L.w + x]);
+      L.set(x, sy, T.ONEWAY, L.theme[a * L.w + x]);
+    }
+  }
 }

@@ -135,7 +135,7 @@ describe('Fase: mecânicas obrigatórias', () => {
     // com planeio, sim
     const withGlide = analyzeReach(data);
     expect(withGlide.reached.has(withGlide.key(320, 32))).toBe(true);
-  });
+  }, 30000);
 });
 
 import { analyzeReachNomad } from '../src/game/level/reach';

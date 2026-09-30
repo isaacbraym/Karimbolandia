@@ -414,4 +414,72 @@ describe('Agachar desvia de tiros retos', () => {
     expect(z).not.toBeNull();
     expect(z!.remaining).toBeGreaterThan(3);
   });
+  it('reviver na luta do chefe após o chão desabar não cai de novo no buraco (bug: perdia todas as vidas)', () => {
+    const w = makeWorld();
+    w.invulnerable = false;
+    const ctl = newCtl();
+    let asked = 0;
+    let over = 0;
+    w.hooks.onContinue = () => asked++;
+    w.hooks.onGameOver = () => over++;
+    teleport(w, 1296, 14);
+    ctl.moveX = 1;
+    for (let i = 0; i < 60; i++) w.update(1 / 60, ctl);
+    ctl.moveX = 0;
+    for (let i = 0; i < 60 * 5; i++) w.update(1 / 60, ctl);
+    const b = w.director.bossRef as unknown as { rect: { x: number; w: number }; phase: number; warnCrumble: (w: unknown, k: string) => void };
+    expect(b).toBeTruthy();
+    const cc = Math.round((b.rect.x + b.rect.w / 2) / TILE);
+    // o "último ponto seguro" fica justamente no meio do palco…
+    w.player.lastSafe = { x: cc * TILE + 16, y: 14 * TILE };
+    b.phase = 2;
+    b.warnCrumble(w, 'center');
+    for (let i = 0; i < 60 * 2.2; i++) w.update(1 / 60, ctl);
+    // …que desabou: o Karimbo cai no buraco com pouca vida e morre
+    w.player.body.x = cc * TILE + 16;
+    w.player.body.y = 12 * TILE;
+    w.player.hp = 15;
+    w.player.invuln = 0;
+    for (let i = 0; i < 60 * 6 && asked === 0; i++) w.update(1 / 60, ctl);
+    expect(asked).toBe(1);
+    const lives = w.lives;
+    w.reviveInPlace();
+    expect(w.lives).toBe(lives - 1);
+    // reviveu em chão firme e continua vivo (não entra em ciclo de quedas)
+    expect(w.standableAt(Math.floor(w.player.x / TILE), Math.floor(w.player.feetY / TILE))).toBe(true);
+    for (let i = 0; i < 60 * 3; i++) w.update(1 / 60, ctl);
+    expect(w.player.mode).not.toBe('dead');
+    expect(asked).toBe(1);
+    expect(over).toBe(0);
+    expect(w.stats.pitFalls).toBeLessThanOrEqual(2);
+  });
+  it('escopeta: coice dá pulinho para trás; atirando para baixo dá um pulinho para cima', () => {
+    const w = makeWorld();
+    teleport(w, 200, 32);
+    const ctl = newCtl();
+    for (let i = 0; i < 20; i++) w.update(1 / 60, ctl);
+    const p = w.player;
+    p.cur = 'shotgun';
+    p.facing = 1;
+    ctl.mouseAim = { x: p.x + 300, y: p.y - 10 };
+    ctl.fire.held = true;
+    w.update(1 / 60, ctl);
+    ctl.fire.held = false;
+    expect(p.body.vx).toBeLessThan(-150);
+    expect(p.body.vy).toBeLessThan(0);
+    for (let i = 0; i < 12; i++) w.update(1 / 60, ctl);
+    expect(p.body.onGround).toBe(false);
+    // no ar, mirando para baixo
+    for (let i = 0; i < 90; i++) w.update(1 / 60, ctl);
+    ctl.jump.pressed = ctl.jump.held = true;
+    w.update(1 / 60, ctl);
+    ctl.jump.pressed = false;
+    ctl.jump.held = false;
+    for (let i = 0; i < 25; i++) w.update(1 / 60, ctl);
+    p.fireCd = 0;
+    ctl.mouseAim = { x: p.x + 2, y: p.y + 300 };
+    ctl.fire.held = true;
+    w.update(1 / 60, ctl);
+    expect(p.body.vy).toBeLessThan(-350);
+  });
 });

@@ -32,6 +32,8 @@ Run-and-gun **2.5D moderno** que roda direto no navegador (celular e PC) — uma
 * **Zonas de guerra:** contador no topo ("FALTAM N INIMIGOS" + onda atual) e setas vermelhas nas bordas da tela apontando os inimigos que estão fora de vista (estilo GTA).
 * **Soldado de escudo:** o escudo tem vida própria (barrinha azul em cima dele); tiros de frente e explosões gastam, e quando zera ele quebra de vez.
 * **Nômad:** 450 de vida (+50%). **Granada:** área de explosão ~50% maior, com onda de choque e anel de fogo do tamanho real do dano.
+* **Alturas ao alcance do pulo:** plataformas que ficavam 4–5 tiles acima do chão desceram para 3 (com o que estava em cima delas), paredes de 4 tiles ganharam um degrau e o pulo ficou ~7% mais alto.
+* **Escopeta com coice:** atirando para a frente o Karimbo dá um pulinho para trás; atirando para baixo ele é jogado para cima (no ar vira um impulso extra).
 * **Armas com munição limitada:** pistola (∞), metralhadora, shotgun, lança-granadas e canhão de plasma — varie as armas! Caixas e inimigos soltam munição.
 * **3 vidas por fase** (fichas de fliperama): ao morrer aparece **CONTINUAR?** com contagem regressiva de 10 s; confirmar gasta 1 vida e você continua *de onde parou* (inimigos, arena e chefe seguem como estavam). Sem confirmar, volta ao último checkpoint. Sem vidas: **FIM DE JOGO** (recomeçar a fase ou menu).
 * **Vida com critério:** corações fixos após combates duros, caixas sorteadas (nem toda caixa tem item) e drops que aparecem mais quando você está ferido.

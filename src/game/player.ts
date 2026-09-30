@@ -16,6 +16,9 @@ import {
 } from './movement';
 
 const SLIDE_T = 0.42; // s de deslize
+const SHOTGUN_KICK = 250; // px/s para trás
+const SHOTGUN_HOP = 230; // pulinho do coice
+const SHOTGUN_POGO = 470; // tiro para baixo: impulso para cima
 const SLIDE_V = 430; // px/s no início do deslize
 
 export { FOOT_W, FOOT_H, CROUCH_H, NOMAD_W, NOMAD_H };
@@ -60,6 +63,8 @@ export class Player {
   crouch = false;
   /** deslize (agachar correndo): passa por baixo dos tiros */
   slideT = 0;
+  /** tempo em que o coice (escopeta) manda no movimento horizontal */
+  recoilT = 0;
   slideDir = 1;
   aim = 0;
   aimVis = 0;
@@ -98,6 +103,8 @@ export class Player {
   deadT = 0;
   /** onde morreu (para continuar de onde parou) */
   deathPos: { x: number; y: number } | null = null;
+  /** após reviver: cair no abismo não tira vida (só reposiciona) */
+  reviveGrace = 0;
   deadVy = 0;
   deadRot = 0;
   respawnQueued = false;
@@ -320,22 +327,18 @@ export class Player {
 
   /** Gasta uma vida: revive no ponto da morte (ou no último ponto seguro se o local for inválido). */
   revive(w: World) {
-    const L = w.level;
-    let x = this.lastSafe.x;
-    let y = this.lastSafe.y;
-    const d = this.deathPos;
-    if (d) {
-      const inside = L.solidAtPx(d.x, d.y - 8) || L.solidAtPx(d.x, d.y - 30) || L.solidAtPx(d.x, d.y - 50);
-      const gy = L.groundBelow(d.x, d.y - 40, 260);
-      if (!inside && gy !== null && d.y < w.deathY() - 40) {
-        x = d.x;
-        y = Math.min(d.y, gy);
-      }
-    }
+    // procura chão firme no mapa ATUAL: onde morreu → perto dali → último ponto seguro → checkpoint
+    const d = this.deathPos ?? this.lastSafe;
+    const spot = w.findSafeSpot(d.x, d.y) ?? w.findSafeSpot(this.lastSafe.x, this.lastSafe.y) ?? w.checkpointPos();
+    const x = spot.x;
+    const y = spot.y;
+    void TILE;
     const facing = this.facing;
     this.reset(x, y);
     this.facing = facing;
     this.invuln = 3;
+    this.reviveGrace = 3;
+    this.lastSafe = { x, y };
     this.deathPos = null;
   }
 
@@ -417,6 +420,8 @@ export class Player {
     this.animT += dt;
     this.scarfT += dt * (8 + Math.abs(this.body.vx) * 0.03);
     if (this.invuln > 0) this.invuln -= dt;
+    if (this.reviveGrace > 0) this.reviveGrace -= dt;
+    if (this.recoilT > 0) this.recoilT -= dt;
     if (this.hurtT > 0) this.hurtT -= dt;
     if (this.fireCd > 0) this.fireCd -= dt;
     if (this.nadeCd > 0) this.nadeCd -= dt;
@@ -573,6 +578,8 @@ export class Player {
       b.vx = this.slideDir * (CROUCH_SPEED + (SLIDE_V - CROUCH_SPEED) * k);
       if (Math.random() < dt * 40) w.fx.add(PK.Dust, this.x - this.slideDir * 10, this.feetY - 1, -this.slideDir * rand.range(30, 90), -rand.range(6, 30), 0.35, 6, '#b9b0c8', { size1: 2, a0: 0.6 });
       if (Math.random() < dt * 20) w.fx.add(PK.Spark, this.x, this.feetY - 1, -this.slideDir * rand.range(60, 160), -rand.range(20, 80), 0.2, 4, '#ffd27a', { size1: 1, g: 500, front: true });
+    } else if (this.recoilT > 0) {
+      b.vx = approach(b.vx, 0, 420 * dt); // coice: desliza para trás
     } else if (!hurt || grounded) b.vx = approach(b.vx, tx, acc * dt);
 
     // timers de pulo
@@ -635,7 +642,7 @@ export class Player {
     } else {
       // gravidade normal
       b.vy = Math.min(FALL_MAX, b.vy + GRAV * dt);
-      if (b.vy < 0 && !ctl.jump.held) b.vy += GRAV * 0.6 * dt; // corte mais firme
+      if (b.vy < 0 && !ctl.jump.held && this.recoilT <= 0) b.vy += GRAV * 0.6 * dt; // corte mais firme
     }
     // ear glide anim
     this.earGlide = damp(this.earGlide, this.glide ? 1 : 0, this.glide ? 18 : 22, dt);
@@ -670,6 +677,36 @@ export class Player {
       }
     } else if (grounded) this.runPhase = damp(this.runPhase, Math.round(this.runPhase / Math.PI) * Math.PI, 12, dt);
     this.wasGround = b.onGround;
+  }
+
+  /**
+   * Coice da escopeta: atirando para a frente o Karimbo dá um pulinho para trás;
+   * atirando para baixo ele é jogado para cima (no ar vira um impulso extra).
+   */
+  private shotgunKick(w: World) {
+    const b = this.body;
+    const down = Math.sin(this.aim) > 0.55;
+    if (down) {
+      b.vy = Math.min(b.vy, -SHOTGUN_POGO);
+      b.onGround = false;
+      this.jumping = false;
+      this.recoilT = 0.2;
+      w.fx.add(PK.Ring, this.x, this.feetY, 0, 0, 0.25, 6, '#ffd9a0', { size1: 30, a0: 0.7, front: true });
+      for (let i = 0; i < 6; i++) w.fx.add(PK.Dust, this.x + rand.spread(16), this.feetY, rand.spread(90), rand.range(10, 50), 0.4, 7, '#b9b0c8', { size1: 2, a0: 0.5 });
+    } else if (this.crouch) {
+      b.vx = -Math.cos(this.aim) * 150;
+      this.recoilT = 0.12;
+    } else {
+      b.vx = -Math.cos(this.aim) * SHOTGUN_KICK;
+      if (b.onGround) {
+        b.vy = Math.min(b.vy, -SHOTGUN_HOP);
+        b.onGround = false;
+        this.jumping = false;
+      } else b.vy = Math.min(b.vy, b.vy * 0.5 - 60);
+      this.recoilT = 0.24;
+      this.landSquash = 0.4;
+    }
+    w.fx.addShake(2.4, 0.12);
   }
 
   private startGlide(w: World) {
@@ -784,7 +821,8 @@ export class Player {
     this.shootAnim = 0.12;
     // recuo no atirador
     const rc = d.recoil;
-    if (rc > 60 || !this.body.onGround) this.body.vx -= Math.cos(this.aim) * rc * (this.body.onGround ? 0.6 : 1);
+    if (this.cur === 'shotgun' && !this.nomad) this.shotgunKick(w);
+    else if (rc > 60 || !this.body.onGround) this.body.vx -= Math.cos(this.aim) * rc * (this.body.onGround ? 0.6 : 1);
     // efeitos
     w.audio(d.sfx, 0.85, this.x);
     w.fx.add(PK.Fire, ox, oy, 0, 0, 0.07, d.pellets > 1 ? 15 : 10, d.trail, { size1: 4, front: true });
@@ -1115,7 +1153,12 @@ export class Player {
     w.audio('hurt', 0.6, this.x);
     w.fx.addShake(3, 0.2);
     const n = this.nomad;
-    const s = this.lastSafe;
+    // o ponto seguro memorizado pode ter virado buraco (chão do chefe desabou): revalida
+    let s = this.lastSafe;
+    if (!w.standableAt(Math.floor(s.x / TILE), Math.floor(s.y / TILE))) {
+      s = w.findSafeSpot(s.x, s.y) ?? w.checkpointPos();
+      this.lastSafe = { x: s.x, y: s.y };
+    }
     this.body.vx = this.body.vy = 0;
     this.body.x = s.x;
     this.body.y = s.y - this.body.h / 2 - 1;
@@ -1126,7 +1169,7 @@ export class Player {
       n.hp -= 35;
       n.hurtFlash = 0.2;
       if (n.hp <= 0) this.ejectNomad(w);
-    } else {
+    } else if (this.reviveGrace <= 0) {
       this.hp -= 20;
       if (this.hp <= 0) {
         this.hp = 0;
