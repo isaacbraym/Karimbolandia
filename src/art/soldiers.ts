@@ -274,6 +274,7 @@ export interface SPose {
   kick: number;
   charge: number; // 0..1 telegrafo (brilho na arma)
   shieldUp?: boolean;
+  shieldBroken?: boolean;
   jet?: number; // 0..1 chama do jetpack
   rot?: number;
   style: SoldierStyle;
@@ -385,7 +386,7 @@ export function drawSoldier(g: CanvasRenderingContext2D, art: SoldierArt, x: num
   g.restore();
 
   // escudo
-  if (S0.extra && p.style === 'shield') {
+  if (S0.extra && p.style === 'shield' && !p.shieldBroken) {
     const up = p.shieldUp !== false;
     g.save();
     g.translate(11 + (p.state === 'bash' ? 6 : 0), -8 + drop + bob);

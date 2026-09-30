@@ -182,6 +182,19 @@ export class Director {
     }
     return null;
   }
+  /** Zona de guerra ativa (não o chefe): quantos faltam abater, onda atual e inimigos vivos. */
+  warZone(): { remaining: number; wave: number; waves: number; enemies: Enemy[]; waiting: boolean } | null {
+    for (const a of this.arenas) {
+      if (a.status !== 'active' || a.def.id === 'boss') continue;
+      const alive = a.alive.filter((e) => e.alive);
+      let remaining = alive.length;
+      const from = a.wave + (a.waveSpawned ? 1 : 0);
+      for (let i = from; i < a.def.waves.length; i++) remaining += a.def.waves[i].spawns.length;
+      return { remaining, wave: Math.min(a.wave + 1, a.def.waves.length), waves: a.def.waves.length, enemies: alive, waiting: !a.waveSpawned };
+    }
+    return null;
+  }
+
   activeArenaRect(): Rect | null {
     for (const a of this.arenas) if (a.status === 'active') return a.def.rect;
     return null;
@@ -245,7 +258,7 @@ export class Director {
       const n = this.w.player.nomad;
       if (n) {
         n.timeLeft = n.maxTime = SUPPORT_TIME;
-        n.hp = n.maxHp = 200;
+        n.hp = n.maxHp = 300;
       }
       this.banner('NÔMAD DE APOIO', `Emprestado por ${SUPPORT_TIME}s`, 2.6);
       return;

@@ -392,4 +392,26 @@ describe('Agachar desvia de tiros retos', () => {
     d.startBoss(a);
     expect(w.lives).toBe(6);
   });
+  it('escudo tem vida e quebra; Nômad 450 de vida; granada maior; contador da zona de guerra', async () => {
+    const { newNomad } = await import('../src/game/player');
+    const { Grenade } = await import('../src/game/bullets');
+    expect(newNomad().maxHp).toBe(450);
+    expect(new Grenade(0, 0, 0, 0).radius).toBeGreaterThanOrEqual(115);
+    const w = makeWorld();
+    const sp = w.data.enemies.find((e) => e.type === 'shield' && !e.arena)!;
+    const e = w.enemies.find((x) => x.spawn.id === sp.id) as unknown as { shieldHp: number; broken: boolean; facing: number; x: number; y: number; hurt: (w: unknown, d: number, i: unknown) => number };
+    const bullet = { vx: -e.facing * 900, vy: 0, kind: 'rifle' };
+    let blocked = 0;
+    for (let i = 0; i < 40 && !e.broken; i++) if (e.hurt(w, 10, { type: 'bullet', bullet, x: e.x, y: e.y, dir: -e.facing, kx: 0, ky: 0 }) === -1) blocked++;
+    expect(blocked).toBeGreaterThan(5);
+    expect(e.broken).toBe(true);
+    // contador: arena 1
+    const d = w.director as unknown as { arenas: { def: { triggerX: number } }[] };
+    teleport(w, Math.floor(d.arenas[0].def.triggerX / TILE) + 1, 32);
+    const ctl = newCtl();
+    for (let i = 0; i < 30; i++) w.update(1 / 60, ctl);
+    const z = w.director.warZone();
+    expect(z).not.toBeNull();
+    expect(z!.remaining).toBeGreaterThan(3);
+  });
 });

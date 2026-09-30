@@ -413,6 +413,23 @@ export class Fx {
     }
   }
 
+  /** Camada extra da granada: onda de choque do tamanho real da área de dano + anel de fogo. */
+  grenadeBlast(x: number, y: number, radius: number) {
+    this.add(PK.Ring, x, y, 0, 0, 0.42, radius * 0.25, '#ffffff', { size1: radius, a0: 0.85, front: true });
+    this.add(PK.Ring, x, y, 0, 0, 0.6, radius * 0.4, '#ff9a3a', { size1: radius * 1.12, a0: 0.55, front: true });
+    const n = Math.ceil(14 * this.density);
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2 + rand.spread(0.2);
+      const r = radius * rand.range(0.45, 0.8);
+      this.add(PK.Fire, x + Math.cos(a) * r * 0.5, y + Math.sin(a) * r * 0.35, Math.cos(a) * r * 1.6, Math.sin(a) * r * 1.1 - 30, rand.range(0.3, 0.5), radius * rand.range(0.18, 0.3), rand.pick(['#ff9a2a', '#ffcf5a', '#ff5a1a']), { size1: 3, drag: 3.2, front: true });
+    }
+    this.add(PK.Fire, x, y, 0, 0, 0.18, radius * 0.9, '#fff6d8', { size1: radius * 0.3, front: true });
+    this.smoke(x, y - 10, 6, '#3c3550', radius * 0.4, 50, 1.4);
+    this.sparks(x, y, 16, '#ffd27a', radius * 5);
+    this.light(x, y, radius * 3, 0.45, '#ffb060');
+    this.addShake(6, 0.35);
+  }
+
   explosion(x: number, y: number, size: number) {
     const s = size;
     this.add(PK.Ring, x, y, 0, 0, 0.32, s * 0.35, '#ffd9a0', { size1: s * 1.15, a0: 0.9, front: true });

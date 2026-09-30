@@ -114,6 +114,79 @@ export class Hud {
     this.hint = { text, t: dur };
   }
 
+  private warPulse = 0;
+  private lastRemaining = -1;
+  /** Contador "faltam N" no topo + setas vermelhas nas bordas apontando os inimigos fora da tela (estilo GTA). */
+  private drawWarZone(g: CanvasRenderingContext2D, w: World, W: number, H: number, wz: NonNullable<ReturnType<World['director']['warZone']>>, T: number) {
+    if (wz.remaining !== this.lastRemaining) {
+      if (this.lastRemaining >= 0 && wz.remaining < this.lastRemaining) this.warPulse = 1;
+      this.lastRemaining = wz.remaining;
+    }
+    this.warPulse = Math.max(0, this.warPulse - 1 / 30);
+    // painel
+    const cx = W / 2;
+    const y = T + 32;
+    const pw = 190;
+    const blink = 0.55 + 0.45 * Math.sin(this.time * 5);
+    pill(g, cx - pw / 2, y, pw, 30, 9, 'rgba(60,6,20,0.82)', `rgba(255,70,80,${0.5 + 0.4 * blink})`);
+    text(g, 'ZONA DE GUERRA', cx - pw / 2 + 10, y + 12, 10, '#ff9a9a', 'left', DISPLAY, '400');
+    text(g, `ONDA ${wz.wave}/${wz.waves}`, cx + pw / 2 - 10, y + 12, 10, '#ffd0d0', 'right', DISPLAY, '400');
+    const s = 1 + this.warPulse * 0.35;
+    g.save();
+    g.translate(cx, y + 26);
+    g.scale(s, s);
+    text(g, wz.remaining === 1 ? 'FALTA 1 INIMIGO' : `FALTAM ${wz.remaining} INIMIGOS`, 0, 0, 13, '#ffffff', 'center', DISPLAY, '400');
+    g.restore();
+
+    // setas vermelhas para inimigos fora da tela
+    const cam = w.camera;
+    const m = 26;
+    const top = T + 72;
+    const bottom = H - 22;
+    const ccx = W / 2;
+    const ccy = (top + bottom) / 2;
+    for (const e of wz.enemies) {
+      const sx = cam.wx(e.x);
+      const sy = cam.wy(e.y - 10);
+      if (sx > 0 && sx < W && sy > 0 && sy < H) continue; // visível: sem seta
+      const dx = sx - ccx;
+      const dy = sy - ccy;
+      const hw = W / 2 - m;
+      const hh = (bottom - top) / 2;
+      const k = Math.min(Math.abs(hw / (dx || 1e-3)), Math.abs(hh / (dy || 1e-3)));
+      const ax = ccx + dx * k;
+      const ay = ccy + dy * k;
+      const ang = Math.atan2(dy, dx);
+      const dist = Math.hypot(e.x - w.player.x, e.y - w.player.y);
+      const near = clamp(1 - dist / 900, 0.35, 1);
+      const pulse = 1 + 0.18 * Math.sin(this.time * 8 + e.x * 0.01);
+      const sz = (9 + near * 5) * pulse;
+      g.save();
+      g.translate(ax, ay);
+      g.rotate(ang);
+      g.globalAlpha = 0.55 + near * 0.45;
+      // brilho
+      g.fillStyle = 'rgba(255,40,60,0.25)';
+      g.beginPath();
+      g.arc(0, 0, sz * 1.5, 0, Math.PI * 2);
+      g.fill();
+      // seta
+      g.fillStyle = '#ff2d3f';
+      g.strokeStyle = '#2a0610';
+      g.lineWidth = 1.6;
+      g.beginPath();
+      g.moveTo(sz, 0);
+      g.lineTo(-sz * 0.7, -sz * 0.75);
+      g.lineTo(-sz * 0.3, 0);
+      g.lineTo(-sz * 0.7, sz * 0.75);
+      g.closePath();
+      g.fill();
+      g.stroke();
+      g.restore();
+    }
+    g.globalAlpha = 1;
+  }
+
   update(dt: number) {
     this.time += dt;
     for (const b of this.banners) b.t += dt;
@@ -247,6 +320,12 @@ export class Hud {
         g.stroke();
         g.globalAlpha = 1;
       }
+    }
+
+    // ------------------------------------------------ zona de guerra: contador + setas
+    const wz = w.director.warZone();
+    if (wz) {
+      this.drawWarZone(g, w, W, H, wz, T);
     }
 
     // ------------------------------------------------ topo central: coletáveis

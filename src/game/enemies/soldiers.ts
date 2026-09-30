@@ -149,12 +149,16 @@ abstract class Soldier extends Enemy {
       charge: this.charge,
       style: this.style,
       shieldUp: this.shieldUp(),
+      shieldBroken: this.shieldBroken(),
       jet: this.flying ? 0.5 + Math.min(0.5, Math.abs(b.vy) / 200) : 0,
     });
     this.drawExtra(g, w, true);
   }
   protected shieldUp(): boolean {
     return true;
+  }
+  protected shieldBroken(): boolean {
+    return false;
   }
   protected drawExtra(g: CanvasRenderingContext2D, w: World, front: boolean) {
     void g;
@@ -305,14 +309,40 @@ export class ShotgunSoldier extends Soldier {
   }
 }
 
+/** vida do escudo (balas de frente gastam; explosões gastam 60%) */
+const SHIELD_HP = 110;
+
 // ------------------------------------------------------------------------------------------
 export class ShieldSoldier extends Soldier {
   shield = true;
+  /** o escudo tem vida própria: quando zera, quebra de vez */
+  shieldHp = SHIELD_HP;
+  broken = false;
+  shieldShown = 1;
+  shieldHitT = 0;
   constructor(spawn: EnemySpawn) {
     super(spawn, 'shield', { hp: 58, w: 44, h: 78, score: 180, wake: 520, tokens: [2, 3] });
   }
   protected shieldUp() {
-    return this.shield;
+    return this.shield && !this.broken;
+  }
+  protected shieldBroken() {
+    return this.broken;
+  }
+  private breakShield(w: World) {
+    this.broken = true;
+    this.shield = false;
+    this.shieldHp = 0;
+    const sx = this.x + this.facing * 16;
+    const sy = this.feetY - 40;
+    w.fx.debris(sx, sy, 14, ['#2f4fb0', '#7ff9ff', '#1c2f70'], 300);
+    w.fx.sparks(sx, sy, 18, '#7ff9ff', 320);
+    w.fx.add(PK.Ring, sx, sy, 0, 0, 0.3, 8, '#bfffff', { size1: 46, a0: 0.9, front: true });
+    w.audio('hitMetal', 1, this.x);
+    w.audio('crateBreak', 0.8, this.x);
+    w.fx.popup(this.x, this.feetY - 92, 'ESCUDO QUEBRADO!', '#7ff9ff', 10);
+    w.fx.addShake(2.5, 0.15);
+    this.setMode('stun');
   }
   hurt(w: World, dmg: number, info: HurtInfo): number {
     if (this.shield && info.type === 'bullet' && info.bullet) {
@@ -321,6 +351,12 @@ export class ShieldSoldier extends Soldier {
       const fromAbove = b.vy > 0 && Math.abs(b.vy) > Math.abs(b.vx) * 1.05;
       const pierces = b.kind === 'plasma';
       if (fromFront && !fromAbove && !pierces) {
+        this.shieldHp -= dmg;
+        this.shieldHitT = 0.12;
+        if (this.shieldHp <= 0) {
+          this.breakShield(w);
+          return -1;
+        }
         w.fx.sparks(info.x, info.y, 6, '#7ff9ff', 200, -info.dir, 0, 1.6);
         w.fx.add(PK.Glint, info.x, info.y, 0, 0, 0.14, 7, '#bfffff', { front: true });
         w.audio('shieldPing', 0.7, this.x);
@@ -328,10 +364,46 @@ export class ShieldSoldier extends Soldier {
         return -1;
       }
     }
+    if (this.shield && !this.broken && info.type === 'explosion') {
+      // o escudo absorve parte da explosão
+      this.shieldHp -= dmg * 0.6;
+      if (this.shieldHp <= 0) this.breakShield(w);
+    }
     return super.hurt(w, dmg, info);
+  }
+  protected drawExtra(g: CanvasRenderingContext2D, w: World, front: boolean) {
+    void w;
+    if (!front || this.broken || !this.alive) return;
+    // barrinha de vida do escudo acima da cabeça
+    const bw = 40;
+    const x = this.x - bw / 2;
+    const y = this.feetY - this.stats.h - 14;
+    const f = clamp(this.shieldHp / SHIELD_HP, 0, 1);
+    this.shieldShown += (f - this.shieldShown) * 0.15;
+    g.fillStyle = 'rgba(14,10,34,0.85)';
+    g.fillRect(x - 1.5, y - 1.5, bw + 3, 8);
+    if (this.shieldShown > f) {
+      g.fillStyle = '#ffffff';
+      g.fillRect(x, y, bw * this.shieldShown, 5);
+    }
+    g.fillStyle = this.shieldHitT > 0 ? '#ffffff' : f < 0.3 ? '#ff8a5a' : '#39d4ff';
+    g.fillRect(x, y, bw * f, 5);
+    g.fillStyle = 'rgba(255,255,255,0.4)';
+    g.fillRect(x, y, bw * f, 1.5);
+    // ícone de escudo
+    g.fillStyle = '#7ff9ff';
+    g.beginPath();
+    g.moveTo(x - 9, y - 1.5);
+    g.lineTo(x - 3, y - 1.5);
+    g.lineTo(x - 3, y + 3);
+    g.lineTo(x - 6, y + 6.5);
+    g.lineTo(x - 9, y + 3);
+    g.closePath();
+    g.fill();
   }
   update(w: World, dt: number) {
     this.commonUpdate(w, dt);
+    if (this.shieldHitT > 0) this.shieldHitT -= dt;
     const b = this.body;
     const see = this.canSee(w, 400);
     if (!this.alert && (see || this.lastHurt > 0)) {
@@ -350,7 +422,7 @@ export class ShieldSoldier extends Soldier {
       this.aiming = false;
       switch (this.mode) {
         case 'advance':
-          this.shield = true;
+          this.shield = !this.broken;
           if (this.ledgeAhead(w, 10)) this.walk(this.facing, 50, dt);
           else b.vx = approach(b.vx, 0, 1000 * dt);
           this.tryJumpObstacle(w);
@@ -375,7 +447,7 @@ export class ShieldSoldier extends Soldier {
           this.shield = false;
           b.vx = approach(b.vx, 0, 1400 * dt);
           if (this.modeT > 0.75) {
-            this.shield = true;
+            this.shield = !this.broken;
             this.setMode('advance');
           }
           break;

@@ -365,8 +365,8 @@ export class Grenade {
     this.vy = vy;
     this.team = team;
     this.fromNomad = fromNomad;
-    this.radius = fromNomad ? 92 : 78;
-    this.dmg = fromNomad ? 90 : 70;
+    this.radius = fromNomad ? 138 : 118; // área maior (+50%)
+    this.dmg = fromNomad ? 95 : 75;
   }
 
   update(w: World, dt: number) {
@@ -423,6 +423,7 @@ export class Grenade {
 
   detonate(w: World) {
     w.explode(this.x, this.y, this.radius, this.dmg, this.team, { kb: 380, fromNomad: this.fromNomad, big: true });
+    if (this.team === 0) w.fx.grenadeBlast(this.x, this.y, this.radius);
     this.dead = true;
   }
 

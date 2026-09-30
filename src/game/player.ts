@@ -1235,8 +1235,8 @@ export class Player {
 }
 
 export const newNomad = (): NomadState => ({
-  hp: 300,
-  maxHp: 300,
+  hp: 450, // +50%
+  maxHp: 450,
   dashT: 0,
   dashKind: 0,
   dashDir: 1,
