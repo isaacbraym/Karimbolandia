@@ -37,9 +37,9 @@ export class TouchUI {
       <div class="stick-zone"><div class="stick-ghost"></div><div class="stick-base"><div class="stick-knob"></div></div></div>
       <button class="tbtn t-jump" data-act="jump" aria-label="Pular">${ICONS.jump}<span>PULO</span></button>
       <button class="tbtn t-fire" data-act="fire" aria-label="Atirar e mirar">${ICONS.fire}<span>FOGO</span><i class="fire-knob"></i></button>
-      <button class="tbtn t-nade" data-act="grenade" aria-label="Granada">${ICONS.grenade}</button>
-      <button class="tbtn t-special" data-act="special" aria-label="Especial">${ICONS.special}</button>
-      <button class="tbtn t-swap" data-act="next" aria-label="Trocar arma">${ICONS.switch}</button>
+      <button class="tbtn t-nade" data-act="grenade" aria-label="Granada">${ICONS.grenade}<b class="badge nade-n">4</b></button>
+      <button class="tbtn t-special" data-act="special" aria-label="Especial">${ICONS.special}<i class="cd-ring"></i></button>
+      <button class="tbtn t-swap" data-act="next" aria-label="Trocar arma"><img class="wicon" alt="" /><b class="badge ammo-n">∞</b></button>
       <button class="tbtn t-pause" data-act="pause" aria-label="Pausar">${ICONS.pause}</button>
     `;
     parent.appendChild(this.root);
@@ -88,6 +88,7 @@ export class TouchUI {
     const t = this.input.touch;
     const down = (e: PointerEvent) => {
       e.preventDefault();
+      this.input.haptic(0.2, 8);
       try {
         el.setPointerCapture(e.pointerId);
       } catch {
@@ -147,6 +148,7 @@ export class TouchUI {
         /* ok */
       }
       pid = e.pointerId;
+      this.input.haptic(0.2, 8);
       this.markActive();
       this.input.onGesture?.();
       t.held.fire = true;
@@ -246,6 +248,35 @@ export class TouchUI {
     this.input.touch.stickX = Math.cos(a) * mag;
     this.input.touch.stickY = Math.sin(a) * mag;
     this.knob.style.transform = `translate(calc(-50% + ${Math.cos(a) * m * R}px), calc(-50% + ${Math.sin(a) * m * R}px))`;
+  }
+
+  private lastSync = '';
+  /** Atualiza os botões com o estado do jogo (ícone/munição da arma, granadas, recarga do avanço). */
+  sync(s: { weaponIcon: string; ammo: string; lowAmmo: boolean; grenades: number; dash01: number }) {
+    const key = `${s.weaponIcon.length}|${s.ammo}|${s.lowAmmo}|${s.grenades}|${Math.round(s.dash01 * 20)}`;
+    if (key === this.lastSync) return;
+    this.lastSync = key;
+    const swap = this.buttons.get('next');
+    if (swap) {
+      const img = swap.querySelector('.wicon') as HTMLImageElement;
+      if (img.dataset.src !== String(s.weaponIcon.length)) {
+        img.src = s.weaponIcon;
+        img.dataset.src = String(s.weaponIcon.length);
+      }
+      const b = swap.querySelector('.ammo-n') as HTMLElement;
+      b.textContent = s.ammo;
+      b.classList.toggle('low', s.lowAmmo);
+    }
+    const nade = this.buttons.get('grenade');
+    if (nade) {
+      (nade.querySelector('.nade-n') as HTMLElement).textContent = String(s.grenades);
+      nade.classList.toggle('empty', s.grenades <= 0);
+    }
+    const sp = this.buttons.get('special');
+    if (sp) {
+      sp.style.setProperty('--cd', String(s.dash01));
+      sp.classList.toggle('ready', s.dash01 >= 1);
+    }
   }
 
   releaseAll() {

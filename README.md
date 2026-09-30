@@ -19,6 +19,14 @@ Run-and-gun **2.5D moderno** que roda direto no navegador (celular e PC) — uma
 | Agachar / engatinhar | `S` / `↓` | joystick p/ baixo | analógico p/ baixo |
 | Pausa | `ESC` | botão de pausa | Start |
 
+* **Deslizar:** agache correndo (`S`/`↓` ou joystick p/ baixo) para deslizar por baixo dos tiros.
+* **Combo:** abates em sequência (janela de 3 s) multiplicam os pontos até x5.
+* **Vida:** o Karimbo aguenta 40% a mais (140). Ao chegar no **Felipão** você ganha **+3 vidas**.
+* **Nômad:** é um robô grande — caixas, barris, barricadas e carros **quebram só de encostar/pousar** (sem atirar) e cair em cima de inimigos os esmaga. A cabeça do Karimbo fica em destaque na cabine.
+* **Câmera dinâmica:** na exploração fica mais perto do personagem; se alguém atira de fora da tela ela abre o zoom e desloca o quadro para mostrar o atirador.
+* **Felipão** anda arrotando como um monstro, e antes do chão desabar os blocos **piscam por 2 s** com contagem regressiva.
+* **Controles de toque modernos:** botões de vidro com áreas de toque maiores, ícone da arma atual e munição no botão de troca, contador de granadas, anel de recarga do avanço e **vibração** (celular e gamepad; desliga nas configurações).
+* **Gráficos:** bloom (brilho neon real), chuva com respingos, relâmpagos com trovão, gradação de cor cinematográfica, granulação de filme e distorção de impacto ao levar dano (ajustados pela qualidade LOW/MEDIUM/HIGH).
 * **Armas com munição limitada:** pistola (∞), metralhadora, shotgun, lança-granadas e canhão de plasma — varie as armas! Caixas e inimigos soltam munição.
 * **3 vidas por fase** (fichas de fliperama): ao morrer aparece **CONTINUAR?** com contagem regressiva de 10 s; confirmar gasta 1 vida e você continua *de onde parou* (inimigos, arena e chefe seguem como estavam). Sem confirmar, volta ao último checkpoint. Sem vidas: **FIM DE JOGO** (recomeçar a fase ou menu).
 * **Vida com critério:** corações fixos após combates duros, caixas sorteadas (nem toda caixa tem item) e drops que aparecem mais quando você está ferido.

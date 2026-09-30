@@ -24,6 +24,7 @@ export interface ResultData {
   deaths: number;
   rank: string;
   newBest: boolean;
+  bestCombo?: number;
 }
 
 export function computeRank(d: { score: number; time: number; emblems: number; secrets: number; deaths: number }) {
@@ -162,7 +163,7 @@ export class Menus {
     const o = el('div', 'overlay hidden');
     o.id = 'gameover';
     const wrap = el('div', 'wrap');
-    wrap.append(el('div', 'title', 'FIM DE JOGO'), el('div', 'sub', 'As 3 vidas desta fase acabaram'));
+    wrap.append(el('div', 'title', 'FIM DE JOGO'), el('div', 'sub', 'Suas vidas acabaram'));
     const btns = el('div', 'btns');
     btns.append(this.btn('RECOMEÇAR A FASE', 'primary', () => this.cb.onRestart()), this.btn('MENU PRINCIPAL', 'alt', () => this.cb.onQuitToMenu()));
     wrap.append(btns);
@@ -269,6 +270,7 @@ export class Menus {
       this.slider('Opacidade dos botões (toque)', () => settings.touchOpacity, (v) => (settings.touchOpacity = v), 0.2, 0.9, 0.05),
       this.toggle('Modo canhoto (inverte os botões)', () => settings.leftHanded, (v) => (settings.leftHanded = v)),
       this.toggle('Assistência de mira (toque/teclado)', () => settings.aimAssist, (v) => (settings.aimAssist = v)),
+      this.toggle('Vibração (celular / controle)', () => settings.haptics, (v) => (settings.haptics = v)),
       this.toggle('Tremor de tela', () => settings.screenShake, (v) => (settings.screenShake = v)),
       this.toggle('Mostrar FPS', () => settings.showFps, (v) => (settings.showFps = v))
     );
@@ -399,6 +401,7 @@ export class Menus {
     stat(`${d.emblems} / 10`, 'EMBLEMAS');
     stat(`${d.secrets} / 3`, 'ORELHAS DOURADAS');
     stat(`${d.kills}`, 'INIMIGOS DERROTADOS');
+    if (d.bestCombo) stat(`${d.bestCombo}`, 'MAIOR COMBO');
     const rec = el('div', '', d.newBest ? '<b style="color:#ffe27a">★ NOVO RECORDE! ★</b>' : `Recorde: ${String(progress.bestScore).padStart(7, '0')}`);
     rec.style.fontWeight = '700';
     const btns = el('div', 'btns');

@@ -1,3 +1,5 @@
+import { settings } from './storage';
+const hapticsOn = () => settings.haptics !== false;
 /**
  * Entrada unificada: teclado + mouse + gamepad + toque.
  * O jogo lê apenas `input.state` (analógico + botões com borda pressionar/soltar).
@@ -279,6 +281,20 @@ export class Input {
     for (const a of ACTIONS) {
       this.state[a].pressed = false;
       this.state[a].released = false;
+    }
+  }
+
+  /** Vibração curta: celular (navigator.vibrate) e gamepad (rumble). */
+  haptic(strength: number, ms: number) {
+    if (!hapticsOn()) return;
+    try {
+      if (this.state.device === 'touch' && typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(Math.round(ms));
+      if (this.state.device === 'pad') {
+        const gp = this.pad() as (Gamepad & { vibrationActuator?: { playEffect?: (t: string, o: object) => Promise<unknown> } }) | null;
+        void gp?.vibrationActuator?.playEffect?.('dual-rumble', { duration: ms, strongMagnitude: Math.min(1, strength), weakMagnitude: Math.min(1, strength * 0.7) });
+      }
+    } catch {
+      /* sem suporte */
     }
   }
 

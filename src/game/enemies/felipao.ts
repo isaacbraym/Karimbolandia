@@ -5,6 +5,8 @@ import { TILE, T } from '../level';
 import { clamp, rand, approach, angleDiff, damp } from '../../core/math';
 import { getArt } from '../../art';
 import { drawFelipao, FELI_LAYOUT } from '../../art/felipao';
+
+const CRUMBLE_WARN = 2; // s de aviso antes do chão cair
 import { PK } from '../fx';
 
 type BState =
@@ -57,6 +59,10 @@ export class Felipao extends Enemy {
   dyingT = 0;
   minionId = 90000;
   crumbledCenter = false;
+  /** desabamento anunciado: os tiles piscam por 2 s antes de cair (dá tempo de escapar) */
+  pendingCrumble: { kind: 'center' | 'plats'; t: number; tiles: [number, number][] } | null = null;
+  burpCd = 2;
+  burpPuff = 0;
   crumbledPlats = false;
   transitionTo: 2 | 3 = 2;
   vulnerableMul = 1;
@@ -177,6 +183,7 @@ export class Felipao extends Enemy {
     w.spawnDrop('ammo', this.rect.x + this.rect.w / 2, this.floorY - 100);
     w.spawnDrop('nade', this.rect.x + this.rect.w / 2 + 70, this.floorY - 100);
     w.director.setBossPhase(to);
+    this.doBurp(w, true);
     w.hooks.onBanner?.(to === 2 ? 'FÚRIA!' : 'ÚLTIMA CARTADA!', to === 2 ? 'Felipão está mais agressivo' : 'Equipamento danificado — cuidado!', 2.4);
   }
 
@@ -198,6 +205,9 @@ export class Felipao extends Enemy {
     this.contactDmg = this.state === 'dash' && this.dashGo ? 24 : this.state === 'pound' && this.poundStage === 2 ? 26 : 10;
     if (this.state === 'stun' || this.state === 'transition' || this.state === 'enter') this.contactDmg = 0;
     this.beamHitCd -= dt;
+    this.burpCd -= dt;
+    if (this.burpPuff > 0) this.burpPuff -= dt;
+    this.updateCrumbleWarning(w, dt);
     this.supplyT -= dt;
     if (this.supplyT <= 0 && this.state !== 'enter' && this.state !== 'transition') {
       this.supplyT = 15;
@@ -264,6 +274,7 @@ export class Felipao extends Enemy {
       this.stepCd = 0.16;
       w.fx.addShake(this.state === 'dash' ? 3.4 : 2.6, 0.17);
       w.audio('stomp', this.state === 'dash' ? 0.5 : 0.7, this.bx);
+      if (this.burpCd <= 0 && rand.chance(this.state === 'dash' ? 0.2 : 0.5)) this.doBurp(w, false);
       const fx = this.bx + (sn > 0 ? -1 : 1) * 34 * this.faceVis;
       for (let i = 0; i < 5; i++) w.fx.add(PK.Dust, fx + rand.spread(14), this.floorY - 2, rand.spread(70), -rand.range(6, 26), 0.5, 8, '#b9b0c8', { size1: 3, a0: 0.6 });
       if (w.fx.opt()) w.fx.add(PK.Ring, fx, this.floorY - 3, 0, 0, 0.25, 6, '#e8e0ff', { size1: 26, a0: 0.4, front: true });
@@ -317,6 +328,7 @@ export class Felipao extends Enemy {
       w.fx.add(PK.Ring, this.bx, this.floorY - 4, 0, 0, 0.5, 10, '#ffffff', { size1: 120, a0: 0.9, front: true });
       this.go('idle');
       this.restT = 1.6;
+      w.after(0.5, () => this.doBurp(w, true));
     }
   }
 
@@ -554,12 +566,80 @@ export class Felipao extends Enemy {
     const p = w.player;
     if (p.targetable && Math.abs(p.x - this.bx) < 56 && p.feetY > this.floorY - 30) p.hit(w, 24, Math.sign(p.x - this.bx) || 1, { kx: 260, ky: -340 });
     // destruição parcial do palco
-    if (this.phase >= 2 && !this.crumbledCenter) {
-      this.crumbledCenter = true;
-      this.crumble(w, -3, 3);
-    } else if (this.phase === 3 && !this.crumbledPlats) {
-      this.crumbledPlats = true;
-      this.crumblePlatforms(w);
+    if (!this.pendingCrumble) {
+      if (this.phase >= 2 && !this.crumbledCenter) {
+        this.crumbledCenter = true;
+        this.warnCrumble(w, 'center');
+      } else if (this.phase === 3 && !this.crumbledPlats) {
+        this.crumbledPlats = true;
+        this.warnCrumble(w, 'plats');
+      }
+    }
+  }
+
+  /** Arroto de monstro (com baforada visível saindo da boca). */
+  private doBurp(w: World, big: boolean) {
+    this.burpCd = big ? 3 : rand.range(2.2, 4.2);
+    this.burpPuff = big ? 1.1 : 0.6;
+    w.audio(big ? 'burpBig' : 'burp', big ? 1.1 : 0.95, this.bx);
+    const [hx, hy] = FELI_LAYOUT.head;
+    const mx = this.bx + this.faceVis * (hx + 18);
+    const my = this.floorY - this.hover + hy + 40;
+    for (let i = 0; i < (big ? 9 : 5); i++) {
+      w.fx.add(PK.Smoke, mx, my, this.facing * rand.range(40, 110), -rand.range(10, 50), rand.range(0.7, 1.3), rand.range(8, 14), '#b8d890', { size1: 28, a0: 0.45 });
+    }
+    if (big) w.fx.addShake(3, 0.4);
+  }
+
+  /** Coleta os tiles que vão cair. */
+  private crumbleTiles(kind: 'center' | 'plats'): [number, number][] {
+    const cc = Math.round((this.rect.x + this.rect.w / 2) / TILE);
+    const out: [number, number][] = [];
+    const L = this.levelRef!;
+    if (kind === 'center') {
+      const row = Math.round(this.floorY / TILE);
+      for (let c = cc - 3; c <= cc + 3; c++) for (let r = row; r < row + 3; r++) if (L.get(c, r) === T.SOLID) out.push([c, r]);
+    } else {
+      const row = Math.round(this.floorY / TILE) - 5;
+      for (const side of [-1, 1]) {
+        for (let c = cc + side * 8 - 2; c <= cc + side * 8 + 1; c++) {
+          for (let r = row - 1; r <= row + 1; r++) if (L.get(c, r) === T.ONEWAY || L.get(c, r) === T.SOLID) out.push([c, r]);
+        }
+      }
+    }
+    return out;
+  }
+  levelRef: World['level'] | null = null;
+
+  private warnCrumble(w: World, kind: 'center' | 'plats') {
+    this.levelRef = w.level;
+    this.pendingCrumble = { kind, t: CRUMBLE_WARN, tiles: this.crumbleTiles(kind) };
+    w.hooks.onBanner?.('CUIDADO!', kind === 'center' ? 'O chão vai desabar — saia do meio!' : 'As plataformas vão cair!', 1.8);
+    w.audio('warning', 1);
+    w.audio('burpBig', 0.9, this.bx);
+  }
+
+  private updateCrumbleWarning(w: World, dt: number) {
+    const pc = this.pendingCrumble;
+    if (!pc) return;
+    if (this.state === 'dying') {
+      this.pendingCrumble = null;
+      return;
+    }
+    const before = pc.t;
+    pc.t -= dt;
+    // bipes cada vez mais rápidos + rachaduras soltando poeira
+    const step = pc.t > 1 ? 0.5 : 0.25;
+    if (Math.floor(before / step) !== Math.floor(pc.t / step)) w.audio('warning', 0.45);
+    if (Math.random() < dt * 18 && pc.tiles.length) {
+      const [c, r] = pc.tiles[Math.floor(Math.random() * pc.tiles.length)];
+      w.fx.add(PK.Dust, c * TILE + Math.random() * TILE, r * TILE, rand.spread(20), -rand.range(10, 40), 0.6, 6, '#c9b8a0', { size1: 3, a0: 0.7 });
+    }
+    w.fx.addShake(0.8 + (1 - pc.t / CRUMBLE_WARN) * 1.6, 0.05);
+    if (pc.t <= 0) {
+      this.pendingCrumble = null;
+      if (pc.kind === 'center') this.crumble(w, -3, 3);
+      else this.crumblePlatforms(w);
     }
   }
 
@@ -724,6 +804,47 @@ export class Felipao extends Enemy {
 
   private drawTelegraphs(g: CanvasRenderingContext2D, w: World) {
     void w;
+    const pc = this.pendingCrumble;
+    if (pc) {
+      // tiles piscando (mais rápido perto do fim) com rachaduras
+      const k = 1 - pc.t / CRUMBLE_WARN;
+      const hz = 4 + k * 10;
+      const on = Math.sin(this.t * hz * Math.PI * 2) > -0.2;
+      g.save();
+      for (const [c, r] of pc.tiles) {
+        const x = c * TILE;
+        const y = r * TILE;
+        g.globalCompositeOperation = 'lighter';
+        g.fillStyle = on ? `rgba(255,${Math.round(90 - k * 60)},40,${0.35 + k * 0.35})` : 'rgba(255,200,60,0.08)';
+        g.fillRect(x, y, TILE, TILE);
+        g.globalCompositeOperation = 'source-over';
+        g.strokeStyle = 'rgba(20,6,10,0.8)';
+        g.lineWidth = 1.6;
+        const s = (c * 7 + r * 13) % 5;
+        g.beginPath();
+        g.moveTo(x + 4 + s, y + 2);
+        g.lineTo(x + 14, y + 12 + s);
+        g.lineTo(x + 10 + s, y + 22);
+        g.lineTo(x + 22, y + TILE - 2);
+        g.moveTo(x + 14, y + 12 + s);
+        g.lineTo(x + TILE - 3, y + 8);
+        g.stroke();
+      }
+      // seta de aviso acima da área
+      const xs = pc.tiles.map((t) => t[0]);
+      const rs = pc.tiles.map((t) => t[1]);
+      if (xs.length) {
+        const cx = ((Math.min(...xs) + Math.max(...xs) + 1) / 2) * TILE;
+        const top = Math.min(...rs) * TILE;
+        g.fillStyle = on ? '#ff4a3a' : '#ffd23a';
+        g.font = '400 22px "Lilita One", Impact, sans-serif';
+        g.textAlign = 'center';
+        g.fillText('⚠', cx, top - 12 - Math.sin(this.t * 10) * 3);
+        g.font = '400 13px "Lilita One", Impact, sans-serif';
+        g.fillText(String(Math.max(0, pc.t).toFixed(1)), cx, top - 36);
+      }
+      g.restore();
+    }
     const pulse = 0.5 + 0.5 * Math.sin(this.t * 24);
     if (this.state === 'dash' && !this.dashGo) {
       const x0 = this.bx;

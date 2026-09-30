@@ -12,6 +12,7 @@ export interface Settings {
   screenShake: boolean;
   showFps: boolean;
   leftHanded: boolean;
+  haptics: boolean; // vibração (celular) / rumble (gamepad)
 }
 
 export interface Progress {
@@ -38,6 +39,7 @@ export const defaultSettings = (): Settings => ({
   screenShake: true,
   showFps: false,
   leftHanded: false,
+  haptics: true,
 });
 
 export const defaultProgress = (): Progress => ({

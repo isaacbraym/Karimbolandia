@@ -13,7 +13,7 @@ export type SfxName =
   | 'dash' | 'dash2' | 'dashHit' | 'nomadBoot' | 'nomadHop' | 'nomadHurt' | 'nomadDeath' | 'eject' | 'nomadEnter'
   | 'uiClick' | 'uiBack' | 'uiStart' | 'alarm' | 'warning' | 'lock' | 'unlock' | 'missile' | 'laserCharge' | 'laserFire'
   | 'enemyShot' | 'sniperShot' | 'turretShot' | 'stomp' | 'bossRoar' | 'bossHit' | 'bossPhase' | 'bossDie' | 'thruster'
-  | 'victory' | 'servo' | 'spark' | 'slam';
+  | 'victory' | 'servo' | 'spark' | 'slam' | 'burp' | 'burpBig' | 'crush' | 'extraLife' | 'thunder';
 
 type LoopName = 'glide' | 'roll' | 'alarm' | 'laser' | 'thrusterLoop';
 
@@ -179,6 +179,76 @@ export class AudioEngine {
     src.stop(t0 + o.dur + 0.05);
     this.active++;
     src.onended = () => this.active--;
+  }
+
+  /**
+   * Arroto de monstro: voz grave em dente-de-serra com "ronco" (modulação de amplitude irregular
+   * ~24–38 Hz, como a glote vibrando), passando por dois formantes de boca e com o pitch caindo.
+   */
+  private burp(big: boolean, v: number, pan: number) {
+    const c = this.ctx!;
+    const t0 = c.currentTime;
+    const dur = (big ? 1.25 : 0.62) * (0.85 + Math.random() * 0.35);
+    const f0 = (big ? 62 : 78) * (0.85 + Math.random() * 0.3);
+    const osc = c.createOscillator();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(f0 * 1.35, t0);
+    osc.frequency.exponentialRampToValueAtTime(f0, t0 + dur * 0.25);
+    osc.frequency.exponentialRampToValueAtTime(f0 * 0.62, t0 + dur);
+    // ronco: modulação de amplitude com frequência que oscila (soa "molhado"/irregular)
+    const am = c.createGain();
+    am.gain.value = 0.55;
+    const lfo = c.createOscillator();
+    lfo.type = 'square';
+    lfo.frequency.setValueAtTime(big ? 24 : 31, t0);
+    lfo.frequency.linearRampToValueAtTime(big ? 17 : 22, t0 + dur);
+    const lfoG = c.createGain();
+    lfoG.gain.value = 0.45;
+    lfo.connect(lfoG);
+    lfoG.connect(am.gain);
+    // jitter de pitch
+    const jit = c.createOscillator();
+    jit.type = 'triangle';
+    jit.frequency.value = 7 + Math.random() * 5;
+    const jitG = c.createGain();
+    jitG.gain.value = f0 * 0.12;
+    jit.connect(jitG);
+    jitG.connect(osc.frequency);
+    // formantes (vogal "ô/uó")
+    const mk = (f: number, q: number, g: number) => {
+      const bp = c.createBiquadFilter();
+      bp.type = 'bandpass';
+      bp.frequency.setValueAtTime(f * 1.25, t0);
+      bp.frequency.exponentialRampToValueAtTime(f * 0.8, t0 + dur);
+      bp.Q.value = q;
+      const gg = c.createGain();
+      gg.gain.value = g;
+      am.connect(bp);
+      bp.connect(gg);
+      return gg;
+    };
+    const env = c.createGain();
+    env.gain.setValueAtTime(0.0001, t0);
+    env.gain.exponentialRampToValueAtTime(0.9 * v, t0 + 0.05);
+    env.gain.setValueAtTime(0.9 * v, t0 + dur * 0.55);
+    env.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    const f1 = mk(big ? 380 : 470, 4, 1.4);
+    const f2 = mk(big ? 820 : 980, 6, 0.6);
+    const lp = c.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = 420;
+    am.connect(lp);
+    osc.connect(am);
+    for (const n of [f1, f2, lp]) n.connect(env);
+    env.connect(this.out(pan));
+    for (const o of [osc, lfo, jit]) {
+      o.start(t0);
+      o.stop(t0 + dur + 0.05);
+    }
+    this.active++;
+    osc.onended = () => this.active--;
+    // "estalo" de garganta no início
+    this.noise({ dur: 0.07, vol: 0.25 * v, type: 'bandpass', f0: 700, f1: 300, q: 2, pan });
   }
 
   // ------------------------------------------------------------------ efeitos
@@ -409,6 +479,26 @@ export class AudioEngine {
         this.tone({ type: 'square', f0: 460 * r, f1: 130, dur: 0.09, vol: 0.12 * v, pan, lp: 1800 });
         this.noise({ dur: 0.06, vol: 0.14 * v, type: 'bandpass', f0: 2200, f1: 900, pan });
         break;
+      case 'burp':
+        this.burp(false, v, pan);
+        break;
+      case 'burpBig':
+        this.burp(true, v, pan);
+        break;
+      case 'crush':
+        this.noise({ dur: 0.22, vol: 0.5 * v, type: 'lowpass', f0: 2400, f1: 200, pan });
+        this.tone({ type: 'square', f0: 140 * r, f1: 40, dur: 0.18, vol: 0.22 * v, lp: 900, pan });
+        this.noise({ dur: 0.1, vol: 0.25 * v, type: 'highpass', f0: 2500, pan, delay: 0.03 });
+        break;
+      case 'thunder':
+        this.noise({ dur: 0.35, vol: 0.45 * v, type: 'lowpass', f0: 3000, f1: 400 });
+        this.noise({ dur: 2.6, vol: 0.55 * v, type: 'lowpass', f0: 420, f1: 60, att: 0.12, delay: 0.05 });
+        this.tone({ type: 'sine', f0: 55, f1: 28, dur: 2.2, vol: 0.4 * v, att: 0.2 });
+        break;
+      case 'extraLife':
+        for (let i = 0; i < 4; i++) this.tone({ type: 'square', f0: [523, 659, 784, 1047][i], dur: 0.16, vol: 0.18 * v, delay: i * 0.09, lp: 3500 });
+        this.tone({ type: 'triangle', f0: 1047, f1: 2093, dur: 0.5, vol: 0.2 * v, delay: 0.36 });
+        break;
       case 'stomp':
         this.tone({ type: 'sine', f0: 110, f1: 30, dur: 0.35, vol: 0.7 * v, pan });
         this.noise({ dur: 0.3, vol: 0.4 * v, type: 'lowpass', f0: 800, f1: 90, pan });
@@ -636,6 +726,9 @@ export class AudioEngine {
 }
 
 const MIN_GAP: Partial<Record<SfxName, number>> = {
+  burp: 0.5,
+  burpBig: 0.9,
+  crush: 0.05,
   step: 0.08,
   spark: 0.03,
   debris: 0.03,

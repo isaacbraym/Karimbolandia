@@ -158,24 +158,35 @@ export function drawNomad(g: CanvasRenderingContext2D, art: NomadArt, heads: Kar
   g.translate(recoilBack, 0); // recuo: torre vai para trás (direita na arte espelhada = trás)
   g.translate(-pivX, -pivY);
 
+  // cabeça do piloto: maior e À FRENTE da torre (rosto em destaque); orelhas atrás da torre
+  const hx = art.cockpit[0] * ls - art.sphereCX - 0.5;
+  const hy = -(art.H - (art.cockpit[1] + 46) * ls) - 7;
+  const hs = 0.98;
+  const fl = p.earFlap > 0.05 ? Math.sin(p.t * 50) * 0.1 * p.earFlap : 0;
+  const open = 0.06 + p.earFlap * 0.14;
+  const kx = 1.3 + p.earFlap * 1.9;
+  const ky = 1.3 + p.earFlap * 0.4;
   if (p.pilot && heads) {
-    const hx = art.cockpit[0] * ls - art.sphereCX - 0.5;
-    const hy = -(art.H - (art.cockpit[1] + 46) * ls);
-    const s = 0.7;
     g.save();
     g.translate(hx, hy);
-    g.scale(-s, s); // cabeça olhando p/ a frente do robô (esquerda no espaço da arte)
-    // orelhas ao vento (atrás da cabeça): crescem e batem conforme a velocidade
-    const fl = p.earFlap > 0.05 ? Math.sin(p.t * 50) * 0.1 * p.earFlap : 0;
-    const open = 0.06 + p.earFlap * 0.14;
-    const kx = 1.3 + p.earFlap * 1.9;
-    const ky = 1.3 + p.earFlap * 0.4;
+    g.scale(-hs, hs); // cabeça olhando p/ a frente do robô (esquerda no espaço da arte)
     drawSpr(g, heads.earFar, heads.earRootFar[0], heads.earRootFar[1], { rot: open - fl, sx: kx * 0.6, sy: ky, white: w });
     drawSpr(g, heads.earNear, heads.earRootNear[0], heads.earRootNear[1], { rot: -open + fl, sx: kx * 0.95, sy: ky, white: w });
-    drawSpr(g, heads.right, 0, 0, { white: w });
     g.restore();
   }
   drawSpr(g, art.upper, 0, 0, { white: w });
+  if (p.pilot && heads) {
+    g.save();
+    g.translate(hx, hy);
+    g.scale(-hs, hs);
+    // contorno escuro sutil para destacar o rosto sobre o metal
+    const halo = softDot('#000000', 16);
+    g.globalAlpha *= 0.35;
+    g.drawImage(halo.c, -heads.right.w * 0.7, -heads.right.h * 1.05, heads.right.w * 1.4, heads.right.h * 1.2);
+    g.globalAlpha /= 0.35;
+    drawSpr(g, heads.right, 0, 0, { white: w });
+    g.restore();
+  }
   g.restore();
 
   // luzes de estado: brilho da esfera quando o avanço secundário está disponível (sutil)

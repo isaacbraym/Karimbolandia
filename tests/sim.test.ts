@@ -255,7 +255,7 @@ describe('Agachar desvia de tiros retos', () => {
     const r = setup(true);
     expect(r.crouched).toBe(true);
     expect(r.hits).toBe(0);
-    expect(r.hp).toBe(100);
+    expect(r.hp).toBe(140);
   });
   it('Nômad de apoio: cai após ~90 s, embarca por cima, dura 50 s e some sem marcar o principal como perdido', () => {
     const w = makeWorld();
@@ -352,5 +352,44 @@ describe('Agachar desvia de tiros retos', () => {
     w.player.body.x = 650 * TILE;
     for (let i = 0; i < 60 * 8; i++) w.update(1 / 60, ctl);
     expect(w.enemies.filter((e) => e.alive && e.spawnedByArena === false && e.spawn.id <= -5000).length).toBeGreaterThan(0);
+  });
+  it('Nômad quebra caixas só de passar (sem atirar); Karimbo desliza ao agachar correndo', () => {
+    const w = makeWorld();
+    teleport(w, 640, 32);
+    w.nomadUsed = true;
+    w.director.remountAtCheckpoint(300);
+    const ctl = newCtl();
+    // caixa logo à frente
+    const crate = w.props.find((p) => p.alive && p.kind === 'crate' && p.x > w.player.x);
+    expect(crate).toBeTruthy();
+    w.player.body.x = crate!.x - 120;
+    w.player.body.y = crate!.y + crate!.h / 2 - w.player.body.h / 2 - 1;
+    ctl.moveX = 1;
+    for (let i = 0; i < 90 && crate!.alive; i++) w.update(1 / 60, ctl);
+    expect(crate!.alive).toBe(false);
+    expect(w.stats.shots).toBe(0);
+    // deslize a pé
+    const w2 = makeWorld();
+    teleport(w2, 200, 32);
+    const c2 = newCtl();
+    c2.moveX = 1;
+    for (let i = 0; i < 40; i++) w2.update(1 / 60, c2);
+    c2.moveY = 1;
+    w2.update(1 / 60, c2);
+    expect(w2.player.slideT).toBeGreaterThan(0);
+    expect(w2.player.crouch).toBe(true);
+    expect(Math.abs(w2.player.body.vx)).toBeGreaterThan(300);
+  });
+
+  it('vida +40% e +3 vidas ao chegar no chefe (uma vez)', () => {
+    const w = makeWorld();
+    expect(w.player.maxHp).toBe(140);
+    expect(w.lives).toBe(3);
+    const d = w.director as unknown as { startBoss: (a: unknown) => void; arenas: { def: { id: string } }[] };
+    const a = d.arenas.find((x) => x.def.id === 'boss');
+    d.startBoss(a);
+    expect(w.lives).toBe(6);
+    d.startBoss(a);
+    expect(w.lives).toBe(6);
   });
 });

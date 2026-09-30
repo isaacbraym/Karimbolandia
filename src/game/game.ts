@@ -1,6 +1,7 @@
 import { orient } from '../core/orient';
 import { Input } from '../core/input';
 import { audio } from '../core/audio';
+import { PostFX } from './post';
 import { music, MIX, type ThemeName } from '../core/music';
 import { settings, progress, saveProgress } from '../core/storage';
 import { clamp } from '../core/math';
@@ -57,6 +58,7 @@ export class Game {
   private lastMounted = false;
   /** tempos médios (ms) de simulação/render — útil para depurar desempenho */
   prof = { update: 0, render: 0 };
+  private post = new PostFX();
 
   constructor(canvas: HTMLCanvasElement, ui: HTMLElement) {
     this.canvas = canvas;
@@ -422,7 +424,7 @@ export class Game {
     saveProgress();
     window.setTimeout(() => {
       this.menus.showResults({
-        time: w.time, score: w.score, tokens: w.tokens, emblems: w.emblems.size, secrets: w.secrets.size, kills: w.stats.kills, deaths: w.stats.deaths, rank, newBest,
+        time: w.time, score: w.score, tokens: w.tokens, emblems: w.emblems.size, secrets: w.secrets.size, kills: w.stats.kills, deaths: w.stats.deaths, rank, newBest, bestCombo: w.bestCombo,
       });
       this.input.onMenuKey = (code) => {
         if (this.menus.handleKey(code)) return;
@@ -470,6 +472,7 @@ export class Game {
       for (let i = 0; i < cps.length; i++) if (cps[i].x <= sx) idx = i;
       w.checkpointIdx = idx;
       w.player.reset(sx, y);
+      if (sx > 600 * 32) w.nomadLost = true; // teleporte de teste além do portão do Nômad
       w.checkpointSnap = w.player.snapshot();
       w.cameraSnap();
     }
@@ -546,6 +549,7 @@ export class Game {
       if (i === 0) this.input.clearEdges();
     }
     this.hud.update(dt);
+    this.post.update(w, dt, this.quality);
     // dicas contextuais
     this.processHints(w);
   }
@@ -567,12 +571,31 @@ export class Game {
     }
   }
 
+  private weaponIcons = new Map<string, string>();
+  private lastHp = -1;
   private updateTouchState(w: World) {
-    const m = w.player.mounted;
+    const p = w.player;
+    const m = p.mounted;
     if (m !== this.lastMounted) {
       this.lastMounted = m;
       this.touch.setMounted(m);
     }
+    // vibração ao levar dano
+    const hpNow = p.nomad ? p.nomad.hp : p.hp;
+    if (this.lastHp >= 0 && hpNow < this.lastHp - 0.5) this.input.haptic(0.7, p.nomad ? 30 : 45);
+    this.lastHp = hpNow;
+    if (!this.touch.enabled) return;
+    let icon = this.weaponIcons.get(p.cur);
+    if (!icon) {
+      const spr = getArt().karimbo.weapons[p.cur];
+      icon = spr.c.toDataURL();
+      this.weaponIcons.set(p.cur, icon);
+    }
+    const ammo = p.weapons.get(p.cur) ?? 0;
+    const n = p.nomad;
+    let dash01 = 1;
+    if (n) dash01 = n.window > 0 ? 1 : n.cooldown > 0 ? clamp(1 - n.cooldown / 3.4, 0, 1) : 1;
+    this.touch.sync({ weaponIcon: icon, ammo: ammo === Infinity ? '∞' : String(ammo), lowAmmo: ammo !== Infinity && ammo < 10, grenades: p.grenades, dash01 });
   }
 
   private autoQuality(dt: number, now: number) {
@@ -620,6 +643,7 @@ export class Game {
     // fundo (espaço de tela)
     const atm = this.atmosphere(w);
     art.bg.draw(g, { camX: cam.x, camY: cam.y, viewW: W, viewH: H, time: w.time, sky: atm.sky, ruin: atm.ruin, refY: w.data.playerStart.y - 200, intensity: w.musicState.startsWith('boss') || w.musicState === 'combat' ? 1 : 0.6 }, this.state === 'playing' ? dt : 0);
+    this.post.drawSkyFlash(g, W, H);
     // mundo
     const z = cam.zoom * k;
     const tx = Math.round(-(cam.x - cam.sx) * z + (W * k - W * k) / 2);
@@ -629,7 +653,11 @@ export class Game {
     // primeiro plano e HUD
     g.setTransform(k, 0, 0, k, 0, 0);
     art.bg.drawForeground(g, { camX: cam.x, camY: cam.y, viewW: W, viewH: H, time: w.time, sky: atm.sky, ruin: atm.ruin, refY: 0, intensity: 0.6 }, this.state === 'playing' ? dt : 0);
+    if (this.state === 'playing') this.post.drawRain(g, w, W, H);
+    this.post.bloom(g, this.canvas, this.quality);
+    this.post.grade(g, W, H, this.quality);
     art.bg.drawVignette(g, W, H, 0.9);
+    this.post.hurt(g, this.canvas, w.player.mode === 'dead' ? 0 : clamp(w.player.hurtT / 0.28, 0, 1));
     this.hud.drawScreenFx(g, w, W, H);
     this.hud.draw(g, w, W, H);
   }

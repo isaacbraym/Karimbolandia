@@ -15,6 +15,9 @@ import {
   GLIDE_FALL, GLIDE_FUEL, GLIDE_SPEED, CROUCH_SPEED, N_RUN, N_ACC, N_DEC, N_GRAV, N_JUMP,
 } from './movement';
 
+const SLIDE_T = 0.42; // s de deslize
+const SLIDE_V = 430; // px/s no início do deslize
+
 export { FOOT_W, FOOT_H, CROUCH_H, NOMAD_W, NOMAD_H };
 export interface NomadState {
   hp: number;
@@ -50,11 +53,14 @@ export class Player {
   body: Body = newBody(FOOT_W, FOOT_H);
   mode: PlayerMode = 'foot';
   facing: 1 | -1 = 1;
-  hp = 100;
-  maxHp = 100;
+  hp = 140; // +40% (aguenta mais tiros)
+  maxHp = 140;
   invuln = 0;
   hurtT = 0;
   crouch = false;
+  /** deslize (agachar correndo): passa por baixo dos tiros */
+  slideT = 0;
+  slideDir = 1;
   aim = 0;
   aimVis = 0;
   weapons: Map<WeaponId, number> = new Map([['pistol', Infinity]]);
@@ -150,6 +156,7 @@ export class Player {
     this.invuln = 1.2;
     this.hurtT = 0;
     this.crouch = false;
+    this.slideT = 0;
     this.glide = false;
     this.earGlide = 0;
     this.glideFuel = GLIDE_FUEL;
@@ -538,7 +545,20 @@ export class Player {
 
     // agachar
     const wantCrouch = b.onGround && ctl.moveY > 0.6 && !hurt;
-    if (wantCrouch && !wasCrouch) this.setCrouch(true, w);
+    if (wantCrouch && !wasCrouch) {
+      this.setCrouch(true, w);
+      if (Math.abs(b.vx) > RUN * 0.7 && this.slideT <= 0) {
+        this.slideT = SLIDE_T;
+        this.slideDir = b.vx > 0 ? 1 : -1;
+        this.facing = this.slideDir as 1 | -1;
+        w.audio('land', 0.8, this.x);
+        w.fx.add(PK.Ring, this.x, this.feetY - 4, 0, 0, 0.25, 6, '#e9e2ff', { size1: 26, a0: 0.5, front: true });
+      }
+    }
+    if (this.slideT > 0) {
+      this.slideT -= dt;
+      if (!this.crouch || hurt) this.slideT = 0;
+    }
     else if (!wantCrouch && wasCrouch && this.canStand(w)) this.setCrouch(false, w);
     if (this.crouch && !b.onGround) this.setCrouch(false, w);
 
@@ -547,7 +567,13 @@ export class Player {
     if (!hurt) tx = ctl.moveX * (this.crouch ? CROUCH_SPEED : this.glide ? GLIDE_SPEED : RUN);
     const grounded = b.onGround;
     const acc = grounded ? (Math.abs(tx) > 0 ? RUN_ACC : RUN_DEC) : Math.abs(tx) > 0 ? AIR_ACC : AIR_DEC;
-    if (!hurt || grounded) b.vx = approach(b.vx, tx, acc * dt);
+    if (this.slideT > 0 && grounded) {
+      // deslize: arranque forte que perde força
+      const k = this.slideT / SLIDE_T;
+      b.vx = this.slideDir * (CROUCH_SPEED + (SLIDE_V - CROUCH_SPEED) * k);
+      if (Math.random() < dt * 40) w.fx.add(PK.Dust, this.x - this.slideDir * 10, this.feetY - 1, -this.slideDir * rand.range(30, 90), -rand.range(6, 30), 0.35, 6, '#b9b0c8', { size1: 2, a0: 0.6 });
+      if (Math.random() < dt * 20) w.fx.add(PK.Spark, this.x, this.feetY - 1, -this.slideDir * rand.range(60, 160), -rand.range(20, 80), 0.2, 4, '#ffd27a', { size1: 1, g: 500, front: true });
+    } else if (!hurt || grounded) b.vx = approach(b.vx, tx, acc * dt);
 
     // timers de pulo
     if (grounded) {
@@ -899,6 +925,7 @@ export class Player {
       b.vy = Math.min(FALL_MAX, b.vy + N_GRAV * dt);
     }
 
+    this.nomadCrush(w, dt);
     const wasGround = b.onGround;
     const preVy = b.vy;
     moveBody(b, dt, w.level, w.solidRects, true);
@@ -931,6 +958,52 @@ export class Player {
     this.wasGround = b.onGround;
     if (grounded) this.airTime = 0;
     else this.airTime += dt;
+  }
+
+  /**
+   * O Nômad é um robô grande: caixas, barris, barricadas e afins quebram só de encostar ou
+   * pousar em cima (sem precisar atirar). Pousar sobre inimigos também os esmaga.
+   */
+  private nomadCrush(w: World, dt: number) {
+    const b = this.body;
+    const ahead = Math.abs(b.vx) * dt * 2 + 8;
+    const x0 = b.x - b.w / 2 - (b.vx < 0 ? ahead : 4);
+    const x1 = b.x + b.w / 2 + (b.vx > 0 ? ahead : 4);
+    const y0 = b.y - b.h / 2 - 4;
+    const y1 = b.y + b.h / 2 + (b.vy > 0 ? b.vy * dt * 2 + 6 : 3);
+    let crushed = 0;
+    for (const p of w.props) {
+      if (!p.alive || !p.hittable || p.dashOnly || p.barrier) continue;
+      const r = p.rect;
+      if (r.x < x1 && r.x + r.w > x0 && r.y < y1 && r.y + r.h > y0) {
+        p.hurt(w, 999, 'melee', Math.sign(p.x - b.x) || this.facing);
+        if (!p.alive) crushed++;
+      }
+    }
+    if (crushed) {
+      w.audio('crush', 1, this.x);
+      w.fx.addShake(3.5, 0.18);
+      w.fx.addHitStop(0.025);
+      b.vx *= 0.92; // quase não perde embalo
+      w.rebuildSolids(); // libera o caminho já neste passo
+    }
+    // pisão: cair em cima de inimigos
+    if (b.vy > 160) {
+      for (const e of w.enemies) {
+        if (!e.alive || !e.canBeHit || e.isBoss) continue;
+        const eb = e.hitbox;
+        const feet = b.y + b.h / 2;
+        if (Math.abs(e.x - b.x) < b.w / 2 + eb.w / 2 - 4 && feet > eb.y - 6 && feet < eb.y + eb.h * 0.6) {
+          e.hurt(w, 80, { kx: Math.sign(e.x - b.x) * 360, ky: -200, x: e.x, y: eb.y, type: 'dash', dir: Math.sign(e.x - b.x) || 1 });
+          b.vy = -380; // quica
+          w.audio('dashHit', 1, e.x);
+          w.fx.addShake(5, 0.2);
+          w.fx.add(PK.Ring, e.x, eb.y, 0, 0, 0.3, 8, '#ffe27a', { size1: 50, a0: 0.8, front: true });
+          w.fx.popup(e.x, eb.y - 20, 'ESMAGADO!', '#ffe27a', 10);
+          break;
+        }
+      }
+    }
   }
 
   private tryDash(w: World, n: NomadState, ctl: ControlState) {

@@ -3,6 +3,10 @@ import { VIEW_H } from './level';
 
 /** Zoom base do jogo (aproxima levemente a ação). */
 export const BASE_ZOOM = 1.14;
+/** Zoom na exploração (sem inimigos por perto): mais perto do personagem. */
+export const EXPLORE_ZOOM = 1.27;
+/** Zoom mínimo ao abrir para mostrar atiradores fora da tela. */
+export const MIN_THREAT_ZOOM = 0.74;
 
 /** Câmera com suavização, look-ahead, zoom, travas de arena e shake. */
 export class Camera {
@@ -22,6 +26,8 @@ export class Camera {
   sy = 0;
   /** Enquadramento manual (cinemáticas): se definido, ignora seguimento */
   focus: { x: number; y: number; rate: number } | null = null;
+  /** centro (mundo) dos atiradores fora da tela: a câmera desloca-se para incluí-los */
+  threat: { x: number; y: number } | null = null;
   private shakePhase = 0;
 
   get w() {
@@ -49,7 +55,8 @@ export class Camera {
   }
 
   update(dt: number, tx: number, ty: number, facing: number, vx: number, onGround: boolean, shakeAmount: number, shakeOn: boolean) {
-    this.zoom = damp(this.zoom, this.zoomTarget, 3.2, dt);
+    // abre rápido (ameaça), fecha devagar (volta suave à exploração)
+    this.zoom = damp(this.zoom, this.zoomTarget, this.zoomTarget < this.zoom ? 3.6 : 1.4, dt);
     let cx: number;
     let cy: number;
     let rate = 5.5;
@@ -63,9 +70,10 @@ export class Camera {
       if (Math.abs(vx) > 70) this.leadDir = vx > 0 ? 1 : -1;
       else if (this.lookX === 0) this.leadDir = facing;
       const targetLook = this.leadDir * this.w * 0.25 + clamp(vx, -420, 420) * 0.05;
-      this.lookX = damp(this.lookX, targetLook, 1.7, dt);
+      const want = this.threat ? clamp(this.threat.x - tx, -this.w * 0.28, this.w * 0.28) : targetLook;
+      this.lookX = damp(this.lookX, want, this.threat ? 2.6 : 1.7, dt);
       cx = tx + this.lookX;
-      cy = ty;
+      cy = this.threat ? ty + clamp((this.threat.y - ty) * 0.5, -this.h * 0.22, this.h * 0.22) : ty;
     }
     const wantX = cx - this.w / 2;
     // vertical: zona morta + enquadramento ligeiramente abaixo do centro

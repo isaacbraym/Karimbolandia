@@ -757,3 +757,96 @@ kbd {
   color: #cfc6ee;
   letter-spacing: 1px;
 }
+
+/* ------------------------------------------------------------------ controles modernos */
+.tbtn {
+  background: radial-gradient(circle at 50% 35%, rgba(255, 255, 255, calc(var(--to) * 0.28)), rgba(30, 18, 70, calc(var(--to) * 0.55)) 72%);
+  border: 2px solid rgba(255, 255, 255, calc(var(--to) * 0.9));
+  box-shadow: 0 0 0 1px rgba(23, 15, 46, 0.5), 0 6px 18px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+  -webkit-backdrop-filter: blur(6px) saturate(140%);
+  backdrop-filter: blur(6px) saturate(140%);
+}
+/* área de toque maior que o desenho do botão (dedos grandes, tela pequena) */
+.tbtn::after {
+  content: '';
+  position: absolute;
+  inset: -14px;
+  border-radius: 50%;
+}
+.t-pause::after {
+  inset: -8px;
+}
+.tbtn.down {
+  box-shadow: 0 0 0 3px rgba(255, 210, 58, 0.55), 0 0 24px rgba(255, 210, 58, 0.55);
+}
+.t-fire {
+  background: radial-gradient(circle at 50% 38%, rgba(255, 255, 255, calc(var(--to) * 0.3)), rgba(255, 50, 120, calc(var(--to) * 0.7)) 70%);
+  border: 2px solid rgba(255, 190, 220, calc(var(--to) + 0.2));
+  box-shadow: 0 0 0 6px rgba(255, 63, 122, calc(var(--to) * 0.18)), 0 6px 18px rgba(0, 0, 0, 0.35);
+}
+.t-jump {
+  background: radial-gradient(circle at 50% 38%, rgba(255, 255, 255, calc(var(--to) * 0.3)), rgba(60, 200, 255, calc(var(--to) * 0.55)) 70%);
+}
+.badge {
+  position: absolute;
+  right: -4px;
+  bottom: -4px;
+  min-width: 20px;
+  padding: 1px 5px;
+  border-radius: 10px;
+  background: #170f2e;
+  border: 1.5px solid rgba(255, 255, 255, 0.75);
+  color: #fff;
+  font-family: var(--display);
+  font-weight: 400;
+  font-size: calc(11px * var(--ts));
+  line-height: 1.3;
+  text-align: center;
+  pointer-events: none;
+}
+.badge.low {
+  color: #ff8a8a;
+  border-color: #ff5a5a;
+}
+.t-nade.empty {
+  opacity: calc(var(--to) * 0.6);
+  filter: grayscale(1);
+}
+.t-swap {
+  width: calc(58px * var(--ts));
+  height: calc(58px * var(--ts));
+}
+.t-swap .wicon {
+  width: 78%;
+  height: 50%;
+  object-fit: contain;
+  image-rendering: auto;
+  filter: drop-shadow(0 2px 0 rgba(23, 15, 46, 0.7));
+  pointer-events: none;
+}
+.t-special {
+  --cd: 1;
+}
+.t-special .cd-ring {
+  position: absolute;
+  inset: -5px;
+  border-radius: 50%;
+  background: conic-gradient(#7ff9ff calc(var(--cd) * 360deg), rgba(255, 255, 255, 0.08) 0);
+  -webkit-mask: radial-gradient(circle, transparent 62%, #000 64%);
+  mask: radial-gradient(circle, transparent 62%, #000 64%);
+  pointer-events: none;
+}
+.t-special.ready {
+  box-shadow: 0 0 18px rgba(127, 249, 255, 0.7), 0 6px 18px rgba(0, 0, 0, 0.35);
+}
+.stick-base {
+  border: 2px solid rgba(255, 255, 255, calc(var(--to) + 0.15));
+  background: radial-gradient(circle, rgba(60, 240, 255, 0.12), rgba(30, 18, 70, 0.28) 70%);
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+  box-shadow: 0 0 0 1px rgba(23, 15, 46, 0.5), 0 0 22px rgba(60, 240, 255, 0.18);
+}
+.stick-knob {
+  background: radial-gradient(circle at 40% 35%, #ffffff, #bdefff 55%, #4ad4ff);
+  box-shadow: 0 0 16px rgba(74, 212, 255, 0.6), 0 3px 8px rgba(0, 0, 0, 0.4);
+}

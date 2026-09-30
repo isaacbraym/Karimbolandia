@@ -31,6 +31,9 @@ export interface Stats {
 export type MusicState = 'explore' | 'combat' | 'nomad' | 'nomadCombat' | 'boss1' | 'boss2' | 'boss3' | 'silence' | 'calm' | 'victory';
 
 export const MAX_LIVES = 3;
+export const COMBO_WINDOW = 3;
+/** multiplicador do combo: x1 → x5 */
+export const comboMult = (n: number) => (n >= 20 ? 5 : n >= 12 ? 4 : n >= 7 ? 3 : n >= 3 ? 2 : 1);
 
 export interface Hooks {
   onRespawn?: () => void;
@@ -69,8 +72,15 @@ export class World {
   parkedNomad: { x: number; y: number; facing: 1 | -1; hp: number } | null = null;
   nomadLost = false;
   lastHealthDrop = -99;
+  /** combo: abates em sequência (janela de 3 s) multiplicam a pontuação */
+  combo = 0;
+  comboT = 0;
+  bestCombo = 0;
+  /** atiradores recentes que estavam FORA da tela (para a câmera abrir e mostrá-los) */
+  threats: { x: number; y: number; t: number }[] = [];
   /** vidas da fase (estilo fichas de fliperama) */
   lives = MAX_LIVES;
+  bossLivesGiven = false;
   nomadUsed = false;
 
   time = 0;
@@ -139,6 +149,10 @@ export class World {
     this.nomadUsed = false;
     this.parkedNomad = null;
     this.lives = MAX_LIVES;
+    this.bossLivesGiven = false;
+    this.combo = 0;
+    this.comboT = 0;
+    this.bestCombo = 0;
     this.finished = false;
     this.player.resetInventory();
     this.director.reset();
@@ -319,6 +333,7 @@ export class World {
     this.bullets.push(new Bullet(x, y, vx, vy, o));
   }
   spawnEnemyBullet(x: number, y: number, ang: number, speed: number, dmg: number, kind: BulletKind, extra: Partial<BulletOpts> = {}) {
+    this.noteThreat(x, y);
     const o: BulletOpts = { kind, team: 1, dmg, life: extra.life ?? 3, r: extra.r ?? (kind === 'bossShell' ? 5 : 3), ...extra };
     if (kind === 'sniper') {
       o.r = 3;
@@ -420,6 +435,26 @@ export class World {
     if (!rand.chance(0.015 + 0.3 * missing * missing)) return false;
     this.lastHealthDrop = this.time;
     return true;
+  }
+
+  /** Registra um disparo inimigo feito de fora da área visível (perto o bastante para importar). */
+  noteThreat(x: number, y: number) {
+    const c = this.camera;
+    const m = 20;
+    const inside = x > c.x + m && x < c.x + c.w - m && y > c.y + m && y < c.y + c.h - m;
+    // já está enquadrado por causa do zoom-out? continua contando enquanto seguir atirando
+    const known = this.threats.find((th) => Math.abs(th.x - x) < 140 && Math.abs(th.y - y) < 140);
+    if (known) {
+      known.x = x;
+      known.y = y;
+      known.t = this.time;
+      return;
+    }
+    if (inside) return;
+    const p = this.player;
+    if (Math.abs(x - p.x) > 900 || Math.abs(y - p.y) > 520) return;
+    this.threats.push({ x, y, t: this.time });
+    if (this.threats.length > 12) this.threats.shift();
   }
 
   dropLoot(p: Prop) {
@@ -541,8 +576,14 @@ export class World {
   onEnemyKilled(e: Enemy, info?: HurtInfo) {
     if (!e.silentDeath) {
       this.stats.kills++;
-      this.score += e.score;
-      this.fx.popup(e.x, e.y - e.body.h / 2 - 8, `+${e.score}`, '#ffe27a');
+      this.combo = this.comboT > 0 ? this.combo + 1 : 1;
+      this.comboT = COMBO_WINDOW;
+      this.bestCombo = Math.max(this.bestCombo, this.combo);
+      const mult = comboMult(this.combo);
+      const pts = Math.round(e.score * mult);
+      this.score += pts;
+      this.fx.popup(e.x, e.y - e.body.h / 2 - 8, mult > 1 ? `+${pts} x${mult}` : `+${pts}`, mult > 1 ? '#ff9ad0' : '#ffe27a');
+      if (this.combo >= 5 && this.combo % 5 === 0) this.audio('coin', 0.6);
       e.drops(this);
     }
     if (!e.spawnedByArena && !e.spawn.arena) this.killedEnemies.add(e.spawn.id);
@@ -565,6 +606,10 @@ export class World {
     this.lastJumpHeld = ctl.jump.held;
     this.time += dt;
     this.stats.time = this.time;
+    if (this.comboT > 0) {
+      this.comboT -= dt;
+      if (this.comboT <= 0) this.combo = 0;
+    }
     const p = this.player;
 
     // timers

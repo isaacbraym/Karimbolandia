@@ -1,4 +1,4 @@
-import { MAX_LIVES, type World } from './world';
+import { MAX_LIVES, COMBO_WINDOW, comboMult, type World } from './world';
 import { getArt } from '../art';
 import { WEAPONS } from './weapons';
 import { clamp, easeOutBack, formatTime } from '../core/math';
@@ -92,7 +92,8 @@ export class Hud {
     drawSpr(g, pr, L + 26 + shake, T + 28, {});
     text(g, 'KARIMBO', L + 26, T + 64, 10, '#ffffff', 'center', DISPLAY, '400');
     // vidas (3 mini-retratos): as apagadas já foram gastas
-    for (let i = 0; i < MAX_LIVES; i++) {
+    const nLives = Math.max(MAX_LIVES, w.lives);
+    for (let i = 0; i < nLives; i++) {
       const on = i < w.lives;
       g.globalAlpha = on ? 1 : 0.22;
       drawSpr(g, pr, L + 68 + i * 19, T + 62, { sx: 0.32, sy: 0.32 });
@@ -104,14 +105,15 @@ export class Hud {
     const by = T + 7;
     for (let i = 0; i < 5; i++) {
       const sx = bx + i * 19;
-      const segHp = clamp(p.hp - i * 20, 0, 20) / 20;
-      const segShown = clamp(this.hpShown - i * 20, 0, 20) / 20;
+      const seg = p.maxHp / 5;
+      const segHp = clamp(p.hp - i * seg, 0, seg) / seg;
+      const segShown = clamp(this.hpShown - i * seg, 0, seg) / seg;
       pill(g, sx, by, 17, 10, 3, 'rgba(23,15,46,0.85)', '#170f2e');
       if (segShown > segHp) {
         pill(g, sx + 1, by + 1, Math.max(0, 15 * segShown), 8, 2.4, '#ffffff');
       }
       if (segHp > 0) {
-        const low = p.hp <= 30;
+        const low = p.hp <= p.maxHp * 0.25;
         const col = low && Math.floor(this.time * 6) % 2 === 0 ? '#ff5a5a' : '#ff3f7a';
         pill(g, sx + 1, by + 1, 15 * segHp, 8, 2.4, col);
         g.fillStyle = 'rgba(255,255,255,0.35)';
@@ -217,6 +219,22 @@ export class Hud {
     // pontuação e tempo (lado direito, abaixo do botão de pausa)
     text(g, String(w.score).padStart(7, '0'), R - 44, T + 16, 15, '#ffffff', 'right');
     text(g, formatTime(w.time), R - 44, T + 31, 12, '#cfc6ee', 'right');
+    // combo
+    if (w.combo >= 2 && w.comboT > 0) {
+      const m = comboMult(w.combo);
+      const pop = 1 + Math.max(0, w.comboT - (COMBO_WINDOW - 0.18)) * 3;
+      const cx0 = R - 44;
+      const cy0 = T + 58;
+      g.save();
+      g.translate(cx0, cy0);
+      g.scale(pop, pop);
+      text(g, `${w.combo} COMBO`, 0, 0, 15, m >= 4 ? '#ff5ab4' : m >= 3 ? '#ffb83a' : '#ffe27a', 'right', DISPLAY, '400');
+      if (m > 1) text(g, `x${m}`, 0, 15, 12, '#ffffff', 'right', DISPLAY, '400');
+      g.restore();
+      const bw = 64;
+      pill(g, cx0 - bw, cy0 + 20, bw, 4, 2, 'rgba(23,15,46,0.7)');
+      pill(g, cx0 - bw, cy0 + 20, bw * clamp(w.comboT / COMBO_WINDOW, 0, 1), 4, 2, '#ffe27a');
+    }
 
     // ------------------------------------------------ Chefe
     const boss = w.director.bossRef as Felipao | null;

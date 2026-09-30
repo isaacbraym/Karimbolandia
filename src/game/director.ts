@@ -10,7 +10,7 @@ import { getArt } from '../art';
 import { drawNomadIdle } from '../art/nomad';
 import { newNomad } from './player';
 import { NOMAD_W, NOMAD_H, FOOT_H } from './movement';
-import { BASE_ZOOM } from './camera';
+import { BASE_ZOOM, EXPLORE_ZOOM, MIN_THREAT_ZOOM } from './camera';
 import { glowSprite } from '../art/kit';
 import { drawDeco } from '../art/decor';
 
@@ -468,7 +468,7 @@ export class Director {
       this.nomadGate = pr;
     }
     // aviso quando o jogador chega no portão
-    if (p.mode === 'foot' && p.x > (GATE_TILE - 9) * 32 && this.gateHintCd <= 0 && !this.cine) {
+    if (p.mode === 'foot' && p.x > (GATE_TILE - 9) * 32 && p.x < (GATE_TILE + 2) * 32 && this.gateHintCd <= 0 && !this.cine) {
       this.gateHintCd = 6;
       this.banner('NÔMAD NECESSÁRIO', 'Pule em cima dele para abrir o portão', 2.2);
       w.hooks.onHint?.('mountNomad');
@@ -720,6 +720,15 @@ export class Director {
   }
 
   private startBoss(a: ArenaState) {
+    // chegou no chefe: +3 vidas extras (uma vez por partida)
+    if (!this.w.bossLivesGiven) {
+      this.w.bossLivesGiven = true;
+      this.w.lives += 3;
+      this.w.after(4.2, () => {
+        this.w.audio('extraLife', 1);
+        this.banner('+3 VIDAS!', 'Bônus para enfrentar o Felipão', 2.2);
+      });
+    }
     const w = this.w;
     this.bossActive = true;
     this.bossPhase = 1;
@@ -853,8 +862,30 @@ export class Director {
       } else cam.focus = { x: spawn.x - 200, y: spawn.y - 76, rate: 3 };
       return;
     }
-    // zoom padrão: um pouco mais aberto ao pilotar o Nômad
-    cam.zoomTarget = this.zoomOverride ?? (w.player.mounted ? BASE_ZOOM - 0.1 : BASE_ZOOM);
+    // Câmera dinâmica:
+    //  • exploração → mais perto do personagem
+    //  • combate → zoom padrão
+    //  • atiradores fora da tela → abre o zoom e desloca o quadro para mostrá-los
+    const p = w.player;
+    const explore = this.combatHold <= 0 && !this.activeArenaRect();
+    let zoom = explore ? EXPLORE_ZOOM : BASE_ZOOM;
+    if (p.mounted) zoom -= 0.1;
+    w.threats = w.threats.filter((t) => w.time - t.t < 2.6);
+    cam.threat = null;
+    if (w.threats.length && p.mode !== 'dead') {
+      let x0 = p.x, x1 = p.x, y0 = p.y - 40, y1 = p.y;
+      for (const t of w.threats) {
+        x0 = Math.min(x0, t.x);
+        x1 = Math.max(x1, t.x);
+        y0 = Math.min(y0, t.y);
+        y1 = Math.max(y1, t.y);
+      }
+      const needW = x1 - x0 + 190;
+      const needH = y1 - y0 + 170;
+      zoom = Math.max(MIN_THREAT_ZOOM, Math.min(zoom, BASE_ZOOM, cam.viewW / needW, cam.viewH / needH));
+      cam.threat = { x: (x0 + x1) / 2, y: (y0 + y1) / 2 };
+    }
+    cam.zoomTarget = this.zoomOverride ?? zoom;
     cam.focus = null;
   }
 
