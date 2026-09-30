@@ -62,6 +62,11 @@ export class Felipao extends Enemy {
   /** desabamento anunciado: os tiles piscam por 2 s antes de cair (dá tempo de escapar) */
   pendingCrumble: { kind: 'center' | 'plats'; t: number; tiles: [number, number][] } | null = null;
   burpCd = 2;
+  /** mola da barriga */
+  jig = 0;
+  jigV = 0;
+  private lastFlash = 0;
+  rage = 0;
   burpPuff = 0;
   crumbledPlats = false;
   transitionTo: 2 | 3 = 2;
@@ -206,6 +211,17 @@ export class Felipao extends Enemy {
     if (this.state === 'stun' || this.state === 'transition' || this.state === 'enter') this.contactDmg = 0;
     this.beamHitCd -= dt;
     this.burpCd -= dt;
+    // mola da barriga: passos e tiros fazem quicar
+    if (this.flash > 0 && this.lastFlash <= 0) this.jigV += 0.35;
+    this.lastFlash = this.flash;
+    this.jigV += (-300 * this.jig - 11 * this.jigV) * dt;
+    this.jig = clamp(this.jig + this.jigV * dt, -0.09, 0.09);
+    this.rage = approach(this.rage, this.phase === 3 && this.state !== 'dying' ? 1 : 0, dt * 1.5);
+    if (this.rage > 0.5 && Math.random() < dt * 9) {
+      // vapor de raiva saindo da cabeça
+      const [hx, hy] = FELI_LAYOUT.head;
+      w.fx.add(PK.Smoke, this.bx + this.faceVis * hx + rand.spread(26), this.floorY - this.hover + hy - 10, rand.spread(30), -rand.range(40, 90), rand.range(0.6, 1), 10, '#ffe0e0', { size1: 26, a0: 0.35 });
+    }
     if (this.burpPuff > 0) this.burpPuff -= dt;
     this.updateCrumbleWarning(w, dt);
     this.supplyT -= dt;
@@ -273,6 +289,7 @@ export class Felipao extends Enemy {
     if (sn * this.prevSin < 0 && this.walking > 0.3 && grounded && this.stepCd <= 0) {
       this.stepCd = 0.16;
       w.fx.addShake(this.state === 'dash' ? 3.4 : 2.6, 0.17);
+      this.jigV += this.state === 'dash' ? 1.1 : 0.8;
       w.audio('stomp', this.state === 'dash' ? 0.5 : 0.7, this.bx);
       if (this.burpCd <= 0 && rand.chance(this.state === 'dash' ? 0.2 : 0.5)) this.doBurp(w, false);
       const fx = this.bx + (sn > 0 ? -1 : 1) * 34 * this.faceVis;
@@ -322,6 +339,7 @@ export class Felipao extends Enemy {
       this.hover = 0;
       this.hoverVy = 0;
       w.fx.addShake(12, 0.6);
+      this.jigV += 2.4;
       w.audio('slam', 1);
       w.fx.addFlash(0.25, '#ffffff');
       for (let i = 0; i < 16; i++) w.fx.add(PK.Dust, this.bx + rand.spread(90), this.floorY - 2, rand.spread(240), -rand.range(10, 50), 0.7, 12, '#b9b0c8', { size1: 4, a0: 0.8 });
@@ -552,6 +570,7 @@ export class Felipao extends Enemy {
   lockX = 0;
 
   private impact(w: World) {
+    this.jigV += 2.2;
     w.audio('slam', 1);
     w.fx.addShake(13, 0.6);
     w.fx.addHitStop(0.07);
@@ -798,6 +817,9 @@ export class Felipao extends Enemy {
       faceX: this.faceVis,
       walk: this.walkPhase,
       walking: this.walking,
+      jiggle: this.jig,
+      burp: this.burpPuff > 0 ? Math.sin(Math.min(1, this.burpPuff / 0.6) * Math.PI) : 0,
+      rage: this.rage,
     });
     if (this.beamOn && this.alive) this.drawBeam(g);
   }

@@ -199,6 +199,7 @@ export abstract class Enemy {
   }
 
   muzzleFlash(w: World, x: number, y: number, ang: number, size = 1) {
+    w.fx.light(x, y, 55 * size, 0.06, '#ff9a6a');
     w.fx.add(PK.Fire, x, y, 0, 0, 0.08, 9 * size, '#ffd27a', { size1: 3, front: true });
     if (w.fx.opt()) w.fx.add(PK.Spark, x, y, Math.cos(ang) * 200, Math.sin(ang) * 200, 0.1, 8, '#fff2b0', { size1: 1, front: true });
   }

@@ -515,7 +515,7 @@ export class Director {
     if (alive >= 9) return;
     const cam = w.camera;
     const n = alive < 4 ? 3 : 2;
-    const kinds: EnemySpawn['type'][] = ['rifle', 'rifle', 'shotgun', 'drone', 'spider', 'shield', 'minimech'];
+    const kinds: EnemySpawn['type'][] = ['rifle', 'rifle', 'shotgun', 'drone', 'roller', 'spider', 'shield', 'minimech', 'roller'];
     for (let i = 0; i < n; i++) {
       const type = kinds[(this.hordeSeq * 3 + i * 5 + Math.floor(w.time)) % kinds.length];
       // três quartos da leva chegam pela frente
@@ -715,6 +715,10 @@ export class Director {
     a.barriers = [];
     w.solidsDirty = true;
     this.banner('ÁREA LIMPA', undefined, 1.2);
+    // último abate em câmera lenta
+    w.fx.slowmo = 0.5;
+    w.fx.slowScale = 0.3;
+    w.fx.addFlash(0.2, '#ffffff');
     w.score += 500;
     this.combatHold = 0;
     this.dropSupplies(true);
@@ -906,10 +910,20 @@ export class Director {
   drawDecos(g: CanvasRenderingContext2D, layer: 'back' | 'front') {
     const cam = this.w.camera;
     const t = this.w.time;
-    for (const d of this.w.data.decos as DecoSpawn[]) {
+    const decos = this.w.data.decos as DecoSpawn[];
+    const smashed = this.w.smash.smashed;
+    for (let i = 0; i < decos.length; i++) {
+      const d = decos[i];
       if (d.layer !== layer) continue;
       if (d.x < cam.x - 200 || d.x > cam.x + cam.w + 200) continue;
+      if (smashed.has(i)) continue;
       drawDeco(g, d, t);
+    }
+    if (layer === 'back') {
+      for (const d of this.w.smash.extra) {
+        if (d.x < cam.x - 200 || d.x > cam.x + cam.w + 200) continue;
+        drawDeco(g, d, t);
+      }
     }
   }
 

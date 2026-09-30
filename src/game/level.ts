@@ -89,7 +89,7 @@ export class Level {
 
 // ------------------------------------------------------------------ dados de fase
 export type EnemyType =
-  | 'rifle' | 'shotgun' | 'shield' | 'jetpack' | 'sniper' | 'drone' | 'turret' | 'heavy' | 'spider' | 'minimech'
+  | 'rifle' | 'shotgun' | 'shield' | 'jetpack' | 'sniper' | 'drone' | 'turret' | 'heavy' | 'spider' | 'minimech' | 'roller'
   | 'boss';
 
 export interface EnemySpawn {

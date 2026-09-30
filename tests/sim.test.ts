@@ -482,4 +482,74 @@ describe('Agachar desvia de tiros retos', () => {
     w.update(1 / 60, ctl);
     expect(p.body.vy).toBeLessThan(-350);
   });
+  it('novidades: golpe corpo a corpo, ORELHADA, Rolo-Bomba e cenário destrutível pelo Nômad', () => {
+    // golpe: inimigo colado leva dano sem gastar munição
+    const w = makeWorld();
+    teleport(w, 200, 32);
+    const ctl = newCtl();
+    for (let i = 0; i < 20; i++) w.update(1 / 60, ctl);
+    const p = w.player;
+    const sp = { id: -777, type: 'rifle' as const, x: p.x + 30, y: p.feetY, facing: -1 as const };
+    const e = w.spawnEnemy(sp);
+    p.facing = 1;
+    const ammo = p.weapons.get(p.cur);
+    const hp0 = e.hp;
+    ctl.mouseAim = { x: p.x + 200, y: p.y };
+    ctl.fire.held = true;
+    w.update(1 / 60, ctl);
+    ctl.fire.held = false;
+    expect(e.hp).toBeLessThan(hp0);
+    expect(p.weapons.get(p.cur)).toBe(ammo);
+    // ORELHADA
+    const w2 = makeWorld();
+    teleport(w2, 200, 32);
+    const c2 = newCtl();
+    for (let i = 0; i < 20; i++) w2.update(1 / 60, c2);
+    const p2 = w2.player;
+    const foe = w2.spawnEnemy({ id: -778, type: 'rifle', x: p2.x + 60, y: p2.feetY, facing: -1 });
+    const fh = foe.hp;
+    c2.jump.pressed = c2.jump.held = true;
+    w2.update(1 / 60, c2);
+    c2.jump.pressed = false;
+    for (let i = 0; i < 12; i++) w2.update(1 / 60, c2);
+    c2.moveY = 1;
+    c2.jump.pressed = true;
+    w2.update(1 / 60, c2);
+    c2.jump.pressed = false;
+    expect(p2.slam).toBe(true);
+    for (let i = 0; i < 60 && p2.slam; i++) w2.update(1 / 60, c2);
+    expect(p2.slam).toBe(false);
+    expect(foe.hp).toBeLessThan(fh);
+    // Rolo-Bomba existe na fase
+    expect(w.data.enemies.some((x) => x.type === 'roller')).toBe(true);
+    // cenário destrutível: explosão perto de um carro estacionado o destrói
+    const car = w.data.decos.findIndex((d) => d.kind === 'parkedCar');
+    expect(car).toBeGreaterThanOrEqual(0);
+    const cd = w.data.decos[car];
+    w.explode(cd.x, cd.y - 20, 80, 10, 0);
+    expect(w.smash.smashed.has(car)).toBe(true);
+  });
+  it('Nômad destrói carros/hidrantes passando por cima; hidrante vira gêiser', () => {
+    const w = makeWorld();
+    const decos = w.data.decos;
+    const carIdx = decos.findIndex((d) => d.kind === 'parkedCar' && d.x > 640 * TILE && d.y === 32 * TILE);
+    expect(carIdx).toBeGreaterThanOrEqual(0);
+    const car = decos[carIdx];
+    teleport(w, Math.floor(car.x / TILE) - 8, 32);
+    w.nomadUsed = true;
+    w.director.remountAtCheckpoint(450);
+    const ctl = newCtl();
+    ctl.moveX = 1;
+    for (let i = 0; i < 120 && !w.smash.smashed.has(carIdx); i++) w.update(1 / 60, ctl);
+    expect(w.smash.smashed.has(carIdx)).toBe(true);
+    expect(w.smash.extra.some((d) => d.kind === 'wreckCar')).toBe(true);
+    for (let i = 0; i < 30; i++) w.update(1 / 60, ctl);
+    expect(Number.isFinite(w.camera.x)).toBe(true);
+    // hidrante
+    const hyd = decos.findIndex((d) => d.kind === 'hydrant');
+    expect(hyd).toBeGreaterThanOrEqual(0);
+    const hd = decos[hyd];
+    w.smash.area(hd.x - 5, hd.x + 5, hd.y - 60, hd.y, 1, 'nomad');
+    expect(w.smash.geysers.length).toBeGreaterThan(0);
+  });
 });

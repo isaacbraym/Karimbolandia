@@ -34,6 +34,13 @@ Run-and-gun **2.5D moderno** que roda direto no navegador (celular e PC) — uma
 * **Nômad:** 450 de vida (+50%). **Granada:** área de explosão ~50% maior, com onda de choque e anel de fogo do tamanho real do dano.
 * **Alturas ao alcance do pulo:** plataformas que ficavam 4–5 tiles acima do chão desceram para 3 (com o que estava em cima delas), paredes de 4 tiles ganharam um degrau e o pulo ficou ~7% mais alto.
 * **Escopeta com coice:** atirando para a frente o Karimbo dá um pulinho para trás; atirando para baixo ele é jogado para cima (no ar vira um impulso extra).
+* **Cidade destrutível:** o Nômad destrói carros estacionados, lixeiras, hidrantes, bancos, caçambas, máquinas de venda, árvores e postes só de passar por cima (e atropela inimigos em movimento). Explosões também destroem o cenário. Carros explodem e viram carcaças em chamas; hidrantes viram **gêiseres que lançam o Karimbo para cima**; lixeiras espalham papel; máquinas de venda soltam fichas.
+* **Golpe corpo a corpo:** com um inimigo colado, o tiro vira um golpe (como a faca do Metal Slug) — não gasta munição e atravessa escudos.
+* **ORELHADA:** no ar, baixo + pulo faz o Karimbo mergulhar de orelhas abertas; ao tocar o chão solta uma onda de choque que arremessa inimigos e quebra caixas.
+* **Novo inimigo — Rolo-Bomba:** esfera com espinhos que rola até você apitando cada vez mais rápido e explode ao encostar; se abatida antes, estoura e fere os inimigos em volta.
+* **Felipão mais vivo:** barriga que quica com mola a cada passo e tiro, respiração, tronco que joga para trás ao arrotar, andar mais pesado e aura de fúria com vapor na fase 3.
+* **Imersão:** chão molhado com poças refletindo o neon na chuva, respingos nos passos e na esfera do Nômad, clarão dos tiros iluminando o cenário e câmera lenta no último abate de cada zona de guerra.
+* **Menu:** botão VOLTAR fixo no canto superior esquerdo dos painéis.
 * **Armas com munição limitada:** pistola (∞), metralhadora, shotgun, lança-granadas e canhão de plasma — varie as armas! Caixas e inimigos soltam munição.
 * **3 vidas por fase** (fichas de fliperama): ao morrer aparece **CONTINUAR?** com contagem regressiva de 10 s; confirmar gasta 1 vida e você continua *de onde parou* (inimigos, arena e chefe seguem como estavam). Sem confirmar, volta ao último checkpoint. Sem vidas: **FIM DE JOGO** (recomeçar a fase ou menu).
 * **Vida com critério:** corações fixos após combates duros, caixas sorteadas (nem toda caixa tem item) e drops que aparecem mais quando você está ferido.

@@ -1,7 +1,7 @@
 import type { EnemySpawn } from '../level';
 import type { Enemy } from './enemy';
 import { RifleSoldier, ShotgunSoldier, ShieldSoldier, JetpackSoldier, Sniper } from './soldiers';
-import { Drone, Turret, HeavyRobot, SpiderBot, MiniMech } from './robots';
+import { Drone, Turret, HeavyRobot, SpiderBot, MiniMech, RollerMine } from './robots';
 import { Felipao } from './felipao';
 
 export function createEnemy(s: EnemySpawn): Enemy {
@@ -16,6 +16,7 @@ export function createEnemy(s: EnemySpawn): Enemy {
     case 'heavy': return new HeavyRobot(s);
     case 'spider': return new SpiderBot(s);
     case 'minimech': return new MiniMech(s);
+    case 'roller': return new RollerMine(s);
     case 'boss': return new Felipao(s);
   }
 }

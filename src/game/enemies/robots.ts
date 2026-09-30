@@ -511,3 +511,131 @@ export class MiniMech extends Enemy {
     drawMiniMech(g, getArt().robots, this.x, this.feetY, pose(this, { aim: this.aim, charge: this.charge, kick: this.kick, phase: this.phase, moving: Math.abs(this.body.vx) > 6, extra: this.pod }));
   }
 }
+
+// ------------------------------------------------------------------------------------------
+/**
+ * ROLO-BOMBA: esfera com espinhos que rola até o Karimbo apitando cada vez mais rápido e explode
+ * ao encostar. Se for abatido antes, estoura no lugar — e a explosão fere os inimigos em volta.
+ */
+export class RollerMine extends Enemy {
+  roll = 0;
+  armed = 0; // 0..1 (acende perto do jogador)
+  beepT = 0;
+  fuse = -1;
+  constructor(spawn: EnemySpawn) {
+    super(spawn, { hp: 18, w: 30, h: 30, score: 120, wake: 520, tokens: [1, 2], metal: true });
+    this.contactDmg = 0;
+  }
+  update(w: World, dt: number) {
+    this.tickCommon(dt);
+    const b = this.body;
+    const p = w.player;
+    const dx = p.x - this.x;
+    const dist = Math.hypot(dx, p.y - this.y);
+    const see = this.canSee(w, 520) || this.lastHurt > 0;
+    if (this.fuse >= 0) {
+      // travou: pisca e explode
+      this.fuse -= dt;
+      b.vx = approach(b.vx, 0, 900 * dt);
+      this.armed = 1;
+      if (this.fuse <= 0) this.blow(w, 1);
+    } else if (see) {
+      this.faceToward(p.x);
+      const ahead = this.ledgeAhead(w, 6);
+      b.vx = approach(b.vx, ahead ? this.facing * 250 : 0, 520 * dt);
+      if (b.wallDir !== 0 && b.onGround) b.vy = -360;
+      this.armed = clamp(1 - (dist - 60) / 360, 0, 1);
+      if (dist < 46 && p.targetable) {
+        this.fuse = 0.28;
+        w.audio('warning', 0.6, this.x);
+      }
+    } else {
+      b.vx = approach(b.vx, 0, 400 * dt);
+      this.armed = Math.max(0, this.armed - dt);
+    }
+    // bipe acelerando
+    this.beepT -= dt;
+    if (this.armed > 0.05 && this.beepT <= 0) {
+      this.beepT = 0.55 - this.armed * 0.45;
+      w.audio('uiClick', 0.35 + this.armed * 0.4, this.x);
+    }
+    this.roll += (b.vx * dt) / 15;
+    this.physics(w, dt);
+  }
+  /** team 1 = fere o jogador (detonou sozinha); team 0 = abatida (fere os inimigos) */
+  private blow(w: World, team: 0 | 1) {
+    if (!this.alive && team === 1) return;
+    this.silentDeath = team === 1;
+    const x = this.x;
+    const y = this.y;
+    if (this.alive) {
+      this.alive = false;
+      w.onEnemyKilled(this, undefined);
+    }
+    w.explode(x, y, 78, team === 1 ? 26 : 60, team, { kb: 360 });
+    w.fx.add(PK.Ring, x, y, 0, 0, 0.35, 10, '#ff5a3a', { size1: 90, a0: 0.9, front: true });
+  }
+  protected onDeath(w: World) {
+    // abatida por tiro: explode e fere quem estiver perto (inimigos)
+    w.after(0.01, () => this.blow(w, 0));
+    w.fx.debris(this.x, this.y, 8, ['#3a3f55', '#8892a8', '#ff3a4a'], 280);
+  }
+  draw(g: CanvasRenderingContext2D, w: World) {
+    const x = this.x;
+    const y = this.y;
+    const r = 15;
+    const blink = this.fuse >= 0 ? Math.sin(w.time * 60) > 0 : Math.sin(w.time * (6 + this.armed * 30)) > 0.2;
+    // sombra
+    g.fillStyle = 'rgba(0,0,0,0.3)';
+    g.beginPath();
+    g.ellipse(x, this.feetY - 1, r * 0.9, 3, 0, 0, Math.PI * 2);
+    g.fill();
+    g.save();
+    g.translate(x, y);
+    g.rotate(this.roll);
+    // espinhos
+    g.fillStyle = '#5b6580';
+    for (let i = 0; i < 8; i++) {
+      g.save();
+      g.rotate((i / 8) * Math.PI * 2);
+      g.beginPath();
+      g.moveTo(r - 2, -4);
+      g.lineTo(r + 6, 0);
+      g.lineTo(r - 2, 4);
+      g.closePath();
+      g.fill();
+      g.restore();
+    }
+    // corpo
+    g.fillStyle = this.flash > 0 ? '#ffffff' : '#3a3f55';
+    g.beginPath();
+    g.arc(0, 0, r, 0, Math.PI * 2);
+    g.fill();
+    g.strokeStyle = '#170f2e';
+    g.lineWidth = 2;
+    g.stroke();
+    g.fillStyle = '#8892a8';
+    g.fillRect(-r, -2.5, r * 2, 5);
+    g.restore();
+    // brilho metálico fixo
+    g.fillStyle = 'rgba(255,255,255,0.22)';
+    g.beginPath();
+    g.arc(x - 5, y - 6, 5, 0, Math.PI * 2);
+    g.fill();
+    // LED
+    g.fillStyle = blink ? '#ff3a4a' : '#5a1020';
+    g.beginPath();
+    g.arc(x, y - 3, 4, 0, Math.PI * 2);
+    g.fill();
+    if (blink) {
+      g.globalCompositeOperation = 'lighter';
+      g.globalAlpha = 0.5 + this.armed * 0.5;
+      g.fillStyle = 'rgba(255,60,70,0.35)';
+      g.beginPath();
+      g.arc(x, y - 3, 12 + this.armed * 10, 0, Math.PI * 2);
+      g.fill();
+      g.globalAlpha = 1;
+      g.globalCompositeOperation = 'source-over';
+    }
+  }
+}

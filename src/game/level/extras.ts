@@ -127,3 +127,17 @@ function stepWalls(b: LevelBuilder) {
     }
   }
 }
+
+/** Rolo-Bombas espalhados pela fase (sempre sobre chão, longe dos checkpoints). */
+export function addRollers(b: LevelBuilder) {
+  const L = b.level;
+  for (const x of [148, 206, 336, 402, 504, 712, 764, 826, 934, 1062, 1096, 1150]) {
+    for (let y = 22; y < L.h - 1; y++) {
+      const t = L.get(x, y);
+      if (t === T.SOLID || t === T.ONEWAY) {
+        if (L.get(x, y - 1) === T.EMPTY && L.get(x, y - 2) === T.EMPTY) b.enemy('roller', x, y, { facing: -1 });
+        break;
+      }
+    }
+  }
+}

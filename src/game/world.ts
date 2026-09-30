@@ -7,6 +7,7 @@ import { Prop, pickLoot } from './props';
 import { Pickup } from './pickups';
 import type { Enemy, HurtInfo } from './enemies/enemy';
 import { createEnemy } from './enemies';
+import { Smasher } from './smash';
 import { Director } from './director';
 import { audio as audioEngine, type SfxName } from '../core/audio';
 import { clamp, rand, type Rect } from '../core/math';
@@ -72,6 +73,10 @@ export class World {
   parkedNomad: { x: number; y: number; facing: 1 | -1; hp: number } | null = null;
   nomadLost = false;
   lastHealthDrop = -99;
+  /** 0..1 intensidade da chuva (definida pelo jogo a cada quadro) — chão molhado, respingos */
+  rainLevel = 0;
+  /** cenário urbano destrutível (carros, hidrantes, lixeiras…) */
+  smash!: Smasher;
   /** combo: abates em sequência (janela de 3 s) multiplicam a pontuação */
   combo = 0;
   comboT = 0;
@@ -121,6 +126,7 @@ export class World {
     this.baseTiles = data.level.tiles.slice();
     this.baseTheme = data.level.theme.slice();
     this.director = new Director(this);
+    this.smash = new Smasher(this);
     this.camera.bounds = { x: 0, y: 0, w: this.level.pxW, h: this.level.pxH };
     this.startRun();
   }
@@ -154,6 +160,7 @@ export class World {
     this.combo = 0;
     this.comboT = 0;
     this.bestCombo = 0;
+    this.smash?.reset();
     this.finished = false;
     this.player.resetInventory();
     this.director.reset();
@@ -269,7 +276,7 @@ export class World {
   audio(name: SfxName, vol = 1, x?: number) {
     let v = vol;
     let pan = 0;
-    if (x !== undefined) {
+    if (x !== undefined && Number.isFinite(x) && Number.isFinite(this.camera.x)) {
       const cx = this.camera.x + this.camera.w / 2;
       const d = Math.abs(x - cx);
       v *= clamp(1.25 - d / 620, 0, 1);
@@ -418,6 +425,8 @@ export class World {
       this.audio(radius > 80 ? 'bigExplosion' : 'explosion', 1, x);
     }
     this.fx.addShake(clamp(radius / 14, 2, 9), 0.28);
+    // explosões destroem o cenário urbano em volta
+    this.smash.area(x - radius * 0.75, x + radius * 0.75, y - radius, y + radius * 0.7, 0, 'blast');
     if (radius > 70) this.fx.addFlash(0.12, '#fff2d0');
     const kb = o.kb ?? 300;
     if (team === 0 || team === 2) {
@@ -646,6 +655,7 @@ export class World {
     this.lastJumpHeld = ctl.jump.held;
     this.time += dt;
     this.stats.time = this.time;
+    this.smash.update(dt);
     if (this.comboT > 0) {
       this.comboT -= dt;
       if (this.comboT <= 0) this.combo = 0;
@@ -684,6 +694,8 @@ export class World {
         if (dx < e.stats.wake && dy < 520) e.awake = true;
         else continue;
       }
+      // acordado mas muito longe da câmera (ficou para trás): congela até voltar à cena
+      if (!e.isBoss && !e.spawnedByArena && Math.abs(e.x - cx) > 1500) continue;
       e.update(this, dt);
     }
     // contato inimigo → jogador
@@ -710,7 +722,7 @@ export class World {
     for (let i = this.bullets.length - 1; i >= 0; i--) if (this.bullets[i].dead) this.bullets.splice(i, 1);
     for (const g of this.grenades) g.update(this, dt);
     for (let i = this.grenades.length - 1; i >= 0; i--) if (this.grenades[i].dead) this.grenades.splice(i, 1);
-    for (const pk of this.pickups) pk.update(this, dt);
+    for (const pk of this.pickups) if (pk.body || Math.abs(pk.x - cx) < 900) pk.update(this, dt);
     for (let i = this.pickups.length - 1; i >= 0; i--) if (!this.pickups[i].alive) this.pickups.splice(i, 1);
     for (const pr of this.props) pr.update(dt);
     for (let i = this.props.length - 1; i >= 0; i--) if (!this.props[i].alive) this.props.splice(i, 1);
@@ -749,6 +761,7 @@ export class World {
     this.director.drawDecos(g, 'back');
     // tiles
     art.tiles.render(g, L, cam.x, cam.y, cam.w, cam.h, this.time);
+    this.drawWet(g);
     // destroços do Nômad
     for (const w of this.wrecks) if (cam.visible(w.x, w.y, 160)) this.drawWreck(g, w);
     // Nômad estacionado / aguardando
@@ -778,6 +791,49 @@ export class World {
   }
 
   /** Sombras suaves no chão sob personagens (profundidade 2.5D). */
+  /** Chuva: borda molhada nas superfícies e poças refletindo o neon (ciano/magenta). */
+  private drawWet(g: CanvasRenderingContext2D) {
+    const r = this.rainLevel;
+    if (r < 0.08) return;
+    const cam = this.camera;
+    const L = this.level;
+    const tx0 = Math.max(0, Math.floor(cam.x / TILE) - 1);
+    const tx1 = Math.min(L.w - 1, Math.floor((cam.x + cam.w) / TILE) + 1);
+    const ty0 = Math.max(1, Math.floor(cam.y / TILE));
+    const ty1 = Math.min(L.h - 1, Math.floor((cam.y + cam.h) / TILE) + 1);
+    const t = this.time;
+    g.save();
+    g.globalCompositeOperation = 'lighter';
+    for (let tx = tx0; tx <= tx1; tx++) {
+      for (let ty = ty0; ty <= ty1; ty++) {
+        if (L.get(tx, ty) !== T.SOLID) continue;
+        const up = L.get(tx, ty - 1);
+        if (up === T.SOLID || up === T.ONEWAY) continue;
+        const x = tx * TILE;
+        const y = ty * TILE;
+        g.globalAlpha = 0.14 * r;
+        g.fillStyle = '#cfe6ff';
+        g.fillRect(x, y, TILE + 0.5, 1.6);
+        const h = ((tx * 73856093) ^ (ty * 19349663)) >>> 0;
+        if (h % 3 === 0) {
+          const pw = 10 + (h % 13);
+          const px = x + ((h >> 4) % (TILE - pw + 1)) + pw / 2;
+          const col = (h >> 7) % 2 ? '#ff4fd0' : '#39f0ff';
+          const sh = 0.6 + 0.4 * Math.sin(t * 2.5 + (h % 17));
+          g.globalAlpha = 0.2 * r * sh;
+          g.fillStyle = col;
+          g.beginPath();
+          g.ellipse(px, y + 1.2, pw / 2, 1.8, 0, 0, Math.PI * 2);
+          g.fill();
+          g.globalAlpha = 0.35 * r * sh;
+          g.fillStyle = '#ffffff';
+          g.fillRect(px - pw * 0.25 + Math.sin(t * 1.3 + h) * 2, y + 0.4, pw * 0.2, 0.8);
+        }
+      }
+    }
+    g.restore();
+  }
+
   private drawShadows(g: CanvasRenderingContext2D) {
     const sh = softDot('#000000', 16);
     const cam = this.camera;

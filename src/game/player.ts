@@ -16,6 +16,11 @@ import {
 } from './movement';
 
 const SLIDE_T = 0.42; // s de deslize
+const MELEE_REACH = 40; // px à frente
+const SLAM_V = 980; // velocidade do mergulho
+const SLAM_R = 96; // raio da onda de choque
+const SLAM_DMG = 48;
+const MELEE_DMG = 55;
 const SHOTGUN_KICK = 250; // px/s para trás
 const SHOTGUN_HOP = 230; // pulinho do coice
 const SHOTGUN_POGO = 470; // tiro para baixo: impulso para cima
@@ -65,6 +70,11 @@ export class Player {
   slideT = 0;
   /** tempo em que o coice (escopeta) manda no movimento horizontal */
   recoilT = 0;
+  /** animação do golpe corpo a corpo */
+  meleeT = 0;
+  /** ORELHADA: mergulho do ar com onda de choque ao pousar */
+  slam = false;
+  private ramHits = new WeakMap<object, number>();
   slideDir = 1;
   aim = 0;
   aimVis = 0;
@@ -164,6 +174,9 @@ export class Player {
     this.hurtT = 0;
     this.crouch = false;
     this.slideT = 0;
+    this.slam = false;
+    this.recoilT = 0;
+    this.meleeT = 0;
     this.glide = false;
     this.earGlide = 0;
     this.glideFuel = GLIDE_FUEL;
@@ -422,6 +435,7 @@ export class Player {
     if (this.invuln > 0) this.invuln -= dt;
     if (this.reviveGrace > 0) this.reviveGrace -= dt;
     if (this.recoilT > 0) this.recoilT -= dt;
+    if (this.meleeT > 0) this.meleeT -= dt;
     if (this.hurtT > 0) this.hurtT -= dt;
     if (this.fireCd > 0) this.fireCd -= dt;
     if (this.nadeCd > 0) this.nadeCd -= dt;
@@ -621,11 +635,23 @@ export class Player {
     }
     if (b.vy >= 0) this.jumping = false;
 
+    // ORELHADA: no ar, baixo + pulo → mergulho com onda de choque
+    if (!grounded && !this.slam && ctl.jump.pressed && ctl.moveY > 0.6 && this.airTime > 0.06 && !hurt) {
+      this.slam = true;
+      this.stopGlide(w);
+      b.vy = Math.max(b.vy, 300);
+      w.audio('flap', 1, this.x);
+      w.fx.add(PK.Ring, this.x, this.y - 18, 0, 0, 0.25, 6, '#ffe27a', { size1: 34, a0: 0.7, front: true });
+    }
     // EAR GLIDE: apertar pulo de novo no ar
-    if (!grounded && this.coyote <= 0 && ctl.jump.pressed && !this.glide && this.glideFuel > 0.15 && !hurt) {
+    if (!this.slam && !grounded && this.coyote <= 0 && ctl.jump.pressed && ctl.moveY <= 0.6 && !this.glide && this.glideFuel > 0.15 && !hurt) {
       this.startGlide(w);
     }
-    if (this.glide) {
+    if (this.slam) {
+      b.vy = Math.min(SLAM_V, b.vy + 4200 * dt);
+      b.vx = approach(b.vx, 0, 1400 * dt);
+      if (Math.random() < 0.6) w.fx.add(PK.Spark, this.x + rand.spread(10), this.y - 20, rand.spread(30), -rand.range(60, 160), 0.2, 8, '#ffe27a', { size1: 1.2, front: true });
+    } else if (this.glide) {
       this.glideT += dt;
       if (!ctl.jump.held || grounded || this.glideFuel <= 0 || hurt) {
         this.stopGlide(w);
@@ -645,7 +671,7 @@ export class Player {
       if (b.vy < 0 && !ctl.jump.held && this.recoilT <= 0) b.vy += GRAV * 0.6 * dt; // corte mais firme
     }
     // ear glide anim
-    this.earGlide = damp(this.earGlide, this.glide ? 1 : 0, this.glide ? 18 : 22, dt);
+    this.earGlide = damp(this.earGlide, this.glide || this.slam ? 1 : 0, this.glide || this.slam ? 18 : 22, dt);
     if (this.earGlide < 0.02 && !this.glide) this.earGlide = 0;
 
     // ---- colisão
@@ -653,6 +679,7 @@ export class Player {
     const preVy = b.vy;
     moveBody(b, dt, w.level, w.solidRects, true);
     if (b.onGround && !wasGround && preVy > 220) this.onLand(w, preVy);
+    if (this.slam && (b.onGround || hurt)) this.slamImpact(w, b.onGround);
     if (b.hitCeil) this.jumping = false;
 
     // ---- mira + armas
@@ -673,6 +700,10 @@ export class Player {
       if (this.stepAcc > 34) {
         this.stepAcc = 0;
         w.audio('step', 0.5, this.x);
+        if (w.rainLevel > 0.3) {
+          // respingos da chuva nos passos
+          for (let i = 0; i < 3; i++) w.fx.add(PK.Drop, this.x + rand.spread(8), this.feetY - 1, rand.spread(60) - this.facing * 20, -rand.range(90, 180), 0.35, rand.range(1, 1.8), '#bfe4ff', { g: 900 });
+        }
         if (w.fx.opt()) w.fx.add(PK.Dust, this.x - this.facing * 4, this.feetY - 1, -this.facing * 14, -6, 0.3, 5, '#b9b0c8', { size1: 1, a0: 0.4 });
       }
     } else if (grounded) this.runPhase = damp(this.runPhase, Math.round(this.runPhase / Math.PI) * Math.PI, 12, dt);
@@ -683,6 +714,39 @@ export class Player {
    * Coice da escopeta: atirando para a frente o Karimbo dá um pulinho para trás;
    * atirando para baixo ele é jogado para cima (no ar vira um impulso extra).
    */
+  /** Golpe corpo a corpo quando há inimigo encostado à frente (atravessa escudos). */
+  private tryMelee(w: World) {
+    const hb = this.hitbox;
+    let target: (typeof w.enemies)[number] | null = null;
+    let best = 1e9;
+    for (const e of w.enemies) {
+      if (!e.alive || !e.canBeHit || e.isBoss) continue;
+      const eb = e.hitbox;
+      const front = (e.x - this.x) * this.facing;
+      if (front < -6 || front > MELEE_REACH + eb.w / 2) continue;
+      if (eb.y > hb.y + hb.h || eb.y + eb.h < hb.y) continue;
+      if (front < best) {
+        best = front;
+        target = e;
+      }
+    }
+    if (!target) return false;
+    this.fireCd = 0.3;
+    this.meleeT = 0.22;
+    this.kick = 1;
+    const dir = this.facing;
+    target.hurt(w, MELEE_DMG, { kx: dir * 380, ky: -220, x: target.x, y: target.y, type: 'melee', dir });
+    w.audio('dashHit', 0.9, target.x);
+    w.audio('hit', 0.8, target.x);
+    w.fx.addHitStop(0.05);
+    w.fx.addShake(3, 0.12);
+    const hx = this.x + dir * 26;
+    const hy = this.feetY - 34 + (this.crouch ? 14 : 0);
+    w.fx.sparks(hx, hy, 10, '#ffffff', 300, dir, 0, 1.2);
+    w.fx.add(PK.Ring, hx, hy, 0, 0, 0.2, 6, '#ffffff', { size1: 30, a0: 0.9, front: true });
+    return true;
+  }
+
   private shotgunKick(w: World) {
     const b = this.body;
     const down = Math.sin(this.aim) > 0.55;
@@ -707,6 +771,35 @@ export class Player {
       this.landSquash = 0.4;
     }
     w.fx.addShake(2.4, 0.12);
+  }
+
+  /** Impacto da ORELHADA: onda de choque que fere, arremessa inimigos e quebra caixas. */
+  private slamImpact(w: World, landed: boolean) {
+    this.slam = false;
+    if (!landed) return;
+    const x = this.x;
+    const y = this.feetY;
+    w.audio('slam', 0.9, x);
+    w.audio('flap', 0.8, x);
+    w.fx.addShake(6, 0.3);
+    w.fx.addHitStop(0.05);
+    w.fx.add(PK.Ring, x, y - 4, 0, 0, 0.4, 10, '#ffe27a', { size1: SLAM_R, a0: 0.9, front: true });
+    w.fx.add(PK.Ring, x, y - 4, 0, 0, 0.55, 20, '#ffffff', { size1: SLAM_R * 1.2, a0: 0.5, front: true });
+    for (let i = 0; i < 16; i++) w.fx.add(PK.Dust, x + rand.spread(30), y - 2, rand.spread(320), -rand.range(10, 80), 0.6, 10, '#b9b0c8', { size1: 4, a0: 0.75 });
+    w.fx.debris(x, y - 2, 8, ['#5a5674', '#7d7896'], 260);
+    for (const e of w.enemies) {
+      if (!e.alive || !e.canBeHit || e.isBoss) continue;
+      const dx = e.x - x;
+      if (Math.abs(dx) > SLAM_R + e.hitbox.w / 2 || Math.abs(e.feetY - y) > 60) continue;
+      const f = 1 - Math.min(1, Math.abs(dx) / (SLAM_R + 20)) * 0.5;
+      const dir = dx >= 0 ? 1 : -1;
+      e.hurt(w, Math.round(SLAM_DMG * f), { kx: dir * 300, ky: -420, x: e.x, y: e.y, type: 'melee', dir });
+    }
+    for (const p of w.props) {
+      if (!p.alive || !p.hittable) continue;
+      if (Math.abs(p.x - x) < SLAM_R && Math.abs(p.y + p.h / 2 - y) < 50) p.hurt(w, 40, 'explosion', Math.sign(p.x - x));
+    }
+    this.invuln = Math.max(this.invuln, 0.25);
   }
 
   private startGlide(w: World) {
@@ -774,6 +867,8 @@ export class Player {
       this.nomadShoot(w);
       return;
     }
+    // inimigo colado: golpe corpo a corpo (como a faca do Metal Slug) — sem gastar munição
+    if (this.tryMelee(w)) return;
     const d = WEAPONS[this.cur];
     const ammo = this.weapons.get(this.cur) ?? 0;
     if (ammo <= 0) {
@@ -826,6 +921,8 @@ export class Player {
     // efeitos
     w.audio(d.sfx, 0.85, this.x);
     w.fx.add(PK.Fire, ox, oy, 0, 0, 0.07, d.pellets > 1 ? 15 : 10, d.trail, { size1: 4, front: true });
+    // clarão do disparo ilumina o ambiente
+    w.fx.light(ox, oy, d.pellets > 1 || this.cur === 'launcher' ? 120 : 70, 0.07, '#ffb060');
     if (d.pellets > 1 || this.cur === 'launcher') {
       w.fx.smoke(ox, oy, 2, '#8b8499', 6, 20, 0.5);
       w.fx.sparks(ox, oy, 5, '#ffd27a', 260, Math.cos(this.aim), Math.sin(this.aim), 0.7);
@@ -981,6 +1078,10 @@ export class Player {
       if (Math.random() < dt * (sp / 8)) {
         w.fx.add(PK.Dust, this.x - Math.sign(b.vx) * 14, this.feetY - 2, -b.vx * 0.15, -rand.range(8, 26), 0.5, 8, '#b9b0c8', { size1: 3, a0: 0.55 });
       }
+      if (w.rainLevel > 0.3 && Math.random() < dt * (sp / 12)) {
+        // esfera jogando água para trás
+        w.fx.add(PK.Drop, this.x - Math.sign(b.vx) * 18, this.feetY - 2, -b.vx * 0.35 + rand.spread(40), -rand.range(80, 200), 0.4, rand.range(1.2, 2.2), '#bfe4ff', { g: 900 });
+      }
       if (sp > 190 && Math.random() < dt * 14) {
         w.fx.add(PK.Spark, this.x - Math.sign(b.vx) * 16, this.feetY - 1, -b.vx * 0.3 + rand.spread(30), -rand.range(40, 110), 0.25, 6, '#ffd27a', { size1: 1, g: 500, front: true });
       }
@@ -1016,6 +1117,25 @@ export class Player {
       if (r.x < x1 && r.x + r.w > x0 && r.y < y1 && r.y + r.h > y0) {
         p.hurt(w, 999, 'melee', Math.sign(p.x - b.x) || this.facing);
         if (!p.alive) crushed++;
+      }
+    }
+    // cenário urbano (carros, lixeiras, hidrantes, árvores, postes…) quebra só de passar
+    crushed += w.smash.area(x0, x1, y0, y1 + 4, Math.sign(b.vx) || this.facing, 'nomad');
+    // atropelar inimigos em movimento (sem precisar do avanço)
+    if (Math.abs(b.vx) > 150) {
+      for (const e of w.enemies) {
+        if (!e.alive || !e.canBeHit || e.isBoss) continue;
+        const last = this.ramHits.get(e) ?? -9;
+        if (w.time - last < 0.6) continue;
+        const eb = e.hitbox;
+        if (eb.x < x1 && eb.x + eb.w > x0 && eb.y < y1 && eb.y + eb.h > y0) {
+          this.ramHits.set(e, w.time);
+          const dir = Math.sign(b.vx);
+          e.hurt(w, 35, { kx: dir * 520, ky: -300, x: e.x, y: e.y, type: 'dash', dir });
+          w.audio('dashHit', 0.8, e.x);
+          w.fx.sparks(e.x, e.y, 8, '#ffffff', 260);
+          w.fx.addHitStop(0.03);
+        }
       }
     }
     if (crushed) {
@@ -1196,6 +1316,32 @@ export class Player {
 
   // ------------------------------------------------------------------ desenho
   draw(g: CanvasRenderingContext2D, w: World) {
+    this.drawBody(g, w);
+    if (this.meleeT > 0 && !this.nomad) {
+      // arco do golpe
+      const k = 1 - this.meleeT / 0.22;
+      const cx = this.x + this.facing * 10;
+      const cy = this.feetY - 34 + (this.crouch ? 14 : 0);
+      g.save();
+      g.globalCompositeOperation = 'lighter';
+      g.strokeStyle = `rgba(255,255,255,${0.9 * (1 - k)})`;
+      g.lineWidth = 5 * (1 - k) + 1;
+      g.lineCap = 'round';
+      g.beginPath();
+      const a0 = this.facing === 1 ? -1.3 : Math.PI + 1.3;
+      const a1 = this.facing === 1 ? -1.3 + 2.4 * Math.min(1, k * 2) : Math.PI + 1.3 - 2.4 * Math.min(1, k * 2);
+      g.arc(cx, cy, 30, Math.min(a0, a1), Math.max(a0, a1));
+      g.stroke();
+      g.strokeStyle = `rgba(255,210,120,${0.6 * (1 - k)})`;
+      g.lineWidth = 2;
+      g.beginPath();
+      g.arc(cx, cy, 36, Math.min(a0, a1), Math.max(a0, a1));
+      g.stroke();
+      g.restore();
+    }
+  }
+
+  private drawBody(g: CanvasRenderingContext2D, w: World) {
     const art = getArt();
     const blink = this.invuln > 0 && !this.isDashing && Math.floor(this.animT * 18) % 2 === 0 && this.mode !== 'dead';
     const alpha = blink ? 0.4 : 1;

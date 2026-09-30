@@ -181,7 +181,15 @@ export class Menus {
   // ------------------------------------------------------------------ painéis
   private openPanel(content: HTMLElement, from: 'main' | 'pause') {
     this.panelReturn = from;
-    this.panel.replaceChildren(content);
+    // voltar SEMPRE visível no canto superior esquerdo (antes ficava no fim do conteúdo, com rolagem)
+    const back = el('button', 'btn back-fab', '<span class="arr">←</span> VOLTAR');
+    (back as HTMLButtonElement).type = 'button';
+    back.setAttribute('aria-label', 'Voltar');
+    back.addEventListener('click', () => {
+      this.cb.onClick();
+      this.closePanel();
+    });
+    this.panel.replaceChildren(back, content);
     this.panel.classList.remove('hidden');
     if (from === 'main') this.main.classList.add('hidden');
     else this.pause.classList.add('hidden');
@@ -275,7 +283,7 @@ export class Menus {
       this.toggle('Mostrar FPS', () => settings.showFps, (v) => (settings.showFps = v))
     );
     const act = el('div', 'actions');
-    act.append(this.btn('VOLTAR', '', () => this.closePanel()));
+
     c.append(act);
     this.openPanel(c, from);
   }
@@ -307,7 +315,7 @@ export class Menus {
       el('p', '', '<b>Gamepad:</b> analógico esquerdo mover/mirar • A pular • X/RT atirar • B granada • Y especial • LB/RB trocar arma • Start pausa.')
     );
     const act = el('div', 'actions');
-    act.append(this.btn('VOLTAR', '', () => this.closePanel()));
+
     c.append(act);
     this.openPanel(c, from);
   }
@@ -327,7 +335,7 @@ export class Menus {
       el('p', '', '<small>Inspirado no ritmo dos clássicos run-and-gun. Nenhum sprite, música, mapa ou marca de terceiros foi utilizado.</small>')
     );
     const act = el('div', 'actions');
-    act.append(this.btn('VOLTAR', '', () => this.closePanel()));
+
     c.append(act);
     this.openPanel(c, from);
   }

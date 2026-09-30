@@ -10,6 +10,8 @@ const H: Record<string, Record<Device, string>> = {
   dash: { kb: 'SHIFT: AVANÇO — atropele tudo pela frente!', touch: 'Botão ⚡ : AVANÇO — atropele tudo pela frente!', pad: 'Y: AVANÇO — atropele tudo pela frente!' },
   mountNomad: { kb: 'Pule em cima do NÔMAD para pilotá-lo!', touch: 'Pule em cima do NÔMAD para pilotá-lo!', pad: 'Pule em cima do NÔMAD para pilotá-lo!' },
   swap: { kb: 'Munição é limitada! Troque de arma com Q / E ou a roda do mouse', touch: 'Munição é limitada! Troque de arma no botão ⇄', pad: 'Munição é limitada! Troque de arma com LB / RB' },
+  slam: { kb: 'No ar: S + ESPAÇO = ORELHADA (mergulho com onda de choque)!', touch: 'No ar: joystick p/ baixo + PULO = ORELHADA!', pad: 'No ar: baixo + A = ORELHADA (onda de choque)!' },
+  melee: { kb: 'Inimigo colado? O tiro vira GOLPE (sem gastar munição, atravessa escudos)', touch: 'Inimigo colado? FOGO vira GOLPE (atravessa escudos)', pad: 'Inimigo colado? O tiro vira GOLPE (atravessa escudos)' },
   crouch: { kb: 'Segure S / ↓ para engatinhar', touch: 'Empurre o joystick para baixo para engatinhar', pad: 'Analógico para baixo para engatinhar' },
 };
 

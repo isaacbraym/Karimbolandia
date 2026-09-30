@@ -173,6 +173,8 @@ export class Game {
     }
     const cssW = rot ? window.innerHeight : window.innerWidth;
     const cssH = rot ? window.innerWidth : window.innerHeight;
+    // aba em segundo plano / janela minimizada pode reportar 0×0: mantém o tamanho anterior
+    if (!(cssW > 0 && cssH > 0)) return;
     const aspect = cssW / cssH;
     this.viewH = VIEW_H;
     this.viewW = clamp(Math.round(aspect * VIEW_H), 520, 820);
@@ -560,6 +562,7 @@ export class Game {
     }
     this.hud.update(dt);
     this.post.update(w, dt, this.quality);
+    w.rainLevel = this.post.rain;
     // dicas contextuais
     this.processHints(w);
   }

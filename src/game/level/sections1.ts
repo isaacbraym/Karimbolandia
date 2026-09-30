@@ -132,6 +132,8 @@ export function section3(b: LevelBuilder) {
   // buraco do PLANEIO (Ear Glide): 8 tiles — a trajetória de moedas mostra o caminho
   b.pit(296, 304);
   b.trigger('hint:glide', 290, 0, 3, 46);
+  b.trigger('hint:slam', 318, 0, 3, 46);
+  b.trigger('hint:melee', 140, 0, 3, 46);
   b.tokenArc(295, G - 2, 305, G - 9, 10);
   b.ground(304, 352);
   b.dress(296, 352, G, { seed: 33 });

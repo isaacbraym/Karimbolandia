@@ -55,6 +55,14 @@ export class Camera {
   }
 
   update(dt: number, tx: number, ty: number, facing: number, vx: number, onGround: boolean, shakeAmount: number, shakeOn: boolean) {
+    // proteção: um valor inválido (NaN) nunca pode "grudar" na câmera
+    if (!Number.isFinite(this.lookX)) this.lookX = 0;
+    if (!Number.isFinite(this.zoom) || this.zoom <= 0) this.zoom = this.zoomTarget > 0 ? this.zoomTarget : BASE_ZOOM;
+    if (!Number.isFinite(this.x) || !Number.isFinite(this.y)) {
+      this.x = tx - this.w / 2;
+      this.y = ty - this.h * 0.6;
+    }
+    if (!Number.isFinite(dt) || !Number.isFinite(tx) || !Number.isFinite(ty)) return;
     // abre rápido (ameaça), fecha devagar (volta suave à exploração)
     this.zoom = damp(this.zoom, this.zoomTarget, this.zoomTarget < this.zoom ? 3.6 : 1.4, dt);
     let cx: number;

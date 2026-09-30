@@ -88,6 +88,11 @@ function bakedDeco(kind: string, seed: number, s: number, b: [number, number, nu
   return c;
 }
 
+/** Escala final da decoração (a do spawn × a do tipo). */
+export function decoScale(d: DecoSpawn) {
+  return (d.scale ?? 1) * (DECO_SCALE[d.kind] ?? 1);
+}
+
 export function drawDeco(g: CanvasRenderingContext2D, d: DecoSpawn, t: number) {
   const s = (d.scale ?? 1) * (DECO_SCALE[d.kind] ?? 1);
   const seed = seedOf(d);

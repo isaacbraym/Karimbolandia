@@ -251,6 +251,12 @@ export interface FPose {
   faceX: number;
   walk: number; // fase do passo (rad)
   walking: number; // 0..1 quanto está andando
+  /** mola da barriga (−0.1..0.1): positivo = achatado (passo/impacto) */
+  jiggle?: number;
+  /** 0..1 arroto (tronco joga para trás) */
+  burp?: number;
+  /** 0..1 fúria (fase 3): aura vermelha */
+  rage?: number;
 }
 
 export function drawFelipao(g: CanvasRenderingContext2D, a: FelipaoArt, x: number, feetY: number, p: FPose) {
@@ -276,8 +282,8 @@ export function drawFelipao(g: CanvasRenderingContext2D, a: FelipaoArt, x: numbe
   const angR = air ? -0.14 : sR * 0.3 * wk;
   const liftL = air ? 0 : Math.max(0, Math.cos(walk)) * 6.5 * wk;
   const liftR = air ? 0 : Math.max(0, -Math.cos(walk)) * 6.5 * wk;
-  const bob = (air ? 0 : -Math.abs(sL) * 3.2 * wk) + Math.sin(p.t * 2.2) * 0.8 * (1 - wk);
-  const sway = sL * 0.028 * wk;
+  const bob = (air ? 0 : -Math.abs(sL) * 4.6 * wk) + Math.sin(p.t * 2.2) * 0.8 * (1 - wk);
+  const sway = sL * 0.04 * wk; // peso de um lado para o outro
   // virada de lado: escala horizontal contínua (passa por uma "fatia" fina)
   const fx = Math.abs(p.faceX) < 0.16 ? 0.16 * (p.faceX < 0 ? -1 : 1) : p.faceX;
   const turning = 1 - Math.min(1, Math.abs(p.faceX));
@@ -294,6 +300,18 @@ export function drawFelipao(g: CanvasRenderingContext2D, a: FelipaoArt, x: numbe
   const shy = (Math.random() - 0.5) * p.shake;
   g.translate(shx, shy);
 
+  // aura de fúria (fase 3), atrás de tudo
+  if ((p.rage ?? 0) > 0.01) {
+    const r = p.rage ?? 0;
+    const glow = glowSprite('#ff2a2a', 32);
+    const pulse = 0.75 + 0.25 * Math.sin(p.t * 7);
+    g.globalCompositeOperation = 'lighter';
+    g.globalAlpha = prevA * p.alpha * 0.42 * r * pulse;
+    const hh = FELI_H;
+    g.drawImage(glow.c, -LW * 0.62, -hh * 1.02, LW * 1.24, hh * 1.1);
+    g.globalCompositeOperation = 'source-over';
+    g.globalAlpha = prevA * p.alpha;
+  }
   // pernas (atrás do tronco); botas/propulsores acompanham a perna
   const drawLeg = (spr: Sprite, hip: [number, number], foot: [number, number], ang: number, lift: number) => {
     g.save();
@@ -320,7 +338,14 @@ export function drawFelipao(g: CanvasRenderingContext2D, a: FelipaoArt, x: numbe
   g.save();
   g.translate(0, bob);
   g.translate(FELI_LAYOUT.hipL[0] * 0.5 + FELI_LAYOUT.hipR[0] * 0.5, FELI_LAYOUT.hipL[1]);
-  g.rotate(sway);
+  g.rotate(sway - (p.burp ?? 0) * 0.1);
+  // barriga com mola (quica a cada passo/impacto) + respiração
+  {
+    const j = p.jiggle ?? 0;
+    const br = Math.sin(p.t * 2.3) * 0.012 * (1 - wk * 0.7);
+    const bu = (p.burp ?? 0) * 0.035;
+    g.scale(1 + j * 0.55 - br * 0.4, 1 - j + br + bu);
+  }
   g.translate(-(FELI_LAYOUT.hipL[0] * 0.5 + FELI_LAYOUT.hipR[0] * 0.5), -FELI_LAYOUT.hipL[1]);
 
   drawSpr(g, a.rack, a.rackPos[0], a.rackPos[1] - p.rackOpen * 4, { flash: fa, sy: 1 + p.rackOpen * 0.1 });

@@ -255,6 +255,7 @@ export class AudioEngine {
   /** vol: 0..1 (distância); pan: -1..1 */
   play(name: SfxName, vol = 1, pan = 0) {
     if (!this.ctx || this.ctx.state !== 'running' || this.muted) return;
+    if (!Number.isFinite(vol) || !Number.isFinite(pan)) return; // nunca derruba o quadro por um valor inválido
     if (this.active > 56) return;
     const now = this.ctx.currentTime;
     // anti-spam: mesmo som muito rápido

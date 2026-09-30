@@ -850,3 +850,24 @@ kbd {
   background: radial-gradient(circle at 40% 35%, #ffffff, #bdefff 55%, #4ad4ff);
   box-shadow: 0 0 16px rgba(74, 212, 255, 0.6), 0 3px 8px rgba(0, 0, 0, 0.4);
 }
+
+/* botão voltar fixo no canto superior esquerdo dos painéis */
+.back-fab {
+  position: fixed;
+  top: calc(var(--sat) + 10px);
+  left: calc(var(--sal) + 10px);
+  z-index: 40;
+  font-size: clamp(14px, 3.6vh, 19px);
+  padding: 6px 14px 6px 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: linear-gradient(180deg, #5ab8ff 0%, #2a78d8 55%, #1a4aa0 100%);
+}
+.back-fab .arr {
+  font-size: 1.25em;
+  line-height: 1;
+}
+.panel-back .panel {
+  margin-top: 34px;
+}
