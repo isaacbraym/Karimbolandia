@@ -43,6 +43,8 @@ Run-and-gun **2.5D moderno** que roda direto no navegador (celular e PC) — uma
 * **Menu:** botão VOLTAR fixo no canto superior esquerdo dos painéis.
 * **Animação (rig com molas):** o Karimbo inclina ao acelerar/frear, estica no ar e achata ao pousar, a cabeça segue o corpo com atraso (follow-through), as orelhas balançam como mola (sobem na queda, quicam no pouso, tremem parado), respira e olha em volta quando parado, achata na virada, tem poses próprias de deslize, ORELHADA e golpe em arco, e o tronco recua a cada disparo. Soldados inclinam ao correr, respiram, erguem a arma suavemente e recuam ao atirar; **todos os inimigos** dão um tranco na direção do golpe ao levar dano e surgem com um "pop"; o Nômad tem suspensão (afunda no pouso, estica no pulo e no avanço, o piloto balança junto).
 * **Buracos sinalizados:** os fossos sem fundo soltam fumaça, brasas incandescentes e um brilho de calor alaranjado que sobe acima da borda — dá para ver o perigo de longe.
+* **Filminho de HQ antes do Felipão:** painéis inclinados com closes dramáticos nos rostos dos dois, retícula de quadrinhos, "VS", balão de grito (*"Vou te ensinar a jogar de verdade, Karimbo!"*), resposta do Karimbo e o encarar olho no olho. Passa uma vez por partida; toque/tiro pula.
+* **Caminho ~15% mais curto até o chefe:** 195 tiles de corredores repetitivos foram removidos (sem perder emblemas, segredos, checkpoints, arenas nem cenas).
 * **Armas com munição limitada:** pistola (∞), metralhadora, shotgun, lança-granadas e canhão de plasma — varie as armas! Caixas e inimigos soltam munição.
 * **3 vidas por fase** (fichas de fliperama): ao morrer aparece **CONTINUAR?** com contagem regressiva de 10 s; confirmar gasta 1 vida e você continua *de onde parou* (inimigos, arena e chefe seguem como estavam). Sem confirmar, volta ao último checkpoint. Sem vidas: **FIM DE JOGO** (recomeçar a fase ou menu).
 * **Vida com critério:** corações fixos após combates duros, caixas sorteadas (nem toda caixa tem item) e drops que aparecem mais quando você está ferido.
@@ -55,7 +57,7 @@ Run-and-gun **2.5D moderno** que roda direto no navegador (celular e PC) — uma
 
 ## A fase
 
-14 seções (~15–25 min): entrada na cidade → primeiros soldados → verticalidade e glide → primeiro segredo → grande combate (arena com ondas) → **encontro com o Nômad** → power trip → avanço → exploração → área de guerra (arena) → passagem estreita (saída do Nômad) → subida final → preparação → **Felipão** (3 fases, piso que desaba).
+14 seções (~13–21 min): entrada na cidade → primeiros soldados → verticalidade e glide → primeiro segredo → grande combate (arena com ondas) → **encontro com o Nômad** → power trip → avanço → exploração → área de guerra (arena) → passagem estreita (saída do Nômad) → subida final → preparação → **Felipão** (3 fases, piso que desaba).
 
 Coletáveis: fichas, **10 emblemas**, **3 Orelhas Douradas** (muito secretas), caixas com munição/armas/vida/granadas. Cenário destrutível (caminho crítico sempre indestrutível), 8 checkpoints, reiniciar fase, pontuação e ranking S/A/B/C.
 

@@ -2,6 +2,7 @@ import { orient } from '../core/orient';
 import { Input } from '../core/input';
 import { audio } from '../core/audio';
 import { PostFX } from './post';
+import { BossComic } from './comic';
 import { setDecoDensity } from '../art/decor';
 import { music, MIX, type ThemeName } from '../core/music';
 import { settings, progress, saveProgress } from '../core/storage';
@@ -16,7 +17,7 @@ import { TouchUI } from '../ui/touch';
 import { hintText } from './hints';
 import { VIEW_H } from './level';
 
-type State = 'loading' | 'menu' | 'playing' | 'paused' | 'complete' | 'continue' | 'gameover';
+type State = 'loading' | 'menu' | 'playing' | 'paused' | 'complete' | 'continue' | 'gameover' | 'comic';
 
 const CONTINUE_SECS = 10;
 
@@ -60,6 +61,8 @@ export class Game {
   /** tempos médios (ms) de simulação/render — útil para depurar desempenho */
   prof = { update: 0, render: 0 };
   private post = new PostFX();
+  private comic: BossComic | null = null;
+  private comicTap = false;
   /** resolução dinâmica: fração da resolução alvo (0.6..1) — cai antes de qualquer efeito ser cortado */
   renderScale = 1;
   private drsAcc = 0;
@@ -89,7 +92,10 @@ export class Game {
       onContinueNo: () => this.declineContinue(),
       onClick: () => audio.play('uiClick', 0.8),
     });
-    this.input.onGesture = () => audio.init();
+    this.input.onGesture = () => {
+      audio.init();
+      if (this.state === 'comic') this.comicTap = true;
+    };
     this.input.onMenuKey = (code) => {
       if (this.state === 'playing') return;
       if (this.menus.handleKey(code)) return;
@@ -272,6 +278,7 @@ export class Game {
       onRespawn: () => this.beginRespawn(),
       onContinue: (lives) => this.askContinue(lives),
       onGameOver: () => this.gameOver(),
+      onBossComic: () => this.startComic(),
       onBanner: (t, s, d) => this.hud.banner(t, s, d),
       onComplete: () => this.onComplete(),
       onMusic: (s) => this.setMusic(s),
@@ -392,6 +399,27 @@ export class Game {
     this.last = performance.now();
   }
 
+  /** Filminho do chefe: congela o mundo, esconde os controles e toca a HQ. */
+  private startComic() {
+    if (this.state !== 'playing') return;
+    this.comic = new BossComic();
+    this.state = 'comic';
+    this.touch.show(false);
+    audio.loop('glide', false);
+    audio.loop('roll', false);
+    audio.loop('alarm', false);
+  }
+
+  private endComic() {
+    this.comic = null;
+    if (this.state !== 'comic') return;
+    this.state = 'playing';
+    this.input.enabled = true;
+    this.touch.show(this.isTouch || this.input.touch.active);
+    this.input.clearEdges();
+    this.last = performance.now();
+  }
+
   private gameOver() {
     if (this.state !== 'playing') return;
     this.state = 'gameover';
@@ -484,7 +512,7 @@ export class Game {
       for (let i = 0; i < cps.length; i++) if (cps[i].x <= sx) idx = i;
       w.checkpointIdx = idx;
       w.player.reset(sx, y);
-      if (sx > 600 * 32) w.nomadLost = true; // teleporte de teste além do portão do Nômad
+      if (sx > w.data.nomadSpawn.x + 40 * 32) w.nomadLost = true; // teleporte de teste além do portão do Nômad
       w.checkpointSnap = w.player.snapshot();
       w.cameraSnap();
     }
@@ -522,6 +550,13 @@ export class Game {
         this.step(w, dt);
       }
       this.updateTouchState(w);
+    } else if (this.state === 'comic' && w && this.comic) {
+      const s = this.input.state;
+      if (s.fire.pressed || s.jump.pressed || s.pause.pressed || this.comicTap) this.comic.skip();
+      this.comicTap = false;
+      this.input.clearEdges();
+      this.comic.update(dt);
+      if (this.comic.done) this.endComic();
     } else if (this.state === 'continue' && w) {
       // mundo congelado; contagem regressiva + confirmação por gamepad
       this.continueLeft -= dt;
@@ -702,7 +737,8 @@ export class Game {
     art.bg.drawVignette(g, W, H, 0.9);
     this.post.hurt(g, this.canvas, w.player.mode === 'dead' ? 0 : clamp(w.player.hurtT / 0.28, 0, 1));
     this.hud.drawScreenFx(g, w, W, H);
-    this.hud.draw(g, w, W, H);
+    if (this.state === 'comic' && this.comic) this.comic.draw(g, W, H);
+    else this.hud.draw(g, w, W, H);
   }
 
   private atmosphere(w: World) {

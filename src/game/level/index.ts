@@ -4,12 +4,16 @@ import { section1, section2, section3, section4 } from './sections1';
 import { section5, section6, section7, section8, section9 } from './sections2';
 import { section10, section11, section12, section13, section14 } from './sections3';
 import { addSupplies, easeClimbs, addRollers } from './extras';
+import { applyCuts, CUT_TOTAL } from './cut';
 
-export const LEVEL_W = 1352;
+/** largura da fase montada (antes dos cortes) */
+const RAW_W = 1352;
+export const LEVEL_W = RAW_W - CUT_TOTAL;
+export { mapTile } from './cut';
 
 /** Monta a fase completa (determinística). */
 export function buildLevel(): LevelData {
-  const b = new LevelBuilder(LEVEL_W, LEVEL_H);
+  const b = new LevelBuilder(RAW_W, LEVEL_H);
   section1(b);
   section2(b);
   section3(b);
@@ -27,6 +31,8 @@ export function buildLevel(): LevelData {
   addSupplies(b);
   easeClimbs(b);
   addRollers(b);
+  // caminho até o chefe ~15% mais curto (remove corredores repetitivos)
+  applyCuts(b);
   b.atmosphere.sort((a, c) => a.x - c.x);
   return b.build('boss');
 }

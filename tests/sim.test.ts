@@ -1,3 +1,4 @@
+import { mapTile as M } from '../src/game/level/index';
 import { describe, it, expect } from 'vitest';
 import { makeWorld, armUp, teleport, Bot, run, newCtl } from './helpers/bot';
 import { TILE } from '../src/game/level';
@@ -34,7 +35,7 @@ describe('Simulação headless (bot invencível)', () => {
   it('limpa a arena 1 (ondas de inimigos) e destrava a câmera', () => {
     const w = makeWorld();
     armUp(w);
-    teleport(w, 436, 32);
+    teleport(w, M(436), 32);
     const bot = new Bot(w, { hold: true });
     const ctl = newCtl();
     const a = w.director.arenas.find((x) => x.def.id === 'a1')!;
@@ -45,7 +46,7 @@ describe('Simulação headless (bot invencível)', () => {
 
   it('a cinemática do Nômad embarca o Karimbo', () => {
     const w = makeWorld();
-    teleport(w, 534, 32);
+    teleport(w, M(534), 32);
     const bot = new Bot(w, { walk: true });
     const ctl = newCtl();
     run(w, bot, ctl, 14, () => w.director.nomadMountable);
@@ -66,7 +67,7 @@ describe('Simulação headless (bot invencível)', () => {
 
   it('Nômad: avanço e segundo avanço (janela de 5 s)', () => {
     const w = makeWorld();
-    teleport(w, 534, 32);
+    teleport(w, M(534), 32);
     const ctl = newCtl();
     mountNomad(w, ctl);
     expect(w.player.mounted).toBe(true);
@@ -90,7 +91,7 @@ describe('Simulação headless (bot invencível)', () => {
 
   it('fora da janela de 5 s o segundo avanço não existe (volta a ser o primeiro)', () => {
     const w2 = makeWorld();
-    teleport(w2, 534, 32);
+    teleport(w2, M(534), 32);
     const c2 = newCtl();
     mountNomad(w2, c2);
     const n2 = w2.player.nomad!;
@@ -107,7 +108,7 @@ describe('Simulação headless (bot invencível)', () => {
   it('Nômad destruído ejeta o Karimbo, que segue a pé', () => {
     const w = makeWorld();
     w.invulnerable = false;
-    teleport(w, 534, 32);
+    teleport(w, M(534), 32);
     const ctl = newCtl();
     mountNomad(w, ctl);
     w.player.invuln = 0;
@@ -137,7 +138,7 @@ describe('Simulação headless (bot invencível)', () => {
     const w = makeWorld();
     w.invulnerable = false;
     armUp(w);
-    teleport(w, 100, 32);
+    teleport(w, M(100), 32);
     const bot = new Bot(w, { hold: true });
     const ctl = newCtl();
     run(w, bot, ctl, 6);
@@ -168,7 +169,7 @@ describe('Reinício e restauração', () => {
   it('reiniciar a fase zera progresso: inimigos, itens, arenas, Nômad e checkpoints', () => {
     const w = makeWorld();
     armUp(w);
-    teleport(w, 100, 32);
+    teleport(w, M(100), 32);
     run(w, new Bot(w, { hold: true }), newCtl(), 8);
     w.score = 999;
     w.emblems.add(3);
@@ -189,7 +190,7 @@ describe('Reinício e restauração', () => {
 describe('Seção 11: desembarque e túnel de engatinhar', () => {
   it('o Nômad é forçado a estacionar e o Karimbo atravessa o túnel de 1 tile engatinhando', () => {
     const w = makeWorld();
-    teleport(w, 1042, 32);
+    teleport(w, M(1042), 32);
     w.director.remountAtCheckpoint(200);
     const ctl = newCtl();
     expect(w.player.mounted).toBe(true);
@@ -206,7 +207,7 @@ describe('Seção 11: desembarque e túnel de engatinhar', () => {
     let crossed = false;
     for (let i = 0; i < 60 * 14; i++) {
       w.update(1 / 60, ctl);
-      if (w.player.x > 1070 * 32) {
+      if (w.player.x > M(1070) * 32) {
         crossed = true;
         break;
       }
@@ -216,11 +217,11 @@ describe('Seção 11: desembarque e túnel de engatinhar', () => {
 
   it('em pé o Karimbo NÃO passa pelo túnel (a passagem exige agachar)', () => {
     const w = makeWorld();
-    teleport(w, 1046, 32);
+    teleport(w, M(1046), 32);
     const ctl = newCtl();
     ctl.moveX = 1;
     for (let i = 0; i < 60 * 8; i++) w.update(1 / 60, ctl);
-    expect(w.player.x).toBeLessThan(1053 * 32);
+    expect(w.player.x).toBeLessThan(M(1053) * 32);
   });
 });
 
@@ -228,7 +229,7 @@ describe('Agachar desvia de tiros retos', () => {
   const setup = (crouch: boolean) => {
     const w = makeWorld();
     w.invulnerable = false;
-    teleport(w, 60, 32);
+    teleport(w, M(38), 32);
     w.director.arenas.length = 0;
     const px = w.player.x;
     // atirador e jogador no mesmo nível, a ~7 tiles
@@ -259,7 +260,7 @@ describe('Agachar desvia de tiros retos', () => {
   });
   it('Nômad de apoio: cai após ~90 s, embarca por cima, dura 50 s e some sem marcar o principal como perdido', () => {
     const w = makeWorld();
-    teleport(w, 200, 32);
+    teleport(w, M(200), 32);
     w.nomadLost = true; // já passou pelo Nômad principal
     const ctl = newCtl();
     const d = w.director;
@@ -295,7 +296,7 @@ describe('Agachar desvia de tiros retos', () => {
   it('3 vidas por fase: continua de onde morreu; sem vidas vira fim de jogo', () => {
     const w = makeWorld();
     w.invulnerable = false;
-    teleport(w, 200, 32);
+    teleport(w, M(200), 32);
     const ctl = newCtl();
     let asked = 0;
     let over = 0;
@@ -336,7 +337,7 @@ describe('Agachar desvia de tiros retos', () => {
   });
   it('Nômad obrigatório: o portão da garagem só abre depois de embarcar; depois vêm hordas', () => {
     const w = makeWorld();
-    teleport(w, 586, 32);
+    teleport(w, M(586), 32);
     w.director.triggered.add('nomadMeet');
     const ctl = newCtl();
     ctl.moveX = 1;
@@ -349,13 +350,13 @@ describe('Agachar desvia de tiros retos', () => {
     expect(w.player.mounted).toBe(true);
     expect(w.director.nomadGate).toBeNull();
     // trecho de guerra: chegam levas contínuas enquanto pilota
-    w.player.body.x = 650 * TILE;
+    w.player.body.x = M(650) * TILE;
     for (let i = 0; i < 60 * 8; i++) w.update(1 / 60, ctl);
     expect(w.enemies.filter((e) => e.alive && e.spawnedByArena === false && e.spawn.id <= -5000).length).toBeGreaterThan(0);
   });
   it('Nômad quebra caixas só de passar (sem atirar); Karimbo desliza ao agachar correndo', () => {
     const w = makeWorld();
-    teleport(w, 640, 32);
+    teleport(w, M(640), 32);
     w.nomadUsed = true;
     w.director.remountAtCheckpoint(300);
     const ctl = newCtl();
@@ -370,7 +371,7 @@ describe('Agachar desvia de tiros retos', () => {
     expect(w.stats.shots).toBe(0);
     // deslize a pé
     const w2 = makeWorld();
-    teleport(w2, 200, 32);
+    teleport(w2, M(200), 32);
     const c2 = newCtl();
     c2.moveX = 1;
     for (let i = 0; i < 40; i++) w2.update(1 / 60, c2);
@@ -422,7 +423,7 @@ describe('Agachar desvia de tiros retos', () => {
     let over = 0;
     w.hooks.onContinue = () => asked++;
     w.hooks.onGameOver = () => over++;
-    teleport(w, 1296, 14);
+    teleport(w, M(1296), 14);
     ctl.moveX = 1;
     for (let i = 0; i < 60; i++) w.update(1 / 60, ctl);
     ctl.moveX = 0;
@@ -455,7 +456,7 @@ describe('Agachar desvia de tiros retos', () => {
   });
   it('escopeta: coice dá pulinho para trás; atirando para baixo dá um pulinho para cima', () => {
     const w = makeWorld();
-    teleport(w, 200, 32);
+    teleport(w, M(30), 32);
     const ctl = newCtl();
     for (let i = 0; i < 20; i++) w.update(1 / 60, ctl);
     const p = w.player;
@@ -485,7 +486,7 @@ describe('Agachar desvia de tiros retos', () => {
   it('novidades: golpe corpo a corpo, ORELHADA, Rolo-Bomba e cenário destrutível pelo Nômad', () => {
     // golpe: inimigo colado leva dano sem gastar munição
     const w = makeWorld();
-    teleport(w, 200, 32);
+    teleport(w, M(200), 32);
     const ctl = newCtl();
     for (let i = 0; i < 20; i++) w.update(1 / 60, ctl);
     const p = w.player;
@@ -502,7 +503,7 @@ describe('Agachar desvia de tiros retos', () => {
     expect(p.weapons.get(p.cur)).toBe(ammo);
     // ORELHADA
     const w2 = makeWorld();
-    teleport(w2, 200, 32);
+    teleport(w2, M(200), 32);
     const c2 = newCtl();
     for (let i = 0; i < 20; i++) w2.update(1 / 60, c2);
     const p2 = w2.player;
@@ -532,7 +533,7 @@ describe('Agachar desvia de tiros retos', () => {
   it('Nômad destrói carros/hidrantes passando por cima; hidrante vira gêiser', () => {
     const w = makeWorld();
     const decos = w.data.decos;
-    const carIdx = decos.findIndex((d) => d.kind === 'parkedCar' && d.x > 640 * TILE && d.y === 32 * TILE);
+    const carIdx = decos.findIndex((d) => d.kind === 'parkedCar' && d.x > M(640) * TILE && d.y === 32 * TILE);
     expect(carIdx).toBeGreaterThanOrEqual(0);
     const car = decos[carIdx];
     teleport(w, Math.floor(car.x / TILE) - 8, 32);

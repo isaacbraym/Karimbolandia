@@ -1,3 +1,4 @@
+import { mapTile as M } from '../src/game/level/index';
 import { describe, it, expect } from 'vitest';
 import { buildLevel, LEVEL_W } from '../src/game/level/index';
 import { T, TILE } from '../src/game/level';
@@ -9,7 +10,7 @@ const L = data.level;
 describe('Fase: integridade dos dados', () => {
   it('tem o tamanho esperado e uma fase longa', () => {
     expect(L.w).toBe(LEVEL_W);
-    expect(L.w * TILE).toBeGreaterThan(40000);
+    expect(L.w * TILE).toBeGreaterThan(35000);
   });
 
   it('inimigos terrestres nascem dentro do ar e com chão perto; nada dentro de sólido', () => {
@@ -129,12 +130,12 @@ describe('Fase: mecânicas obrigatórias', () => {
   it('o buraco do planeio (seção 3) NÃO é atravessável sem o Ear Glide', () => {
     const noGlide = analyzeReach(data, [], { noGlide: true });
     // coluna logo após o buraco de 8 tiles (x=304..)
-    const after = data.level.get(304, 32) === T.SOLID;
+    const after = data.level.get(M(304), 32) === T.SOLID;
     expect(after).toBe(true);
-    expect(noGlide.reached.has(noGlide.key(320, 32))).toBe(false);
+    expect(noGlide.reached.has(noGlide.key(M(320), 32))).toBe(false);
     // com planeio, sim
     const withGlide = analyzeReach(data);
-    expect(withGlide.reached.has(withGlide.key(320, 32))).toBe(true);
+    expect(withGlide.reached.has(withGlide.key(M(320), 32))).toBe(true);
   }, 30000);
 });
 
@@ -151,7 +152,7 @@ describe('Fase: trecho do Nômad atravessável pilotando', () => {
 
   it('atravessa o abismo de 8 tiles usando o avanço (não é alcançável só pulando)', () => {
     // sem avanço não chega; com o perfil completo (salto+propulsor+avanço) chega
-    const after = res.reached.has(res.key(752, 32));
+    const after = res.reached.has(res.key(M(752), 32));
     expect(after).toBe(true);
   });
 

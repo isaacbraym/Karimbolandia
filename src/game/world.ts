@@ -45,6 +45,8 @@ export interface Hooks {
   /** o jogador morreu e ainda tem vidas: perguntar se quer continuar de onde parou */
   onContinue?: (livesLeft: number) => void;
   onGameOver?: () => void;
+  /** chegou no Felipão: filminho em quadrinhos (o mundo congela até acabar) */
+  onBossComic?: () => void;
 }
 
 export interface Wreck {
@@ -88,6 +90,8 @@ export class World {
   /** vidas da fase (estilo fichas de fliperama) */
   lives = MAX_LIVES;
   bossLivesGiven = false;
+  /** o filminho do chefe já passou nesta partida (não repete ao continuar) */
+  comicShown = false;
   nomadUsed = false;
 
   time = 0;
@@ -161,6 +165,7 @@ export class World {
     this.parkedNomad = null;
     this.lives = MAX_LIVES;
     this.bossLivesGiven = false;
+    this.comicShown = false;
     this.combo = 0;
     this.comboT = 0;
     this.bestCombo = 0;

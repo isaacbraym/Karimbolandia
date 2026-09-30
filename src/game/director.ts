@@ -33,9 +33,6 @@ interface Cine {
   stage: number;
 }
 
-const GATE_TILE = 596; // portão da garagem (tile)
-const HORDE_FROM = 600; // início do trecho de guerra (Nômad)
-const HORDE_TO = 1040;
 const SUPPORT_AT = 90; // s de jogo (a pé, fora de arenas) até a entrega do Nômad de apoio
 const SUPPORT_TIME = 50; // s de uso
 const ctlJumpHeld = (w: World) => w.lastJumpHeld;
@@ -74,8 +71,17 @@ export class Director {
   streak = 0;
   streakT = 0;
 
+  /** portão da garagem (tile) e trecho das hordas do Nômad — derivados da fase */
+  private gateTile = 0;
+  private hordeFrom = 0;
+  private hordeTo = 0;
+
   constructor(w: World) {
     this.w = w;
+    this.gateTile = Math.floor(w.data.nomadSpawn.x / 32) + 36;
+    this.hordeFrom = this.gateTile + 4;
+    const dm = w.data.triggers.find((t) => t.id === 'dismount');
+    this.hordeTo = dm ? Math.floor(dm.rect.x / 32) - 6 : this.hordeFrom + 440;
     this.buildArenas();
   }
 
@@ -471,7 +477,7 @@ export class Director {
     if (!need) return;
     const g = this.nomadGate;
     if (!g || !g.alive || !w.props.includes(g)) {
-      const gx = GATE_TILE * 32 + 16;
+      const gx = this.gateTile * 32 + 16;
       const gy = 32 * 32; // chão principal
       const pr = new PropClass({ id: -900, kind: 'door', x: gx, y: gy, w: 20, h: gy, solid: true, critical: true });
       pr.barrier = true;
@@ -481,7 +487,7 @@ export class Director {
       this.nomadGate = pr;
     }
     // aviso quando o jogador chega no portão
-    if (p.mode === 'foot' && p.x > (GATE_TILE - 9) * 32 && p.x < (GATE_TILE + 2) * 32 && this.gateHintCd <= 0 && !this.cine) {
+    if (p.mode === 'foot' && p.x > (this.gateTile - 9) * 32 && p.x < (this.gateTile + 2) * 32 && this.gateHintCd <= 0 && !this.cine) {
       this.gateHintCd = 6;
       this.banner('NÔMAD NECESSÁRIO', 'Pule em cima dele para abrir o portão', 2.2);
       w.hooks.onHint?.('mountNomad');
@@ -507,7 +513,7 @@ export class Director {
       if (this.streakT <= 0) this.streak = 0;
     }
     if (p.mode !== 'nomad' || this.cine || this.activeArenaRect() || p.nomad?.timeLeft !== Infinity) return;
-    if (p.x < HORDE_FROM * 32 || p.x > HORDE_TO * 32) return;
+    if (p.x < this.hordeFrom * 32 || p.x > this.hordeTo * 32) return;
     this.hordeT -= dt;
     if (this.hordeT > 0) return;
     this.hordeT = 2.3;
@@ -737,6 +743,11 @@ export class Director {
   }
 
   private startBoss(a: ArenaState) {
+    // filminho de HQ (só na primeira vez da partida); o mundo fica congelado enquanto passa
+    if (!this.w.comicShown && this.w.hooks.onBossComic) {
+      this.w.comicShown = true;
+      this.w.hooks.onBossComic();
+    }
     // chegou no chefe: +3 vidas extras (uma vez por partida)
     if (!this.w.bossLivesGiven) {
       this.w.bossLivesGiven = true;
