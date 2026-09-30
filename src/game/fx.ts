@@ -64,6 +64,8 @@ export class Fx {
   /** 0.25..1 — reduz spawn em qualidade baixa */
   density = 1;
   maxParts = 900;
+  /** área visível (mundo) para descartar o desenho do que está fora da tela */
+  view = { x0: -1e9, y0: -1e9, x1: 1e9, y1: 1e9 };
   shake = 0;
   shakeT = 0;
   hitStop = 0;
@@ -211,9 +213,11 @@ export class Fx {
   }
 
   draw(g: CanvasRenderingContext2D, front: boolean) {
+    const v = this.view;
     // pass 1: normais; pass 2: aditivas
     for (const p of this.parts) {
       if (p.front !== front) continue;
+      if (p.x < v.x0 || p.x > v.x1 || p.y < v.y0 || p.y > v.y1) continue;
       const t = p.life / p.max;
       switch (p.kind) {
         case PK.Smoke:
@@ -267,6 +271,7 @@ export class Fx {
     g.globalCompositeOperation = 'lighter';
     for (const p of this.parts) {
       if (p.front !== front) continue;
+      if (p.x < v.x0 || p.x > v.x1 || p.y < v.y0 || p.y > v.y1) continue;
       const t = p.life / p.max;
       switch (p.kind) {
         case PK.Spark: {
@@ -335,18 +340,48 @@ export class Fx {
     g.globalCompositeOperation = 'source-over';
   }
 
+  /** cache de popups (texto com contorno pré-desenhado): "+100", "ESMAGADO!"... se repetem muito */
+  private popCache = new Map<string, { c: HTMLCanvasElement; w: number; h: number; ay: number }>();
+  /** px de tela por unidade de mundo (para o texto ficar nítido) */
+  popScale = 3;
+  private popSprite(text: string, size: number, color: string) {
+    const key = text + '|' + size + '|' + color;
+    let e = this.popCache.get(key);
+    if (e) return e;
+    const k = this.popScale;
+    const f = `bold ${size}px Rajdhani, sans-serif`;
+    const mc = document.createElement('canvas').getContext('2d')!;
+    mc.font = f;
+    const pad = 3;
+    const tw = Math.ceil(mc.measureText(text).width);
+    const w = tw + pad * 2;
+    const h = Math.ceil(size * 1.4) + pad * 2;
+    const c = document.createElement('canvas');
+    c.width = Math.ceil(w * k);
+    c.height = Math.ceil(h * k);
+    const cg = c.getContext('2d')!;
+    cg.scale(k, k);
+    cg.font = f;
+    cg.textAlign = 'center';
+    cg.lineWidth = 2.4;
+    cg.lineJoin = 'round';
+    cg.strokeStyle = '#170f2e';
+    const by = pad + Math.ceil(size * 1.05);
+    cg.strokeText(text, w / 2, by);
+    cg.fillStyle = color;
+    cg.fillText(text, w / 2, by);
+    e = { c, w, h, ay: by };
+    if (this.popCache.size > 120) this.popCache.delete(this.popCache.keys().next().value as string);
+    this.popCache.set(key, e);
+    return e;
+  }
+
   drawPopups(g: CanvasRenderingContext2D) {
-    if (!this.popups.length) return;
-    g.font = 'bold 9px Rajdhani, sans-serif';
-    g.textAlign = 'center';
+    if (!this.popups.length || typeof document === 'undefined') return;
     for (const p of this.popups) {
       g.globalAlpha = Math.min(1, (p.life / p.max) * 2);
-      g.font = `bold ${p.size}px Rajdhani, sans-serif`;
-      g.lineWidth = 2.4;
-      g.strokeStyle = '#170f2e';
-      g.strokeText(p.text, p.x, p.y);
-      g.fillStyle = p.color;
-      g.fillText(p.text, p.x, p.y);
+      const e = this.popSprite(p.text, p.size, p.color);
+      g.drawImage(e.c, p.x - e.w / 2, p.y - e.ay, e.w, e.h);
     }
     g.globalAlpha = 1;
   }

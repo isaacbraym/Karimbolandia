@@ -131,6 +131,7 @@ export class PostFX {
     g.save();
     g.lineCap = 'round';
     g.strokeStyle = '#bcd4ff';
+    // atualiza posições
     for (const d of this.drops) {
       const sp = 760 * d.z;
       d.x += wind * sp * dt - dxCam * d.z;
@@ -141,84 +142,120 @@ export class PostFX {
       } else if (d.y < -80) d.y = H + 10;
       if (d.x > W + 40) d.x -= W + 80;
       else if (d.x < -40) d.x += W + 80;
-      const len = 9 + 15 * d.z;
-      g.globalAlpha = a * (0.1 + 0.3 * d.z);
-      g.lineWidth = 0.6 + d.z * 0.9;
+    }
+    // desenha em 3 camadas (um traço por camada)
+    for (let layer = 0; layer < 3; layer++) {
+      const zMin = 0.35 + layer * 0.217;
+      const zMax = zMin + 0.217 + (layer === 2 ? 0.01 : 0);
+      const zc = (zMin + zMax) / 2;
+      const len = 9 + 15 * zc;
+      g.globalAlpha = a * (0.1 + 0.3 * zc);
+      g.lineWidth = 0.6 + zc * 0.9;
       g.beginPath();
-      g.moveTo(d.x, d.y);
-      g.lineTo(d.x - wind * len, d.y - len);
+      for (const d of this.drops) {
+        if (d.z < zMin || d.z >= zMax) continue;
+        g.moveTo(d.x, d.y);
+        g.lineTo(d.x - wind * len, d.y - len);
+      }
       g.stroke();
     }
-    // respingos
+    // respingos (um caminho por faixa de idade)
     g.strokeStyle = '#dfe9ff';
     g.lineWidth = 1;
-    for (const s of this.splashes) {
-      const k = s.t / 0.3;
-      const sx = cam.wx(s.x);
-      const sy = cam.wy(s.y);
-      g.globalAlpha = a * (1 - k) * 0.7;
+    for (let band = 0; band < 3; band++) {
+      g.globalAlpha = a * (1 - (band + 0.5) / 3) * 0.7;
       g.beginPath();
-      g.ellipse(sx, sy - 1, (2 + k * 7) * cam.zoom, (0.8 + k * 1.6) * cam.zoom, 0, 0, Math.PI * 2);
-      g.stroke();
-      g.beginPath();
-      g.moveTo(sx - 2, sy - 2 - k * 7);
-      g.lineTo(sx - 3, sy - 4 - k * 9);
-      g.moveTo(sx + 2, sy - 2 - k * 6);
-      g.lineTo(sx + 3, sy - 4 - k * 8);
+      for (const s of this.splashes) {
+        const k = s.t / 0.3;
+        if (Math.min(2, Math.floor(k * 3)) !== band) continue;
+        const sx = cam.wx(s.x);
+        const sy = cam.wy(s.y);
+        const rx = (2 + k * 7) * cam.zoom;
+        g.moveTo(sx + rx, sy - 1);
+        g.ellipse(sx, sy - 1, rx, (0.8 + k * 1.6) * cam.zoom, 0, 0, Math.PI * 2);
+        g.moveTo(sx - 2, sy - 2 - k * 7);
+        g.lineTo(sx - 3, sy - 4 - k * 9);
+        g.moveTo(sx + 2, sy - 2 - k * 6);
+        g.lineTo(sx + 3, sy - 4 - k * 8);
+      }
       g.stroke();
     }
     g.restore();
   }
 
   // ------------------------------------------------------------------ pós
-  /** Bloom: pega o quadro, reduz em cascata, eleva ao quadrado (só o que brilha sobra) e soma de volta. */
+  private bloomFrame = 0;
+  /**
+   * Bloom: reduz o quadro em cascata, eleva ao cubo (só o que brilha sobra), soma as duas escalas
+   * no buffer pequeno e devolve com UMA passada de tela cheia. Em aparelhos modestos o buffer é
+   * recalculado a cada 2 quadros (a soma continua a cada quadro — visual idêntico).
+   */
   bloom(g: CanvasRenderingContext2D, canvas: HTMLCanvasElement, q: Quality) {
-    if (q === 'low') return;
     const W = canvas.width;
     const H = canvas.height;
     const w1 = Math.max(2, Math.round(W / 4));
     const h1 = Math.max(2, Math.round(H / 4));
     const w2 = Math.max(2, Math.round(W / 10));
     const h2 = Math.max(2, Math.round(H / 10));
-    if (!this.b1 || this.b1.width !== w1 || this.b1.height !== h1) this.b1 = mk(w1, h1);
-    if (!this.b2 || this.b2.width !== w2 || this.b2.height !== h2) this.b2 = mk(w2, h2);
-    const c1 = this.b1.getContext('2d')!;
-    const c2 = this.b2.getContext('2d')!;
-    c1.globalCompositeOperation = 'source-over';
-    c1.imageSmoothingEnabled = true;
-    c1.drawImage(canvas, 0, 0, w1, h1);
-    // curva de contraste: x² (escuros somem, neon fica)
-    c1.globalCompositeOperation = 'multiply';
-    c1.drawImage(this.b1, 0, 0);
-    c1.drawImage(this.b1, 0, 0); // x³
-    c1.globalCompositeOperation = 'source-over';
-    c2.imageSmoothingEnabled = true;
-    c2.clearRect(0, 0, w2, h2);
-    c2.drawImage(this.b1, 0, 0, w2, h2);
+    let fresh = false;
+    if (!this.b1 || this.b1.width !== w1 || this.b1.height !== h1) {
+      this.b1 = mk(w1, h1);
+      fresh = true;
+    }
+    if (!this.b2 || this.b2.width !== w2 || this.b2.height !== h2) {
+      this.b2 = mk(w2, h2);
+      fresh = true;
+    }
+    this.bloomFrame++;
+    if (fresh || q === 'high' || this.bloomFrame % 2 === 0) {
+      const c1 = this.b1.getContext('2d')!;
+      const c2 = this.b2.getContext('2d')!;
+      c1.globalCompositeOperation = 'source-over';
+      c1.globalAlpha = 1;
+      c1.imageSmoothingEnabled = true;
+      c1.drawImage(canvas, 0, 0, w1, h1);
+      c1.globalCompositeOperation = 'multiply';
+      c1.drawImage(this.b1, 0, 0);
+      c1.drawImage(this.b1, 0, 0); // x³
+      c2.imageSmoothingEnabled = true;
+      c2.globalCompositeOperation = 'source-over';
+      c2.clearRect(0, 0, w2, h2);
+      c2.drawImage(this.b1, 0, 0, w2, h2);
+      // halo largo somado ao estreito no buffer pequeno (economiza uma passada de tela cheia)
+      c1.globalAlpha = 1;
+      c1.globalCompositeOperation = 'lighter';
+      c1.drawImage(this.b2, 0, 0, w1, h1);
+      c1.drawImage(this.b2, 0, 0, w1, h1);
+      c1.drawImage(this.b2, 0, 0, w1, h1);
+      c1.globalAlpha = 1;
+      c1.globalCompositeOperation = 'source-over';
+    }
     g.save();
     g.setTransform(1, 0, 0, 1, 0, 0);
     g.imageSmoothingEnabled = true;
     g.globalCompositeOperation = 'lighter';
-    g.globalAlpha = q === 'high' ? 0.5 : 0.4;
-    g.drawImage(this.b2, 0, 0, W, H);
-    g.globalAlpha = q === 'high' ? 0.16 : 0.12;
+    g.globalAlpha = q === 'high' ? 0.17 : 0.15;
     g.drawImage(this.b1, 0, 0, W, H);
     g.restore();
   }
 
+  private gradeCache: { H: number; gr: CanvasGradient | null } = { H: -1, gr: null };
+  private grainPat: CanvasPattern | null = null;
   /** Gradação de cor + granulação (espaço de tela lógico). */
   grade(g: CanvasRenderingContext2D, W: number, H: number, q: Quality) {
-    if (q === 'low') return;
+    void q;
+    if (this.gradeCache.H !== H || !this.gradeCache.gr) {
+      const gr = g.createLinearGradient(0, 0, 0, H);
+      gr.addColorStop(0, 'rgba(255,60,190,0.32)');
+      gr.addColorStop(0.55, 'rgba(120,80,255,0.08)');
+      gr.addColorStop(1, 'rgba(40,230,255,0.28)');
+      this.gradeCache = { H, gr };
+    }
     g.save();
     g.globalCompositeOperation = 'soft-light';
-    const gr = g.createLinearGradient(0, 0, 0, H);
-    gr.addColorStop(0, 'rgba(255,60,190,0.32)');
-    gr.addColorStop(0.55, 'rgba(120,80,255,0.08)');
-    gr.addColorStop(1, 'rgba(40,230,255,0.28)');
-    g.fillStyle = gr;
+    g.fillStyle = this.gradeCache.gr!;
     g.fillRect(0, 0, W, H);
     g.restore();
-    if (q !== 'high') return;
     if (!this.grain) {
       this.grain = mk(128, 128);
       const gg = this.grain.getContext('2d')!;
@@ -229,18 +266,16 @@ export class PostFX {
         img.data[i + 3] = 255;
       }
       gg.putImageData(img, 0, 0);
+      this.grainPat = null;
     }
+    if (!this.grainPat) this.grainPat = g.createPattern(this.grain, 'repeat');
+    if (!this.grainPat) return;
     g.save();
     g.globalCompositeOperation = 'overlay';
     g.globalAlpha = 0.06;
-    const ox = Math.floor(Math.random() * 128);
-    const oy = Math.floor(Math.random() * 128);
-    const pat = g.createPattern(this.grain, 'repeat');
-    if (pat) {
-      g.translate(-ox, -oy);
-      g.fillStyle = pat;
-      g.fillRect(0, 0, W + 128, H + 128);
-    }
+    g.translate(-Math.floor(Math.random() * 128), -Math.floor(Math.random() * 128));
+    g.fillStyle = this.grainPat;
+    g.fillRect(0, 0, W + 128, H + 128);
     g.restore();
   }
 

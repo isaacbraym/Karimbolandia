@@ -27,11 +27,17 @@ export class Level {
     if (ty < 0 || ty >= this.h) return T.EMPTY;
     return this.tiles[ty * this.w + tx];
   }
+  /** muda sempre que o mapa inteiro é trocado (reinício) → invalida os blocos em cache */
+  rev = 0;
+  /** blocos (8×8 tiles) alterados desde o último desenho: "cx,cy" */
+  dirtyChunks = new Set<number>();
   set(tx: number, ty: number, t: number, theme = 0) {
     if (tx < 0 || tx >= this.w || ty < 0 || ty >= this.h) return;
     const i = ty * this.w + tx;
     this.tiles[i] = t;
     this.theme[i] = theme;
+    // o autotile dos vizinhos também muda: marca os blocos em volta
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) this.dirtyChunks.add(((ty + dy) >> 3) * 4096 + ((tx + dx) >> 3));
   }
   themeAt(tx: number, ty: number) {
     if (tx < 0 || tx >= this.w || ty < 0 || ty >= this.h) return 0;

@@ -32,16 +32,63 @@ function pill(g: CanvasRenderingContext2D, x: number, y: number, w: number, h: n
   }
 }
 
+/**
+ * Texto do HUD com contorno: cada combinação (texto, tamanho, cor, fonte) é desenhada UMA vez
+ * numa imagem na resolução da tela e depois só copiada. strokeText/fillText a cada quadro custa
+ * caro na GPU de celulares (e causava engasgos periódicos).
+ */
+interface TextSpr {
+  c: HTMLCanvasElement;
+  w: number;
+  h: number;
+  ax: number;
+  ay: number;
+}
+const textCache = new Map<string, TextSpr>();
+let textScale = 2;
+let measureCtx: CanvasRenderingContext2D | null = null;
+/** Escala (px de tela por unidade lógica) do HUD — chamado no resize. */
+export function setHudTextScale(s: number) {
+  const q = Math.max(1, Math.round(s * 4) / 4);
+  if (q === textScale) return;
+  textScale = q;
+  textCache.clear();
+}
+
 function text(g: CanvasRenderingContext2D, s: string, x: number, y: number, size: number, color = '#fff', align: CanvasTextAlign = 'left', font = UI, weight = '700') {
-  g.font = `${weight} ${size}px ${font}`;
-  g.textAlign = align;
-  g.textBaseline = 'alphabetic';
-  g.lineWidth = Math.max(2, size * 0.24);
-  g.strokeStyle = '#170f2e';
-  g.lineJoin = 'round';
-  g.strokeText(s, x, y);
-  g.fillStyle = color;
-  g.fillText(s, x, y);
+  if (typeof document === 'undefined') return;
+  const key = s + '|' + size + '|' + color + '|' + align + '|' + font + '|' + weight;
+  let e = textCache.get(key);
+  if (!e) {
+    const f = `${weight} ${size}px ${font}`;
+    if (!measureCtx) measureCtx = document.createElement('canvas').getContext('2d')!;
+    measureCtx.font = f;
+    const lw = Math.max(2, size * 0.24);
+    const pad = Math.ceil(lw + 2);
+    const tw = Math.ceil(measureCtx.measureText(s).width);
+    const w = tw + pad * 2;
+    const h = Math.ceil(size * 1.45) + pad * 2;
+    const c = document.createElement('canvas');
+    c.width = Math.max(1, Math.ceil(w * textScale));
+    c.height = Math.max(1, Math.ceil(h * textScale));
+    const cg = c.getContext('2d')!;
+    cg.scale(textScale, textScale);
+    cg.font = f;
+    cg.textAlign = 'left';
+    cg.textBaseline = 'alphabetic';
+    cg.lineWidth = lw;
+    cg.strokeStyle = '#170f2e';
+    cg.lineJoin = 'round';
+    const by = pad + Math.ceil(size * 1.1);
+    cg.strokeText(s, pad, by);
+    cg.fillStyle = color;
+    cg.fillText(s, pad, by);
+    const ax = align === 'center' ? pad + tw / 2 : align === 'right' || align === 'end' ? pad + tw : pad;
+    e = { c, w, h, ax, ay: by };
+    if (textCache.size > 260) textCache.delete(textCache.keys().next().value as string);
+    textCache.set(key, e);
+  }
+  g.drawImage(e.c, x - e.ax, y - e.ay, e.w, e.h);
 }
 
 export class Hud {

@@ -35,6 +35,59 @@ const DECO_SCALE: Record<string, number> = {
   vine: 1.2,
 };
 
+/**
+ * Decorações 100% estáticas são desenhadas UMA vez numa imagem (na densidade de pixels da tela)
+ * e depois só copiadas: mesmo visual, uma fração do custo (fachadas têm dezenas de janelas etc.).
+ * As animadas (neon piscando, fogo, plantas balançando...) continuam desenhadas ao vivo.
+ */
+const STATIC_BOUNDS: Record<string, [number, number, number, number]> = {
+  facade: [-66, -194, 66, 2],
+  pipes: [-50, -46, 50, 2],
+  fgPillar: [-20, -422, 20, 22],
+  parkedCar: [-64, -54, 64, 6],
+  bench: [-32, -40, 32, 2],
+  dumpster: [-40, -52, 40, 2],
+  hydrant: [-14, -42, 14, 2],
+  powerPole: [-26, -174, 206, 4],
+  trashCans: [-24, -38, 24, 2],
+  shopFront: [-86, -114, 70, 12],
+  streetTree: [-44, -122, 44, 2],
+  kiosk: [-60, -82, 60, 8],
+  crateStack: [-18, -58, 46, 2],
+};
+let decoDensity = 2;
+const baked = new Map<string, HTMLCanvasElement>();
+const MAX_BAKED = 70;
+
+/** Densidade (px de tela por unidade) usada para pré-desenhar as decorações estáticas. */
+export function setDecoDensity(dens: number) {
+  const d = Math.max(1, Math.min(3.2, Math.round(dens * 4) / 4));
+  if (d === decoDensity) return;
+  decoDensity = d;
+  baked.clear();
+}
+
+function bakedDeco(kind: string, seed: number, s: number, b: [number, number, number, number]): HTMLCanvasElement {
+  const key = kind + '|' + seed + '|' + s;
+  const hit = baked.get(key);
+  if (hit) {
+    baked.delete(key);
+    baked.set(key, hit); // LRU
+    return hit;
+  }
+  const D = s * decoDensity;
+  const c = document.createElement('canvas');
+  c.width = Math.max(1, Math.ceil((b[2] - b[0]) * D));
+  c.height = Math.max(1, Math.ceil((b[3] - b[1]) * D));
+  const g = c.getContext('2d')!;
+  g.scale(D, D);
+  g.translate(-b[0], -b[1]);
+  paintDeco(g, kind, seed, 0);
+  baked.set(key, c);
+  if (baked.size > MAX_BAKED) baked.delete(baked.keys().next().value as string);
+  return c;
+}
+
 export function drawDeco(g: CanvasRenderingContext2D, d: DecoSpawn, t: number) {
   const s = (d.scale ?? 1) * (DECO_SCALE[d.kind] ?? 1);
   const seed = seedOf(d);
@@ -42,7 +95,15 @@ export function drawDeco(g: CanvasRenderingContext2D, d: DecoSpawn, t: number) {
   g.translate(d.x, d.y);
   if (d.flip) g.scale(-1, 1);
   g.scale(s, s);
-  switch (d.kind) {
+  const b = STATIC_BOUNDS[d.kind];
+  if (b && typeof document !== 'undefined') g.drawImage(bakedDeco(d.kind, seed, s, b), b[0], b[1], b[2] - b[0], b[3] - b[1]);
+  else paintDeco(g, d.kind, seed, t);
+  g.restore();
+  void rngCache;
+}
+
+function paintDeco(g: CanvasRenderingContext2D, kind: string, seed: number, t: number) {
+  switch (kind) {
     case 'facade': {
       // painel de fachada atrás do gameplay (profundidade)
       const w = 128;
@@ -776,6 +837,5 @@ export function drawDeco(g: CanvasRenderingContext2D, d: DecoSpawn, t: number) {
     default:
       break;
   }
-  g.restore();
-  void rngCache;
 }
+

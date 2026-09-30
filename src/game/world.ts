@@ -129,6 +129,7 @@ export class World {
   restoreTiles() {
     this.level.tiles.set(this.baseTiles);
     this.level.theme.set(this.baseTheme);
+    this.level.rev++;
   }
 
   startRun() {
@@ -701,11 +702,16 @@ export class World {
     const cam = this.camera;
     const L = this.level;
     // decorações de fundo
+    {
+      const c = this.camera;
+      const m = 90;
+      this.fx.view = { x0: c.x - m, y0: c.y - m, x1: c.x + c.w + m, y1: c.y + c.h + m };
+    }
     this.director.drawDecos(g, 'back');
     // tiles
     art.tiles.render(g, L, cam.x, cam.y, cam.w, cam.h, this.time);
     // destroços do Nômad
-    for (const w of this.wrecks) this.drawWreck(g, w);
+    for (const w of this.wrecks) if (cam.visible(w.x, w.y, 160)) this.drawWreck(g, w);
     // Nômad estacionado / aguardando
     this.director.drawNomadWorld(g);
     // props
@@ -717,9 +723,9 @@ export class World {
     for (const pk of this.pickups) if (cam.visible(pk.x, pk.y, 40)) pk.draw(g, this);
     this.drawShadows(g);
     this.fx.draw(g, false);
-    for (const c of this.corpses) c.render(g);
+    for (const c of this.corpses) if (cam.visible(c.x, c.y, 140)) c.render(g);
     for (const e of this.enemies) {
-      if (!e.awake && !cam.visible(e.x, e.y, 120)) continue;
+      if (!e.isBoss && e.spawn.type !== 'sniper' && !cam.visible(e.x, e.y, 160)) continue; // fora da tela: não desenha (a mira laser do sniper sempre aparece)
       e.draw(g, this);
     }
     this.player.draw(g, this);

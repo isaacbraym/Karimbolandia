@@ -280,7 +280,8 @@ export interface SPose {
   squash?: number;
 }
 
-export const SOLDIER_SCALE = 1.3;
+/** Humanoides na altura do Karimbo (tiro reto sai na altura do peito: agachar desvia). */
+export const SOLDIER_SCALE = 1.7;
 const SHOULDER: [number, number] = [2.2, -24.5];
 
 export function soldierMuzzle(facing: 1 | -1, aim: number, gunLen: number, crouch: boolean, kick = 0): [number, number] {

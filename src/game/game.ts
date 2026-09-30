@@ -2,13 +2,14 @@ import { orient } from '../core/orient';
 import { Input } from '../core/input';
 import { audio } from '../core/audio';
 import { PostFX } from './post';
+import { setDecoDensity } from '../art/decor';
 import { music, MIX, type ThemeName } from '../core/music';
 import { settings, progress, saveProgress } from '../core/storage';
 import { clamp } from '../core/math';
 import { buildArt, getArt, artReady, type Quality } from '../art';
 import { World, type MusicState } from './world';
 import { buildLevel } from './level/index';
-import { Hud } from './hud';
+import { Hud, setHudTextScale } from './hud';
 import { MenuScene } from './menuScene';
 import { Menus, computeRank } from '../ui/menus';
 import { TouchUI } from '../ui/touch';
@@ -21,8 +22,8 @@ const CONTINUE_SECS = 10;
 
 const MAX_H: Record<Quality, number> = { low: 540, medium: 720, high: 1080 };
 const CAPS: Record<Quality, { parts: number; density: number }> = {
-  low: { parts: 260, density: 0.45 },
-  medium: { parts: 520, density: 0.75 },
+  low: { parts: 620, density: 0.85 },
+  medium: { parts: 760, density: 0.95 },
   high: { parts: 900, density: 1 },
 };
 
@@ -59,6 +60,11 @@ export class Game {
   /** tempos médios (ms) de simulação/render — útil para depurar desempenho */
   prof = { update: 0, render: 0 };
   private post = new PostFX();
+  /** resolução dinâmica: fração da resolução alvo (0.6..1) — cai antes de qualquer efeito ser cortado */
+  renderScale = 1;
+  private drsAcc = 0;
+  private drsN = 0;
+  private drsGood = 0;
 
   constructor(canvas: HTMLCanvasElement, ui: HTMLElement) {
     this.canvas = canvas;
@@ -181,7 +187,10 @@ export class Game {
     this.canvas.style.height = `${Math.floor(h)}px`;
     const dpr = window.devicePixelRatio || 1;
     const targetH = Math.min(h * dpr, MAX_H[this.quality]);
-    this.pxScale = Math.max(1, targetH / this.viewH);
+    this.pxScale = Math.max(1, (targetH / this.viewH) * this.renderScale);
+    setDecoDensity((targetH / this.viewH) * 1.25);
+    setHudTextScale(this.pxScale);
+    if (this.world) this.world.fx.popScale = Math.max(2, (targetH / this.viewH) * 1.3);
     this.canvas.width = Math.round(this.viewW * this.pxScale);
     this.canvas.height = Math.round(this.viewH * this.pxScale);
     if (this.world) {
@@ -241,6 +250,7 @@ export class Game {
     w.camera.viewW = this.viewW;
     w.camera.viewH = this.viewH;
     this.applyFxCaps();
+    w.fx.popScale = Math.max(2, this.pxScale * 1.3);
     this.applyDebugParams(w);
     this.state = 'playing';
     this.input.enabled = true;
@@ -598,8 +608,38 @@ export class Game {
     this.touch.sync({ weaponIcon: icon, ammo: ammo === Infinity ? '∞' : String(ammo), lowAmmo: ammo !== Infinity && ammo < 10, grenades: p.grenades, dash01 });
   }
 
+  /**
+   * Resolução dinâmica (como nos consoles): se o quadro passa de ~21 ms, reduz a resolução interna
+   * em passos de 10% (até 60%); quando sobra folga por alguns segundos, sobe de novo. Todos os
+   * efeitos continuam ligados — só a nitidez varia, e pouco.
+   */
+  private dynamicResolution(dt: number) {
+    if (this.state !== 'playing') {
+      this.drsAcc = this.drsN = 0;
+      return;
+    }
+    this.drsAcc += Math.min(dt, 0.1);
+    this.drsN++;
+    if (this.drsAcc < 1.2) return;
+    const avg = this.drsAcc / this.drsN;
+    this.drsAcc = this.drsN = 0;
+    if (avg > 1 / 47 && this.renderScale > 0.61) {
+      this.renderScale = Math.max(0.6, +(this.renderScale - 0.1).toFixed(2));
+      this.drsGood = 0;
+      this.resize();
+    } else if (avg < 1 / 57 && this.renderScale < 1) {
+      if (++this.drsGood >= 4) {
+        this.renderScale = Math.min(1, +(this.renderScale + 0.05).toFixed(2));
+        this.drsGood = 0;
+        this.resize();
+      }
+    } else this.drsGood = 0;
+  }
+
   private autoQuality(dt: number, now: number) {
-    if (settings.quality !== 'auto' || this.state !== 'playing') {
+    this.dynamicResolution(dt);
+    // só troca a qualidade se nem a resolução mínima der conta
+    if (settings.quality !== 'auto' || this.state !== 'playing' || this.renderScale > 0.61) {
       this.frameTimes.length = 0;
       return;
     }

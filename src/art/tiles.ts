@@ -55,7 +55,116 @@ export function bakeTiles(): TileArt {
     }
   });
 
+  // ---- cache de blocos: 8×8 tiles viram UMA imagem (≈300 drawImage/quadro → ≈12–24)
+  const CH = 8;
+  const CPX = CH * CELL; // 512 px (2x, igual ao atlas)
+  interface Chunk { c: HTMLCanvasElement | null; empty: boolean; hazards: number[]; used: number }
+  const chunks = new Map<number, Chunk>();
+  let cacheRev = -1;
+  let cacheLevel: Level | null = null;
+  let frame = 0;
+  const pool: HTMLCanvasElement[] = [];
+  const MAX_CHUNKS = 40;
+
+  const drawTile = (g: CanvasRenderingContext2D, level: Level, tx: number, ty: number, ox: number, oy: number, k: number, time: number) => {
+    const t = level.tiles[ty * level.w + tx];
+    if (t === T.EMPTY) return;
+    const th = level.theme[ty * level.w + tx];
+    const sy = th * CELL;
+    const dx = (tx * TILE - ox) * k;
+    const dy = (ty * TILE - oy) * k;
+    if (t === T.SOLID) {
+      const up = level.get(tx, ty - 1) === T.SOLID ? 1 : 0;
+      const rt = level.get(tx + 1, ty) === T.SOLID ? 2 : 0;
+      const dn = level.get(tx, ty + 1) === T.SOLID ? 4 : 0;
+      const lf = level.get(tx - 1, ty) === T.SOLID ? 8 : 0;
+      const mask = up | rt | dn | lf;
+      const v = (tx * 7 + ty * 13 + ((tx * ty) & 3)) & 1;
+      g.drawImage(atlas, (mask * N_VAR + v) * CELL, sy, CELL, CELL, dx, dy, (TILE + 0.6) * k, (TILE + 0.6) * k);
+    } else if (t === T.ONEWAY) {
+      const l = level.get(tx - 1, ty) === T.ONEWAY;
+      const r = level.get(tx + 1, ty) === T.ONEWAY;
+      const kk = !l ? 0 : !r ? 2 : 1;
+      g.drawImage(atlas, (32 + kk) * CELL, sy, CELL, CELL, dx, dy, (TILE + 0.6) * k, TILE * k);
+    } else if (t === T.HAZARD) {
+      const kk = Math.floor(time * 6 + tx) % 2;
+      g.drawImage(atlas, (35 + kk) * CELL, sy, CELL, CELL, dx, dy, TILE * k, TILE * k);
+    }
+  };
+
+  const buildChunk = (level: Level, cx: number, cy: number): Chunk => {
+    const hazards: number[] = [];
+    let any = false;
+    for (let ty = cy * CH; ty < cy * CH + CH && ty < level.h; ty++) {
+      for (let tx = cx * CH; tx < cx * CH + CH && tx < level.w; tx++) {
+        const t = level.tiles[ty * level.w + tx];
+        if (t === T.HAZARD) hazards.push(ty * level.w + tx);
+        else if (t !== T.EMPTY) any = true;
+      }
+    }
+    if (!any) return { c: null, empty: true, hazards, used: frame };
+    const c = pool.pop() ?? makeCanvas(CPX + 2, CPX + 2);
+    const cg = c.getContext('2d')!;
+    cg.clearRect(0, 0, c.width, c.height);
+    const k = CELL / TILE;
+    for (let ty = cy * CH; ty < cy * CH + CH && ty < level.h; ty++) {
+      for (let tx = cx * CH; tx < cx * CH + CH && tx < level.w; tx++) {
+        if (level.tiles[ty * level.w + tx] === T.HAZARD) continue;
+        drawTile(cg, level, tx, ty, cx * CH * TILE, cy * CH * TILE, k, 0);
+      }
+    }
+    return { c, empty: false, hazards, used: frame };
+  };
+
+  const dropChunk = (key: number) => {
+    const ch = chunks.get(key);
+    if (ch?.c) pool.push(ch.c);
+    chunks.delete(key);
+  };
+
   const render = (g: CanvasRenderingContext2D, level: Level, camX: number, camY: number, camW: number, camH: number, time: number) => {
+    frame++;
+    if (cacheLevel !== level || cacheRev !== level.rev) {
+      for (const k of [...chunks.keys()]) dropChunk(k);
+      cacheLevel = level;
+      cacheRev = level.rev;
+      level.dirtyChunks.clear();
+    }
+    if (level.dirtyChunks.size) {
+      for (const k of level.dirtyChunks) dropChunk(k);
+      level.dirtyChunks.clear();
+    }
+    const cx0 = Math.max(0, Math.floor((camX - TILE) / (CH * TILE)));
+    const cx1 = Math.min(Math.ceil(level.w / CH) - 1, Math.floor((camX + camW + TILE) / (CH * TILE)));
+    const cy0 = Math.max(0, Math.floor((camY - TILE) / (CH * TILE)));
+    const cy1 = Math.min(Math.ceil(level.h / CH) - 1, Math.floor((camY + camH + TILE) / (CH * TILE)));
+    let built = 0;
+    for (let cy = cy0; cy <= cy1; cy++) {
+      for (let cx = cx0; cx <= cx1; cx++) {
+        const key = cy * 4096 + cx;
+        let ch = chunks.get(key);
+        if (!ch) {
+          if (built >= 4) {
+            // limite de montagem por quadro (sem engasgos): desenha tile a tile por enquanto
+            for (let ty = cy * CH; ty < cy * CH + CH && ty < level.h; ty++) for (let tx = cx * CH; tx < cx * CH + CH && tx < level.w; tx++) drawTile(g, level, tx, ty, 0, 0, 1, time);
+            continue;
+          }
+          ch = buildChunk(level, cx, cy);
+          chunks.set(key, ch);
+          built++;
+        }
+        ch.used = frame;
+        if (ch.c) g.drawImage(ch.c, 0, 0, CPX + 0.6 * (CELL / TILE), CPX + 0.6 * (CELL / TILE), cx * CH * TILE, cy * CH * TILE, CH * TILE + 0.6, CH * TILE + 0.6);
+        for (const i of ch.hazards) drawTile(g, level, i % level.w, Math.floor(i / level.w), 0, 0, 1, time);
+      }
+    }
+    // LRU: descarta blocos longe da câmera
+    if (chunks.size > MAX_CHUNKS) {
+      const arr = [...chunks.entries()].sort((a, b) => a[1].used - b[1].used);
+      for (let i = 0; i < arr.length - MAX_CHUNKS; i++) dropChunk(arr[i][0]);
+    }
+  };
+  const renderLegacy = (g: CanvasRenderingContext2D, level: Level, camX: number, camY: number, camW: number, camH: number, time: number) => {
     const x0 = Math.max(0, Math.floor(camX / TILE) - 1);
     const x1 = Math.min(level.w - 1, Math.floor((camX + camW) / TILE) + 1);
     const y0 = Math.max(0, Math.floor(camY / TILE) - 1);
@@ -86,6 +195,7 @@ export function bakeTiles(): TileArt {
       }
     }
   };
+  void renderLegacy;
   return { atlas, render };
 }
 
