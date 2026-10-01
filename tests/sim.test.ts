@@ -168,6 +168,7 @@ describe('Reinício e restauração', () => {
 
   it('reiniciar a fase zera progresso: inimigos, itens, arenas, Nômad e checkpoints', () => {
     const w = makeWorld();
+    const initialEnemies = w.enemies.length;
     armUp(w);
     teleport(w, M(100), 32);
     run(w, new Bot(w, { hold: true }), newCtl(), 8);
@@ -183,7 +184,7 @@ describe('Reinício e restauração', () => {
     expect(w.director.arenas.every((a) => a.status === 'idle')).toBe(true);
     expect(w.checkpointIdx).toBe(-1);
     expect(w.player.x).toBeCloseTo(w.data.playerStart.x, 0);
-    expect(w.enemies.length).toBe(w.data.enemies.filter((e) => !e.arena).length);
+    expect(w.enemies.length).toBe(initialEnemies);
   });
 });
 
@@ -264,6 +265,7 @@ describe('Agachar desvia de tiros retos', () => {
     w.nomadLost = true; // já passou pelo Nômad principal
     const ctl = newCtl();
     const d = w.director;
+    d.supportWillArrive = true;
     d.supportClock = 89.5;
     for (let i = 0; i < 60 * 4 && !d.support?.ready; i++) w.update(1 / 60, ctl);
     expect(d.support?.ready).toBe(true);
@@ -279,6 +281,66 @@ describe('Agachar desvia de tiros retos', () => {
     for (let i = 0; i < 60 * 52 && w.player.mounted; i++) w.update(1 / 60, ctl);
     expect(w.player.mounted).toBe(false);
     expect(w.player.mode).not.toBe('dead');
+  });
+
+  it('Nômad de apoio pode não aparecer, sem afetar o Nômad principal', () => {
+    const w = makeWorld();
+    teleport(w, M(200), 32);
+    w.nomadLost = true;
+    w.director.supportWillArrive = false;
+    w.director.supportClock = 95;
+    for (let i = 0; i < 120; i++) w.update(1 / 60, newCtl());
+    expect(w.director.support).toBeNull();
+    expect(w.director.supportUsed).toBe(false);
+  });
+
+  it('Nômad perde 10% de vida máxima e não se cura por abate', async () => {
+    const { newNomad } = await import('../src/game/player');
+    const w = makeWorld();
+    w.player.mode = 'nomad';
+    w.player.nomad = newNomad();
+    w.player.nomad.hp = 200;
+    const enemy = w.enemies.find((e) => !e.isBoss)!;
+    w.director.onEnemyKilled(enemy);
+    expect(w.player.nomad.hp).toBe(200);
+    expect(w.director.streak).toBe(1);
+    expect(w.player.nomad.maxHp).toBe(405);
+  });
+
+  it('ondas a pé têm menos inimigos; montado mantém a onda completa', async () => {
+    const { newNomad } = await import('../src/game/player');
+    const count = (mounted: boolean) => {
+      const w = makeWorld();
+      if (mounted) {
+        w.player.mode = 'nomad';
+        w.player.nomad = newNomad();
+      }
+      const d = w.director as unknown as { arenas: { def: { id: string; waves: { spawns: number[] }[] }; alive: unknown[]; wave: number }[]; spawnWave: (a: unknown) => void };
+      const arena = d.arenas.find((a) => a.def.id === 'a2')!;
+      d.spawnWave(arena);
+      return { spawned: arena.alive.length, full: arena.def.waves[0].spawns.length };
+    };
+    const foot = count(false);
+    const nomad = count(true);
+    expect(foot.spawned).toBeLessThan(foot.full);
+    expect(nomad.spawned).toBe(nomad.full);
+  });
+
+  it('busca espacial conserva cada decoração visível e a ordem de desenho', () => {
+    const w = makeWorld();
+    const buckets = (w.director as unknown as { decoBuckets: Record<'back' | 'front', Map<number, number[]>> }).decoBuckets;
+    for (const camX of [0, w.data.nomadSpawn.x, w.data.arenas.find((a) => a.id === 'a2')!.rect.x, w.data.arenas.find((a) => a.id === 'boss')!.rect.x]) {
+      for (const layer of ['back', 'front'] as const) {
+        const lo = camX - 200;
+        const hi = camX + 1200;
+        const expected = w.data.decos.flatMap((d, i) => d.layer === layer && d.x >= lo && d.x <= hi ? [i] : []);
+        const actual: number[] = [];
+        for (let key = Math.floor(lo / 512); key <= Math.floor(hi / 512); key++) actual.push(...(buckets[layer].get(key) ?? []));
+        actual.sort((a, b) => a - b);
+        expect(actual.filter((i) => w.data.decos[i].x >= lo && w.data.decos[i].x <= hi)).toEqual(expected);
+        expect(actual.length).toBeLessThan(w.data.decos.length);
+      }
+    }
   });
 
   it('caixas: nem todas dão item e o sorteio varia', () => {
@@ -393,10 +455,10 @@ describe('Agachar desvia de tiros retos', () => {
     d.startBoss(a);
     expect(w.lives).toBe(6);
   });
-  it('escudo tem vida e quebra; Nômad 450 de vida; granada maior; contador da zona de guerra', async () => {
+  it('escudo tem vida e quebra; Nômad 405 de vida; granada maior; contador da zona de guerra', async () => {
     const { newNomad } = await import('../src/game/player');
     const { Grenade } = await import('../src/game/bullets');
-    expect(newNomad().maxHp).toBe(450);
+    expect(newNomad().maxHp).toBe(405);
     expect(new Grenade(0, 0, 0, 0).radius).toBeGreaterThanOrEqual(115);
     const w = makeWorld();
     const sp = w.data.enemies.find((e) => e.type === 'shield' && !e.arena)!;

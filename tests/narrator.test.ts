@@ -26,6 +26,20 @@ function spy(w: World) {
 const overlaps = (a: { t0: number; t1: number }, b: { t0: number; t1: number }) => a.t0 < b.t1 - 1e-6 && b.t0 < a.t1 - 1e-6;
 
 describe('Narrador', () => {
+  it('repete a fala 27 em cada tela de continuar, inclusive perto do chefe', () => {
+    const w = makeWorld();
+    const heard: number[] = [];
+    w.hooks.onNarrate = (id) => heard.push(id);
+    const boss = w.data.arenas.find((a) => a.id === 'boss')!;
+    w.player.body.x = boss.triggerX - TILE;
+    w.player.mode = 'dead';
+    for (let i = 0; i < 3; i++) {
+      w.narrator.onContinue();
+      w.narrator.update(1 / 60);
+      expect(heard.filter((id) => id === 27)).toHaveLength(i + 1);
+      w.narrator.update(NARR_LEN[27] + 1);
+    }
+  });
   it('28 falas com duração conhecida', () => {
     expect(NARR_COUNT).toBe(28);
     for (let i = 1; i <= NARR_COUNT; i++) expect(NARR_LEN[i]).toBeGreaterThan(1);

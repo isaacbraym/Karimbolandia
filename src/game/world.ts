@@ -211,8 +211,13 @@ export class World {
     this.wrecks = this.wrecks.filter(() => !fresh);
     this.fx.reset();
     this.timers = [];
+    const dismountX = this.data.triggers.find((t) => t.id === 'dismount')?.rect.x ?? Infinity;
+    let footGrunts = 0;
     for (const s of this.data.enemies) {
       if (s.arena) continue;
+      // Nos trechos percorridos a pé, reduz só tropas comuns; encontros especiais permanecem.
+      if ((s.x < this.data.nomadSpawn.x || s.x >= dismountX) &&
+          (s.type === 'rifle' || s.type === 'shotgun' || s.type === 'drone') && ++footGrunts % 4 === 0) continue;
       if (this.killedEnemies.has(s.id)) continue;
       this.enemies.push(createEnemy(s));
     }

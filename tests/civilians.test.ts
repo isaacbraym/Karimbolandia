@@ -258,6 +258,7 @@ describe('Voz do Karimbo ao encontrar o Nômad', () => {
     }) as World['voice'];
     teleport(w2, M(200), 32);
     w2.nomadLost = true;
+    w2.director.supportWillArrive = true;
     w2.director.supportClock = 89.5;
     for (let i = 0; i < 60 * 4 && !w2.director.support?.ready; i++) w2.update(1 / 60, newCtl());
     expect(w2.director.support?.ready).toBe(true);

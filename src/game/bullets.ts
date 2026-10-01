@@ -134,8 +134,13 @@ export class Bullet {
     }
 
     // props (destrutíveis e sólidos)
+    const minX = Math.min(this.px, this.x) - this.r;
+    const maxX = Math.max(this.px, this.x) + this.r;
+    const minY = Math.min(this.py, this.y) - this.r;
+    const maxY = Math.max(this.py, this.y) + this.r;
     for (const p of w.props) {
       if (!p.alive || !p.hittable) continue;
+      if (p.x + p.w / 2 < minX || p.x - p.w / 2 > maxX || p.y + p.h / 2 < minY || p.y - p.h / 2 > maxY) continue;
       if (segHitsRect(this.px, this.py, this.x, this.y, this.r, p.x - p.w / 2, p.y - p.h / 2, p.w, p.h)) {
         if (this.team === 0 && (this.dmgProps > 0 || this.explode)) {
           p.hurt(w, this.dmgProps, 'bullet', Math.sign(this.vx));
@@ -164,6 +169,7 @@ export class Bullet {
       for (const e of w.enemies) {
         if (!e.alive || !e.canBeHit) continue;
         if (this.hitList && this.hitList.includes(e)) continue;
+        if (e.x + e.stats.w < minX || e.x - e.stats.w > maxX || e.y + e.stats.h < minY || e.y - e.stats.h > maxY) continue;
         const hb = e.hitbox;
         if (segHitsRect(this.px, this.py, this.x, this.y, this.r, hb.x, hb.y, hb.w, hb.h)) {
           this.hitEnemy(w, e);

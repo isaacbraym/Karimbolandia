@@ -442,8 +442,7 @@ export class Game {
     this.continueLeft = CONTINUE_SECS;
     this.continueTick = CONTINUE_SECS;
     audio.setDuck(0.45);
-    // primeira vez na tela CONTINUAR?: o narrador consola
-    this.world?.narrator.request(27, 2, undefined, 2);
+    this.world?.narrator.onContinue();
     audio.loop('glide', false);
     audio.loop('roll', false);
     audio.loop('alarm', false);

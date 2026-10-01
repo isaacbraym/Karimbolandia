@@ -102,6 +102,8 @@ export class Director {
   support: { x: number; y: number; t: number; ready: boolean } | null = null;
   supportClock = 0;
   supportUsed = false;
+  /** Sorteado uma vez por partida: o Nômad extra é opcional. */
+  supportWillArrive = true;
   supportMounting = false;
   /** portão da garagem: só abre depois de embarcar no Nômad (ele é obrigatório) */
   nomadGate: PropClass | null = null;
@@ -131,9 +133,20 @@ export class Director {
   private gateTile = 0;
   private hordeFrom = 0;
   private hordeTo = 0;
+  private enemySpawnById = new Map<number, EnemySpawn>();
+  /** Busca espacial das decorações; a ordenação original é preservada ao desenhar. */
+  private decoBuckets = { back: new Map<number, number[]>(), front: new Map<number, number[]>() };
 
   constructor(w: World) {
     this.w = w;
+    for (const spawn of w.data.enemies) this.enemySpawnById.set(spawn.id, spawn);
+    w.data.decos.forEach((d, i) => {
+      const key = Math.floor(d.x / 512);
+      const buckets = this.decoBuckets[d.layer];
+      const list = buckets.get(key) ?? [];
+      list.push(i);
+      buckets.set(key, list);
+    });
     this.gateTile = Math.floor(w.data.nomadSpawn.x / 32) + 36;
     this.hordeFrom = this.gateTile + 4;
     const dm = w.data.triggers.find((t) => t.id === 'dismount');
@@ -157,6 +170,7 @@ export class Director {
     this.support = null;
     this.supportClock = 0;
     this.supportUsed = false;
+    this.supportWillArrive = Math.random() < 0.5;
     this.supportMounting = false;
     this.nomadGate = null;
     this.hordeT = 0;
@@ -255,7 +269,7 @@ export class Director {
       const alive = a.alive.filter((e) => e.alive);
       let remaining = alive.length;
       const from = a.wave + (a.waveSpawned ? 1 : 0);
-      for (let i = from; i < a.def.waves.length; i++) remaining += a.def.waves[i].spawns.length;
+      for (let i = from; i < a.def.waves.length; i++) remaining += a.def.waves[i].spawns.filter((_, j) => this.waveEnemyEnabled(a, j)).length;
       return { remaining, wave: Math.min(a.wave + 1, a.def.waves.length), waves: a.def.waves.length, enemies: alive, waiting: !a.waveSpawned };
     }
     return null;
@@ -284,8 +298,7 @@ export class Director {
     void info;
     const pl = this.w.player;
     if (pl.mounted && pl.nomad && !e.isBoss) {
-      // frenesi: cada abate recupera um pouco do Nômad e alimenta a sequência
-      pl.nomad.hp = Math.min(pl.nomad.maxHp, pl.nomad.hp + 4);
+      // frenesi preserva o combo, sem regenerar a blindagem por abate
       this.streak++;
       this.streakT = 3.2;
       if (this.streak >= 5 && this.streak % 5 === 0) {
@@ -324,7 +337,7 @@ export class Director {
       const n = this.w.player.nomad;
       if (n) {
         n.timeLeft = n.maxTime = SUPPORT_TIME;
-        n.hp = n.maxHp = 300;
+        n.hp = n.maxHp = 270;
       }
       this.banner('NÔMAD DE APOIO', `Emprestado por ${SUPPORT_TIME}s`, 2.6);
       return;
@@ -468,7 +481,7 @@ export class Director {
       if (n.timeLeft < 8 && Math.floor(n.timeLeft) !== Math.floor(before)) w.audio('warning', 0.35);
       if (n.timeLeft <= 0) p.ejectNomad(w, true);
     }
-    if (this.supportUsed) return;
+    if (this.supportUsed || !this.supportWillArrive) return;
     const s = this.support;
     if (!s) {
       const passed = w.nomadUsed || w.nomadLost;
@@ -777,14 +790,20 @@ export class Director {
     }
   }
 
+  private waveEnemyEnabled(a: ArenaState, index: number) {
+    return a.def.id === 'boss' || this.w.player.mounted || index % 4 !== 3;
+  }
+
   private spawnWave(a: ArenaState) {
     const w = this.w;
     a.waveSpawned = true;
     const wave = a.def.waves[a.wave];
     if (!wave) return;
     const cam = w.camera;
-    for (const id of wave.spawns) {
-      const sp = w.data.enemies.find((e) => e.id === id);
+    for (let i = 0; i < wave.spawns.length; i++) {
+      if (!this.waveEnemyEnabled(a, i)) continue;
+      const id = wave.spawns[i];
+      const sp = this.enemySpawnById.get(id);
       if (!sp) continue;
       const s: EnemySpawn = { ...sp };
       const r = a.def.rect;
@@ -1343,9 +1362,17 @@ export class Director {
     const t = this.w.time;
     const decos = this.w.data.decos as DecoSpawn[];
     const smashed = this.w.smash.smashed;
-    for (let i = 0; i < decos.length; i++) {
+    const visible: number[] = [];
+    const buckets = this.decoBuckets[layer];
+    const left = Math.floor((cam.x - 200) / 512);
+    const right = Math.floor((cam.x + cam.w + 200) / 512);
+    for (let key = left; key <= right; key++) {
+      const list = buckets.get(key);
+      if (list) visible.push(...list);
+    }
+    visible.sort((a, b) => a - b);
+    for (const i of visible) {
       const d = decos[i];
-      if (d.layer !== layer) continue;
       if (d.x < cam.x - 200 || d.x > cam.x + cam.w + 200) continue;
       if (smashed.has(i)) continue;
       drawDeco(g, d, t);

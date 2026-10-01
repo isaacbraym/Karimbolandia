@@ -388,7 +388,7 @@ export class Felipao extends Enemy {
     if (this.phase === 3) opts.push('beam', 'pound', 'missiles');
     let pick = rand.pick(opts);
     if (pick === this.lastAtk) pick = rand.pick(opts);
-    if (pick === 'summon' && w.enemies.filter((e) => e.alive && !e.isBoss).length >= 3) pick = 'cannon';
+    if (pick === 'summon' && w.enemies.filter((e) => e.alive && !e.isBoss).length >= 2) pick = 'cannon';
     this.lastAtk = pick;
     this.atkCount++;
     switch (pick) {
@@ -463,7 +463,7 @@ export class Felipao extends Enemy {
         { type: rand.chance(0.5) ? 'drone' : 'shotgun', x: r.x + r.w - 90, y: this.floorY },
       ];
       for (const s of list) {
-        if (w.enemies.filter((e) => e.alive && !e.isBoss).length >= 3) break;
+        if (w.enemies.filter((e) => e.alive && !e.isBoss).length >= 2) break;
         const y = s.type === 'drone' ? this.floorY - 120 : this.rect.y + 10;
         const e = w.spawnEnemy({ id: this.minionId++, type: s.type, x: s.x, y, arena: 'boss', drop: s.type !== 'drone' });
         if (s.type !== 'drone') e.body.vy = 200;

@@ -125,6 +125,15 @@ export class Narrator {
     this.stop();
     this.queue.length = 0;
   }
+  /** A fala de CONTINUAR? pertence a cada morte, não ao limite de uma vez por partida. */
+  onContinue() {
+    this.stop();
+    this.queue.length = 0;
+    this.played.delete(27);
+    this.asked.delete(27);
+    this.gapUntil = this.t;
+    this.request(27, 10, undefined, 2);
+  }
   /** Corta a fala atual (pular a abertura, reinício...). */
   stop() {
     if (this.cur >= 0) {
@@ -215,6 +224,7 @@ export class Narrator {
     if (d.bossActive && !d.bossIntroDone) return false;
     if (p.mode === 'dead' && id !== 27) return false;
     if (p.mode === 'mounting') return false;
+    if (id === 27) return true; // a morte tem prioridade sobre avisos de cenas próximas
     // cenas com voz logo à frente: não começa uma fala que ainda estaria tocando quando elas chegarem
     const reach = (len + 0.8) * APPROACH;
     if (!w.nomadUsed && !w.nomadLost && !d.triggered.has('nomadMeet')) {
@@ -224,7 +234,7 @@ export class Narrator {
         if (dx > -TILE && dx < reach) return false;
       }
     }
-    if (!d.supportUsed) {
+    if (!d.supportUsed && d.supportWillArrive) {
       if (d.support && !d.support.ready) return false;
       if (!d.support && (w.nomadUsed || w.nomadLost) && d.supportClock > SUPPORT_AT - len - 2) return false;
     }
