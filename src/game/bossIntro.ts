@@ -4,8 +4,10 @@
  *             holofotes procurando e faixa de ALERTA (o Felipão ainda não aparece)
  *   ≈ 4 s     revelação: cai do céu, o chão racha, onda de choque, câmera em zoom lento, reator e
  *             canhões acendendo, título
- *   ≈ 7,8 s   HQ dos dois se encarando (com a voz do Karimbo quando as fotos aparecem)
- *   ≈ 15,7 s  fim do áudio: música do chefe e a luta começa
+ *   ≈ 7,8 s   HQ dos dois se encarando (o grito do Felipão acompanha o resto do áudio dele)
+ *   ≈ 15,7 s  o áudio do chefe acaba e a voz do Karimbo entra logo em seguida ("PODE VIR, FELIPÃO!"
+ *             e o close dos olhos) — as duas vozes nunca tocam juntas
+ *   ≈ 19,7 s  fim da voz: música do chefe e a luta começa
  * Sem áudio (testes/sem som) tudo roda por tempo. A simulação fica no Director; aqui só há
  * constantes e o desenho em espaço de tela (tudo pré-desenhado uma vez).
  */
@@ -17,8 +19,14 @@ export const INTRO_LEN = 15.7;
 export const INTRO_DROP = 3.45;
 /** a HQ começa (pausa no áudio) */
 export const INTRO_COMIC = 7.8;
-/** duração da HQ dentro da entrada */
-export const INTRO_COMIC_LEN = INTRO_LEN - INTRO_COMIC;
+/** voz do Karimbo (karimbo_encara, 3,7 s), logo depois do áudio do chefe */
+export const KARIMBO_VOICE_LEN = 3.7;
+/** dentro da HQ (tempo real): quando o áudio do chefe acaba e o Karimbo começa a falar */
+export const INTRO_VOICE_AT = INTRO_LEN - INTRO_COMIC;
+/** duração da HQ dentro da entrada (resto do áudio do chefe + voz do Karimbo + respiro) */
+export const INTRO_COMIC_LEN = INTRO_VOICE_AT + KARIMBO_VOICE_LEN + 0.3;
+/** duração total da entrada */
+export const INTRO_TOTAL = INTRO_COMIC + INTRO_COMIC_LEN;
 
 const DISPLAY = '"Lilita One", "Arial Black", Impact, sans-serif';
 const clamp01 = (v: number) => (v < 0 ? 0 : v > 1 ? 1 : v);

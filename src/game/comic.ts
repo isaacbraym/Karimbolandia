@@ -3,8 +3,11 @@
  * reais (fotos), linhas de ação, retícula, "VS", balões com texto datilografado e, no fim, o encarar
  * olho no olho. Desenhado em espaço de tela (lógico) por cima do mundo congelado.
  *
- * A linha do tempo é escrita na duração "base" (COMIC_LEN) e esticada/encolhida para caber na
- * entrada do chefe (a HQ termina junto com o áudio da entrada).
+ * A linha do tempo é escrita na duração "base" (COMIC_LEN) e mapeada para o tempo real em trechos:
+ *   1) Felipão (fotos, VS, balão do grito, arroto) — dura o resto do áudio da entrada do chefe;
+ *   2) assim que o áudio do chefe acaba, a voz do Karimbo começa: balão "PODE VIR, FELIPÃO!";
+ *   3) close dos olhos até a voz terminar.
+ * Assim as duas vozes nunca tocam juntas.
  */
 import { getArt } from '../art';
 import { audio, type ClipHandle } from '../core/audio';
@@ -12,9 +15,11 @@ import { audio, type ClipHandle } from '../core/audio';
 const DISPLAY = '"Lilita One", "Arial Black", Impact, sans-serif';
 /** duração base da linha do tempo (s) */
 export const COMIC_LEN = 8.6;
-/** batida em que a foto do Karimbo entra (a voz dele toca aqui) */
-const VOICE_AT = 0.35;
-const VOICE_LEN = 3.7;
+/** na linha do tempo base: o Karimbo responde (início do trecho 2) e o close dos olhos (trecho 3) */
+const B_REPLY = 4.8;
+const B_STARE = 6.1;
+/** tempo real do trecho 2 (balão do Karimbo) */
+const REPLY_REAL = 2.0;
 
 const FELI_LINE = 'VOU TE ENSINAR A JOGAR DE VERDADE, KARIMBO!';
 const KARI_LINE = 'PODE VIR, FELIPÃO!';
@@ -36,22 +41,37 @@ const easeBack = (t: number) => {
 export class BossComic {
   /** tempo na linha do tempo base (0..COMIC_LEN) */
   t = 0;
+  /** tempo real desde o início da HQ */
+  real = 0;
   done = false;
-  /** segundos reais por segundo da linha do tempo base */
-  private k: number;
+  /** duração real total */
+  readonly len: number;
+  /** tempo real em que o áudio do chefe acaba e a voz do Karimbo começa */
+  readonly voiceAt: number;
   private voice: ClipHandle | null = null;
-  /** abafa/devolve o áudio da entrada enquanto o Karimbo fala */
-  onVoice: ((talking: boolean) => void) | null = null;
 
-  constructor(len = COMIC_LEN) {
-    this.k = len / COMIC_LEN;
+  /**
+   * len: duração real da HQ; voiceAt: quando (tempo real) o Karimbo começa a falar.
+   * Sem voiceAt (uso avulso) a linha do tempo só é esticada por igual.
+   */
+  constructor(len = COMIC_LEN, voiceAt = -1) {
+    this.len = len;
+    this.voiceAt = voiceAt >= 0 ? Math.min(voiceAt, len - REPLY_REAL - 0.5) : (B_REPLY / COMIC_LEN) * len;
+  }
+
+  /** Tempo real → linha do tempo base (por trechos). */
+  private toBase(r: number) {
+    const a = this.voiceAt;
+    const b = a + REPLY_REAL;
+    if (r <= a) return (r / a) * B_REPLY;
+    if (r <= b) return B_REPLY + ((r - a) / REPLY_REAL) * (B_STARE - B_REPLY);
+    return B_STARE + Math.min(1, (r - b) / Math.max(0.1, this.len - b)) * (COMIC_LEN - B_STARE);
   }
 
   /** Sincroniza com o relógio do áudio da entrada (segundos reais desde o início da HQ). */
   syncTo(realT: number) {
     if (realT < 0) return;
-    const bt = realT / this.k;
-    if (Math.abs(bt - this.t) > 0.05) this.t = Math.max(0, bt);
+    if (Math.abs(realT - this.real) > 0.05) this.real = realT;
   }
 
   /** Corta a voz (pulou a cena). */
@@ -72,18 +92,15 @@ export class BossComic {
   }
 
   update(dt: number) {
-    this.t += dt / this.k;
+    this.real += dt;
+    this.t = this.toBase(this.real);
     this.beat('open', 0, () => audio.play('lock', 1));
-    this.beat('k', VOICE_AT, () => {
-      audio.play('slam', 0.7);
-      // as fotos dos dois aparecem: o Karimbo fala
-      this.voice = audio.playClip('karimboEncara', { vol: 1 });
-      if (this.voice.playing) this.onVoice?.(true);
-    });
-    this.beat('kEnd', VOICE_AT + VOICE_LEN / this.k, () => this.onVoice?.(false));
+    this.beat('k', 0.35, () => audio.play('slam', 0.7));
     this.beat('f', 1.0, () => audio.play('slam', 0.8));
     this.beat('vs', 1.55, () => audio.play('bossRoar', 0.9));
     this.beat('burp', 4.3, () => audio.play('burpBig', 1));
+    // o áudio do chefe acabou: a voz do Karimbo entra logo em seguida (nunca as duas juntas)
+    this.beat('voice', B_REPLY, () => (this.voice = audio.playClip('karimboEncara', { vol: 1 })));
     this.beat('eyes', 6.2, () => audio.play('laserCharge', 0.7));
     this.beat('end', COMIC_LEN - 0.3, () => audio.play('bigExplosion', 0.6));
     // datilografia
@@ -92,7 +109,7 @@ export class BossComic {
       this.lastTyped = n;
       if (n % 2 === 0) audio.play('uiClick', 0.35);
     }
-    if (this.t >= COMIC_LEN) this.done = true;
+    if (this.real >= this.len) this.done = true;
   }
 
   private typed(s: string, start: number, dur: number) {

@@ -3,7 +3,7 @@ import { Input } from '../core/input';
 import { audio, type ClipHandle } from '../core/audio';
 import { PostFX } from './post';
 import { BossComic } from './comic';
-import { IntroOverlay, INTRO_COMIC } from './bossIntro';
+import { IntroOverlay, INTRO_COMIC, INTRO_VOICE_AT } from './bossIntro';
 import { bakeCivilians } from '../art/civilians';
 import { setDecoDensity } from '../art/decor';
 import { music, MIX, type ThemeName } from '../core/music';
@@ -216,7 +216,9 @@ export class Game {
     const targetH = Math.min(h * dpr, MAX_H[this.quality]);
     this.pxScale = Math.max(1, (targetH / this.viewH) * this.renderScale);
     setDecoDensity((targetH / this.viewH) * 1.25);
-    setHudTextScale(this.pxScale);
+    // textos do HUD na escala alvo (sem a resolução dinâmica): cada passo da resolução dinâmica não
+    // obriga mais a recriar todas as imagens de texto (isso dava um engasgo a cada ajuste)
+    setHudTextScale(Math.max(1, targetH / this.viewH));
     if (this.world) this.world.fx.popScale = Math.max(2, (targetH / this.viewH) * 1.3);
     this.canvas.width = Math.round(this.viewW * this.pxScale);
     this.canvas.height = Math.round(this.viewH * this.pxScale);
@@ -471,9 +473,8 @@ export class Game {
   /** Filminho do chefe: congela o mundo, esconde os controles e toca a HQ. */
   private startComic(len?: number) {
     if (this.state !== 'playing') return;
-    const c = new BossComic(len);
-    // enquanto o Karimbo fala, o áudio da entrada abaixa um pouco
-    c.onVoice = (talking) => this.introClip?.setVol(talking ? 0.6 : 1, 0.12);
+    // a voz do Karimbo entra quando o áudio do chefe termina
+    const c = new BossComic(len, INTRO_VOICE_AT);
     this.comic = c;
     this.state = 'comic';
     this.comicTap = false;
@@ -641,9 +642,12 @@ export class Game {
       this.input.clearEdges();
       if (tap) this.skipBossIntro(w);
       else {
-        // a HQ acompanha o relógio do áudio da entrada
-        const e = this.introClip ? this.introClip.elapsed() : -1;
-        if (e >= 0) this.comic.syncTo(e - INTRO_COMIC);
+        // a HQ acompanha o relógio do áudio da entrada; quando ele acaba, o Karimbo fala na hora
+        const clip = this.introClip;
+        if (clip && clip.playing) {
+          const e = clip.elapsed();
+          if (e >= 0) this.comic.syncTo(Math.min(e - INTRO_COMIC, this.comic.voiceAt - 0.01));
+        } else if (clip && this.comic.real < this.comic.voiceAt) this.comic.syncTo(this.comic.voiceAt);
         this.comic.update(dt);
         if (this.comic.done) this.endComic();
       }

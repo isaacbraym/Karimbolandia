@@ -7,6 +7,13 @@ import { getArt } from '../../art';
 import { drawFelipao, FELI_LAYOUT } from '../../art/felipao';
 
 const CRUMBLE_WARN = 2; // s de aviso antes do chão cair
+/** "00".."ff" (cores montadas sem string nova por bloco) */
+const HEX2: string[] = [];
+for (let i = 0; i < 256; i++) HEX2.push(i.toString(16).padStart(2, '0'));
+/** contagem regressiva "2.0".."0.0" pronta (nada de toFixed por quadro) */
+const COUNT_TXT: string[] = [];
+for (let i = 0; i <= CRUMBLE_WARN * 10; i++) COUNT_TXT.push((i / 10).toFixed(1));
+const countdownText = (t: number) => COUNT_TXT[Math.max(0, Math.min(COUNT_TXT.length - 1, Math.round(t * 10)))];
 import { PK } from '../fx';
 
 type BState =
@@ -60,7 +67,7 @@ export class Felipao extends Enemy {
   minionId = 90000;
   crumbledCenter = false;
   /** desabamento anunciado: os tiles piscam por 2 s antes de cair (dá tempo de escapar) */
-  pendingCrumble: { kind: 'center' | 'plats'; t: number; tiles: [number, number][] } | null = null;
+  pendingCrumble: { kind: 'center' | 'plats'; t: number; tiles: [number, number][]; cx: number; top: number } | null = null;
   burpCd = 2;
   /** mola da barriga */
   jig = 0;
@@ -652,7 +659,17 @@ export class Felipao extends Enemy {
 
   private warnCrumble(w: World, kind: 'center' | 'plats') {
     this.levelRef = w.level;
-    this.pendingCrumble = { kind, t: CRUMBLE_WARN, tiles: this.crumbleTiles(kind) };
+    const tiles = this.crumbleTiles(kind);
+    // centro/topo da área calculados uma vez (antes: listas novas a cada quadro do aviso)
+    let x0 = Infinity;
+    let x1 = -Infinity;
+    let r0 = Infinity;
+    for (const [c, r] of tiles) {
+      if (c < x0) x0 = c;
+      if (c > x1) x1 = c;
+      if (r < r0) r0 = r;
+    }
+    this.pendingCrumble = { kind, t: CRUMBLE_WARN, tiles, cx: ((x0 + x1 + 1) / 2) * TILE, top: r0 * TILE };
     w.hooks.onBanner?.('CUIDADO!', kind === 'center' ? 'O chão vai desabar — saia do meio!' : 'As plataformas vão cair!', 1.8);
     w.audio('warning', 1);
     w.audio('burpBig', 0.9, this.bx);
@@ -854,37 +871,43 @@ export class Felipao extends Enemy {
       const hz = 4 + k * 10;
       const on = Math.sin(this.t * hz * Math.PI * 2) > -0.2;
       g.save();
+      // blocos piscando: uma cor por quadro (não uma por bloco) e todas as rachaduras num só traço
+      g.globalCompositeOperation = 'lighter';
+      if (on) {
+        g.fillStyle = '#ff' + HEX2[Math.round(90 - k * 60)] + '28';
+        g.globalAlpha = 0.35 + k * 0.35;
+      } else {
+        g.fillStyle = '#ffc83c';
+        g.globalAlpha = 0.08;
+      }
+      for (const [c, r] of pc.tiles) g.fillRect(c * TILE, r * TILE, TILE, TILE);
+      g.globalAlpha = 1;
+      g.globalCompositeOperation = 'source-over';
+      g.strokeStyle = 'rgba(20,6,10,0.8)';
+      g.lineWidth = 1.6;
+      g.beginPath();
       for (const [c, r] of pc.tiles) {
         const x = c * TILE;
         const y = r * TILE;
-        g.globalCompositeOperation = 'lighter';
-        g.fillStyle = on ? `rgba(255,${Math.round(90 - k * 60)},40,${0.35 + k * 0.35})` : 'rgba(255,200,60,0.08)';
-        g.fillRect(x, y, TILE, TILE);
-        g.globalCompositeOperation = 'source-over';
-        g.strokeStyle = 'rgba(20,6,10,0.8)';
-        g.lineWidth = 1.6;
         const s = (c * 7 + r * 13) % 5;
-        g.beginPath();
         g.moveTo(x + 4 + s, y + 2);
         g.lineTo(x + 14, y + 12 + s);
         g.lineTo(x + 10 + s, y + 22);
         g.lineTo(x + 22, y + TILE - 2);
         g.moveTo(x + 14, y + 12 + s);
         g.lineTo(x + TILE - 3, y + 8);
-        g.stroke();
       }
+      g.stroke();
       // seta de aviso acima da área
-      const xs = pc.tiles.map((t) => t[0]);
-      const rs = pc.tiles.map((t) => t[1]);
-      if (xs.length) {
-        const cx = ((Math.min(...xs) + Math.max(...xs) + 1) / 2) * TILE;
-        const top = Math.min(...rs) * TILE;
+      if (pc.tiles.length) {
+        const cx = pc.cx;
+        const top = pc.top;
         g.fillStyle = on ? '#ff4a3a' : '#ffd23a';
         g.font = '400 22px "Lilita One", Impact, sans-serif';
         g.textAlign = 'center';
         g.fillText('⚠', cx, top - 12 - Math.sin(this.t * 10) * 3);
         g.font = '400 13px "Lilita One", Impact, sans-serif';
-        g.fillText(String(Math.max(0, pc.t).toFixed(1)), cx, top - 36);
+        g.fillText(countdownText(pc.t), cx, top - 36);
       }
       g.restore();
     }

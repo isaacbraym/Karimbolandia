@@ -36,6 +36,8 @@ export interface Particle {
   onGround: boolean;
 }
 
+let popMeasure: CanvasRenderingContext2D | null = null;
+
 export interface Popup {
   x: number;
   y: number;
@@ -45,6 +47,8 @@ export interface Popup {
   text: string;
   color: string;
   size: number;
+  /** chave do cache da imagem (montada uma vez, não a cada quadro) */
+  key: string;
 }
 
 export interface FlashLight {
@@ -144,7 +148,7 @@ export class Fx {
   }
   popup(x: number, y: number, text: string, color = '#ffe27a', size = 9) {
     if (this.popups.length > 16) this.popups.shift();
-    this.popups.push({ x, y, vy: -34, life: 0.9, max: 0.9, text, color, size });
+    this.popups.push({ x, y, vy: -34, life: 0.9, max: 0.9, text, color, size, key: text + '|' + size + '|' + color });
   }
 
   update(dt: number, solidAt: (x: number, y: number) => boolean) {
@@ -345,15 +349,16 @@ export class Fx {
   /** px de tela por unidade de mundo (para o texto ficar nítido) */
   popScale = 3;
   private popBudget = 2;
-  private popSprite(text: string, size: number, color: string) {
-    const key = text + '|' + size + '|' + color;
+  private popSprite(key: string, text: string, size: number, color: string) {
     let e = this.popCache.get(key);
     if (e) return e;
     if (this.popBudget <= 0) return null;
     this.popBudget--;
     const k = this.popScale;
     const f = `bold ${size}px Rajdhani, sans-serif`;
-    const mc = document.createElement('canvas').getContext('2d')!;
+    // contexto de medida reaproveitado (antes: um canvas novo por texto)
+    if (!popMeasure) popMeasure = document.createElement('canvas').getContext('2d')!;
+    const mc = popMeasure;
     mc.font = f;
     const pad = 3;
     const tw = Math.ceil(mc.measureText(text).width);
@@ -384,7 +389,7 @@ export class Fx {
     this.popBudget = 2;
     for (const p of this.popups) {
       g.globalAlpha = Math.min(1, (p.life / p.max) * 2);
-      const e = this.popSprite(p.text, p.size, p.color);
+      const e = this.popSprite(p.key, p.text, p.size, p.color);
       if (e) g.drawImage(e.c, p.x - e.w / 2, p.y - e.ay, e.w, e.h);
       else {
         // orçamento do quadro esgotado: desenha direto (mesmo visual)

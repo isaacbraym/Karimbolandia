@@ -14,7 +14,7 @@ import { BASE_ZOOM, EXPLORE_ZOOM, MIN_THREAT_ZOOM } from './camera';
 import { glowSprite } from '../art/kit';
 import { drawDeco, resetDecoBudget } from '../art/decor';
 import { drawSpr } from '../art/kit';
-import { INTRO_LEN, INTRO_DROP, INTRO_COMIC, INTRO_COMIC_LEN, type IntroOverlay } from './bossIntro';
+import { INTRO_TOTAL, INTRO_DROP, INTRO_COMIC, INTRO_COMIC_LEN, type IntroOverlay } from './bossIntro';
 import type { Felipao } from './enemies/felipao';
 
 type ArenaStatus = 'idle' | 'active' | 'cleared';
@@ -44,6 +44,24 @@ interface Cine {
   /** tremor/poeira da entrada (ritmo próprio) */
   fxT?: number;
   beat?: number;
+}
+
+/** Faixa de energia das barreiras (degradê horizontal), desenhada uma vez. */
+let barrierC: HTMLCanvasElement | null = null;
+function barrierStrip() {
+  if (barrierC) return barrierC;
+  const c = document.createElement('canvas');
+  c.width = 40;
+  c.height = 2;
+  const g = c.getContext('2d')!;
+  const grd = g.createLinearGradient(0, 0, 40, 0);
+  grd.addColorStop(0, 'rgba(60,240,255,0)');
+  grd.addColorStop(0.5, 'rgba(90,240,255,0.55)');
+  grd.addColorStop(1, 'rgba(60,240,255,0)');
+  g.fillStyle = grd;
+  g.fillRect(0, 0, 40, 2);
+  barrierC = c;
+  return c;
 }
 
 /** batidas do suspense: [tempo, céu piscando, flash vermelho] */
@@ -98,6 +116,15 @@ export class Director {
   hordeSeq = 0;
   streak = 0;
   streakT = 0;
+
+  /** onde o Felipão nasce (consultado todo quadro na luta: guardado em vez de procurar na lista) */
+  private _bossSpawn: EnemySpawn | null = null;
+  get bossSpawn(): EnemySpawn {
+    if (!this._bossSpawn) this._bossSpawn = this.w.data.enemies.find((e) => e.type === 'boss')!;
+    return this._bossSpawn;
+  }
+  /** limpeza periódica das hordas que ficaram para trás */
+  private hordeGcT = 0;
 
   /** portão da garagem (tile) e trecho das hordas do Nômad — derivados da fase */
   private gateTile = 0;
@@ -545,6 +572,20 @@ export class Director {
       this.streakT -= dt;
       if (this.streakT <= 0) this.streak = 0;
     }
+    // inimigos das hordas que ficaram muito para trás (fora da tela) saem do mundo: antes se
+    // acumulavam (~90) e eram percorridos por vários laços a cada quadro
+    this.hordeGcT -= dt;
+    if (this.hordeGcT <= 0) {
+      this.hordeGcT = 1.5;
+      const list = w.enemies;
+      for (let i = list.length - 1; i >= 0; i--) {
+        const e = list[i];
+        if (e.spawn.id <= -5000 && Math.abs(e.x - p.x) > 1700 && !w.camera.visible(e.x, e.y, 200)) {
+          e.alive = false;
+          list.splice(i, 1);
+        }
+      }
+    }
     if (p.mode !== 'nomad' || this.cine || this.activeArenaRect() || p.nomad?.timeLeft !== Infinity) return;
     if (p.x < this.hordeFrom * 32 || p.x > this.hordeTo * 32) return;
     this.hordeT -= dt;
@@ -646,7 +687,7 @@ export class Director {
       this.updateLongIntro(dt, c);
     } else if (c.kind === 'bossIntro') {
       // câmera mostra a entrada do chefe (jogador e chefe no quadro)
-      const spawn = w.data.enemies.find((e) => e.type === 'boss')!;
+      const spawn = this.bossSpawn;
       w.camera.focus = { x: (spawn.x + p.x) / 2, y: spawn.y - 86, rate: 2.6 };
       w.camera.zoomTarget = 0.95;
       if (c.t > 3.8) {
@@ -837,7 +878,7 @@ export class Director {
 
   private spawnBoss(a: ArenaState | undefined): Enemy {
     const w = this.w;
-    const sp = w.data.enemies.find((e) => e.type === 'boss')!;
+    const sp = this.bossSpawn;
     const e = w.spawnEnemy({ ...sp, arena: 'boss' });
     this.bossRef = e;
     if (a) {
@@ -874,7 +915,7 @@ export class Director {
   private updateLongIntro(dt: number, c: Cine) {
     const w = this.w;
     const p = w.player;
-    const sp = w.data.enemies.find((e) => e.type === 'boss')!;
+    const sp = this.bossSpawn;
     const t = c.t;
     p.body.vx = 0;
     p.lockInput = true;
@@ -962,8 +1003,8 @@ export class Director {
         c.comicHooked = !!w.hooks.onBossComic;
         w.hooks.onBossComic?.(INTRO_COMIC_LEN);
       }
-    } else if (c.comicHooked ? c.comicDone : t >= INTRO_LEN) {
-      // sem jogo por cima (testes/sem tela), a HQ "passa" pelo tempo do áudio
+    } else if (c.comicHooked ? c.comicDone : t >= INTRO_TOTAL) {
+      // sem jogo por cima (testes/sem tela), a HQ "passa" pelo tempo dos áudios
       this.finishBossIntro();
     }
   }
@@ -971,7 +1012,7 @@ export class Director {
   /** Pouso do Felipão na entrada: chão racha, onda de choque e flash. */
   private bossLanded() {
     const w = this.w;
-    const sp = w.data.enemies.find((e) => e.type === 'boss')!;
+    const sp = this.bossSpawn;
     const x = this.bossRef ? this.bossRef.x : sp.x;
     this.cracks.length = 0;
     this.cracks.push({ x, y: sp.y });
@@ -1119,7 +1160,7 @@ export class Director {
     if (this.bossActive) {
       // enquadra jogador e chefe juntos (o chefe nunca deve sair da tela)
       const p = w.player;
-      const spawn = w.data.enemies.find((e) => e.type === 'boss')!;
+      const spawn = this.bossSpawn;
       const b = this.bossRef;
       const zoom = 0.98;
       cam.zoomTarget = zoom;
@@ -1138,7 +1179,7 @@ export class Director {
     const explore = this.combatHold <= 0 && !this.activeArenaRect();
     let zoom = explore ? EXPLORE_ZOOM : BASE_ZOOM;
     if (p.mounted) zoom -= 0.1;
-    w.threats = w.threats.filter((t) => w.time - t.t < 2.6);
+    for (let i = w.threats.length - 1; i >= 0; i--) if (w.time - w.threats[i].t >= 2.6) w.threats.splice(i, 1);
     cam.threat = null;
     if (w.threats.length && p.mode !== 'dead') {
       let x0 = p.x, x1 = p.x, y0 = p.y - 40, y1 = p.y;
@@ -1262,30 +1303,25 @@ export class Director {
   }
 
   drawBarriers(g: CanvasRenderingContext2D) {
+    // sem listas temporárias nem gradiente por quadro (faixa de energia pré-desenhada)
+    for (const a of this.arenas) for (const b of a.barriers) this.drawBarrier(g, b);
+    if (this.nomadGate && this.nomadGate.alive) this.drawBarrier(g, this.nomadGate);
+  }
+
+  private drawBarrier(g: CanvasRenderingContext2D, b: PropClass) {
     const t = this.w.time;
-    const all: PropClass[] = [];
-    for (const a of this.arenas) all.push(...a.barriers);
-    if (this.nomadGate && this.nomadGate.alive) all.push(this.nomadGate);
-    {
-      for (const b of all) {
-        const x = b.x;
-        const top = b.y - b.h / 2;
-        g.globalCompositeOperation = 'lighter';
-        const grd = g.createLinearGradient(x - 10, 0, x + 10, 0);
-        grd.addColorStop(0, 'rgba(60,240,255,0)');
-        grd.addColorStop(0.5, 'rgba(90,240,255,0.55)');
-        grd.addColorStop(1, 'rgba(60,240,255,0)');
-        g.fillStyle = grd;
-        g.fillRect(x - 10, top, 20, b.h);
-        g.fillStyle = 'rgba(200,255,255,0.7)';
-        const n = Math.floor(b.h / 24);
-        for (let i = 0; i < n; i++) {
-          const yy = top + ((i * 24 + t * 60) % b.h);
-          g.fillRect(x - 1.5, yy, 3, 8);
-        }
-        g.globalCompositeOperation = 'source-over';
-      }
+    const x = b.x;
+    const top = b.y - b.h / 2;
+    if (!this.w.camera.visible(x, top + b.h / 2, b.h / 2 + 40)) return;
+    g.globalCompositeOperation = 'lighter';
+    g.drawImage(barrierStrip(), x - 10, top, 20, b.h);
+    g.fillStyle = 'rgba(200,255,255,0.7)';
+    const n = Math.floor(b.h / 24);
+    for (let i = 0; i < n; i++) {
+      const yy = top + ((i * 24 + t * 60) % b.h);
+      g.fillRect(x - 1.5, yy, 3, 8);
     }
+    g.globalCompositeOperation = 'source-over';
   }
 
   drawWorldOverlays(g: CanvasRenderingContext2D) {

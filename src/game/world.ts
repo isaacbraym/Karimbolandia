@@ -909,25 +909,21 @@ export class World {
       if (p.y < cam.y - 40 || p.y > cam.y + cam.h + 160) continue;
       const fl = 0.75 + 0.25 * Math.sin(this.time * 3.1 + p.x0 * 0.01) + 0.08 * Math.sin(this.time * 11 + p.x0);
       // calor subindo: brilho forte no fundo do buraco e um "véu" acima da borda (visível na altura do jogador)
-      const gr = g.createLinearGradient(0, p.y + 160, 0, p.y - 110);
-      gr.addColorStop(0, `rgba(255,120,40,${0.9 * fl})`);
-      gr.addColorStop(0.55, `rgba(255,90,30,${0.45 * fl})`);
-      gr.addColorStop(0.72, `rgba(255,100,40,${0.26 * fl})`);
-      gr.addColorStop(1, 'rgba(255,60,30,0)');
+      // (degradês pré-desenhados uma vez; a pulsação é a transparência — mesmo visual, sem gradiente por quadro)
+      const sp = pitSprites();
       g.save();
       // fundo escuro do buraco (contraste com o chão)
-      const dk = g.createLinearGradient(0, p.y, 0, p.y + 120);
-      dk.addColorStop(0, 'rgba(8,2,16,0.75)');
-      dk.addColorStop(1, 'rgba(8,2,16,0)');
-      g.fillStyle = dk;
-      g.fillRect(p.x0, p.y, p.x1 - p.x0, 120);
+      g.drawImage(sp.dark, p.x0, p.y, p.x1 - p.x0, 120);
       g.globalCompositeOperation = 'lighter';
-      g.fillStyle = gr;
-      g.fillRect(p.x0 + 2, p.y - 110, p.x1 - p.x0 - 4, 270);
+      g.globalAlpha = Math.min(1, fl / 1.08);
+      g.drawImage(sp.heat, p.x0 + 2, p.y - 110, p.x1 - p.x0 - 4, 270);
+      g.globalAlpha = 1;
       // bordas incandescentes
-      g.fillStyle = `rgba(255,150,70,${0.55 * fl})`;
+      g.fillStyle = '#ff9646';
+      g.globalAlpha = Math.min(1, 0.55 * fl);
       g.fillRect(p.x0 - 1, p.y, 3, 14);
       g.fillRect(p.x1 - 2, p.y, 3, 14);
+      g.globalAlpha = 1;
       g.restore();
     }
   }
@@ -1010,6 +1006,35 @@ export class World {
     if (Math.random() < 0.05) this.fx.sparks(w.x + rand.spread(14), w.y - 40, 3, '#ffb347', 120);
     if (Math.random() < 0.07) this.fx.add(PK.Fire, w.x + rand.spread(12), w.y - 44, 0, -30, 0.5, 8, '#ff7a1a', { size1: 2 });
   }
+}
+
+/** Degradês dos buracos (fundo escuro + calor subindo), desenhados uma vez em faixas finas. */
+let pitSpr: { dark: HTMLCanvasElement; heat: HTMLCanvasElement } | null = null;
+function pitSprites() {
+  if (pitSpr) return pitSpr;
+  const dark = document.createElement('canvas');
+  dark.width = 4;
+  dark.height = 120;
+  const dg = dark.getContext('2d')!;
+  const dk = dg.createLinearGradient(0, 0, 0, 120);
+  dk.addColorStop(0, 'rgba(8,2,16,0.75)');
+  dk.addColorStop(1, 'rgba(8,2,16,0)');
+  dg.fillStyle = dk;
+  dg.fillRect(0, 0, 4, 120);
+  const heat = document.createElement('canvas');
+  heat.width = 4;
+  heat.height = 270;
+  const hg = heat.getContext('2d')!;
+  // mesmas paradas de antes × 1,08 (pico da pulsação); a pulsação vira transparência
+  const gr = hg.createLinearGradient(0, 270, 0, 0);
+  gr.addColorStop(0, 'rgba(255,120,40,0.972)');
+  gr.addColorStop(0.55, 'rgba(255,90,30,0.486)');
+  gr.addColorStop(0.72, 'rgba(255,100,40,0.281)');
+  gr.addColorStop(1, 'rgba(255,60,30,0)');
+  hg.fillStyle = gr;
+  hg.fillRect(0, 0, 4, 270);
+  pitSpr = { dark, heat };
+  return pitSpr;
 }
 
 const WEAPON_AMMO_FLOOR: Record<WeaponId, number> = { pistol: Infinity, rifle: 60, shotgun: 12, launcher: 5, energy: 25 };

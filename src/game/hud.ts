@@ -58,7 +58,89 @@ export function setHudTextScale(s: number) {
   if (q === textScale) return;
   textScale = q;
   textCache.clear();
+  slots.clear();
 }
+
+/**
+ * Textos que mudam o tempo todo (munição a cada tiro, pontuação a cada abate, relógio, combo...):
+ * cada campo do HUD tem UMA imagem fixa ("vaga") que só é redesenhada quando o valor muda.
+ * Antes cada valor novo criava um canvas novo (upload para a GPU + lixo para o coletor) — em
+ * combate intenso isso dava as travadinhas. Nada é alocado nos quadros em que o valor não muda.
+ */
+interface Slot {
+  c: HTMLCanvasElement;
+  g: CanvasRenderingContext2D;
+  val: number;
+  color: string;
+  w: number;
+  h: number;
+  ax: number;
+  ay: number;
+}
+const slots = new Map<string, Slot>();
+function numText(
+  g: CanvasRenderingContext2D, slot: string, val: number, fmt: (v: number) => string, x: number, y: number, size: number,
+  color = '#fff', align: CanvasTextAlign = 'left', font = UI, weight = '700'
+) {
+  if (typeof document === 'undefined') return;
+  let e = slots.get(slot);
+  if (!e || e.val !== val || e.color !== color) {
+    const str = fmt(val);
+    const f = `${weight} ${size}px ${font}`;
+    if (!measureCtx) measureCtx = document.createElement('canvas').getContext('2d')!;
+    measureCtx.font = f;
+    const lw = Math.max(2, size * 0.24);
+    const pad = Math.ceil(lw + 2);
+    const tw = Math.ceil(measureCtx.measureText(str).width);
+    const w = tw + pad * 2;
+    const h = Math.ceil(size * 1.45) + pad * 2;
+    const pw = Math.max(1, Math.ceil(w * textScale));
+    const ph = Math.max(1, Math.ceil(h * textScale));
+    if (!e) {
+      const c = document.createElement('canvas');
+      // folga para valores maiores (o canvas só cresce em casos raros)
+      c.width = Math.ceil(pw * 1.5);
+      c.height = ph;
+      e = { c, g: c.getContext('2d')!, val, color, w, h, ax: 0, ay: 0 };
+      slots.set(slot, e);
+    } else if (e.c.width < pw || e.c.height < ph) {
+      e.c.width = Math.max(e.c.width, Math.ceil(pw * 1.5));
+      e.c.height = Math.max(e.c.height, ph);
+      e.g = e.c.getContext('2d')!;
+    }
+    const cg = e.g;
+    cg.setTransform(1, 0, 0, 1, 0, 0);
+    cg.clearRect(0, 0, e.c.width, e.c.height);
+    cg.setTransform(textScale, 0, 0, textScale, 0, 0);
+    cg.font = f;
+    cg.textAlign = 'left';
+    cg.textBaseline = 'alphabetic';
+    cg.lineWidth = lw;
+    cg.strokeStyle = '#170f2e';
+    cg.lineJoin = 'round';
+    const by = pad + Math.ceil(size * 1.1);
+    cg.strokeText(str, pad, by);
+    cg.fillStyle = color;
+    cg.fillText(str, pad, by);
+    e.val = val;
+    e.color = color;
+    e.w = w;
+    e.h = h;
+    e.ax = align === 'center' ? pad + tw / 2 : align === 'right' || align === 'end' ? pad + tw : pad;
+    e.ay = by;
+  }
+  g.drawImage(e.c, 0, 0, Math.ceil(e.w * textScale), Math.ceil(e.h * textScale), x - e.ax, y - e.ay, e.w, e.h);
+}
+const fmtInt = (v: number) => String(v);
+const fmtAmmo = (v: number) => (v === Infinity ? '∞' : String(v));
+const fmtScore = (v: number) => String(v).padStart(7, '0');
+const fmtEmblems = (v: number) => `${v} / 10`;
+const fmtCombo = (v: number) => `${v} COMBO`;
+const fmtMult = (v: number) => `x${v}`;
+const fmtSupport = (v: number) => `APOIO ${v}s`;
+const fmtFps = (v: number) => `${v} FPS`;
+const fmtRemaining = (v: number) => (v === 1 ? 'FALTA 1 INIMIGO' : `FALTAM ${v} INIMIGOS`);
+const fmtWave = (v: number) => `ONDA ${v >> 8}/${v & 255}`;
 
 function text(g: CanvasRenderingContext2D, s: string, x: number, y: number, size: number, color = '#fff', align: CanvasTextAlign = 'left', font = UI, weight = '700') {
   if (typeof document === 'undefined') return;
@@ -119,6 +201,16 @@ export class Hud {
   fps = 60;
   hpShown = 100;
   bossShown = 1;
+  private bossGrad: CanvasGradient | null = null;
+  private bossGradX = 0;
+  private bossGradW = 0;
+  private bannerGrad: CanvasGradient | null = null;
+  private bannerGradW = 0;
+  /** vinheta vermelha de perigo (pouca vida / Nômad crítico): pré-desenhada por tamanho */
+  private dangerVig: HTMLCanvasElement | null = null;
+  private dangerW = 0;
+  private dangerH = 0;
+  private dangerBlue = -1;
   nomadShown = 1;
   safeL = 0;
   safeT = 0;
@@ -149,12 +241,12 @@ export class Hud {
     const blink = 0.55 + 0.45 * Math.sin(this.time * 5);
     pill(g, cx - pw / 2, y, pw, 30, 9, 'rgba(60,6,20,0.82)', `rgba(255,70,80,${0.5 + 0.4 * blink})`);
     text(g, 'ZONA DE GUERRA', cx - pw / 2 + 10, y + 12, 10, '#ff9a9a', 'left', DISPLAY, '400');
-    text(g, `ONDA ${wz.wave}/${wz.waves}`, cx + pw / 2 - 10, y + 12, 10, '#ffd0d0', 'right', DISPLAY, '400');
+    numText(g, 'wave', (wz.wave << 8) | wz.waves, fmtWave, cx + pw / 2 - 10, y + 12, 10, '#ffd0d0', 'right', DISPLAY, '400');
     const s = 1 + this.warPulse * 0.35;
     g.save();
     g.translate(cx, y + 26);
     g.scale(s, s);
-    text(g, wz.remaining === 1 ? 'FALTA 1 INIMIGO' : `FALTAM ${wz.remaining} INIMIGOS`, 0, 0, 13, '#ffffff', 'center', DISPLAY, '400');
+    numText(g, 'remaining', wz.remaining, fmtRemaining, 0, 0, 13, '#ffffff', 'center', DISPLAY, '400');
     g.restore();
 
     // setas vermelhas para inimigos fora da tela
@@ -208,8 +300,11 @@ export class Hud {
 
   update(dt: number) {
     this.time += dt;
-    for (const b of this.banners) b.t += dt;
-    this.banners = this.banners.filter((b) => b.t < b.dur);
+    for (let i = this.banners.length - 1; i >= 0; i--) {
+      const b = this.banners[i];
+      b.t += dt;
+      if (b.t >= b.dur) this.banners.splice(i, 1);
+    }
     if (this.hint) {
       this.hint.t -= dt;
       if (this.hint.t <= 0) this.hint = null;
@@ -271,7 +366,7 @@ export class Hud {
     g.drawImage(wp.c, -wp.ox, -wp.oy, wp.w, wp.h);
     g.restore();
     const ammo = p.weapons.get(p.cur) ?? 0;
-    text(g, ammo === Infinity ? '∞' : String(ammo), bx + 92, by + 31.5, 14, ammo !== Infinity && ammo < 10 ? '#ff8a8a' : '#ffffff', 'right');
+    numText(g, 'ammo', ammo, fmtAmmo, bx + 92, by + 31.5, 14, ammo !== Infinity && ammo < 10 ? '#ff8a8a' : '#ffffff', 'right');
     // granadas
     for (let i = 0; i < p.maxGrenades; i++) {
       const gx = bx + 4 + i * 8;
@@ -307,7 +402,7 @@ export class Hud {
         const blink = n.timeLeft < 8 && Math.floor(this.time * 6) % 2 === 0;
         pill(g, L + 8, ny + 27, w0, 4, 2, '#0e0a22');
         if (tf > 0) pill(g, L + 9, ny + 27.5, (w0 - 2) * tf, 3, 1.5, blink ? '#ff5a5a' : '#7ff9ff');
-        text(g, `APOIO ${Math.ceil(n.timeLeft)}s`, L + 8 + w0, ny + 12, 10, blink ? '#ff8a8a' : '#7ff9ff', 'right', DISPLAY, '400');
+        numText(g, 'support', Math.ceil(n.timeLeft), fmtSupport, L + 8 + w0, ny + 12, 10, blink ? '#ff8a8a' : '#7ff9ff', 'right', DISPLAY, '400');
       }
       // ícone do avanço + anel sutil da janela de 5 s
       const ix = L + 176 + 12;
@@ -353,9 +448,9 @@ export class Hud {
     const cw = 158;
     pill(g, cx - cw / 2, T, cw, 26, 8, 'rgba(23,15,46,0.72)', 'rgba(255,255,255,0.16)');
     drawSpr(g, art.pickups.token, cx - cw / 2 + 14, T + 13, { sx: 0.85, sy: 0.85 });
-    text(g, String(w.tokens), cx - cw / 2 + 26, T + 19, 15, '#ffe27a');
+    numText(g, 'tokens', w.tokens, fmtInt, cx - cw / 2 + 26, T + 19, 15, '#ffe27a');
     drawSpr(g, art.pickups.emblem, cx + 2, T + 13, { sx: 0.55, sy: 0.55 });
-    text(g, `${w.emblems.size} / 10`, cx + 14, T + 19, 15, '#ffffff');
+    numText(g, 'emblems', w.emblems.size, fmtEmblems, cx + 14, T + 19, 15, '#ffffff');
     for (let i = 0; i < 3; i++) {
       const got = w.secrets.has(i);
       g.globalAlpha = got ? 1 : 0.28;
@@ -363,8 +458,8 @@ export class Hud {
     }
     g.globalAlpha = 1;
     // pontuação e tempo (lado direito, abaixo do botão de pausa)
-    text(g, String(w.score).padStart(7, '0'), R - 44, T + 16, 15, '#ffffff', 'right');
-    text(g, formatTime(w.time), R - 44, T + 31, 12, '#cfc6ee', 'right');
+    numText(g, 'score', w.score, fmtScore, R - 44, T + 16, 15, '#ffffff', 'right');
+    numText(g, 'time', Math.floor(w.time), formatTime, R - 44, T + 31, 12, '#cfc6ee', 'right');
     // combo
     if (w.combo >= 2 && w.comboT > 0) {
       const m = comboMult(w.combo);
@@ -374,8 +469,8 @@ export class Hud {
       g.save();
       g.translate(cx0, cy0);
       g.scale(pop, pop);
-      text(g, `${w.combo} COMBO`, 0, 0, 15, m >= 4 ? '#ff5ab4' : m >= 3 ? '#ffb83a' : '#ffe27a', 'right', DISPLAY, '400');
-      if (m > 1) text(g, `x${m}`, 0, 15, 12, '#ffffff', 'right', DISPLAY, '400');
+      numText(g, 'combo', w.combo, fmtCombo, 0, 0, 15, m >= 4 ? '#ff5ab4' : m >= 3 ? '#ffb83a' : '#ffe27a', 'right', DISPLAY, '400');
+      if (m > 1) numText(g, 'mult', m, fmtMult, 0, 15, 12, '#ffffff', 'right', DISPLAY, '400');
       g.restore();
       const bw = 64;
       pill(g, cx0 - bw, cy0 + 20, bw, 4, 2, 'rgba(23,15,46,0.7)');
@@ -397,10 +492,15 @@ export class Hud {
       const f = clamp(boss.hp / boss.maxHp, 0, 1);
       const fs = clamp(this.bossShown, 0, 1);
       if (fs > f) pill(g, bx2 + 1, byy + 17, (bw - 2) * fs, 9, 3, '#ffffff');
-      const grd = g.createLinearGradient(bx2, 0, bx2 + bw, 0);
-      grd.addColorStop(0, '#ff3f7a');
-      grd.addColorStop(1, '#ffb83a');
-      if (f > 0) pill(g, bx2 + 1, byy + 17, (bw - 2) * f, 9, 3, grd);
+      if (!this.bossGrad || this.bossGradX !== bx2 || this.bossGradW !== bw) {
+        const grd = g.createLinearGradient(bx2, 0, bx2 + bw, 0);
+        grd.addColorStop(0, '#ff3f7a');
+        grd.addColorStop(1, '#ffb83a');
+        this.bossGrad = grd;
+        this.bossGradX = bx2;
+        this.bossGradW = bw;
+      }
+      if (f > 0) pill(g, bx2 + 1, byy + 17, (bw - 2) * f, 9, 3, this.bossGrad);
       // marcas das fases (66% / 33%)
       g.fillStyle = '#170f2e';
       g.fillRect(bx2 + bw * 0.66 - 1, byy + 16, 2, 11);
@@ -421,12 +521,16 @@ export class Hud {
       g.scale(0.7 + 0.3 * sc, 0.7 + 0.3 * sc);
       // faixa
       const wid = Math.min(W - 40, 360);
-      const grd = g.createLinearGradient(-wid / 2, 0, wid / 2, 0);
-      grd.addColorStop(0, 'rgba(23,15,46,0)');
-      grd.addColorStop(0.2, 'rgba(23,15,46,0.78)');
-      grd.addColorStop(0.8, 'rgba(23,15,46,0.78)');
-      grd.addColorStop(1, 'rgba(23,15,46,0)');
-      g.fillStyle = grd;
+      if (!this.bannerGrad || this.bannerGradW !== wid) {
+        const grd = g.createLinearGradient(-wid / 2, 0, wid / 2, 0);
+        grd.addColorStop(0, 'rgba(23,15,46,0)');
+        grd.addColorStop(0.2, 'rgba(23,15,46,0.78)');
+        grd.addColorStop(0.8, 'rgba(23,15,46,0.78)');
+        grd.addColorStop(1, 'rgba(23,15,46,0)');
+        this.bannerGrad = grd;
+        this.bannerGradW = wid;
+      }
+      g.fillStyle = this.bannerGrad;
       g.fillRect(-wid / 2, -22, wid, b.sub ? 52 : 38);
       g.fillStyle = '#ffb83a';
       g.fillRect(-wid * 0.32, -22, wid * 0.64, 2);
@@ -447,8 +551,38 @@ export class Hud {
     }
 
     // ------------------------------------------------ FPS
-    if (this.showFps) text(g, `${Math.round(this.fps)} FPS`, R - 4, H - 8, 10, '#9dfcff', 'right');
+    if (this.showFps) numText(g, 'fps', Math.round(this.fps), fmtFps, R - 4, H - 8, 10, '#9dfcff', 'right');
     g.restore();
+  }
+
+  /**
+   * Vinheta vermelha (mesmo gradiente radial de antes), pré-desenhada uma vez por tamanho e
+   * desenhada com transparência — antes era um gradiente de tela cheia criado a cada quadro.
+   */
+  private drawDanger(g: CanvasRenderingContext2D, W: number, H: number, alpha: number, r0: number, r1: number, blue: number) {
+    if (alpha <= 0.003) return;
+    if (!this.dangerVig || this.dangerW !== W || this.dangerH !== H || this.dangerBlue !== blue) {
+      const c = this.dangerVig ?? document.createElement('canvas');
+      // metade da resolução lógica: é um degradê suave (escalado fica idêntico)
+      c.width = Math.ceil(W / 2);
+      c.height = Math.ceil(H / 2);
+      const cg = c.getContext('2d')!;
+      cg.setTransform(0.5, 0, 0, 0.5, 0, 0);
+      cg.clearRect(0, 0, W, H);
+      const gr = cg.createRadialGradient(W / 2, H / 2, H * r0, W / 2, H / 2, H * r1);
+      gr.addColorStop(0, `rgba(255,40,${blue},0)`);
+      gr.addColorStop(1, `rgba(255,40,${blue},1)`);
+      cg.fillStyle = gr;
+      cg.fillRect(0, 0, W, H);
+      this.dangerVig = c;
+      this.dangerW = W;
+      this.dangerH = H;
+      this.dangerBlue = blue;
+    }
+    const prev = g.globalAlpha;
+    g.globalAlpha = prev * Math.min(1, alpha);
+    g.drawImage(this.dangerVig, 0, 0, W, H);
+    g.globalAlpha = prev;
   }
 
   /** Efeitos de tela: alarme do Nômad, pouca vida, velocidade. */
@@ -457,19 +591,11 @@ export class Hud {
     // alarme vermelho pulsando (Nômad quase destruído)
     if (p.nomad && p.nomad.hp / p.nomad.maxHp < 0.25) {
       const a = 0.12 + 0.12 * (0.5 + 0.5 * Math.sin(this.time * 8));
-      const gr = g.createRadialGradient(W / 2, H / 2, H * 0.3, W / 2, H / 2, H * 0.9);
-      gr.addColorStop(0, 'rgba(255,40,40,0)');
-      gr.addColorStop(1, `rgba(255,40,40,${a * 2.2})`);
-      g.fillStyle = gr;
-      g.fillRect(0, 0, W, H);
+      this.drawDanger(g, W, H, a * 2.2, 0.3, 0.9, 40);
       text(g, '⚠ NÔMAD CRÍTICO', W / 2, H - 26, 13, Math.floor(this.time * 6) % 2 ? '#ff6a6a' : '#ffd0d0', 'center');
     } else if (!p.nomad && p.hp <= 30 && p.mode !== 'dead') {
       const a = 0.1 + 0.08 * Math.sin(this.time * 6);
-      const gr = g.createRadialGradient(W / 2, H / 2, H * 0.35, W / 2, H / 2, H * 0.95);
-      gr.addColorStop(0, 'rgba(255,40,80,0)');
-      gr.addColorStop(1, `rgba(255,40,80,${a * 2.4})`);
-      g.fillStyle = gr;
-      g.fillRect(0, 0, W, H);
+      this.drawDanger(g, W, H, a * 2.4, 0.35, 0.95, 80);
     }
     // linhas de velocidade no avanço
     if (w.speedLines > 0) {

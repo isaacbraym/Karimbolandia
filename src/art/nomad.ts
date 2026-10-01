@@ -130,15 +130,9 @@ export function drawNomad(g: CanvasRenderingContext2D, art: NomadArt, heads: Kar
   g.restore();
   // sombreamento fixo sobre a esfera (esconde o sombreado "embutido" que gira)
   {
+    // (pré-desenhado uma vez: antes era um gradiente radial criado a cada quadro)
     const r = (art.sphere.w / 2) * 0.96;
-    const gr = g.createRadialGradient(-r * 0.25, sphereY - r * 0.35, r * 0.1, 0, sphereY, r);
-    gr.addColorStop(0, 'rgba(255,255,255,0.10)');
-    gr.addColorStop(0.55, 'rgba(0,0,0,0)');
-    gr.addColorStop(1, 'rgba(6,4,20,0.42)');
-    g.fillStyle = gr;
-    g.beginPath();
-    g.arc(0, sphereY, r, 0, Math.PI * 2);
-    g.fill();
+    g.drawImage(sphereShade(r), -r, sphereY - r, r * 2, r * 2);
   }
 
   // chassi
@@ -203,6 +197,29 @@ export function drawNomad(g: CanvasRenderingContext2D, art: NomadArt, heads: Kar
   g.restore();
   g.globalAlpha = prevA;
   void PAL;
+}
+
+/** Sombreamento fixo da esfera (mesmo degradê radial de antes), em cache por raio. */
+let shadeC: HTMLCanvasElement | null = null;
+let shadeR = -1;
+function sphereShade(r: number) {
+  if (shadeC && shadeR === r) return shadeC;
+  const S = 3;
+  const c = shadeC ?? document.createElement('canvas');
+  c.width = c.height = Math.ceil(r * 2 * S);
+  const g = c.getContext('2d')!;
+  g.setTransform(S, 0, 0, S, r * S, r * S);
+  const gr = g.createRadialGradient(-r * 0.25, -r * 0.35, r * 0.1, 0, 0, r);
+  gr.addColorStop(0, 'rgba(255,255,255,0.10)');
+  gr.addColorStop(0.55, 'rgba(0,0,0,0)');
+  gr.addColorStop(1, 'rgba(6,4,20,0.42)');
+  g.fillStyle = gr;
+  g.beginPath();
+  g.arc(0, 0, r, 0, Math.PI * 2);
+  g.fill();
+  shadeC = c;
+  shadeR = r;
+  return c;
 }
 
 /** Pose "estacionado" (antes de embarcar): esfera parada, luzes piscando. */

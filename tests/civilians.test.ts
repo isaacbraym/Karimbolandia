@@ -4,7 +4,7 @@ import { buildLevel } from '../src/game/level/index';
 import { T, TILE } from '../src/game/level';
 import { lookKey } from '../src/game/civLook';
 import { PHRASES, TALK_DIST } from '../src/game/civilians';
-import { INTRO_DROP, INTRO_LEN, INTRO_COMIC_LEN } from '../src/game/bossIntro';
+import { INTRO_DROP, INTRO_TOTAL, INTRO_COMIC_LEN, INTRO_LEN, KARIMBO_VOICE_LEN } from '../src/game/bossIntro';
 import { makeWorld, armUp, teleport, Bot, run, newCtl } from './helpers/bot';
 import type { World } from '../src/game/world';
 import type { Felipao } from '../src/game/enemies/felipao';
@@ -174,9 +174,10 @@ describe('Entrada do Felipão (sem áudio)', () => {
     expect(sawBossBeforeDrop).toBe(false);
     expect(landedAt).toBeGreaterThan(INTRO_DROP);
     expect(landedAt).toBeLessThan(INTRO_DROP + 1.6);
-    // ~15,7 s no total
-    expect(t).toBeGreaterThan(INTRO_LEN - 0.3);
-    expect(t).toBeLessThan(INTRO_LEN + 0.5);
+    // áudio do chefe (~15,7 s) e, em sequência, a voz do Karimbo (3,7 s)
+    expect(INTRO_TOTAL).toBeGreaterThanOrEqual(INTRO_LEN + KARIMBO_VOICE_LEN);
+    expect(t).toBeGreaterThan(INTRO_TOTAL - 0.3);
+    expect(t).toBeLessThan(INTRO_TOTAL + 0.5);
     // ninguém atacou durante a cena
     expect(w.player.hp).toBe(hp0);
     // terminou na luta
@@ -261,5 +262,27 @@ describe('Voz do Karimbo ao encontrar o Nômad', () => {
     for (let i = 0; i < 60 * 4 && !w2.director.support?.ready; i++) w2.update(1 / 60, newCtl());
     expect(w2.director.support?.ready).toBe(true);
     expect(v2).toEqual(['karimboNomad']);
+  });
+});
+
+describe('HQ do chefe: vozes em sequência', () => {
+  it('a voz do Karimbo só começa quando o áudio do chefe acaba (nunca as duas juntas)', async () => {
+    const { BossComic } = await import('../src/game/comic');
+    const { INTRO_VOICE_AT } = await import('../src/game/bossIntro');
+    const c = new BossComic(INTRO_COMIC_LEN, INTRO_VOICE_AT);
+    const beats = (c as unknown as { beats: Set<string> }).beats;
+    let voiceAt = -1;
+    let real = 0;
+    while (!c.done && real < 30) {
+      c.update(1 / 60);
+      real += 1 / 60;
+      if (voiceAt < 0 && beats.has('voice')) voiceAt = real;
+    }
+    // o áudio do chefe dura até INTRO_LEN; a HQ começa em INTRO_COMIC
+    expect(voiceAt).toBeGreaterThanOrEqual(INTRO_VOICE_AT - 1 / 60);
+    expect(voiceAt).toBeLessThan(INTRO_VOICE_AT + 0.05);
+    // e a HQ só termina depois da voz inteira
+    expect(real).toBeGreaterThanOrEqual(INTRO_VOICE_AT + KARIMBO_VOICE_LEN);
+    expect(real).toBeCloseTo(INTRO_COMIC_LEN, 1);
   });
 });

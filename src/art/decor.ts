@@ -57,7 +57,7 @@ const STATIC_BOUNDS: Record<string, [number, number, number, number]> = {
 };
 let decoDensity = 2;
 const baked = new Map<string, HTMLCanvasElement>();
-const MAX_BAKED = 70;
+const MAX_BAKED = 90;
 let bakeBudget = 2;
 /** Chamado uma vez por quadro: limita quantas decorações novas são pré-desenhadas. */
 export function resetDecoBudget(n = 2) {
@@ -72,14 +72,9 @@ export function setDecoDensity(dens: number) {
   baked.clear();
 }
 
-function bakedDeco(kind: string, seed: number, s: number, b: [number, number, number, number]): HTMLCanvasElement {
-  const key = kind + '|' + seed + '|' + s;
+function bakedDeco(key: string, kind: string, seed: number, s: number, b: [number, number, number, number]): HTMLCanvasElement {
   const hit = baked.get(key);
-  if (hit) {
-    baked.delete(key);
-    baked.set(key, hit); // LRU
-    return hit;
-  }
+  if (hit) return hit;
   const D = s * decoDensity;
   const c = document.createElement('canvas');
   c.width = Math.max(1, Math.ceil((b[2] - b[0]) * D));
@@ -98,17 +93,44 @@ export function decoScale(d: DecoSpawn) {
   return (d.scale ?? 1) * (DECO_SCALE[d.kind] ?? 1);
 }
 
+/**
+ * Semente das decorações estáticas: as que não sorteiam nada usam uma imagem só para todas (antes
+ * cada poste/banco/hidrante idêntico era assado de novo); o carro só varia a cor (5); fachadas,
+ * lojas, árvores e pilhas de caixas ficam com 8 variações. Assim as imagens prontas cabem todas no
+ * cache e nada é recriado enquanto o Nômad atravessa a cidade em alta velocidade.
+ */
+function bakeSeed(kind: string, seed: number) {
+  switch (kind) {
+    case 'parkedCar':
+      return Math.abs(seed) % 5;
+    case 'facade':
+    case 'shopFront':
+    case 'streetTree':
+    case 'crateStack':
+      return (Math.abs(seed) % 8) * 977 + 13;
+    default:
+      return 0;
+  }
+}
+type KeyedDeco = DecoSpawn & { _bk?: string; _bs?: number };
+
 export function drawDeco(g: CanvasRenderingContext2D, d: DecoSpawn, t: number) {
   const s = (d.scale ?? 1) * (DECO_SCALE[d.kind] ?? 1);
-  const seed = seedOf(d);
+  const b = STATIC_BOUNDS[d.kind];
+  const kd = d as KeyedDeco;
+  // chave da imagem pronta calculada uma vez por decoração (nada de strings novas por quadro)
+  if (b && kd._bk === undefined) {
+    kd._bs = bakeSeed(d.kind, seedOf(d));
+    kd._bk = d.kind + '|' + kd._bs + '|' + s;
+  }
+  const seed = b ? kd._bs! : seedOf(d);
   g.save();
   g.translate(d.x, d.y);
   if (d.flip) g.scale(-1, 1);
   g.scale(s, s);
-  const b = STATIC_BOUNDS[d.kind];
-  const ready = b && typeof document !== 'undefined' ? baked.get(d.kind + '|' + seed + '|' + s) : undefined;
+  const ready = b && typeof document !== 'undefined' ? baked.get(kd._bk!) : undefined;
   if (b && (ready || (typeof document !== 'undefined' && bakeBudget-- > 0))) {
-    g.drawImage(ready ?? bakedDeco(d.kind, seed, s, b), b[0], b[1], b[2] - b[0], b[3] - b[1]);
+    g.drawImage(ready ?? bakedDeco(kd._bk!, d.kind, seed, s, b), b[0], b[1], b[2] - b[0], b[3] - b[1]);
   } else paintDeco(g, d.kind, seed, t);
   g.restore();
   void rngCache;

@@ -8,7 +8,7 @@ import { bakeRobots, type RobotArt } from './robots';
 import { bakeTiles, type TileArt } from './tiles';
 import { bakeProps, bakePickups } from './props';
 import { Background } from './background';
-import { setArtScale, type Sprite } from './kit';
+import { setArtScale, whiteOf, glowSprite, softDot, type Sprite } from './kit';
 import type { PropKind, PickupKind } from '../game/level';
 
 export interface Art {
@@ -25,6 +25,16 @@ export interface Art {
 }
 
 let art: Art | null = null;
+
+/** Gera a máscara branca de todo sprite de um grupo de arte (objetos com c/w/h/ox/oy). */
+function warmWhites(group: unknown) {
+  if (!group || typeof group !== 'object') return;
+  for (const [k, v] of Object.entries(group as Record<string, unknown>)) {
+    if (k === 'body' || k === 'wreck') continue; // foto inteira legada / carcaça: nunca piscam
+    const sp = v as Partial<Sprite> | null;
+    if (sp && typeof sp === 'object' && sp.c instanceof HTMLCanvasElement && typeof sp.ox === 'number') whiteOf(sp as Sprite);
+  }
+}
 
 export function getArt(): Art {
   if (!art) throw new Error('Arte ainda não carregada');
@@ -58,6 +68,13 @@ export async function buildArt(base: string, quality: Quality, onProgress: (p: n
   steps.push(['Construindo a cidade...', () => { out.tiles = bakeTiles(); }]);
   steps.push(['Espalhando caixas e tesouros...', () => { out.props = bakeProps(); out.pickups = bakePickups(); }]);
   steps.push(['Pintando o horizonte...', () => { out.bg = new Background(quality === 'high' ? 1.5 : quality === 'medium' ? 1.25 : 1); }]);
+  // máscaras brancas do "pisca" ao levar dano e brilhos mais usados: prontos antes de jogar
+  // (gerar na hora o branco dos sprites grandes do Felipão/Nômad dava um engasgo no primeiro tiro)
+  steps.push(['Aquecendo os efeitos...', () => {
+    for (const group of [out.felipao, out.nomad, out.robots, ...Object.values(out.soldiers ?? {})]) warmWhites(group);
+    for (const c of ['#ffffff', '#ffd27a', '#ffb347', '#ff7a1a', '#ff8a3a', '#ff3a2a', '#39f0ff', '#7ff9ff', '#ffe27a', '#ff9a4a', '#ffb060', '#ff4a4a']) glowSprite(c, 32);
+    for (const c of ['#000000', '#ffffff', '#b9b0c8', '#ffd27a', '#ff7a1a']) softDot(c, 16);
+  }]);
   for (let i = 0; i < steps.length; i++) {
     onProgress(0.3 + (i / steps.length) * 0.7, steps[i][0]);
     await tick();
