@@ -172,7 +172,7 @@ export class Narrator {
       return;
     }
     this.watch();
-    if (this.cur >= 0 && this.t >= this.curEnd) {
+    if (this.cur >= 0 && (this.w.hooks.narrPlaying ? !this.w.hooks.narrPlaying(this.cur) : this.t >= this.curEnd)) {
       this.cur = -1;
       this.gapUntil = this.t + GAP;
       this.w.hooks.onNarrEnd?.();

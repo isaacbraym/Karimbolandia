@@ -84,7 +84,7 @@ export class OpeningOverlay {
         g.textAlign = 'right';
         g.textBaseline = 'middle';
         g.fillStyle = '#ffffff';
-        g.fillText('toque / tiro para pular ▶', w - 2, h / 2);
+        g.fillText('aguarde a narração...', w - 2, h / 2);
       },
       { scale: 3, ox: 150, oy: 16 }
     );

@@ -16,7 +16,7 @@ import { drawDeco, resetDecoBudget } from '../art/decor';
 import { drawSpr } from '../art/kit';
 import { INTRO_TOTAL, INTRO_DROP, INTRO_COMIC, INTRO_COMIC_LEN, type IntroOverlay } from './bossIntro';
 import type { Felipao } from './enemies/felipao';
-import { NARR_LEN, OPEN_BEATS } from './narrator';
+import { OPEN_BEATS } from './narrator';
 
 type ArenaStatus = 'idle' | 'active' | 'cleared';
 interface ArenaState {
@@ -940,7 +940,7 @@ export class Director {
     this.cine = { kind: 'opening', t: 0, stage: 0, fxT: 0, beat: 0 };
     w.player.lockInput = true;
     w.player.body.vx = 0;
-    w.narrator.request(1, 3, undefined, 3);
+    w.narrator.request(1, 15, undefined, 3);
   }
   openingActive() {
     return this.cine?.kind === 'opening';
@@ -973,11 +973,10 @@ export class Director {
     const nr = w.narrator;
     p.lockInput = true;
     p.body.vx = 0;
-    // a fala ainda não começou (áudio terminando de decodificar): a cena espera um pouco
+    // a fala ainda não começou (áudio terminando de decodificar): espera até tocar
     if (!nr.played.has(1)) {
       c.t = 0;
-      c.fxT = (c.fxT ?? 0) + dt;
-      if (c.fxT > 2.5 || !nr.pending(1)) this.endOpening();
+      if (!nr.pending(1)) this.endOpening(); // áudio indisponível: não prende a partida
       return;
     }
     const t = c.t;
@@ -1024,7 +1023,7 @@ export class Director {
         p.earPop(1.4);
       }
     }
-    if (t >= NARR_LEN[1] + 0.5 || (!nr.busy() && t > B.name)) this.endOpening();
+    if (!nr.busy() && t > B.name) this.endOpening();
   }
 
   /** Entrada longa em andamento (o jogo esconde o HUD, trava o jogador e permite pular). */

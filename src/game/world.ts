@@ -59,6 +59,8 @@ export interface Hooks {
   onNarrEnd?: () => void;
   /** narrador: o áudio da fala N já está pronto para tocar? (sem hook = sim) */
   narrReady?: (id: number) => boolean;
+  /** áudio real ainda em reprodução (sem hook, usa a duração simulada nos testes) */
+  narrPlaying?: (id: number) => boolean;
   /** narrador: comece a preparar (decodificar) a fala N */
   onNarrPrepare?: (id: number) => void;
 }

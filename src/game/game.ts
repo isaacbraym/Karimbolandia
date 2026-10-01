@@ -348,6 +348,7 @@ export class Game {
         audio.setSfxDuck(1);
       },
       narrReady: (id) => audio.narrReady(id),
+      narrPlaying: (id) => this.narrId === id && !!this.narrClip?.playing,
       onNarrPrepare: (id) => audio.prepareNarr(id),
       onBanner: (t, s, d) => this.hud.banner(t, s, d),
       onComplete: () => this.onComplete(),
@@ -733,13 +734,9 @@ export class Game {
       return;
     }
     if (w.fx.slowmo > 0) sdt = dt * w.fx.slowScale;
-    // abertura narrada: a fala manda no ritmo; toque/tiro/pulo pula
+    // abertura narrada: a fala manda no ritmo e o controle só volta quando ela termina
     if (w.director.openingActive()) {
-      const s = this.input.state;
-      if ((s.fire.pressed || s.jump.pressed || this.introTap) && w.director.openingTime() > 0.6) {
-        w.director.skipOpening();
-        this.input.clearEdges();
-      } else if (this.narrId === 1 && this.narrClip && this.narrClip.playing) w.director.syncOpening(this.narrClip.elapsed());
+      if (this.narrId === 1 && this.narrClip?.playing) w.director.syncOpening(this.narrClip.elapsed());
       this.introTap = false;
     }
     // entrada do Felipão: o áudio é o relógio da cena; toque/tiro/pulo pula tudo

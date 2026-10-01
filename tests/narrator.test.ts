@@ -70,6 +70,31 @@ describe('Narrador', () => {
     expect(s2.narr[0].t1).toBeLessThan(2);
   });
 
+  it('abertura espera o áudio real mesmo além da duração estimada', () => {
+    const w = makeWorld();
+    let ready = false;
+    let playing = true;
+    w.hooks.narrReady = () => ready;
+    w.hooks.narrPlaying = (id) => id === 1 && playing;
+    w.director.startOpening();
+    const ctl = newCtl();
+    ctl.moveX = 1;
+    const startX = w.player.x;
+    for (let i = 0; i < 60 * 5; i++) w.update(1 / 60, ctl);
+    expect(w.director.openingActive()).toBe(true); // decodificação passou do antigo prazo de 3 s
+    expect(w.player.lockInput).toBe(true);
+    ready = true;
+    for (let i = 0; i < 60 * 18; i++) w.update(1 / 60, ctl);
+    expect(w.narrator.t).toBeGreaterThan(NARR_LEN[1]);
+    expect(w.director.openingActive()).toBe(true);
+    expect(w.player.lockInput).toBe(true);
+    expect(w.player.x).toBeCloseTo(startX, 0);
+    playing = false;
+    for (let i = 0; i < 3; i++) w.update(1 / 60, ctl);
+    expect(w.director.openingActive()).toBe(false);
+    expect(w.player.lockInput).toBe(false);
+  });
+
   it('a apresentação do Nômad espera o narrador: a voz do Karimbo nunca cruza com ele', () => {
     const w = makeWorld();
     const { narr, voices } = spy(w);
