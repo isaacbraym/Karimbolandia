@@ -5,6 +5,8 @@ import { PostFX } from './post';
 import { BossComic } from './comic';
 import { IntroOverlay, INTRO_COMIC, INTRO_VOICE_AT } from './bossIntro';
 import { bakeCivilians } from '../art/civilians';
+import { OpeningOverlay } from './opening';
+import { NARR_COUNT } from './narrator';
 import { setDecoDensity } from '../art/decor';
 import { music, MIX, type ThemeName } from '../core/music';
 import { settings, progress, saveProgress } from '../core/storage';
@@ -69,6 +71,12 @@ export class Game {
   private intro = new IntroOverlay();
   private introClip: ClipHandle | null = null;
   private introTap = false;
+  /** narrador: fala tocando agora */
+  private narrClip: ClipHandle | null = null;
+  private narrId = -1;
+  private opening = new OpeningOverlay();
+  /** a abertura narrada só passa no começo de uma partida nova (não em QA com teleporte) */
+  private noOpening = new URLSearchParams(location.search).has('tp');
   /** resolução dinâmica: fração da resolução alvo (0.6..1) — cai antes de qualquer efeito ser cortado */
   renderScale = 1;
   private drsAcc = 0;
@@ -102,7 +110,7 @@ export class Game {
     this.input.onGesture = () => {
       audio.init();
       if (this.state === 'comic') this.comicTap = true;
-      else if (this.state === 'playing' && this.world?.director.longIntroActive()) this.introTap = true;
+      else if (this.state === 'playing' && (this.world?.director.longIntroActive() || this.world?.director.openingActive())) this.introTap = true;
     };
     this.input.onMenuKey = (code) => {
       if (this.state === 'playing') return;
@@ -131,14 +139,17 @@ export class Game {
     }
     // vozes/entrada do chefe: baixadas junto com a arte (decodificadas no primeiro toque)
     const clips = audio.loadClips(base);
+    // narrador: a primeira fala (abertura) chega junto; as outras baixam em segundo plano
+    const narr = audio.loadNarration(base, NARR_COUNT);
     await buildArt(base, this.quality, (p, l) => this.menus.setLoading(p * 0.94, l));
     // moradores: só as aparências que existem na fase, assadas uma vez
     this.menus.setLoading(0.95, 'Chamando os moradores...');
     await new Promise((r) => setTimeout(r, 0));
     bakeCivilians(buildLevel().civilians.map((c) => c.look));
     this.intro.prepare();
+    this.opening.prepare();
     this.menus.setLoading(0.98, 'Afinando as vozes...');
-    await Promise.race([clips, new Promise((r) => setTimeout(r, 4000))]);
+    await Promise.race([Promise.all([clips, narr]), new Promise((r) => setTimeout(r, 4000))]);
     this.menus.setLoading(1, 'Pronto!');
     this.hud.showFps = settings.showFps;
     this.menuScene = new MenuScene();
@@ -164,6 +175,7 @@ export class Game {
 
   applySettings() {
     audio.setVolumes(settings.music, settings.sfx);
+    if (this.world) this.world.narrator.enabled = settings.narrator;
     this.touch.applySettings();
     this.hud.showFps = settings.showFps;
     if (settings.quality !== 'auto' && settings.quality !== this.quality) {
@@ -270,6 +282,7 @@ export class Game {
     this.menus.hideAll();
     this.menus.fade(false);
     this.stopIntroAudio();
+    this.stopNarr(0.2);
     if (!this.world || again || this.state === 'complete') {
       this.world = new World(buildLevel());
       this.bindWorld(this.world);
@@ -278,6 +291,7 @@ export class Game {
     }
     const w = this.world;
     w.director.introArt = this.intro;
+    w.narrator.enabled = settings.narrator;
     w.camera.viewW = this.viewW;
     w.camera.viewH = this.viewH;
     this.applyFxCaps();
@@ -293,7 +307,23 @@ export class Game {
     audio.setDuck(1);
     this.wasMusic = null;
     this.setMusic(w.musicState);
+    // abertura narrada (câmera pelas ruínas até o herói)
+    if (settings.narrator && !this.noOpening) w.director.startOpening();
     this.last = performance.now();
+  }
+
+  // ------------------------------------------------------------------ narrador
+  private playNarr(id: number) {
+    this.narrClip?.stop(0.12);
+    this.narrClip = audio.playNarr(id);
+    this.narrId = id;
+    audio.setNarrDuck(0.5, 0.35);
+  }
+  private stopNarr(fade = 0.3) {
+    this.narrClip?.stop(fade);
+    this.narrClip = null;
+    this.narrId = -1;
+    audio.setNarrDuck(1, 0.5);
   }
 
   private bindWorld(w: World) {
@@ -304,6 +334,11 @@ export class Game {
       onBossIntro: () => this.startBossIntro(),
       onBossComic: (len) => this.startComic(len),
       onBossIntroEnd: () => this.endBossIntro(),
+      onNarrate: (id) => this.playNarr(id),
+      onNarrStop: () => this.stopNarr(0.3),
+      onNarrEnd: () => audio.setNarrDuck(1, 0.6),
+      narrReady: (id) => audio.narrReady(id),
+      onNarrPrepare: (id) => audio.prepareNarr(id),
       onBanner: (t, s, d) => this.hud.banner(t, s, d),
       onComplete: () => this.onComplete(),
       onMusic: (s) => this.setMusic(s),
@@ -327,6 +362,7 @@ export class Game {
     this.touch.show(false);
     this.menus.showPause();
     this.introClip?.pause();
+    this.narrClip?.pause();
     audio.setDuck(0.3);
     audio.loop('glide', false);
     audio.loop('roll', false);
@@ -341,6 +377,7 @@ export class Game {
     this.input.enabled = true;
     this.touch.show(!this.world?.director.longIntroActive() && (this.isTouch || this.input.touch.active));
     this.introClip?.resume();
+    this.narrClip?.resume();
     audio.setDuck(1);
     this.last = performance.now();
     this.updateRotate();
@@ -367,11 +404,12 @@ export class Game {
 
   toMenu(first = false) {
     this.stopIntroAudio();
+    this.stopNarr(0.2);
     this.state = 'menu';
     this.input.enabled = false;
     this.touch.show(false);
     this.menus.hideAll();
-    this.menus.showMain(first ? 'v3 • toque em JOGAR' : 'v3');
+    this.menus.showMain(first ? 'v4 • toque em JOGAR' : 'v4');
     this.menus.fade(false);
     this.updateRotate();
     audio.setDuck(1);
@@ -394,6 +432,8 @@ export class Game {
     this.continueLeft = CONTINUE_SECS;
     this.continueTick = CONTINUE_SECS;
     audio.setDuck(0.45);
+    // primeira vez na tela CONTINUAR?: o narrador consola
+    this.world?.narrator.request(27, 2, undefined, 2);
     audio.loop('glide', false);
     audio.loop('roll', false);
     audio.loop('alarm', false);
@@ -652,7 +692,8 @@ export class Game {
         if (this.comic.done) this.endComic();
       }
     } else if (this.state === 'continue' && w) {
-      // mundo congelado; contagem regressiva + confirmação por gamepad
+      // mundo congelado; contagem regressiva + confirmação por gamepad (o narrador continua)
+      w.narrator.update(dt);
       this.continueLeft -= dt;
       if (Math.ceil(this.continueLeft) < this.continueTick) {
         this.continueTick = Math.ceil(this.continueLeft);
@@ -683,6 +724,15 @@ export class Game {
       return;
     }
     if (w.fx.slowmo > 0) sdt = dt * w.fx.slowScale;
+    // abertura narrada: a fala manda no ritmo; toque/tiro/pulo pula
+    if (w.director.openingActive()) {
+      const s = this.input.state;
+      if ((s.fire.pressed || s.jump.pressed || this.introTap) && w.director.openingTime() > 0.6) {
+        w.director.skipOpening();
+        this.input.clearEdges();
+      } else if (this.narrId === 1 && this.narrClip && this.narrClip.playing) w.director.syncOpening(this.narrClip.elapsed());
+      this.introTap = false;
+    }
     // entrada do Felipão: o áudio é o relógio da cena; toque/tiro/pulo pula tudo
     if (w.director.longIntroActive()) {
       const s = this.input.state;
@@ -857,6 +907,7 @@ export class Game {
     this.hud.drawScreenFx(g, w, W, H);
     if (this.state === 'comic' && this.comic) this.comic.draw(g, W, H);
     else if (w.director.longIntroActive()) this.intro.draw(g, W, H, w.director.introTime(), w.director.introLandT());
+    else if (w.director.openingActive()) this.opening.draw(g, W, H, w.director.openingTime());
     else this.hud.draw(g, w, W, H);
   }
 

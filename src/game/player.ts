@@ -16,11 +16,14 @@ import {
 } from './movement';
 
 const SLIDE_T = 0.42; // s de deslize
-const MELEE_REACH = 40; // px à frente
+const MELEE_REACH = 48; // px à frente (faquinha: pega quem está colado)
 const SLAM_V = 980; // velocidade do mergulho
 const SLAM_R = 96; // raio da onda de choque
 const SLAM_DMG = 48;
-const MELEE_DMG = 55;
+/** faquinha de manteiga: derruba soldados e robôs pequenos num golpe só */
+const MELEE_DMG = 62;
+/** duração do golpe de faca (s) */
+export const KNIFE_T = 0.26;
 const SHOTGUN_KICK = 340; // px/s para trás
 const SHOTGUN_HOP = 400; // pulinho do coice (~45 px)
 const SHOTGUN_POGO = 600; // tiro para baixo: impulso para cima (~100 px)
@@ -70,8 +73,10 @@ export class Player {
   slideT = 0;
   /** tempo em que o coice (escopeta) manda no movimento horizontal */
   recoilT = 0;
-  /** animação do golpe corpo a corpo */
+  /** animação do golpe corpo a corpo (faquinha) */
   meleeT = 0;
+  /** alterna o golpe: de cima para baixo / de baixo para cima */
+  meleeAlt = 0;
   // ---- rig de animação (molas de movimento secundário)
   private animLean = 0;
   private animLeanV = 0;
@@ -771,35 +776,48 @@ export class Player {
     else this.idleT = 0;
   }
 
+  /** Orelhas balançam (cinemática de abertura). */
+  earPop(k = 1) {
+    this.earSprV += 2.6 * k;
+    this.headLagVY -= 30 * k;
+  }
+
   /** Impulso nas molas (pouso, pulo, tiro forte). */
   private rigKick(headY: number, ears: number) {
     this.headLagVY += headY;
     this.earSprV += ears;
   }
 
+  /**
+   * Faquinha (como a faca do Metal Slug): com inimigo colado, o tiro vira um golpe de faca de
+   * manteiga — atinge todos que estão encostados na frente, sem gastar munição, e atravessa escudos.
+   */
   private tryMelee(w: World) {
     const hb = this.hitbox;
-    let target: (typeof w.enemies)[number] | null = null;
-    let best = 1e9;
+    let hits = 0;
+    let tx = 0;
+    const dir = this.facing;
     for (const e of w.enemies) {
       if (!e.alive || !e.canBeHit || e.isBoss) continue;
       const eb = e.hitbox;
-      const front = (e.x - this.x) * this.facing;
+      const front = (e.x - this.x) * dir;
       if (front < -6 || front > MELEE_REACH + eb.w / 2) continue;
       if (eb.y > hb.y + hb.h || eb.y + eb.h < hb.y) continue;
-      if (front < best) {
-        best = front;
-        target = e;
+      if (hits === 0) {
+        // primeiro golpe da sequência: a faca sai
+        this.fireCd = 0.3;
+        this.meleeT = KNIFE_T;
+        this.meleeAlt = this.meleeAlt ? 0 : 1;
+        this.kick = 1;
       }
+      e.hurt(w, MELEE_DMG, { kx: dir * 380, ky: -220, x: e.x, y: e.y - 20, type: 'melee', dir });
+      if (hits === 0) tx = e.x;
+      hits++;
     }
-    if (!target) return false;
-    this.fireCd = 0.3;
-    this.meleeT = 0.22;
-    this.kick = 1;
-    const dir = this.facing;
-    target.hurt(w, MELEE_DMG, { kx: dir * 380, ky: -220, x: target.x, y: target.y, type: 'melee', dir });
-    w.audio('dashHit', 0.9, target.x);
-    w.audio('hit', 0.8, target.x);
+    if (!hits) return false;
+    const target = { x: tx };
+    w.audio('knife', 1, target.x);
+    w.audio('hit', 0.7, target.x);
     w.fx.addHitStop(0.05);
     w.fx.addShake(3, 0.12);
     const hx = this.x + dir * 26;
@@ -1384,8 +1402,8 @@ export class Player {
   draw(g: CanvasRenderingContext2D, w: World) {
     this.drawBody(g, w);
     if (this.meleeT > 0 && !this.nomad) {
-      // arco do golpe
-      const k = 1 - this.meleeT / 0.22;
+      // rastro do corte da faca
+      const k = 1 - this.meleeT / KNIFE_T;
       const cx = this.x + this.facing * 10;
       const cy = this.feetY - 34 + (this.crouch ? 14 : 0);
       g.save();
@@ -1394,8 +1412,12 @@ export class Player {
       g.lineWidth = 5 * (1 - k) + 1;
       g.lineCap = 'round';
       g.beginPath();
-      const a0 = this.facing === 1 ? -1.3 : Math.PI + 1.3;
-      const a1 = this.facing === 1 ? -1.3 + 2.4 * Math.min(1, k * 2) : Math.PI + 1.3 - 2.4 * Math.min(1, k * 2);
+      // alterna: de cima para baixo / de baixo para cima
+      const up = this.meleeAlt === 1;
+      const s0 = up ? 1.1 : -1.3;
+      const sw = (up ? -2.4 : 2.4) * Math.min(1, k * 2);
+      const a0 = this.facing === 1 ? s0 : Math.PI - s0;
+      const a1 = this.facing === 1 ? s0 + sw : Math.PI - s0 - sw;
       g.arc(cx, cy, 30, Math.min(a0, a1), Math.max(a0, a1));
       g.stroke();
       g.strokeStyle = `rgba(255,210,120,${0.6 * (1 - k)})`;
@@ -1482,7 +1504,8 @@ export class Player {
       earSpring: this.earSpr,
       turn: this.turnT > 0 ? Math.sin((this.turnT / 0.11) * Math.PI) : 0,
       idleT: this.idleT,
-      melee: this.meleeT > 0 ? 1 - this.meleeT / 0.22 : 0,
+      melee: this.meleeT > 0 ? 1 - this.meleeT / KNIFE_T : 0,
+      meleeUp: this.meleeAlt === 1,
     });
     // barra de "combustível" do glide (sutil)
     if (this.glide || (this.glideUsed && !b.onGround && this.glideFuel < GLIDE_FUEL * 0.999 && this.glideFuel > 0)) {

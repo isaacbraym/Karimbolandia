@@ -108,7 +108,7 @@ export class Menus {
     const o = el('div', 'overlay hidden');
     o.id = 'menu';
     const wrap = el('div', 'wrap');
-    wrap.append(el('div', 'title', 'KARIMBOLÂNDIA<span class="ver">.v3</span>'), el('div', 'sub', 'RUN &amp; GUN 2.5D'));
+    wrap.append(el('div', 'title', 'KARIMBOLÂNDIA<span class="ver">.v4</span>'), el('div', 'sub', 'RUN &amp; GUN 2.5D'));
     const btns = el('div', 'btns');
     btns.append(
       this.btn('JOGAR', 'primary', () => this.cb.onPlay()),
@@ -278,6 +278,7 @@ export class Menus {
       this.slider('Opacidade dos botões (toque)', () => settings.touchOpacity, (v) => (settings.touchOpacity = v), 0.2, 0.9, 0.05),
       this.toggle('Modo canhoto (inverte os botões)', () => settings.leftHanded, (v) => (settings.leftHanded = v)),
       this.toggle('Assistência de mira (toque/teclado)', () => settings.aimAssist, (v) => (settings.aimAssist = v)),
+      this.toggle('Narrador da história', () => settings.narrator, (v) => (settings.narrator = v)),
       this.toggle('Vibração (celular / controle)', () => settings.haptics, (v) => (settings.haptics = v)),
       this.toggle('Tremor de tela', () => settings.screenShake, (v) => (settings.screenShake = v)),
       this.toggle('Mostrar FPS', () => settings.showFps, (v) => (settings.showFps = v))

@@ -19,6 +19,7 @@ import { drawNomadIdle } from '../art/nomad';
 import { softDot, drawSpr } from '../art/kit';
 import { Corpse } from './corpse';
 import { Crowd } from './civilians';
+import { Narrator } from './narrator';
 
 export interface Stats {
   kills: number;
@@ -52,6 +53,14 @@ export interface Hooks {
   onBossComic?: (len: number) => void;
   /** entrada longa terminou (ou foi pulada): devolve a música e o controle */
   onBossIntroEnd?: () => void;
+  /** narrador: tocar a fala N / cortar a atual / a fala terminou (pelo relógio do narrador) */
+  onNarrate?: (id: number) => void;
+  onNarrStop?: () => void;
+  onNarrEnd?: () => void;
+  /** narrador: o áudio da fala N já está pronto para tocar? (sem hook = sim) */
+  narrReady?: (id: number) => boolean;
+  /** narrador: comece a preparar (decodificar) a fala N */
+  onNarrPrepare?: (id: number) => void;
 }
 
 export interface Wreck {
@@ -67,6 +76,8 @@ export class World {
   camera = new Camera();
   player = new Player();
   director: Director;
+  /** narrador da história (falas por lugar/evento, nunca por cima das vozes dos personagens) */
+  narrator!: Narrator;
   enemies: Enemy[] = [];
   bullets: Bullet[] = [];
   grenades: Grenade[] = [];
@@ -139,6 +150,7 @@ export class World {
     this.baseTiles = data.level.tiles.slice();
     this.baseTheme = data.level.theme.slice();
     this.director = new Director(this);
+    this.narrator = new Narrator(this);
     this.computePits();
     this.smash = new Smasher(this);
     this.camera.bounds = { x: 0, y: 0, w: this.level.pxW, h: this.level.pxH };
@@ -177,6 +189,7 @@ export class World {
     this.comboT = 0;
     this.bestCombo = 0;
     this.smash?.reset();
+    this.narrator?.reset();
     this.finished = false;
     this.player.resetInventory();
     this.director.reset();
@@ -226,6 +239,7 @@ export class World {
     const sx = cp ? cp.x : this.data.playerStart.x;
     const sy = cp ? cp.y : this.data.playerStart.y;
     this.director.onRespawn();
+    this.narrator.onRespawn();
     this.restoreTiles();
     this.populate(false);
     this.director.afterPopulate();
@@ -304,6 +318,8 @@ export class World {
   }
   /** Voz/clipe gravado (sem áudio devolve um controle vazio). */
   voice(name: ClipName, vol = 1): ClipHandle {
+    // o narrador não começa enquanto um personagem fala
+    this.narrator.voiceStarted(CLIP_LEN[name]);
     return audioEngine.playClip(name, { vol });
   }
   music(s: MusicState) {
@@ -696,6 +712,7 @@ export class World {
     if (this.solidsDirty) this.rebuildSolids();
 
     this.director.update(dt, ctl);
+    this.narrator.update(dt);
     p.update(this, dt, ctl);
     // BZZZ do pernilongo enquanto plana (tom varia com velocidade e subida/descida)
     if (p.glide && p.mode === 'foot') audioEngine.loop('glide', true, clamp(Math.abs(p.body.vx) / 218, 0, 1), clamp(-p.body.vy / 220, -1, 1));
@@ -1036,5 +1053,8 @@ function pitSprites() {
   pitSpr = { dark, heat };
   return pitSpr;
 }
+
+/** duração das vozes gravadas dos personagens (s) */
+const CLIP_LEN: Record<ClipName, number> = { bossIntro: 15.7, karimboEncara: 3.7, karimboNomad: 1.5 };
 
 const WEAPON_AMMO_FLOOR: Record<WeaponId, number> = { pistol: Infinity, rifle: 60, shotgun: 12, launcher: 5, energy: 25 };

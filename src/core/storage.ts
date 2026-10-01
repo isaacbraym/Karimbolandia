@@ -13,6 +13,7 @@ export interface Settings {
   showFps: boolean;
   leftHanded: boolean;
   haptics: boolean; // vibração (celular) / rumble (gamepad)
+  narrator: boolean; // voz do narrador da história
 }
 
 export interface Progress {
@@ -40,6 +41,7 @@ export const defaultSettings = (): Settings => ({
   showFps: false,
   leftHanded: false,
   haptics: true,
+  narrator: true,
 });
 
 export const defaultProgress = (): Progress => ({

@@ -16,6 +16,7 @@ import { drawDeco, resetDecoBudget } from '../art/decor';
 import { drawSpr } from '../art/kit';
 import { INTRO_TOTAL, INTRO_DROP, INTRO_COMIC, INTRO_COMIC_LEN, type IntroOverlay } from './bossIntro';
 import type { Felipao } from './enemies/felipao';
+import { NARR_LEN, OPEN_BEATS } from './narrator';
 
 type ArenaStatus = 'idle' | 'active' | 'cleared';
 interface ArenaState {
@@ -31,7 +32,7 @@ interface ArenaState {
 }
 
 interface Cine {
-  kind: 'nomad' | 'bossDeath' | 'bossIntro';
+  kind: 'nomad' | 'bossDeath' | 'bossIntro' | 'opening';
   t: number;
   stage: number;
   /** entrada longa do chefe (primeira vez da partida, guiada pelo áudio) */
@@ -73,7 +74,7 @@ const SUSPENSE_BEATS: [number, number, number][] = [
   [3.1, 0.8, 0.08],
 ];
 
-const SUPPORT_AT = 90; // s de jogo (a pé, fora de arenas) até a entrega do Nômad de apoio
+export const SUPPORT_AT = 90; // s de jogo (a pé, fora de arenas) até a entrega do Nômad de apoio
 const SUPPORT_TIME = 50; // s de uso
 const ctlJumpHeld = (w: World) => w.lastJumpHeld;
 
@@ -415,7 +416,8 @@ export class Director {
 
     // fim de fase
     if (this.finishTimer >= 0) {
-      this.finishTimer -= dt;
+      // a tela de resultados espera o narrador terminar a fala da vitória
+      if (!w.narrator.pending(28)) this.finishTimer -= dt;
       if (this.finishTimer <= 0) {
         this.finishTimer = -1;
         w.finished = true;
@@ -445,9 +447,19 @@ export class Director {
   }
 
   /** Nômad de apoio: entrega aérea depois de ~90 s; embarca-se pulando em cima, como o principal. */
+  /** voz do Karimbo no pouso do apoio, adiada enquanto o narrador fala (s restantes de espera) */
+  private supportVoiceT = 0;
+
   private updateSupport(dt: number) {
     const w = this.w;
     const p = w.player;
+    if (this.supportVoiceT > 0) {
+      this.supportVoiceT -= dt;
+      if (!w.narrator.busy()) {
+        this.supportVoiceT = 0;
+        w.voice('karimboNomad');
+      }
+    }
     // tempo limitado do Nômad emprestado
     if (p.nomad && p.nomad.timeLeft !== Infinity && p.mode === 'nomad') {
       const n = p.nomad;
@@ -477,7 +489,8 @@ export class Director {
       s.t += dt;
       if (s.t >= 1.1) {
         s.ready = true;
-        w.voice('karimboNomad');
+        if (w.narrator.busy()) this.supportVoiceT = 6;
+        else w.voice('karimboNomad');
         w.audio('nomadEnter', 0.9, s.x);
         w.audio('explosion', 0.5, s.x);
         w.fx.addShake(5, 0.35);
@@ -656,6 +669,8 @@ export class Director {
       w.camera.focus = { x: ns.x - 20, y: ns.y - 64, rate: 3.2 };
       w.camera.zoomTarget = 1.4;
       p.body.vx = 0;
+      // a voz do Karimbo nunca cruza com o narrador: a cena segura até ele terminar
+      if (c.stage === 0 && c.t > 0.7 && w.narrator.busy()) c.t = 0.7;
       if (c.stage === 0 && c.t > 0.7) {
         c.stage = 1;
         w.audio('nomadBoot', 1);
@@ -683,6 +698,8 @@ export class Director {
         w.setMusic('explore');
         w.hooks.onHint?.('mountNomad');
       }
+    } else if (c.kind === 'opening') {
+      this.updateOpening(dt, c);
     } else if (c.kind === 'bossIntro' && c.long) {
       this.updateLongIntro(dt, c);
     } else if (c.kind === 'bossIntro') {
@@ -839,14 +856,20 @@ export class Director {
     w.player.lockInput = true;
     w.player.body.vx = 0;
     if (long) {
-      this.cine = { kind: 'bossIntro', t: 0, stage: 0, long: true, fxT: 0, beat: 0 };
+      // se o narrador estiver falando ("presença pesada..."), a cena segura no suspense até ele
+      // terminar; só então o áudio da entrada começa (as vozes nunca se cruzam)
+      const wait = w.narrator.busy();
+      w.narrator.queue.length = 0;
+      this.cine = { kind: 'bossIntro', t: 0, stage: wait ? -1 : 0, long: true, fxT: 0, beat: 0 };
       this.introLives = livesNow;
       // nada de tiros inimigos voando durante a entrada
       w.bullets = w.bullets.filter((b) => b.team === 0);
       w.grenades = w.grenades.filter((g) => g.team === 0);
       w.camera.zoomTarget = 0.95;
-      w.audio('warning', 0.7);
-      w.hooks.onBossIntro?.();
+      if (!wait) {
+        w.audio('warning', 0.7);
+        w.hooks.onBossIntro?.();
+      }
       return;
     }
     if (livesNow) {
@@ -888,6 +911,103 @@ export class Director {
     return e;
   }
 
+  // ------------------------------------------------------------------ abertura (narrador)
+  /**
+   * Abertura dramática na primeira partida: letreiro de cinema, câmera passeando pelas ruínas e
+   * voltando ao herói no ritmo da fala 1 ("O homem. A lenda. As orelhas. ... Karimbo!").
+   */
+  startOpening() {
+    const w = this.w;
+    this.cine = { kind: 'opening', t: 0, stage: 0, fxT: 0, beat: 0 };
+    w.player.lockInput = true;
+    w.player.body.vx = 0;
+    w.narrator.request(1, 3, undefined, 3);
+  }
+  openingActive() {
+    return this.cine?.kind === 'opening';
+  }
+  /** Tempo da abertura (−1 fora dela). */
+  openingTime() {
+    return this.cine?.kind === 'opening' ? this.cine.t : -1;
+  }
+  /** O relógio do áudio da fala 1 manda na cena. */
+  syncOpening(audioT: number) {
+    const c = this.cine;
+    if (c?.kind !== 'opening' || audioT < 0) return;
+    if (Math.abs(audioT - c.t) > 0.05) c.t = audioT;
+  }
+  skipOpening() {
+    if (!this.openingActive()) return;
+    this.w.narrator.stop();
+    this.endOpening();
+  }
+  private endOpening() {
+    const w = this.w;
+    this.cine = null;
+    w.player.lockInput = false;
+    w.camera.focus = null;
+  }
+  private updateOpening(dt: number, c: Cine) {
+    const w = this.w;
+    const p = w.player;
+    const cam = w.camera;
+    const nr = w.narrator;
+    p.lockInput = true;
+    p.body.vx = 0;
+    // a fala ainda não começou (áudio terminando de decodificar): a cena espera um pouco
+    if (!nr.played.has(1)) {
+      c.t = 0;
+      c.fxT = (c.fxT ?? 0) + dt;
+      if (c.fxT > 2.5 || !nr.pending(1)) this.endOpening();
+      return;
+    }
+    const t = c.t;
+    const B = OPEN_BEATS;
+    if (t < B.hero) {
+      // passeio pela cidade em ruínas, à frente do herói, voltando devagar
+      const k = t / B.hero;
+      cam.focus = { x: p.x + 820 - k * 620, y: p.y - 80, rate: 1.6 };
+      cam.zoomTarget = 0.9;
+    } else if (t < B.man) {
+      cam.focus = { x: p.x + 30, y: p.y - 30, rate: 2.6 };
+      cam.zoomTarget = 1.15;
+    } else if (t < B.legend) {
+      cam.focus = { x: p.x + 16, y: p.y - 24, rate: 4 };
+      cam.zoomTarget = 1.32;
+    } else if (t < B.ears) {
+      cam.focus = { x: p.x + 8, y: p.y - 18, rate: 4 };
+      cam.zoomTarget = 1.5;
+    } else if (t < B.name) {
+      // "As orelhas." — close nas orelhas
+      cam.focus = { x: p.x, y: p.y - 12, rate: 4.5 };
+      cam.zoomTarget = 1.85;
+    } else {
+      cam.focus = { x: p.x + 60, y: p.y - 30, rate: 3 };
+      cam.zoomTarget = 1.27;
+    }
+    const beat = c.beat ?? 0;
+    const beats = [B.man, B.legend, B.ears, B.name];
+    if (beat < beats.length && t >= beats[beat]) {
+      c.beat = beat + 1;
+      if (beat < 2) {
+        w.fx.addShake(2, 0.15);
+        w.fx.addFlash(0.07, '#ffffff');
+      } else if (beat === 2) {
+        p.earPop(1);
+        w.fx.addShake(1.5, 0.12);
+      } else {
+        // "Karimbo!"
+        w.fx.addShake(5, 0.35);
+        w.fx.addFlash(0.35, '#fff2c0');
+        w.fx.add(PK.Ring, p.x, p.y - 30, 0, 0, 0.45, 10, '#ffe27a', { size1: 120, a0: 0.9, front: true });
+        w.fx.sparks(p.x, p.y - 40, 18, '#ffe27a', 260);
+        w.audio('slam', 0.6);
+        p.earPop(1.4);
+      }
+    }
+    if (t >= NARR_LEN[1] + 0.5 || (!nr.busy() && t > B.name)) this.endOpening();
+  }
+
   /** Entrada longa em andamento (o jogo esconde o HUD, trava o jogador e permite pular). */
   longIntroActive() {
     return !!this.cine && this.cine.kind === 'bossIntro' && !!this.cine.long;
@@ -920,6 +1040,24 @@ export class Director {
     p.body.vx = 0;
     p.lockInput = true;
     const cam = w.camera;
+    if (c.stage === -1) {
+      // ---- esperando o narrador terminar: travado, câmera no palco, tremor leve
+      c.t = 0;
+      cam.focus = { x: p.x + Math.min((sp.x - p.x) * 0.5, cam.w * 0.28), y: sp.y - 62, rate: 2 };
+      cam.zoomTarget = 0.97;
+      c.fxT = (c.fxT ?? 0) - dt;
+      if (c.fxT <= 0) {
+        c.fxT = 0.5;
+        w.fx.addShake(0.8, 0.2);
+      }
+      if (!w.narrator.busy()) {
+        c.stage = 0;
+        c.fxT = 0;
+        w.audio('warning', 0.7);
+        w.hooks.onBossIntro?.();
+      }
+      return;
+    }
     if (c.stage === 0) {
       // ---- suspense: o Felipão ainda não aparece
       const k = clamp(t / INTRO_DROP, 0, 1);

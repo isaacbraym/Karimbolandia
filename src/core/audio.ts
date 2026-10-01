@@ -14,7 +14,7 @@ export type SfxName =
   | 'dash' | 'dash2' | 'dashHit' | 'nomadBoot' | 'nomadHop' | 'nomadHurt' | 'nomadDeath' | 'eject' | 'nomadEnter'
   | 'uiClick' | 'uiBack' | 'uiStart' | 'alarm' | 'warning' | 'lock' | 'unlock' | 'missile' | 'laserCharge' | 'laserFire'
   | 'enemyShot' | 'sniperShot' | 'turretShot' | 'stomp' | 'bossRoar' | 'bossHit' | 'bossPhase' | 'bossDie' | 'thruster'
-  | 'victory' | 'servo' | 'spark' | 'slam' | 'burp' | 'burpBig' | 'crush' | 'extraLife' | 'thunder';
+  | 'victory' | 'servo' | 'spark' | 'slam' | 'burp' | 'burpBig' | 'crush' | 'extraLife' | 'thunder' | 'knife';
 
 type LoopName = 'glide' | 'roll' | 'alarm' | 'laser' | 'thrusterLoop';
 
@@ -62,6 +62,13 @@ export class AudioEngine {
   /** abafamento da música por cinemáticas (0..1), separado do "duck" da pausa/menus */
   private cineDuck = 1;
   private cineRate = 0.05;
+  /** abafamento da música enquanto o narrador fala */
+  private narrDuck = 1;
+  /** narração: arquivos comprimidos (pequenos) e só as falas prestes a tocar decodificadas */
+  private narrData = new Map<number, ArrayBuffer>();
+  private narrBuf = new Map<number, AudioBuffer>();
+  private narrDecoding = new Set<number>();
+  private decoderCtx: BaseAudioContext | null | undefined = undefined;
   private clipData = new Map<ClipName, ArrayBuffer>();
   private clipBuf = new Map<ClipName, AudioBuffer>();
   private loops = new Map<LoopName, { nodes: AudioNode[]; params: Record<string, AudioParam | undefined>; gain: GainNode }>();
@@ -122,13 +129,95 @@ export class AudioEngine {
     const t = this.ctx.currentTime;
     this.sfxBus.gain.setTargetAtTime(this.muted ? 0 : this.sfxVol, t, 0.02);
     this.voiceBus.gain.setTargetAtTime(this.muted ? 0 : this.sfxVol, t, 0.02);
-    this.musicBus.gain.setTargetAtTime(this.muted ? 0 : this.musicVol * 0.34 * this.duck * this.cineDuck, t, this.duck < 1 ? 0.05 : this.cineRate);
+    this.musicBus.gain.setTargetAtTime(this.muted ? 0 : this.musicVol * 0.34 * this.duck * this.cineDuck * this.narrDuck, t, this.duck < 1 ? 0.05 : this.cineRate);
   }
   /** Abafa (0) ou devolve (1) a música do jogo durante cinemáticas; `fade` ≈ duração da rampa (s). */
   setCineDuck(v: number, fade = 0.3) {
     this.cineDuck = clamp(v, 0, 1);
     this.cineRate = Math.max(0.01, fade / 3);
     this.applyVolumes();
+  }
+
+  /** Abaixa a música enquanto o narrador fala (1 = normal). */
+  setNarrDuck(v: number, fade = 0.4) {
+    this.narrDuck = clamp(v, 0, 1);
+    this.cineRate = Math.max(0.01, fade / 3);
+    this.applyVolumes();
+  }
+
+  // ------------------------------------------------------------------ narração
+  /**
+   * Baixa as falas do narrador (nN.mp3) em segundo plano, uma de cada vez (não disputa a rede com o
+   * resto). Ficam comprimidas na memória (~1,3 MB); a primeira resolve a promessa logo cedo.
+   */
+  loadNarration(base: string, count: number): Promise<void> {
+    let firstDone: () => void = () => undefined;
+    const first = new Promise<void>((r) => (firstDone = r));
+    void (async () => {
+      for (let i = 1; i <= count; i++) {
+        try {
+          const r = await fetch(`${base}assets/audio/narr/n${i}.mp3`);
+          if (r.ok) this.narrData.set(i, await r.arrayBuffer());
+        } catch {
+          /* sem a fala: o narrador simplesmente pula */
+        }
+        if (i === 1) {
+          this.prepareNarr(1);
+          firstDone();
+        }
+      }
+    })();
+    return first;
+  }
+
+  /** Contexto só para decodificar (24 kHz mono: metade da memória, voz igualmente nítida). */
+  private decoder(): BaseAudioContext | null {
+    if (this.decoderCtx === undefined) {
+      this.decoderCtx = null;
+      try {
+        const W = window as unknown as { OfflineAudioContext?: typeof OfflineAudioContext; webkitOfflineAudioContext?: typeof OfflineAudioContext };
+        const OAC = W.OfflineAudioContext ?? W.webkitOfflineAudioContext;
+        if (OAC) this.decoderCtx = new OAC(1, 24000, 24000);
+      } catch {
+        this.decoderCtx = null;
+      }
+    }
+    return this.decoderCtx ?? this.ctx;
+  }
+
+  /** Decodifica a fala N (assíncrono, fora do quadro). Idempotente. */
+  prepareNarr(i: number) {
+    if (this.narrBuf.has(i) || this.narrDecoding.has(i)) return;
+    const data = this.narrData.get(i);
+    const dc = data ? this.decoder() : null;
+    if (!data || !dc) return;
+    this.narrDecoding.add(i);
+    const done = () => this.narrDecoding.delete(i);
+    try {
+      const p = dc.decodeAudioData(
+        data.slice(0),
+        (b) => {
+          this.narrBuf.set(i, b);
+          done();
+        },
+        done
+      ) as unknown as Promise<AudioBuffer> | undefined;
+      if (p && typeof p.catch === 'function') p.catch(done);
+    } catch {
+      done();
+    }
+  }
+
+  narrReady(i: number) {
+    return this.narrBuf.has(i);
+  }
+
+  /** Toca a fala N (já decodificada). A memória decodificada é liberada assim que ela começa. */
+  playNarr(i: number, vol = 1): ClipHandle {
+    const buf = this.narrBuf.get(i);
+    if (!buf) return NO_CLIP;
+    this.narrBuf.delete(i); // a fonte de áudio mantém o buffer vivo só enquanto toca
+    return this.playBuffer(buf, { vol, fadeIn: 0.04 });
   }
 
   // ------------------------------------------------------------------ clipes gravados
@@ -175,9 +264,14 @@ export class AudioEngine {
 
   /** Toca um clipe gravado no barramento de voz. Nunca falha: sem áudio devolve um controle vazio. */
   playClip(n: ClipName, o: { vol?: number; fadeIn?: number } = {}): ClipHandle {
-    const c = this.ctx;
     const buf = this.clipBuf.get(n);
-    if (!c || c.state !== 'running' || !buf || this.muted) return NO_CLIP;
+    if (!buf) return NO_CLIP;
+    return this.playBuffer(buf, o);
+  }
+
+  private playBuffer(buf: AudioBuffer, o: { vol?: number; fadeIn?: number } = {}): ClipHandle {
+    const c = this.ctx;
+    if (!c || c.state !== 'running' || this.muted) return NO_CLIP;
     const vol = o.vol ?? 1;
     const gain = c.createGain();
     gain.connect(this.voiceBus);
@@ -558,6 +652,13 @@ export class AudioEngine {
         this.noise({ dur: 0.6, vol: 0.7 * v, type: 'bandpass', f0: 200, f1: 4500, q: 1, pan });
         this.tone({ type: 'sawtooth', f0: 70, f1: 320, dur: 0.5, vol: 0.4 * v, lp: 1200, pan });
         this.tone({ type: 'square', f0: 660, f1: 1320, dur: 0.3, vol: 0.12 * v, pan });
+        break;
+      case 'knife':
+        // "shhk!" da lâmina cortando o ar + impacto abafado + tinido metálico
+        this.noise({ dur: 0.12, vol: 0.42 * v, type: 'highpass', f0: 2600, f1: 6200, q: 0.8, pan });
+        this.noise({ dur: 0.1, vol: 0.4 * v, type: 'lowpass', f0: 1800, f1: 260, delay: 0.05, pan });
+        this.tone({ type: 'sine', f0: 140, f1: 55, dur: 0.12, vol: 0.4 * v, delay: 0.05, pan });
+        this.tone({ type: 'triangle', f0: 2400 * r, f1: 2100 * r, dur: 0.18, vol: 0.07 * v, delay: 0.04, pan });
         break;
       case 'dashHit':
         this.noise({ dur: 0.16, vol: 0.5 * v, type: 'lowpass', f0: 2500, f1: 200, pan });

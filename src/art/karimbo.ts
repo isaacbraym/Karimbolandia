@@ -17,6 +17,8 @@ export interface KarimboArt {
   armFront: Sprite;
   armBack: Sprite;
   weapons: Record<WeaponId, Sprite>;
+  /** faquinha de cortar manteiga (golpe corpo a corpo) */
+  knife: Sprite;
   heads: KarimboHeads;
 }
 
@@ -24,6 +26,59 @@ const S = 3;
 const SHIRT = '#d2b892'; // camiseta bege da foto
 const SKIN = '#c98a66';
 const SHORTS = '#3b4763';
+
+/** Faquinha de cortar manteiga: lâmina larga de ponta redonda, cabo de madeira com rebites. */
+function bakeKnife(): Sprite {
+  return bake(
+    26,
+    9,
+    (g) => {
+      // cabo (empunhado na mão: pivô no começo do cabo)
+      shadedRR(g, 0.6, 2.6, 8.6, 3.8, 1.6, '#8a5a30', { lw: 0.9 });
+      g.fillStyle = '#e8d8b0';
+      g.beginPath();
+      g.arc(3, 4.5, 0.6, 0, Math.PI * 2);
+      g.arc(6.4, 4.5, 0.6, 0, Math.PI * 2);
+      g.fill();
+      // guarda
+      shadedRR(g, 8.4, 2, 1.6, 5, 0.6, '#9aa0b8', { lw: 0.7, shine: false });
+      // lâmina de manteiga: reta em cima, ponta arredondada, serrilhado fino embaixo
+      g.beginPath();
+      g.moveTo(9.8, 2.2);
+      g.lineTo(21, 2);
+      g.quadraticCurveTo(25.6, 2.4, 25.2, 5);
+      g.quadraticCurveTo(24.4, 7, 21, 6.8);
+      g.lineTo(9.8, 6.4);
+      g.closePath();
+      const gr = g.createLinearGradient(0, 2, 0, 7);
+      gr.addColorStop(0, '#ffffff');
+      gr.addColorStop(0.45, '#d6dbe8');
+      gr.addColorStop(1, '#8a92ab');
+      g.fillStyle = gr;
+      g.fill();
+      g.lineWidth = 0.9;
+      g.strokeStyle = OUT;
+      g.stroke();
+      g.strokeStyle = 'rgba(40,30,70,0.45)';
+      g.lineWidth = 0.5;
+      g.beginPath();
+      for (let x = 12; x < 21; x += 1.6) {
+        g.moveTo(x, 6.4);
+        g.lineTo(x + 0.8, 5.8);
+      }
+      g.stroke();
+      // brilho na lâmina
+      g.fillStyle = 'rgba(255,255,255,0.8)';
+      g.fillRect(11, 2.8, 9, 0.8);
+      // um restinho de manteiga
+      g.fillStyle = '#ffe27a';
+      g.beginPath();
+      g.ellipse(22.6, 4.2, 1.6, 0.9, 0, 0, Math.PI * 2);
+      g.fill();
+    },
+    { scale: S, ox: 1.5, oy: 4.5 }
+  );
+}
 
 export function bakeKarimbo(heads: KarimboHeads): KarimboArt {
   // ---------------------------------------------------------------- tronco (camiseta + barriguinha)
@@ -166,7 +221,7 @@ export function bakeKarimbo(heads: KarimboHeads): KarimboArt {
       { scale: S, ox: 3, oy: 4 }
     );
 
-  return { torso, shorts, legFront, legBack, armFront: mkArm(false), armBack: mkArm(true), weapons: bakeWeapons(), heads };
+  return { torso, shorts, legFront, legBack, armFront: mkArm(false), armBack: mkArm(true), weapons: bakeWeapons(), knife: bakeKnife(), heads };
 }
 
 export function bakeWeapons(): Record<WeaponId, Sprite> {
@@ -302,6 +357,8 @@ export interface KPose {
   idleT?: number;
   /** 0..1 progresso do golpe corpo a corpo */
   melee?: number;
+  /** golpe de baixo para cima (alterna com o de cima para baixo) */
+  meleeUp?: boolean;
 }
 
 // ombro abaixo do queixo: o braço/arma nunca cobre o rosto
@@ -422,15 +479,19 @@ export function drawKarimbo(g: CanvasRenderingContext2D, art: KarimboArt, x: num
     let a = localAim(p.aim, p.facing);
     const m = p.melee ?? 0;
     if (m > 0) {
-      // golpe: a arma varre em arco de cima para baixo (com antecipação)
-      const k = m < 0.25 ? -m / 0.25 : (m - 0.25) / 0.75;
-      a = k < 0 ? -0.6 + k * 0.7 : -1.3 + 2.4 * (1 - Math.pow(1 - k, 3));
+      // golpe de faca: antecipação curta e corte em arco (alternando de cima / de baixo)
+      const k = m < 0.2 ? -m / 0.2 : (m - 0.2) / 0.8;
+      const e = 1 - Math.pow(1 - Math.max(0, k), 3);
+      if (p.meleeUp) a = k < 0 ? 0.7 - k * 0.5 : 1.1 - 2.4 * e;
+      else a = k < 0 ? -0.6 + k * 0.7 : -1.3 + 2.4 * e;
     }
     g.save();
     g.translate(sh[0] - recoil, shY);
     g.rotate(a);
     drawSpr(g, art.armFront, 0, 0, { white: w });
-    drawSpr(g, art.weapons[p.weapon], ARM_LEN - 1.5 - p.kick * 3.2, 0.3, { white: w });
+    // durante o golpe a arma some e a faquinha aparece na mão (como no Metal Slug)
+    if (m > 0) drawSpr(g, art.knife, ARM_LEN - 1, 0.2, { white: w });
+    else drawSpr(g, art.weapons[p.weapon], ARM_LEN - 1.5 - p.kick * 3.2, 0.3, { white: w });
     g.restore();
   } else {
     drawSpr(g, art.armFront, sh[0], shY, { rot: 0.9 + Math.sin(c + 3) * (running ? 0.5 : 0), white: w });
