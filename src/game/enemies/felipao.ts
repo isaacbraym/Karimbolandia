@@ -78,6 +78,10 @@ export class Felipao extends Enemy {
   prevX = 0;
   prevSin = 0;
   stepCd = 0;
+  /** entrada dramática: depois de pousar fica parado se exibindo (não ataca até a luta começar) */
+  introHold = false;
+  /** 0..1 revelação: reator, aura e canhões acendendo durante a entrada */
+  introPower = 0;
 
   constructor(spawn: EnemySpawn) {
     super(spawn, { hp: 3600, w: 84, h: 140, score: 5000, wake: 2000, tokens: [0, 0], metal: false });
@@ -224,7 +228,7 @@ export class Felipao extends Enemy {
     }
     if (this.burpPuff > 0) this.burpPuff -= dt;
     this.updateCrumbleWarning(w, dt);
-    this.supplyT -= dt;
+    if (!this.introHold) this.supplyT -= dt;
     if (this.supplyT <= 0 && this.state !== 'enter' && this.state !== 'transition') {
       this.supplyT = 15;
       w.spawnDrop('ammo', this.rect.x + rand.range(200, this.rect.w - 200), this.rect.y + 20);
@@ -248,7 +252,11 @@ export class Felipao extends Enemy {
     this.aimL += clamp(angleDiff(this.aimL, tL), -5 * dt, 5 * dt);
     this.aimR += clamp(angleDiff(this.aimR, tR), -5 * dt, 5 * dt);
 
-    switch (this.state) {
+    if (this.introHold && this.state === 'idle') {
+      // exibindo-se na entrada: firme no chão, sem atacar
+      this.hover = approach(this.hover, 0, 40 * dt);
+      this.charge = Math.max(this.charge, this.introPower * 0.8);
+    } else switch (this.state) {
       case 'enter': this.doEnter(w, dt); break;
       case 'idle': this.doIdle(w, dt); break;
       case 'cannon': this.doCannon(w, dt); break;
@@ -264,7 +272,8 @@ export class Felipao extends Enemy {
     this.lean = damp(this.lean, this.targetLean(), 8, dt);
     this.squash = damp(this.squash, this.targetSquash(), 12, dt);
     this.thrust = damp(this.thrust, this.targetThrust(), 10, dt);
-    this.rackOpen = damp(this.rackOpen, this.state === 'missiles' ? 1 : 0, 10, dt);
+    this.rackOpen = damp(this.rackOpen, this.state === 'missiles' || this.introPower > 0.6 ? 1 : 0, 10, dt);
+    if (this.introPower > 0) this.taunt = Math.max(this.taunt, this.introPower);
     this.setBody();
     this.stepCycle(w, dt);
     // estabilidade do corpo dentro do palco
@@ -300,6 +309,7 @@ export class Felipao extends Enemy {
   }
 
   private targetReactor() {
+    if (this.introPower > 0) return Math.max(0.25, this.introPower);
     switch (this.state) {
       case 'beam': return 1;
       case 'cannon': case 'missiles': return 0.55;
@@ -597,7 +607,17 @@ export class Felipao extends Enemy {
   }
 
   /** Arroto de monstro (com baforada visível saindo da boca). */
-  private doBurp(w: World, big: boolean) {
+  /** Pula a queda (entrada pulada): já no chão, pronto para lutar. */
+  skipEnter() {
+    if (this.state !== 'enter') return;
+    this.hover = 0;
+    this.hoverVy = 0;
+    this.go('idle');
+    this.restT = 1.2;
+    this.setBody();
+  }
+
+  doBurp(w: World, big: boolean) {
     this.burpCd = big ? 3 : rand.range(2.2, 4.2);
     this.burpPuff = big ? 1.1 : 0.6;
     w.audio(big ? 'burpBig' : 'burp', big ? 1.1 : 0.95, this.bx);

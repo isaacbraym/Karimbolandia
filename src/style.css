@@ -162,8 +162,24 @@ html.rot #app {
   margin-left: max(2vw, 8px);
 }
 #menu .title {
-  font-size: clamp(30px, min(13vh, 7.6vw), 84px);
+  /* também limitado pela largura da coluna: o título inteiro (e o ".v3") sempre cabe na tela */
+  font-size: clamp(30px, min(13vh, 7.6vw, calc(min(470px, 58vw) / 7.2)), 84px);
   white-space: nowrap;
+}
+/* versão publicada: ".v3" pequeno ao lado do título (confirma que o jogador está na versão nova) */
+#menu .title {
+  position: relative;
+}
+#menu .title .ver {
+  position: absolute;
+  left: 100%;
+  bottom: 0.1em;
+  margin-left: 0.08em;
+  font-size: 0.32em;
+  color: #ffe9b8;
+  -webkit-text-fill-color: #ffe9b8;
+  -webkit-text-stroke: 1.2px #170f2e;
+  letter-spacing: 1px;
 }
 #menu .sub {
   font-size: clamp(11px, 2.6vh, 16px);

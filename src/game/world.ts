@@ -9,7 +9,7 @@ import type { Enemy, HurtInfo } from './enemies/enemy';
 import { createEnemy } from './enemies';
 import { Smasher } from './smash';
 import { Director } from './director';
-import { audio as audioEngine, type SfxName } from '../core/audio';
+import { audio as audioEngine, type SfxName, type ClipName, type ClipHandle } from '../core/audio';
 import { clamp, rand, type Rect } from '../core/math';
 import type { ControlState } from '../core/input';
 import { WEAPON_ORDER, type WeaponId } from './weapons';
@@ -18,6 +18,7 @@ import { getArt } from '../art';
 import { drawNomadIdle } from '../art/nomad';
 import { softDot, drawSpr } from '../art/kit';
 import { Corpse } from './corpse';
+import { Crowd } from './civilians';
 
 export interface Stats {
   kills: number;
@@ -45,8 +46,12 @@ export interface Hooks {
   /** o jogador morreu e ainda tem vidas: perguntar se quer continuar de onde parou */
   onContinue?: (livesLeft: number) => void;
   onGameOver?: () => void;
-  /** chegou no Felipão: filminho em quadrinhos (o mundo congela até acabar) */
-  onBossComic?: () => void;
+  /** entrada longa do Felipão começou (o jogo toca o áudio e abafa a música) */
+  onBossIntro?: () => void;
+  /** HQ dos dois se encarando, com `len` segundos (o mundo congela até acabar) */
+  onBossComic?: (len: number) => void;
+  /** entrada longa terminou (ou foi pulada): devolve a música e o controle */
+  onBossIntroEnd?: () => void;
 }
 
 export interface Wreck {
@@ -81,6 +86,8 @@ export class World {
   pits: { x0: number; x1: number; y: number }[] = [];
   /** cenário urbano destrutível (carros, hidrantes, lixeiras…) */
   smash!: Smasher;
+  /** moradores da cidade (não são alvos nem sólidos) */
+  crowd = new Crowd();
   /** combo: abates em sequência (janela de 3 s) multiplicam a pontuação */
   combo = 0;
   comboT = 0;
@@ -204,6 +211,7 @@ export class World {
       if (this.collectedPickups.has(p.id)) continue;
       this.pickups.push(new Pickup(p.kind, p.x, p.y, p.id, p.itemId ?? 0));
     }
+    this.crowd.reset(this.data.civilians);
     this.solidsDirty = true;
   }
 
@@ -293,6 +301,10 @@ export class World {
       if (v < 0.03) return;
     }
     audioEngine.play(name, v, pan);
+  }
+  /** Voz/clipe gravado (sem áudio devolve um controle vazio). */
+  voice(name: ClipName, vol = 1): ClipHandle {
+    return audioEngine.playClip(name, { vol });
   }
   music(s: MusicState) {
     this.setMusic(s);
@@ -696,8 +708,11 @@ export class World {
     // ativação de inimigos por proximidade da câmera/jogador
     const cx = this.camera.x + this.camera.w / 2;
     const cy = this.camera.y + this.camera.h / 2;
+    // entrada do Felipão: o resto do mundo espera (ninguém ataca durante a cena)
+    const introFreeze = this.director.longIntroActive();
     for (const e of this.enemies) {
       if (!e.alive) continue;
+      if (introFreeze && !e.isBoss) continue;
       if (!e.awake) {
         const dx = Math.abs(e.x - cx);
         const dy = Math.abs(e.y - cy);
@@ -709,7 +724,7 @@ export class World {
       e.update(this, dt);
     }
     // contato inimigo → jogador
-    if (p.targetable && !p.isDashing) {
+    if (p.targetable && !p.isDashing && !introFreeze) {
       for (const e of this.enemies) {
         if (!e.alive || e.contactDmg <= 0 || !e.awake) continue;
         const a = e.hitbox;
@@ -737,6 +752,7 @@ export class World {
     for (const pr of this.props) pr.update(dt);
     for (let i = this.props.length - 1; i >= 0; i--) if (!this.props[i].alive) this.props.splice(i, 1);
     for (const w of this.wrecks) w.t += dt;
+    this.crowd.update(this, dt);
     for (const c of this.corpses) c.update(dt);
     for (let i = this.corpses.length - 1; i >= 0; i--) if (this.corpses[i].dead) this.corpses.splice(i, 1);
 
@@ -785,6 +801,7 @@ export class World {
     this.director.drawBarriers(g);
     for (const pk of this.pickups) if (cam.visible(pk.x, pk.y, 40)) pk.draw(g, this);
     this.drawShadows(g);
+    this.crowd.draw(g, this);
     this.fx.draw(g, false);
     for (const c of this.corpses) if (cam.visible(c.x, c.y, 140)) c.render(g);
     for (const e of this.enemies) {
@@ -811,6 +828,7 @@ export class World {
     this.director.drawWorldOverlays(g);
     this.fx.draw(g, true);
     this.director.drawDecos(g, 'front');
+    this.crowd.drawBalloon(g, this);
     this.fx.drawPopups(g);
     void art.props;
   }
@@ -974,6 +992,12 @@ export class World {
     for (const e of this.enemies) {
       if (!e.alive || e.isBoss || !cam.visible(e.x, e.y, 60)) continue;
       put(e.x, e.feetY, Math.max(10, e.body.w * 0.6), 0.34);
+    }
+    const civs = this.crowd.list;
+    for (let i = 0; i < civs.length; i++) {
+      const c = civs[i];
+      if (!cam.visible(c.x, c.y, 60)) continue;
+      put(c.x, c.y - c.hop, c.spawn.look?.build === 'kid' ? 9 : 13, 0.34);
     }
     g.globalAlpha = 1;
   }

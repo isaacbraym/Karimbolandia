@@ -108,7 +108,7 @@ export class Menus {
     const o = el('div', 'overlay hidden');
     o.id = 'menu';
     const wrap = el('div', 'wrap');
-    wrap.append(el('div', 'title', 'KARIMBOLÂNDIA'), el('div', 'sub', 'RUN &amp; GUN 2.5D'));
+    wrap.append(el('div', 'title', 'KARIMBOLÂNDIA<span class="ver">.v3</span>'), el('div', 'sub', 'RUN &amp; GUN 2.5D'));
     const btns = el('div', 'btns');
     btns.append(
       this.btn('JOGAR', 'primary', () => this.cb.onPlay()),

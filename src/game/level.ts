@@ -1,4 +1,5 @@
 import type { Rect } from '../core/math';
+import type { CivLook } from './civLook';
 
 export const TILE = 32;
 export const VIEW_H = 360;
@@ -196,6 +197,22 @@ export interface SecretRoom {
   rect: Rect; // área "escondida": ao entrar, revela e toca jingle
 }
 
+/** Comportamento base de um civil (morador da cidade). */
+export type CivMood = 'cheer' | 'help' | 'flee' | 'scared';
+
+export interface CivilianSpawn {
+  id: number;
+  x: number; // px centro
+  y: number; // px pés (chão sólido)
+  mood: CivMood;
+  facing: -1 | 1;
+  /** pedindo ajuda ajoelhado / abaixado */
+  kneel?: boolean;
+  seed: number;
+  /** aparência única (preenchida ao montar a fase) */
+  look?: CivLook;
+}
+
 export interface LevelData {
   level: Level;
   playerStart: { x: number; y: number };
@@ -215,4 +232,6 @@ export interface LevelData {
   atmosphere: { x: number; sky: number; ruin: number }[];
   /** seções para debug/teleporte */
   sections: { name: string; x: number; y: number }[];
+  /** moradores da cidade (não são alvos nem sólidos) */
+  civilians: CivilianSpawn[];
 }

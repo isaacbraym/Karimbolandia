@@ -51,6 +51,11 @@ export class PostFX {
     this.flashSeq = [];
   }
 
+  /** Clarão no céu pedido por uma cinemática (0..1). */
+  skyFlash(v: number) {
+    this.flash = Math.max(this.flash, Math.min(1, v));
+  }
+
   // ------------------------------------------------------------------ clima
   update(w: World, dt: number, q: Quality) {
     this.time += dt;

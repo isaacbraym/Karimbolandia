@@ -1,6 +1,7 @@
 /**
- * Motor de áudio 100% procedural (WebAudio). Nenhum arquivo de som externo:
- * funciona offline e não usa material protegido.
+ * Motor de áudio procedural (WebAudio): efeitos e música gerados por código. As únicas exceções
+ * são as falas/cinemáticas gravadas (clipes curtos em public/assets/audio), tocadas por um
+ * barramento próprio de voz que respeita o volume de efeitos.
  */
 import { clamp } from './math';
 
@@ -17,17 +18,52 @@ export type SfxName =
 
 type LoopName = 'glide' | 'roll' | 'alarm' | 'laser' | 'thrusterLoop';
 
+/** Clipes gravados (vozes e a entrada do Felipão). */
+export type ClipName = 'bossIntro' | 'karimboEncara' | 'karimboNomad';
+export const CLIP_FILES: Record<ClipName, string> = {
+  bossIntro: 'boss_intro.mp3',
+  karimboEncara: 'karimbo_encara.mp3',
+  karimboNomad: 'karimbo_nomad.mp3',
+};
+
+/** Controle de um clipe tocando. Sem áudio (testes/sem som) é um controle "vazio" que só mede o tempo. */
+export interface ClipHandle {
+  /** segundos desde o início (pausas não contam); -1 se o clipe não está tocando de verdade */
+  elapsed(): number;
+  readonly playing: boolean;
+  stop(fade?: number): void;
+  pause(): void;
+  resume(): void;
+  setVol(v: number, rate?: number): void;
+}
+
+const NO_CLIP: ClipHandle = {
+  elapsed: () => -1,
+  playing: false,
+  stop() {},
+  pause() {},
+  resume() {},
+  setVol() {},
+};
+
 export class AudioEngine {
   ctx: AudioContext | null = null;
   master!: GainNode;
   sfxBus!: GainNode;
   musicBus!: GainNode;
+  /** vozes e cinemáticas (clipes gravados) */
+  voiceBus!: GainNode;
   private comp!: DynamicsCompressorNode;
   noiseBuf!: AudioBuffer;
   private active = 0;
   private sfxVol = 0.9;
   private musicVol = 0.7;
   private duck = 1;
+  /** abafamento da música por cinemáticas (0..1), separado do "duck" da pausa/menus */
+  private cineDuck = 1;
+  private cineRate = 0.05;
+  private clipData = new Map<ClipName, ArrayBuffer>();
+  private clipBuf = new Map<ClipName, AudioBuffer>();
   private loops = new Map<LoopName, { nodes: AudioNode[]; params: Record<string, AudioParam | undefined>; gain: GainNode }>();
   private lastPlay = new Map<string, number>();
   muted = false;
@@ -56,8 +92,10 @@ export class AudioEngine {
     this.master.gain.value = 0.9;
     this.sfxBus = c.createGain();
     this.musicBus = c.createGain();
+    this.voiceBus = c.createGain();
     this.sfxBus.connect(this.comp);
     this.musicBus.connect(this.comp);
+    this.voiceBus.connect(this.comp);
     this.comp.connect(this.master);
     this.master.connect(c.destination);
     const len = c.sampleRate * 2;
@@ -66,6 +104,8 @@ export class AudioEngine {
     for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
     this.applyVolumes();
     if (c.state === 'suspended') void c.resume();
+    // clipes baixados na tela de carregamento: decodifica agora que o contexto existe
+    for (const n of this.clipData.keys()) this.decodeClip(n);
   }
 
   get ready() {
@@ -81,7 +121,127 @@ export class AudioEngine {
     if (!this.ctx) return;
     const t = this.ctx.currentTime;
     this.sfxBus.gain.setTargetAtTime(this.muted ? 0 : this.sfxVol, t, 0.02);
-    this.musicBus.gain.setTargetAtTime(this.muted ? 0 : this.musicVol * 0.34 * this.duck, t, 0.05);
+    this.voiceBus.gain.setTargetAtTime(this.muted ? 0 : this.sfxVol, t, 0.02);
+    this.musicBus.gain.setTargetAtTime(this.muted ? 0 : this.musicVol * 0.34 * this.duck * this.cineDuck, t, this.duck < 1 ? 0.05 : this.cineRate);
+  }
+  /** Abafa (0) ou devolve (1) a música do jogo durante cinemáticas; `fade` ≈ duração da rampa (s). */
+  setCineDuck(v: number, fade = 0.3) {
+    this.cineDuck = clamp(v, 0, 1);
+    this.cineRate = Math.max(0.01, fade / 3);
+    this.applyVolumes();
+  }
+
+  // ------------------------------------------------------------------ clipes gravados
+  /** Baixa os clipes (na tela de carregamento). Decodifica quando o contexto de áudio existir. */
+  async loadClips(base: string, onProgress?: (p: number) => void) {
+    const names = Object.keys(CLIP_FILES) as ClipName[];
+    let done = 0;
+    await Promise.all(
+      names.map(async (n) => {
+        try {
+          const r = await fetch(`${base}assets/audio/${CLIP_FILES[n]}`);
+          if (r.ok) {
+            this.clipData.set(n, await r.arrayBuffer());
+            if (this.ctx) this.decodeClip(n);
+          }
+        } catch {
+          /* sem o arquivo: a cena roda por tempo, sem a voz */
+        }
+        onProgress?.(++done / names.length);
+      })
+    );
+  }
+
+  private decodeClip(n: ClipName) {
+    const c = this.ctx;
+    const data = this.clipData.get(n);
+    if (!c || !data || this.clipBuf.has(n)) return;
+    const ok = (b: AudioBuffer) => {
+      this.clipBuf.set(n, b);
+      this.clipData.delete(n);
+    };
+    try {
+      // forma com callback: funciona também no Safari antigo
+      const p = c.decodeAudioData(data.slice(0), ok, () => undefined) as unknown as Promise<AudioBuffer> | undefined;
+      if (p && typeof p.catch === 'function') p.catch(() => undefined);
+    } catch {
+      /* formato não suportado: segue sem */
+    }
+  }
+
+  clipReady(n: ClipName) {
+    return this.clipBuf.has(n);
+  }
+
+  /** Toca um clipe gravado no barramento de voz. Nunca falha: sem áudio devolve um controle vazio. */
+  playClip(n: ClipName, o: { vol?: number; fadeIn?: number } = {}): ClipHandle {
+    const c = this.ctx;
+    const buf = this.clipBuf.get(n);
+    if (!c || c.state !== 'running' || !buf || this.muted) return NO_CLIP;
+    const vol = o.vol ?? 1;
+    const gain = c.createGain();
+    gain.connect(this.voiceBus);
+    const fadeIn = o.fadeIn ?? 0.02;
+    gain.gain.setValueAtTime(0.0001, c.currentTime);
+    gain.gain.linearRampToValueAtTime(vol, c.currentTime + Math.max(0.005, fadeIn));
+    let src: AudioBufferSourceNode | null = null;
+    let startedAt = 0; // currentTime quando o trecho atual começou
+    let offset = 0; // posição no clipe quando o trecho atual começou
+    let paused = false;
+    let ended = false;
+    const start = () => {
+      const s = c.createBufferSource();
+      s.buffer = buf;
+      s.connect(gain);
+      s.onended = () => {
+        if (src === s && !paused) ended = true;
+      };
+      startedAt = c.currentTime;
+      s.start(0, Math.min(offset, buf.duration - 0.001));
+      src = s;
+    };
+    start();
+    const h: ClipHandle = {
+      elapsed: () => (ended ? buf.duration : paused ? offset : offset + (c.currentTime - startedAt)),
+      get playing() {
+        return !ended;
+      },
+      stop: (fade = 0.15) => {
+        if (ended) return;
+        ended = true;
+        const t = c.currentTime;
+        gain.gain.cancelScheduledValues(t);
+        gain.gain.setValueAtTime(gain.gain.value, t);
+        gain.gain.linearRampToValueAtTime(0.0001, t + Math.max(0.01, fade));
+        try {
+          src?.stop(t + Math.max(0.01, fade) + 0.02);
+        } catch {
+          /* já parou */
+        }
+      },
+      pause: () => {
+        if (ended || paused || !src) return;
+        offset += c.currentTime - startedAt;
+        paused = true;
+        try {
+          src.stop();
+        } catch {
+          /* já parou */
+        }
+        src = null;
+      },
+      resume: () => {
+        if (ended || !paused) return;
+        paused = false;
+        if (offset >= buf.duration - 0.01) ended = true;
+        else start();
+      },
+      setVol: (v: number, rate = 0.08) => {
+        if (ended) return;
+        gain.gain.setTargetAtTime(Math.max(0.0001, v), c.currentTime, rate);
+      },
+    };
+    return h;
   }
   /** Abaixa a música (pausa/menus) sem parar o contexto. */
   setDuck(v: number) {

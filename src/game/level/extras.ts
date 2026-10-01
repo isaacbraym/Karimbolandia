@@ -1,4 +1,5 @@
 import { T, TILE } from '../level';
+import { G } from './builder';
 import type { LevelBuilder } from './builder';
 
 /**
@@ -140,4 +141,33 @@ export function addRollers(b: LevelBuilder) {
       }
     }
   }
+}
+
+/**
+ * Moradores da cidade (coordenadas ORIGINAIS, chão principal): reagem à chegada do Karimbo.
+ * Só em chão sólido, fora de arenas, buracos, do trecho das hordas do Nômad e da arena do chefe.
+ */
+export function addCivilians(b: LevelBuilder) {
+  // rua inicial: a cidade recebe o herói
+  b.civilian(9, G, { mood: 'cheer' });
+  b.civilian(17, G, { mood: 'help' });
+  b.civilian(21, G, { mood: 'cheer', facing: -1 });
+  // primeiros soldados: moradores fogem quando o tiroteio começa
+  b.civilian(115, G, { mood: 'flee', facing: 1 });
+  b.civilian(120, G, { mood: 'flee', facing: 1 });
+  // checkpoint da rua principal: medo e pedido de ajuda
+  b.civilian(210, G, { mood: 'scared' });
+  b.civilian(214, G, { mood: 'help', kneel: true });
+  // depois da emboscada (zona de guerra limpa): comemoração
+  b.civilian(474, G, { mood: 'cheer' });
+  b.civilian(480, G, { mood: 'cheer', facing: -1 });
+  b.civilian(482, G, { mood: 'cheer' });
+  // base da torre: a Júlia foi levada lá para cima
+  b.civilian(1097, G, { mood: 'help' });
+  b.civilian(1101, G, { mood: 'help', kneel: true });
+  b.civilian(1104, G, { mood: 'scared' });
+  // telhado: últimos pedidos antes do Felipão
+  b.civilian(1185, 14, { mood: 'help' });
+  b.civilian(1278, 14, { mood: 'scared' });
+  b.civilian(1281, 14, { mood: 'help', kneel: true });
 }

@@ -3,6 +3,7 @@ import {
   Level, T, TILE, THEME,
   type EnemySpawn, type EnemyType, type PropSpawn, type PropKind, type LootKind, type PickupSpawn, type PickupKind,
   type Checkpoint, type Arena, type CamZone, type DecoSpawn, type Trigger, type SecretRoom, type LevelData, type Wave,
+  type CivilianSpawn, type CivMood,
 } from '../level';
 
 export const G = 32; // linha do chão principal
@@ -22,6 +23,7 @@ export class LevelBuilder {
   decos: DecoSpawn[] = [];
   triggers: Trigger[] = [];
   secretRooms: SecretRoom[] = [];
+  civilians: CivilianSpawn[] = [];
   sections: { name: string; x: number; y: number }[] = [];
   atmosphere: { x: number; sky: number; ruin: number }[] = [];
   playerStart = { x: 0, y: 0 };
@@ -30,6 +32,7 @@ export class LevelBuilder {
   private eid = 0;
   private pid = 0;
   private kid = 0;
+  private cid = 0;
   theme: number = THEME.STREET;
 
   constructor(width: number, height = LEVEL_H) {
@@ -124,6 +127,13 @@ export class LevelBuilder {
   }
   secret(id: number, x: number, row: number) {
     return this.pickup('secret', x, row, id);
+  }
+  /** Civil (morador) no chão da cidade: nunca em plataforma, arena ou buraco. */
+  civilian(x: number, row: number, o: { mood: CivMood; facing?: -1 | 1; kneel?: boolean; seed?: number }): CivilianSpawn {
+    const id = this.cid++;
+    const s: CivilianSpawn = { id, x: this.px(x), y: this.py(row), mood: o.mood, facing: o.facing ?? -1, kneel: o.kneel, seed: o.seed ?? id * 7919 + x * 31 };
+    this.civilians.push(s);
+    return s;
   }
   checkpoint(name: string, x: number, row: number) {
     this.checkpoints.push({ id: this.checkpoints.length, x: this.px(x), y: this.py(row), name });
@@ -247,6 +257,7 @@ export class LevelBuilder {
       finishX: this.finishX,
       atmosphere: this.atmosphere,
       sections: this.sections,
+      civilians: this.civilians,
     };
   }
 }

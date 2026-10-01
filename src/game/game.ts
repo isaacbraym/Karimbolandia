@@ -1,8 +1,10 @@
 import { orient } from '../core/orient';
 import { Input } from '../core/input';
-import { audio } from '../core/audio';
+import { audio, type ClipHandle } from '../core/audio';
 import { PostFX } from './post';
 import { BossComic } from './comic';
+import { IntroOverlay, INTRO_COMIC } from './bossIntro';
+import { bakeCivilians } from '../art/civilians';
 import { setDecoDensity } from '../art/decor';
 import { music, MIX, type ThemeName } from '../core/music';
 import { settings, progress, saveProgress } from '../core/storage';
@@ -63,6 +65,10 @@ export class Game {
   private post = new PostFX();
   private comic: BossComic | null = null;
   private comicTap = false;
+  /** entrada do Felipão: camada de tela, áudio guiando a cena e toque para pular */
+  private intro = new IntroOverlay();
+  private introClip: ClipHandle | null = null;
+  private introTap = false;
   /** resolução dinâmica: fração da resolução alvo (0.6..1) — cai antes de qualquer efeito ser cortado */
   renderScale = 1;
   private drsAcc = 0;
@@ -96,6 +102,7 @@ export class Game {
     this.input.onGesture = () => {
       audio.init();
       if (this.state === 'comic') this.comicTap = true;
+      else if (this.state === 'playing' && this.world?.director.longIntroActive()) this.introTap = true;
     };
     this.input.onMenuKey = (code) => {
       if (this.state === 'playing') return;
@@ -122,7 +129,17 @@ export class Game {
     } catch {
       /* segue sem */
     }
-    await buildArt(base, this.quality, (p, l) => this.menus.setLoading(p, l));
+    // vozes/entrada do chefe: baixadas junto com a arte (decodificadas no primeiro toque)
+    const clips = audio.loadClips(base);
+    await buildArt(base, this.quality, (p, l) => this.menus.setLoading(p * 0.94, l));
+    // moradores: só as aparências que existem na fase, assadas uma vez
+    this.menus.setLoading(0.95, 'Chamando os moradores...');
+    await new Promise((r) => setTimeout(r, 0));
+    bakeCivilians(buildLevel().civilians.map((c) => c.look));
+    this.intro.prepare();
+    this.menus.setLoading(0.98, 'Afinando as vozes...');
+    await Promise.race([clips, new Promise((r) => setTimeout(r, 4000))]);
+    this.menus.setLoading(1, 'Pronto!');
     this.hud.showFps = settings.showFps;
     this.menuScene = new MenuScene();
     this.menus.hideLoading();
@@ -250,6 +267,7 @@ export class Game {
     if (orient.rot) this.menus.toast('Vire o celular de lado para jogar em tela cheia');
     this.menus.hideAll();
     this.menus.fade(false);
+    this.stopIntroAudio();
     if (!this.world || again || this.state === 'complete') {
       this.world = new World(buildLevel());
       this.bindWorld(this.world);
@@ -257,6 +275,7 @@ export class Game {
       this.world.restart();
     }
     const w = this.world;
+    w.director.introArt = this.intro;
     w.camera.viewW = this.viewW;
     w.camera.viewH = this.viewH;
     this.applyFxCaps();
@@ -280,7 +299,9 @@ export class Game {
       onRespawn: () => this.beginRespawn(),
       onContinue: (lives) => this.askContinue(lives),
       onGameOver: () => this.gameOver(),
-      onBossComic: () => this.startComic(),
+      onBossIntro: () => this.startBossIntro(),
+      onBossComic: (len) => this.startComic(len),
+      onBossIntroEnd: () => this.endBossIntro(),
       onBanner: (t, s, d) => this.hud.banner(t, s, d),
       onComplete: () => this.onComplete(),
       onMusic: (s) => this.setMusic(s),
@@ -303,6 +324,7 @@ export class Game {
     this.input.enabled = false;
     this.touch.show(false);
     this.menus.showPause();
+    this.introClip?.pause();
     audio.setDuck(0.3);
     audio.loop('glide', false);
     audio.loop('roll', false);
@@ -315,7 +337,8 @@ export class Game {
     this.menus.hidePause();
     this.state = 'playing';
     this.input.enabled = true;
-    this.touch.show(this.isTouch || this.input.touch.active);
+    this.touch.show(!this.world?.director.longIntroActive() && (this.isTouch || this.input.touch.active));
+    this.introClip?.resume();
     audio.setDuck(1);
     this.last = performance.now();
     this.updateRotate();
@@ -323,6 +346,7 @@ export class Game {
 
   restartLevel() {
     if (!this.world) return;
+    this.stopIntroAudio();
     this.menus.hidePause();
     this.menus.hideAll();
     this.world.restart();
@@ -340,11 +364,12 @@ export class Game {
   }
 
   toMenu(first = false) {
+    this.stopIntroAudio();
     this.state = 'menu';
     this.input.enabled = false;
     this.touch.show(false);
     this.menus.hideAll();
-    this.menus.showMain(first ? 'v1.0 • toque em JOGAR' : 'v1.0');
+    this.menus.showMain(first ? 'v3 • toque em JOGAR' : 'v3');
     this.menus.fade(false);
     this.updateRotate();
     audio.setDuck(1);
@@ -401,18 +426,64 @@ export class Game {
     this.last = performance.now();
   }
 
+  /** Entrada longa do Felipão: esconde os controles, abafa a música e toca o áudio que guia a cena. */
+  private startBossIntro() {
+    this.touch.show(false);
+    audio.loop('glide', false);
+    audio.loop('roll', false);
+    audio.loop('alarm', false);
+    audio.setCineDuck(0, 0.35);
+    this.introClip?.stop(0.1);
+    this.introClip = audio.playClip('bossIntro', { vol: 1, fadeIn: 0.03 });
+    this.introTap = false;
+    this.input.clearEdges();
+  }
+
+  /** Fim (natural ou pulado) da entrada: corta o que sobrou do áudio e devolve a música. */
+  private endBossIntro() {
+    if (this.introClip?.playing) this.introClip.stop(0.35);
+    this.introClip = null;
+    audio.setCineDuck(1, 0.8);
+    if (this.state === 'playing') this.touch.show(this.isTouch || this.input.touch.active);
+  }
+
+  /** Pular a sequência inteira (toque, tiro ou pulo): fade curto nos áudios e direto para a luta. */
+  private skipBossIntro(w: World) {
+    this.introClip?.stop(0.25);
+    this.introClip = null;
+    if (this.comic) {
+      this.comic.stopVoice(0.15);
+      this.endComic(false);
+    }
+    this.input.clearEdges();
+    w.director.skipBossIntro();
+  }
+
+  /** Para qualquer áudio da entrada (reinício, menu, nova partida). */
+  private stopIntroAudio() {
+    this.introClip?.stop(0.2);
+    this.introClip = null;
+    this.comic?.stopVoice(0.1);
+    this.comic = null;
+    audio.setCineDuck(1, 0.3);
+  }
+
   /** Filminho do chefe: congela o mundo, esconde os controles e toca a HQ. */
-  private startComic() {
+  private startComic(len?: number) {
     if (this.state !== 'playing') return;
-    this.comic = new BossComic();
+    const c = new BossComic(len);
+    // enquanto o Karimbo fala, o áudio da entrada abaixa um pouco
+    c.onVoice = (talking) => this.introClip?.setVol(talking ? 0.6 : 1, 0.12);
+    this.comic = c;
     this.state = 'comic';
+    this.comicTap = false;
     this.touch.show(false);
     audio.loop('glide', false);
     audio.loop('roll', false);
     audio.loop('alarm', false);
   }
 
-  private endComic() {
+  private endComic(notify = true) {
     this.comic = null;
     if (this.state !== 'comic') return;
     this.state = 'playing';
@@ -420,6 +491,8 @@ export class Game {
     this.touch.show(this.isTouch || this.input.touch.active);
     this.input.clearEdges();
     this.last = performance.now();
+    // a HQ fecha a entrada do chefe: a luta começa
+    if (notify) this.world?.director.onComicDone();
   }
 
   /** Há versão nova publicada: confirmação no menu/pausa; durante a partida, só um botão discreto. */
@@ -431,6 +504,7 @@ export class Game {
 
   private gameOver() {
     if (this.state !== 'playing') return;
+    this.stopIntroAudio();
     this.state = 'gameover';
     this.input.enabled = false;
     this.touch.show(false);
@@ -440,6 +514,7 @@ export class Game {
 
   private beginRespawn() {
     if (this.respawnPending || !this.world) return;
+    this.stopIntroAudio();
     this.respawnPending = true;
     this.menus.fade(true);
     window.setTimeout(() => {
@@ -561,11 +636,17 @@ export class Game {
       this.updateTouchState(w);
     } else if (this.state === 'comic' && w && this.comic) {
       const s = this.input.state;
-      if (s.fire.pressed || s.jump.pressed || s.pause.pressed || this.comicTap) this.comic.skip();
+      const tap = s.fire.pressed || s.jump.pressed || s.pause.pressed || this.comicTap;
       this.comicTap = false;
       this.input.clearEdges();
-      this.comic.update(dt);
-      if (this.comic.done) this.endComic();
+      if (tap) this.skipBossIntro(w);
+      else {
+        // a HQ acompanha o relógio do áudio da entrada
+        const e = this.introClip ? this.introClip.elapsed() : -1;
+        if (e >= 0) this.comic.syncTo(e - INTRO_COMIC);
+        this.comic.update(dt);
+        if (this.comic.done) this.endComic();
+      }
     } else if (this.state === 'continue' && w) {
       // mundo congelado; contagem regressiva + confirmação por gamepad
       this.continueLeft -= dt;
@@ -598,11 +679,26 @@ export class Game {
       return;
     }
     if (w.fx.slowmo > 0) sdt = dt * w.fx.slowScale;
+    // entrada do Felipão: o áudio é o relógio da cena; toque/tiro/pulo pula tudo
+    if (w.director.longIntroActive()) {
+      const s = this.input.state;
+      if ((s.fire.pressed || s.jump.pressed || this.introTap) && w.director.introTime() > 0.6) this.skipBossIntro(w);
+      else {
+        const e = this.introClip ? this.introClip.elapsed() : -1;
+        if (e >= 0) w.director.syncIntro(e);
+      }
+      this.introTap = false;
+    }
     const n = Math.min(4, Math.max(1, Math.ceil(sdt / (1 / 55))));
     const h = sdt / n;
     for (let i = 0; i < n; i++) {
       w.update(h, this.input.state);
       if (i === 0) this.input.clearEdges();
+      if (this.state !== 'playing') break; // a HQ congelou o mundo
+    }
+    if (w.director.skyPulse > 0) {
+      this.post.skyFlash(w.director.skyPulse);
+      w.director.skyPulse = 0;
     }
     this.hud.update(dt);
     this.post.update(w, dt, this.quality);
@@ -756,6 +852,7 @@ export class Game {
     this.post.hurt(g, this.canvas, w.player.mode === 'dead' ? 0 : clamp(w.player.hurtT / 0.28, 0, 1));
     this.hud.drawScreenFx(g, w, W, H);
     if (this.state === 'comic' && this.comic) this.comic.draw(g, W, H);
+    else if (w.director.longIntroActive()) this.intro.draw(g, W, H, w.director.introTime(), w.director.introLandT());
     else this.hud.draw(g, w, W, H);
   }
 

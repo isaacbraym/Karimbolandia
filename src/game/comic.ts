@@ -2,12 +2,19 @@
  * Filminho em quadrinhos antes do Felipão: painéis inclinados de HQ com closes dramáticos nos rostos
  * reais (fotos), linhas de ação, retícula, "VS", balões com texto datilografado e, no fim, o encarar
  * olho no olho. Desenhado em espaço de tela (lógico) por cima do mundo congelado.
+ *
+ * A linha do tempo é escrita na duração "base" (COMIC_LEN) e esticada/encolhida para caber na
+ * entrada do chefe (a HQ termina junto com o áudio da entrada).
  */
 import { getArt } from '../art';
-import { audio } from '../core/audio';
+import { audio, type ClipHandle } from '../core/audio';
 
 const DISPLAY = '"Lilita One", "Arial Black", Impact, sans-serif';
+/** duração base da linha do tempo (s) */
 export const COMIC_LEN = 8.6;
+/** batida em que a foto do Karimbo entra (a voz dele toca aqui) */
+const VOICE_AT = 0.35;
+const VOICE_LEN = 3.7;
 
 const FELI_LINE = 'VOU TE ENSINAR A JOGAR DE VERDADE, KARIMBO!';
 const KARI_LINE = 'PODE VIR, FELIPÃO!';
@@ -27,16 +34,35 @@ const easeBack = (t: number) => {
 };
 
 export class BossComic {
+  /** tempo na linha do tempo base (0..COMIC_LEN) */
   t = 0;
   done = false;
+  /** segundos reais por segundo da linha do tempo base */
+  private k: number;
+  private voice: ClipHandle | null = null;
+  /** abafa/devolve o áudio da entrada enquanto o Karimbo fala */
+  onVoice: ((talking: boolean) => void) | null = null;
+
+  constructor(len = COMIC_LEN) {
+    this.k = len / COMIC_LEN;
+  }
+
+  /** Sincroniza com o relógio do áudio da entrada (segundos reais desde o início da HQ). */
+  syncTo(realT: number) {
+    if (realT < 0) return;
+    const bt = realT / this.k;
+    if (Math.abs(bt - this.t) > 0.05) this.t = Math.max(0, bt);
+  }
+
+  /** Corta a voz (pulou a cena). */
+  stopVoice(fade = 0.12) {
+    this.voice?.stop(fade);
+    this.voice = null;
+  }
   private beats = new Set<string>();
   private dots: HTMLCanvasElement | null = null;
   private pat: CanvasPattern | null = null;
   private lastTyped = 0;
-
-  skip() {
-    if (this.t > 0.7) this.t = Math.max(this.t, COMIC_LEN - 0.35);
-  }
 
   private beat(id: string, at: number, fn: () => void) {
     if (this.t >= at && !this.beats.has(id)) {
@@ -46,9 +72,15 @@ export class BossComic {
   }
 
   update(dt: number) {
-    this.t += dt;
+    this.t += dt / this.k;
     this.beat('open', 0, () => audio.play('lock', 1));
-    this.beat('k', 0.35, () => audio.play('slam', 0.7));
+    this.beat('k', VOICE_AT, () => {
+      audio.play('slam', 0.7);
+      // as fotos dos dois aparecem: o Karimbo fala
+      this.voice = audio.playClip('karimboEncara', { vol: 1 });
+      if (this.voice.playing) this.onVoice?.(true);
+    });
+    this.beat('kEnd', VOICE_AT + VOICE_LEN / this.k, () => this.onVoice?.(false));
     this.beat('f', 1.0, () => audio.play('slam', 0.8));
     this.beat('vs', 1.55, () => audio.play('bossRoar', 0.9));
     this.beat('burp', 4.3, () => audio.play('burpBig', 1));

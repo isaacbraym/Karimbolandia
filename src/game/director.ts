@@ -13,6 +13,9 @@ import { NOMAD_W, NOMAD_H, FOOT_H } from './movement';
 import { BASE_ZOOM, EXPLORE_ZOOM, MIN_THREAT_ZOOM } from './camera';
 import { glowSprite } from '../art/kit';
 import { drawDeco, resetDecoBudget } from '../art/decor';
+import { drawSpr } from '../art/kit';
+import { INTRO_LEN, INTRO_DROP, INTRO_COMIC, INTRO_COMIC_LEN, type IntroOverlay } from './bossIntro';
+import type { Felipao } from './enemies/felipao';
 
 type ArenaStatus = 'idle' | 'active' | 'cleared';
 interface ArenaState {
@@ -31,7 +34,26 @@ interface Cine {
   kind: 'nomad' | 'bossDeath' | 'bossIntro';
   t: number;
   stage: number;
+  /** entrada longa do chefe (primeira vez da partida, guiada pelo áudio) */
+  long?: boolean;
+  /** quando o Felipão pousou (entrada longa) */
+  landT?: number;
+  /** a HQ foi entregue ao jogo (hook) e já terminou */
+  comicHooked?: boolean;
+  comicDone?: boolean;
+  /** tremor/poeira da entrada (ritmo próprio) */
+  fxT?: number;
+  beat?: number;
 }
+
+/** batidas do suspense: [tempo, céu piscando, flash vermelho] */
+const SUSPENSE_BEATS: [number, number, number][] = [
+  [0.45, 0.5, 0.05],
+  [1.3, 0.9, 0.08],
+  [2.05, 0.6, 0.05],
+  [2.6, 1, 0.1],
+  [3.1, 0.8, 0.08],
+];
 
 const SUPPORT_AT = 90; // s de jogo (a pé, fora de arenas) até a entrega do Nômad de apoio
 const SUPPORT_TIME = 50; // s de uso
@@ -65,6 +87,12 @@ export class Director {
   /** portão da garagem: só abre depois de embarcar no Nômad (ele é obrigatório) */
   nomadGate: PropClass | null = null;
   gateHintCd = 0;
+  /** relâmpago no céu pedido pela cinemática (o jogo consome e zera) */
+  skyPulse = 0;
+  /** rachaduras do pouso do Felipão (decalques no chão) */
+  cracks: { x: number; y: number }[] = [];
+  /** arte da entrada (posta pelo jogo; nos testes fica nula) */
+  introArt: IntroOverlay | null = null;
   /** hordas frenéticas enquanto se pilota o Nômad */
   hordeT = 0;
   hordeSeq = 0;
@@ -112,6 +140,8 @@ export class Director {
     this.bossIntroDone = false;
     this.finishTimer = -1;
     this.lastCheckpointBanner = -1;
+    this.cracks.length = 0;
+    this.skyPulse = 0;
     this.zoomOverride = null;
     this.w.camera.focus = null;
     this.w.camera.lock = null;
@@ -131,7 +161,9 @@ export class Director {
         a.bossEnemy = null;
       }
     }
+    if (this.cine?.long) this.w.hooks.onBossIntroEnd?.();
     this.cine = null;
+    this.cracks.length = 0;
     if (!this.supportUsed) {
       this.support = null;
       this.supportClock = Math.max(this.supportClock, SUPPORT_AT - 25);
@@ -418,6 +450,7 @@ export class Director {
       s.t += dt;
       if (s.t >= 1.1) {
         s.ready = true;
+        w.voice('karimboNomad');
         w.audio('nomadEnter', 0.9, s.x);
         w.audio('explosion', 0.5, s.x);
         w.fx.addShake(5, 0.35);
@@ -585,6 +618,8 @@ export class Director {
       if (c.stage === 0 && c.t > 0.7) {
         c.stage = 1;
         w.audio('nomadBoot', 1);
+        // voz do Karimbo ao encontrar o Nômad (no momento em que ele liga)
+        w.voice('karimboNomad');
         w.setMusic('calm');
       }
       if (c.stage === 1) {
@@ -607,6 +642,8 @@ export class Director {
         w.setMusic('explore');
         w.hooks.onHint?.('mountNomad');
       }
+    } else if (c.kind === 'bossIntro' && c.long) {
+      this.updateLongIntro(dt, c);
     } else if (c.kind === 'bossIntro') {
       // câmera mostra a entrada do chefe (jogador e chefe no quadro)
       const spawn = w.data.enemies.find((e) => e.type === 'boss')!;
@@ -743,35 +780,44 @@ export class Director {
   }
 
   private startBoss(a: ArenaState) {
-    // filminho de HQ (só na primeira vez da partida); o mundo fica congelado enquanto passa
-    if (!this.w.comicShown && this.w.hooks.onBossComic) {
-      this.w.comicShown = true;
-      this.w.hooks.onBossComic();
-    }
-    // chegou no chefe: +3 vidas extras (uma vez por partida)
-    if (!this.w.bossLivesGiven) {
-      this.w.bossLivesGiven = true;
-      this.w.lives += 3;
-      this.w.after(4.2, () => {
-        this.w.audio('extraLife', 1);
-        this.banner('+3 VIDAS!', 'Bônus para enfrentar o Felipão', 2.2);
-      });
-    }
     const w = this.w;
+    // entrada longa (áudio + HQ) só na primeira vez da partida; ao continuar/voltar, a curta
+    const long = !w.comicShown;
+    if (long) w.comicShown = true;
+    // chegou no chefe: +3 vidas extras (uma vez por partida)
+    let livesNow = false;
+    if (!w.bossLivesGiven) {
+      w.bossLivesGiven = true;
+      w.lives += 3;
+      livesNow = true;
+    }
     this.bossActive = true;
     this.bossPhase = 1;
     this.bossIntroDone = false;
     w.setMusic('silence');
     w.player.lockInput = true;
     w.player.body.vx = 0;
+    if (long) {
+      this.cine = { kind: 'bossIntro', t: 0, stage: 0, long: true, fxT: 0, beat: 0 };
+      this.introLives = livesNow;
+      // nada de tiros inimigos voando durante a entrada
+      w.bullets = w.bullets.filter((b) => b.team === 0);
+      w.grenades = w.grenades.filter((g) => g.team === 0);
+      w.camera.zoomTarget = 0.95;
+      w.audio('warning', 0.7);
+      w.hooks.onBossIntro?.();
+      return;
+    }
+    if (livesNow) {
+      w.after(4.2, () => {
+        w.audio('extraLife', 1);
+        this.banner('+3 VIDAS!', 'Bônus para enfrentar o Felipão', 2.2);
+      });
+    }
     this.cine = { kind: 'bossIntro', t: 0, stage: 0 };
     w.camera.zoomTarget = 0.95;
     w.after(0.8, () => {
-      const sp = w.data.enemies.find((e) => e.type === 'boss')!;
-      const e = w.spawnEnemy({ ...sp, arena: 'boss' });
-      this.bossRef = e;
-      a.alive.push(e);
-      a.bossEnemy = e;
+      this.spawnBoss(a);
       this.banner('FELIPÃO', 'O Chefe da Legião', 3.2);
       w.audio('bossRoar', 1);
       w.fx.addShake(8, 0.8);
@@ -782,6 +828,200 @@ export class Director {
       this.bossIntroDone = true;
       w.player.lockInput = false;
     });
+  }
+  private introLives = false;
+
+  private bossArena(): ArenaState | undefined {
+    return this.arenas.find((x) => x.def.id === 'boss');
+  }
+
+  private spawnBoss(a: ArenaState | undefined): Enemy {
+    const w = this.w;
+    const sp = w.data.enemies.find((e) => e.type === 'boss')!;
+    const e = w.spawnEnemy({ ...sp, arena: 'boss' });
+    this.bossRef = e;
+    if (a) {
+      a.alive.push(e);
+      a.bossEnemy = e;
+    }
+    return e;
+  }
+
+  /** Entrada longa em andamento (o jogo esconde o HUD, trava o jogador e permite pular). */
+  longIntroActive() {
+    return !!this.cine && this.cine.kind === 'bossIntro' && !!this.cine.long;
+  }
+  /** Tempo da entrada longa (−1 fora dela). */
+  introTime() {
+    return this.cine?.long ? this.cine.t : -1;
+  }
+  /** Quando o Felipão pousou na entrada longa (−1 se ainda não). */
+  introLandT() {
+    return this.cine?.long ? this.cine.landT ?? -1 : -1;
+  }
+  /** Mantém a cena sincronizada com o áudio (o relógio do áudio manda). */
+  syncIntro(audioT: number) {
+    const c = this.cine;
+    if (!c?.long || c.stage >= 3) return;
+    if (Math.abs(audioT - c.t) > 0.05) c.t = Math.min(audioT, INTRO_COMIC);
+  }
+  /** O jogo terminou de mostrar a HQ: a luta começa. */
+  onComicDone() {
+    const c = this.cine;
+    if (c?.long) c.comicDone = true;
+  }
+
+  private updateLongIntro(dt: number, c: Cine) {
+    const w = this.w;
+    const p = w.player;
+    const sp = w.data.enemies.find((e) => e.type === 'boss')!;
+    const t = c.t;
+    p.body.vx = 0;
+    p.lockInput = true;
+    const cam = w.camera;
+    if (c.stage === 0) {
+      // ---- suspense: o Felipão ainda não aparece
+      const k = clamp(t / INTRO_DROP, 0, 1);
+      // jogador sempre no quadro, olhando para onde o chefe vai cair
+      cam.focus = { x: p.x + Math.min((sp.x - p.x) * 0.5, cam.w * 0.28), y: sp.y - 62 - k * 18, rate: 2.2 };
+      cam.zoomTarget = 0.97 - 0.08 * k;
+      c.fxT = (c.fxT ?? 0) - dt;
+      if (c.fxT <= 0) {
+        c.fxT = 0.12;
+        w.fx.addShake(0.6 + 4.6 * k * k, 0.18);
+      }
+      // poeira e cascalho caindo do alto
+      let n = (8 + 34 * k) * dt * w.fx.density;
+      while (n > 0) {
+        if (Math.random() < n) {
+          const x = cam.x + Math.random() * cam.w;
+          w.fx.add(PK.Dust, x, cam.y - 6, rand.spread(14), rand.range(70, 150), rand.range(1.1, 1.8), rand.range(4, 7), '#a89cb8', { size1: 2, a0: 0.7, drag: 0.1 });
+          if (k > 0.45 && Math.random() < 0.25) w.fx.debris(x, cam.y - 4, 1, ['#3a3350', '#5a4f70'], 40);
+        }
+        n -= 1;
+      }
+      // céu e luzes piscando
+      const beat = c.beat ?? 0;
+      if (beat < SUSPENSE_BEATS.length && t >= SUSPENSE_BEATS[beat][0]) {
+        const [, sky, red] = SUSPENSE_BEATS[beat];
+        c.beat = beat + 1;
+        this.skyPulse = Math.max(this.skyPulse, sky);
+        w.fx.addFlash(red, '#ff2a3a');
+        if (beat === 1) w.audio('thunder', 0.7);
+        if (beat === 3) w.audio('warning', 0.55);
+      }
+      if (t >= INTRO_DROP) {
+        c.stage = 1;
+        c.beat = SUSPENSE_BEATS.length;
+        const e = this.spawnBoss(this.bossArena()) as Felipao;
+        e.introHold = true;
+        w.audio('thruster', 1);
+        w.fx.addShake(5, 0.4);
+      }
+    } else if (c.stage === 1) {
+      // ---- caindo do céu: a câmera espera no ponto de pouso e ele entra pelo alto do quadro
+      const b = this.bossRef as Felipao | null;
+      cam.focus = { x: sp.x - 40, y: sp.y - 80, rate: 4 };
+      cam.zoomTarget = 1;
+      if (!b || b.state !== 'enter' || t > INTRO_DROP + 2.2) {
+        if (b) b.skipEnter();
+        c.stage = 2;
+        c.landT = t;
+        this.bossLanded();
+      }
+    } else if (c.stage === 2) {
+      // ---- revelação: zoom lento, reator/aura/canhões acendendo
+      const b = this.bossRef as Felipao | null;
+      const lt = c.landT ?? t;
+      const k = clamp((t - lt) / Math.max(0.5, INTRO_COMIC - lt), 0, 1);
+      const ease = k * k * (3 - 2 * k);
+      cam.focus = { x: sp.x - 30 + (p.x - sp.x) * 0.12 * (1 - ease), y: sp.y - 76, rate: 1.8 };
+      cam.zoomTarget = 1.02 + 0.4 * ease;
+      if (b) b.introPower = clamp((t - lt - 0.35) / 1.5, 0, 1);
+      const beat = c.beat ?? 0;
+      const B = SUSPENSE_BEATS.length;
+      if (beat === B && t > lt + 0.75) {
+        c.beat = beat + 1;
+        w.audio('bossRoar', 1);
+        w.fx.addShake(7, 0.7);
+        w.fx.addFlash(0.25, '#ffe2b0');
+        this.skyPulse = 1;
+      } else if (beat === B + 1 && t > lt + 1.7) {
+        // canhões se armando
+        c.beat = beat + 1;
+        w.audio('servo', 1);
+        w.audio('laserCharge', 0.8);
+        if (b) w.fx.sparks(b.x, b.y - 90, 14, '#ffd27a', 260);
+      } else if (beat === B + 2 && t > lt + 2.6) {
+        c.beat = beat + 1;
+        if (b) b.doBurp(w, true);
+      }
+      if (t >= INTRO_COMIC) {
+        // ---- HQ dos dois se encarando (o jogo congela o mundo enquanto passa)
+        c.stage = 3;
+        c.comicHooked = !!w.hooks.onBossComic;
+        w.hooks.onBossComic?.(INTRO_COMIC_LEN);
+      }
+    } else if (c.comicHooked ? c.comicDone : t >= INTRO_LEN) {
+      // sem jogo por cima (testes/sem tela), a HQ "passa" pelo tempo do áudio
+      this.finishBossIntro();
+    }
+  }
+
+  /** Pouso do Felipão na entrada: chão racha, onda de choque e flash. */
+  private bossLanded() {
+    const w = this.w;
+    const sp = w.data.enemies.find((e) => e.type === 'boss')!;
+    const x = this.bossRef ? this.bossRef.x : sp.x;
+    this.cracks.length = 0;
+    this.cracks.push({ x, y: sp.y });
+    w.fx.addShake(14, 0.9);
+    w.fx.addFlash(0.6, '#ffffff');
+    w.fx.add(PK.Ring, x, sp.y - 6, 0, 0, 0.7, 14, '#ffd27a', { size1: 280, a0: 0.9, front: true });
+    w.fx.add(PK.Ring, x, sp.y - 6, 0, 0, 0.45, 10, '#ffffff', { size1: 170, a0: 1, front: true });
+    w.fx.debris(x, sp.y - 4, 18, ['#59628a', '#3a4064', '#ff8a2a'], 420);
+    w.fx.sparks(x, sp.y - 6, 26, '#ffd27a', 420);
+    w.fx.smoke(x, sp.y - 10, 10, '#4d4560', 30, 30, 1.6);
+    w.audio('bigExplosion', 0.8);
+    this.skyPulse = 1;
+  }
+
+  /** Fim da entrada longa: a luta começa (música do chefe, controle de volta). */
+  private finishBossIntro() {
+    const w = this.w;
+    const c = this.cine;
+    if (!c?.long) return;
+    let b = this.bossRef as Felipao | null;
+    if (!b) {
+      b = this.spawnBoss(this.bossArena()) as Felipao;
+      b.skipEnter();
+      this.bossLanded();
+    }
+    b.skipEnter();
+    b.introHold = false;
+    b.introPower = 0;
+    this.cine = null;
+    // corte seco (a HQ termina num flash): enquadramento da luta, com o Karimbo no quadro
+    const cam = w.camera;
+    cam.focus = null;
+    cam.zoom = cam.zoomTarget = 0.98;
+    cam.snapTo(w.player.x, w.player.y, w.player.x <= b.x ? 1 : -1);
+    this.bossIntroDone = true;
+    w.player.lockInput = false;
+    w.setMusic('boss1');
+    w.fx.addFlash(0.35, '#ffffff');
+    if (this.introLives) {
+      this.introLives = false;
+      w.audio('extraLife', 1);
+      this.banner('+3 VIDAS!', 'Bônus para enfrentar o Felipão', 2.2);
+    }
+    w.hooks.onBossIntroEnd?.();
+  }
+
+  /** Toque/tiro/pulo: pula a sequência inteira e vai direto para a luta. */
+  skipBossIntro() {
+    if (!this.longIntroActive()) return;
+    this.finishBossIntro();
   }
 
   setBossPhase(n: number) {
@@ -1049,6 +1289,14 @@ export class Director {
   }
 
   drawWorldOverlays(g: CanvasRenderingContext2D) {
-    void g;
+    // rachaduras do pouso do Felipão (somem onde o chão desabou)
+    const spr = this.introArt?.crack;
+    if (!spr || !this.cracks.length) return;
+    const L = this.w.level;
+    for (const ck of this.cracks) {
+      if (!this.w.camera.visible(ck.x, ck.y, 140)) continue;
+      if (!L.solidAtPx(ck.x, ck.y + 4)) continue;
+      drawSpr(g, spr, ck.x, ck.y, {});
+    }
   }
 }

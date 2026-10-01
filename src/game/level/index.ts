@@ -3,7 +3,8 @@ import { LevelBuilder, LEVEL_H } from './builder';
 import { section1, section2, section3, section4 } from './sections1';
 import { section5, section6, section7, section8, section9 } from './sections2';
 import { section10, section11, section12, section13, section14 } from './sections3';
-import { addSupplies, easeClimbs, addRollers } from './extras';
+import { addSupplies, easeClimbs, addRollers, addCivilians } from './extras';
+import { assignLooks } from '../civLook';
 import { applyCuts, CUT_TOTAL } from './cut';
 
 /** largura da fase montada (antes dos cortes) */
@@ -31,8 +32,11 @@ export function buildLevel(): LevelData {
   addSupplies(b);
   easeClimbs(b);
   addRollers(b);
+  addCivilians(b);
   // caminho até o chefe ~15% mais curto (remove corredores repetitivos)
   applyCuts(b);
   b.atmosphere.sort((a, c) => a.x - c.x);
+  // cada morador com uma aparência única (sem repetir combinação)
+  assignLooks(b.civilians);
   return b.build('boss');
 }

@@ -65,6 +65,8 @@ export function applyCuts(b: LevelBuilder) {
   for (const p of b.pickups) p.x = mapPx(p.x);
   b.decos = b.decos.filter((d) => keep(d.x));
   for (const d of b.decos) d.x = mapPx(d.x);
+  b.civilians = b.civilians.filter((c) => keep(c.x));
+  for (const c of b.civilians) c.x = mapPx(c.x);
   for (const c of b.checkpoints) c.x = mapPx(c.x);
   for (const a of b.arenas) {
     a.rect.x = mapPx(a.rect.x);

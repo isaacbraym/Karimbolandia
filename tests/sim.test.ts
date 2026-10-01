@@ -457,6 +457,8 @@ describe('Agachar desvia de tiros retos', () => {
   it('escopeta: coice dá pulinho para trás; atirando para baixo dá um pulinho para cima', () => {
     const w = makeWorld();
     teleport(w, M(30), 32);
+    // sem inimigos por perto: um tiro do soldado parado (tile 40) atrapalhava o pulo (teste instável)
+    w.enemies.length = 0;
     const ctl = newCtl();
     for (let i = 0; i < 20; i++) w.update(1 / 60, ctl);
     const p = w.player;
