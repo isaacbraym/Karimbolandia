@@ -324,6 +324,13 @@ export class Game {
     this.narrClip = null;
     this.narrId = -1;
     audio.setNarrDuck(1, 0.5);
+    audio.setSfxDuck(1);
+  }
+
+  /** Pilotando o Nômad, o barulho dele abaixa enquanto o narrador fala (para a voz ficar clara). */
+  private updateNarrDuck(w: World) {
+    const talking = w.narrator.busy() && !!this.narrClip && this.narrClip.playing;
+    audio.setSfxDuck(talking && w.player.mounted ? 0.45 : 1);
   }
 
   private bindWorld(w: World) {
@@ -336,7 +343,10 @@ export class Game {
       onBossIntroEnd: () => this.endBossIntro(),
       onNarrate: (id) => this.playNarr(id),
       onNarrStop: () => this.stopNarr(0.3),
-      onNarrEnd: () => audio.setNarrDuck(1, 0.6),
+      onNarrEnd: () => {
+        audio.setNarrDuck(1, 0.6);
+        audio.setSfxDuck(1);
+      },
       narrReady: (id) => audio.narrReady(id),
       onNarrPrepare: (id) => audio.prepareNarr(id),
       onBanner: (t, s, d) => this.hud.banner(t, s, d),
@@ -750,6 +760,7 @@ export class Game {
       if (i === 0) this.input.clearEdges();
       if (this.state !== 'playing') break; // a HQ congelou o mundo
     }
+    this.updateNarrDuck(w);
     if (w.director.skyPulse > 0) {
       this.post.skyFlash(w.director.skyPulse);
       w.director.skyPulse = 0;

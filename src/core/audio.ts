@@ -64,6 +64,8 @@ export class AudioEngine {
   private cineRate = 0.05;
   /** abafamento da música enquanto o narrador fala */
   private narrDuck = 1;
+  /** abafamento dos efeitos (ex.: o barulho do Nômad enquanto o narrador fala) */
+  private sfxDuck = 1;
   /** narração: arquivos comprimidos (pequenos) e só as falas prestes a tocar decodificadas */
   private narrData = new Map<number, ArrayBuffer>();
   private narrBuf = new Map<number, AudioBuffer>();
@@ -127,7 +129,7 @@ export class AudioEngine {
   private applyVolumes() {
     if (!this.ctx) return;
     const t = this.ctx.currentTime;
-    this.sfxBus.gain.setTargetAtTime(this.muted ? 0 : this.sfxVol, t, 0.02);
+    this.sfxBus.gain.setTargetAtTime(this.muted ? 0 : this.sfxVol * this.sfxDuck, t, this.sfxDuck < 1 ? 0.12 : 0.2);
     this.voiceBus.gain.setTargetAtTime(this.muted ? 0 : this.sfxVol, t, 0.02);
     this.musicBus.gain.setTargetAtTime(this.muted ? 0 : this.musicVol * 0.34 * this.duck * this.cineDuck * this.narrDuck, t, this.duck < 1 ? 0.05 : this.cineRate);
   }
@@ -135,6 +137,14 @@ export class AudioEngine {
   setCineDuck(v: number, fade = 0.3) {
     this.cineDuck = clamp(v, 0, 1);
     this.cineRate = Math.max(0.01, fade / 3);
+    this.applyVolumes();
+  }
+
+  /** Abafa os efeitos sonoros (1 = normal); a voz do narrador fica em outro barramento. */
+  setSfxDuck(v: number) {
+    const d = clamp(v, 0, 1);
+    if (d === this.sfxDuck) return;
+    this.sfxDuck = d;
     this.applyVolumes();
   }
 
