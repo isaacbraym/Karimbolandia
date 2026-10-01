@@ -46,6 +46,11 @@ interface TextSpr {
 }
 const textCache = new Map<string, TextSpr>();
 let textScale = 2;
+let textBudget = 3;
+/** Chamado a cada quadro: limita quantas imagens de texto novas são criadas (sem picos). */
+export function resetTextBudget() {
+  textBudget = 3;
+}
 let measureCtx: CanvasRenderingContext2D | null = null;
 /** Escala (px de tela por unidade lógica) do HUD — chamado no resize. */
 export function setHudTextScale(s: number) {
@@ -59,7 +64,21 @@ function text(g: CanvasRenderingContext2D, s: string, x: number, y: number, size
   if (typeof document === 'undefined') return;
   const key = s + '|' + size + '|' + color + '|' + align + '|' + font + '|' + weight;
   let e = textCache.get(key);
+  if (!e && textBudget <= 0) {
+    // orçamento do quadro esgotado: desenha direto (fica idêntico) e cria a imagem num quadro seguinte
+    g.font = `${weight} ${size}px ${font}`;
+    g.textAlign = align;
+    g.textBaseline = 'alphabetic';
+    g.lineWidth = Math.max(2, size * 0.24);
+    g.strokeStyle = '#170f2e';
+    g.lineJoin = 'round';
+    g.strokeText(s, x, y);
+    g.fillStyle = color;
+    g.fillText(s, x, y);
+    return;
+  }
   if (!e) {
+    textBudget--;
     const f = `${weight} ${size}px ${font}`;
     if (!measureCtx) measureCtx = document.createElement('canvas').getContext('2d')!;
     measureCtx.font = f;
@@ -198,6 +217,7 @@ export class Hud {
   }
 
   draw(g: CanvasRenderingContext2D, w: World, W: number, H: number) {
+    resetTextBudget();
     const art = getArt();
     const p = w.player;
     const L = 14 + this.safeL;

@@ -487,7 +487,65 @@ export class Background {
   draw(g: CanvasRenderingContext2D, s: BgState, dt: number) {
     const W = s.viewW;
     const H = s.viewH;
-    // A — céu
+    // A — céu, estrelas, planeta e sol: mudam muito devagar → imagem em cache, refeita a cada
+    // poucos quadros ou quando a câmera desloca o bastante para se notar (economiza ~6 preenchimentos
+    // de tela cheia por quadro, sem diferença visível)
+    this.drawFarCached(g, s);
+    // B — naves distantes
+    this.drawShips(g, s, dt);
+    // C, D
+    this.drawLayer(g, this.layers.far, s);
+    this.drawSearchlights(g, s, dt);
+    this.drawLayer(g, this.layers.big, s);
+    // F — batalhas distantes (flashes + colunas de fumaça)
+    this.drawBattles(g, s, dt);
+    // E — rodovias
+    this.drawLayer(g, this.layers.hwy, s);
+    this.drawTraffic(g, s);
+    // G — estruturas próximas (mistura industrial/ruínas)
+    this.drawLayer(g, this.layers.near, s, 1 - s.ruin);
+    if (s.ruin > 0.01) this.drawLayer(g, this.layersRuin, s, s.ruin);
+  }
+
+  private farC: HTMLCanvasElement | null = null;
+  private farX = 1e9;
+  private farY = 1e9;
+  private farSky = -1;
+  private farAge = 99;
+  private farK = 0;
+  private drawFarCached(g: CanvasRenderingContext2D, s: BgState) {
+    const W = s.viewW;
+    const H = s.viewH;
+    const m = g.getTransform();
+    const k = m.a;
+    const cw = Math.max(1, Math.round(W * k));
+    const ch = Math.max(1, Math.round(H * k));
+    if (!this.farC) this.farC = document.createElement('canvas');
+    const c = this.farC;
+    const moved = Math.abs(s.camX - this.farX) * 0.01 * k > 0.6 || Math.abs(s.camY - this.farY) * 0.01 * k > 0.6;
+    this.farAge++;
+    if (c.width !== cw || c.height !== ch || this.farK !== k || Math.abs(s.sky - this.farSky) > 0.004 || moved || this.farAge >= 4) {
+      if (c.width !== cw || c.height !== ch) {
+        c.width = cw;
+        c.height = ch;
+      }
+      const cg = c.getContext('2d')!;
+      cg.setTransform(k, 0, 0, k, 0, 0);
+      cg.globalAlpha = 1;
+      cg.globalCompositeOperation = 'source-over';
+      this.paintFar(cg, s);
+      this.farX = s.camX;
+      this.farY = s.camY;
+      this.farSky = s.sky;
+      this.farK = k;
+      this.farAge = 0;
+    }
+    g.drawImage(c, 0, 0, W, H);
+  }
+
+  private paintFar(g: CanvasRenderingContext2D, s: BgState) {
+    const W = s.viewW;
+    const H = s.viewH;
     const cols = this.skyColors(s.sky);
     const gr = g.createLinearGradient(0, 0, 0, H * 0.92);
     cols.forEach((c, i) => gr.addColorStop(i / (cols.length - 1), c));
@@ -522,20 +580,6 @@ export class Background {
       g.globalAlpha = 1;
       g.globalCompositeOperation = 'source-over';
     }
-    // B — naves distantes
-    this.drawShips(g, s, dt);
-    // C, D
-    this.drawLayer(g, this.layers.far, s);
-    this.drawSearchlights(g, s, dt);
-    this.drawLayer(g, this.layers.big, s);
-    // F — batalhas distantes (flashes + colunas de fumaça)
-    this.drawBattles(g, s, dt);
-    // E — rodovias
-    this.drawLayer(g, this.layers.hwy, s);
-    this.drawTraffic(g, s);
-    // G — estruturas próximas (mistura industrial/ruínas)
-    this.drawLayer(g, this.layers.near, s, 1 - s.ruin);
-    if (s.ruin > 0.01) this.drawLayer(g, this.layersRuin, s, s.ruin);
   }
 
   private drawLayer(g: CanvasRenderingContext2D, L: Layer, s: BgState, alpha = 1) {

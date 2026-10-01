@@ -151,6 +151,7 @@ export class Input {
     );
     window.addEventListener('gamepadconnected', (e) => {
       this.padIndex = e.gamepad.index;
+      this.padSeen = true;
     });
     window.addEventListener('gamepaddisconnected', () => {
       this.padIndex = -1;
@@ -174,6 +175,8 @@ export class Input {
 
   private pad(): Gamepad | null {
     if (typeof navigator === 'undefined' || !navigator.getGamepads) return null;
+    // só consulta depois que algum controle se conectou (getGamepads pode custar caro a cada quadro)
+    if (this.padIndex < 0 && !this.padSeen) return null;
     const pads = navigator.getGamepads();
     let p: Gamepad | null = null;
     if (this.padIndex >= 0) p = pads[this.padIndex] ?? null;

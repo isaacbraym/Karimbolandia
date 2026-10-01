@@ -344,10 +344,13 @@ export class Fx {
   private popCache = new Map<string, { c: HTMLCanvasElement; w: number; h: number; ay: number }>();
   /** px de tela por unidade de mundo (para o texto ficar nítido) */
   popScale = 3;
+  private popBudget = 2;
   private popSprite(text: string, size: number, color: string) {
     const key = text + '|' + size + '|' + color;
     let e = this.popCache.get(key);
     if (e) return e;
+    if (this.popBudget <= 0) return null;
+    this.popBudget--;
     const k = this.popScale;
     const f = `bold ${size}px Rajdhani, sans-serif`;
     const mc = document.createElement('canvas').getContext('2d')!;
@@ -378,10 +381,22 @@ export class Fx {
 
   drawPopups(g: CanvasRenderingContext2D) {
     if (!this.popups.length || typeof document === 'undefined') return;
+    this.popBudget = 2;
     for (const p of this.popups) {
       g.globalAlpha = Math.min(1, (p.life / p.max) * 2);
       const e = this.popSprite(p.text, p.size, p.color);
-      g.drawImage(e.c, p.x - e.w / 2, p.y - e.ay, e.w, e.h);
+      if (e) g.drawImage(e.c, p.x - e.w / 2, p.y - e.ay, e.w, e.h);
+      else {
+        // orçamento do quadro esgotado: desenha direto (mesmo visual)
+        g.font = `bold ${p.size}px Rajdhani, sans-serif`;
+        g.textAlign = 'center';
+        g.lineWidth = 2.4;
+        g.lineJoin = 'round';
+        g.strokeStyle = '#170f2e';
+        g.strokeText(p.text, p.x, p.y);
+        g.fillStyle = p.color;
+        g.fillText(p.text, p.x, p.y);
+      }
     }
     g.globalAlpha = 1;
   }

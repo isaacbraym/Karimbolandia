@@ -12,7 +12,7 @@ import { newNomad } from './player';
 import { NOMAD_W, NOMAD_H, FOOT_H } from './movement';
 import { BASE_ZOOM, EXPLORE_ZOOM, MIN_THREAT_ZOOM } from './camera';
 import { glowSprite } from '../art/kit';
-import { drawDeco } from '../art/decor';
+import { drawDeco, resetDecoBudget } from '../art/decor';
 
 type ArenaStatus = 'idle' | 'active' | 'cleared';
 interface ArenaState {
@@ -919,6 +919,7 @@ export class Director {
 
   // ------------------------------------------------------------------ desenho
   drawDecos(g: CanvasRenderingContext2D, layer: 'back' | 'front') {
+    if (layer === 'back') resetDecoBudget(2);
     const cam = this.w.camera;
     const t = this.w.time;
     const decos = this.w.data.decos as DecoSpawn[];

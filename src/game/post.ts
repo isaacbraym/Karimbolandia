@@ -207,7 +207,7 @@ export class PostFX {
       fresh = true;
     }
     this.bloomFrame++;
-    if (fresh || q === 'high' || this.bloomFrame % 2 === 0) {
+    if (fresh || this.bloomFrame % 2 === 0) {
       const c1 = this.b1.getContext('2d')!;
       const c2 = this.b2.getContext('2d')!;
       c1.globalCompositeOperation = 'source-over';
@@ -256,6 +256,7 @@ export class PostFX {
     g.fillStyle = this.gradeCache.gr!;
     g.fillRect(0, 0, W, H);
     g.restore();
+    if (q !== 'high') return; // granulação: só na alta (passada de tela cheia em 'overlay')
     if (!this.grain) {
       this.grain = mk(128, 128);
       const gg = this.grain.getContext('2d')!;

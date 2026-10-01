@@ -58,6 +58,11 @@ const STATIC_BOUNDS: Record<string, [number, number, number, number]> = {
 let decoDensity = 2;
 const baked = new Map<string, HTMLCanvasElement>();
 const MAX_BAKED = 70;
+let bakeBudget = 2;
+/** Chamado uma vez por quadro: limita quantas decorações novas são pré-desenhadas. */
+export function resetDecoBudget(n = 2) {
+  bakeBudget = n;
+}
 
 /** Densidade (px de tela por unidade) usada para pré-desenhar as decorações estáticas. */
 export function setDecoDensity(dens: number) {
@@ -101,8 +106,10 @@ export function drawDeco(g: CanvasRenderingContext2D, d: DecoSpawn, t: number) {
   if (d.flip) g.scale(-1, 1);
   g.scale(s, s);
   const b = STATIC_BOUNDS[d.kind];
-  if (b && typeof document !== 'undefined') g.drawImage(bakedDeco(d.kind, seed, s, b), b[0], b[1], b[2] - b[0], b[3] - b[1]);
-  else paintDeco(g, d.kind, seed, t);
+  const ready = b && typeof document !== 'undefined' ? baked.get(d.kind + '|' + seed + '|' + s) : undefined;
+  if (b && (ready || (typeof document !== 'undefined' && bakeBudget-- > 0))) {
+    g.drawImage(ready ?? bakedDeco(d.kind, seed, s, b), b[0], b[1], b[2] - b[0], b[3] - b[1]);
+  } else paintDeco(g, d.kind, seed, t);
   g.restore();
   void rngCache;
 }

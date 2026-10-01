@@ -8,6 +8,9 @@ import { createHash } from 'node:crypto';
  * Service worker simples: pré-cacheia todo o build (caminhos RELATIVOS ao escopo,
  * então funciona em /Karimbolandia/ no GitHub Pages ou em qualquer subpasta).
  */
+/** Identificador deste build (vai para o código e para version.json → aviso de atualização). */
+const BUILD_ID = `${new Date().toISOString().slice(0, 16).replace(/[-:T]/g, '')}-${Math.random().toString(36).slice(2, 6)}`;
+
 function pwaPlugin(): Plugin {
   let outDir = 'dist';
   return {
@@ -26,10 +29,11 @@ function pwaPlugin(): Plugin {
         }
       };
       walk(outDir);
-      const list = files.filter((f) => f !== 'sw.js' && !f.endsWith('.map'));
+      writeFileSync(join(outDir, 'version.json'), JSON.stringify({ id: BUILD_ID, date: new Date().toISOString() }));
+      const list = files.filter((f) => f !== 'sw.js' && f !== 'version.json' && !f.endsWith('.map'));
       const hash = createHash('sha1');
       for (const f of list) hash.update(f).update(readFileSync(join(outDir, f)));
-      const version = hash.digest('hex').slice(0, 10);
+      const version = hash.digest('hex').slice(0, 10) + '-' + BUILD_ID;
       const sw = `/* gerado no build — Karimbolândia */
 const VERSION = 'karimbolandia-${version}';
 const PRECACHE = ${JSON.stringify(['./', ...list])};
@@ -41,9 +45,27 @@ self.addEventListener('activate', (e) => {
     caches.keys().then((keys) => Promise.all(keys.filter((k) => k !== VERSION).map((k) => caches.delete(k)))).then(() => self.clients.claim())
   );
 });
+self.addEventListener('message', (e) => {
+  if (e.data === 'skipWaiting') self.skipWaiting();
+});
 self.addEventListener('fetch', (e) => {
   const req = e.request;
-  if (req.method !== 'GET' || new URL(req.url).origin !== self.location.origin) return;
+  const url = new URL(req.url);
+  if (req.method !== 'GET' || url.origin !== self.location.origin) return;
+  // versão: sempre da rede (nunca do cache)
+  if (url.pathname.endsWith('/version.json')) return;
+  // página (navegação): rede primeiro → quem abre o jogo recebe a versão nova; offline usa o cache
+  if (req.mode === 'navigate' || url.pathname.endsWith('/index.html')) {
+    e.respondWith(
+      fetch(req, { cache: 'no-store' }).then((res) => {
+        const copy = res.clone();
+        caches.open(VERSION).then((c) => c.put('./', copy));
+        return res;
+      }).catch(() => caches.match('./').then((hit) => hit || caches.match(req, { ignoreSearch: true })))
+    );
+    return;
+  }
+  // arquivos com hash no nome (imutáveis), imagens e fontes: cache primeiro
   e.respondWith(
     caches.match(req, { ignoreSearch: true }).then((hit) => hit || fetch(req).then((res) => {
       const copy = res.clone();
@@ -62,6 +84,7 @@ export default defineConfig({
   // Caminhos relativos: funciona em https://isaacbraym.github.io/Karimbolandia/ e localmente.
   base: './',
   plugins: [pwaPlugin()],
+  define: { __BUILD_ID__: JSON.stringify(BUILD_ID) },
   build: {
     target: 'es2022',
     sourcemap: false,

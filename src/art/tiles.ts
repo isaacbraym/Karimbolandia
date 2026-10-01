@@ -144,7 +144,7 @@ export function bakeTiles(): TileArt {
         const key = cy * 4096 + cx;
         let ch = chunks.get(key);
         if (!ch) {
-          if (built >= 4) {
+          if (built >= 2) {
             // limite de montagem por quadro (sem engasgos): desenha tile a tile por enquanto
             for (let ty = cy * CH; ty < cy * CH + CH && ty < level.h; ty++) for (let tx = cx * CH; tx < cx * CH + CH && tx < level.w; tx++) drawTile(g, level, tx, ty, 0, 0, 1, time);
             continue;

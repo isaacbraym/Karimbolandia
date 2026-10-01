@@ -1,5 +1,6 @@
 import './style.css';
 import { Game } from './game/game';
+import { startUpdateWatch } from './core/update';
 
 const base = import.meta.env.BASE_URL;
 const params = new URLSearchParams(location.search);
@@ -22,10 +23,12 @@ async function boot() {
   void import('./core/audio').then((a) => import('./core/music').then((m) => ((window as unknown as Record<string, unknown>).__snd = { audio: a.audio, music: m.music, MIX: m.MIX })));
   await game.boot(base);
   if ('serviceWorker' in navigator && import.meta.env.PROD) {
-    const reg = () => navigator.serviceWorker.register(`${base}sw.js`).catch(() => undefined);
+    const reg = () => navigator.serviceWorker.register(`${base}sw.js`, { updateViaCache: 'none' }).catch(() => undefined);
     if (document.readyState === 'complete') void reg();
     else window.addEventListener('load', () => void reg());
   }
+  // aviso de versão nova (só no build publicado)
+  if (import.meta.env.PROD) startUpdateWatch(base, { onUpdate: (apply) => game.notifyUpdate(apply) });
   if (params.get('autoplay') === '1') game.play();
 }
 

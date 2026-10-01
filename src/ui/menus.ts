@@ -394,6 +394,56 @@ export class Menus {
     this.collectFocus(this.over);
   }
 
+  private updateEl: HTMLElement | null = null;
+  private updatePill: HTMLElement | null = null;
+  /** Janela de confirmação: há uma versão nova do jogo. */
+  showUpdate(apply: () => void, onLater?: () => void) {
+    this.updatePill?.remove();
+    this.updatePill = null;
+    if (this.updateEl) return;
+    const o = el('div', 'overlay panel-back');
+    o.id = 'update';
+    const p = el('div', 'panel');
+    p.style.width = 'min(400px, 92vw)';
+    p.style.textAlign = 'center';
+    p.append(el('h2', '', 'NOVA VERSÃO!'), el('p', '', 'Saiu uma atualização do Karimbolândia. Atualize para jogar a versão mais nova.'));
+    const btns = el('div', 'btns');
+    btns.append(
+      this.btn('ATUALIZAR AGORA', 'primary', () => {
+        p.querySelectorAll('.btn').forEach((b) => b.setAttribute('disabled', ''));
+        (p.querySelector('h2') as HTMLElement).textContent = 'ATUALIZANDO...';
+        apply();
+      }),
+      this.btn('DEPOIS', 'alt small', () => {
+        o.remove();
+        this.updateEl = null;
+        this.showUpdatePill(apply, onLater);
+        onLater?.();
+      })
+    );
+    p.append(btns);
+    o.append(p);
+    this.root.append(o);
+    this.updateEl = o;
+    this.collectFocus(o);
+  }
+
+  /** Botão discreto (durante a partida): toca para ver a confirmação. */
+  showUpdatePill(apply: () => void, onOpen?: () => void) {
+    if (this.updatePill || this.updateEl) return;
+    const b = el('button', 'update-pill', '⬆ NOVA VERSÃO — ATUALIZAR');
+    (b as HTMLButtonElement).type = 'button';
+    b.addEventListener('click', () => {
+      this.cb.onClick();
+      b.remove();
+      this.updatePill = null;
+      onOpen?.();
+      this.showUpdate(apply);
+    });
+    this.root.append(b);
+    this.updatePill = b;
+  }
+
   showResults(d: ResultData) {
     this.results.innerHTML = '';
     const t = el('div', 'title', 'FASE COMPLETA!');

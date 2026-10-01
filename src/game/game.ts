@@ -21,7 +21,7 @@ type State = 'loading' | 'menu' | 'playing' | 'paused' | 'complete' | 'continue'
 
 const CONTINUE_SECS = 10;
 
-const MAX_H: Record<Quality, number> = { low: 540, medium: 720, high: 1080 };
+const MAX_H: Record<Quality, number> = { low: 540, medium: 720, high: 960 };
 const CAPS: Record<Quality, { parts: number; density: number }> = {
   low: { parts: 620, density: 0.85 },
   medium: { parts: 760, density: 0.95 },
@@ -68,6 +68,7 @@ export class Game {
   private drsAcc = 0;
   private drsN = 0;
   private drsGood = 0;
+  private drsBad = 0;
 
   constructor(canvas: HTMLCanvasElement, ui: HTMLElement) {
     this.canvas = canvas;
@@ -136,7 +137,8 @@ export class Game {
       const mem = (navigator as unknown as { deviceMemory?: number }).deviceMemory ?? 4;
       const cores = navigator.hardwareConcurrency ?? 4;
       const small = Math.min(screen.width, screen.height) * (window.devicePixelRatio || 1) < 900;
-      if (this.isTouch) q = mem <= 3 || cores <= 4 ? 'low' : mem <= 4 ? 'medium' : 'high';
+      // celular: no máximo 'média' (telas com DPR 3 em 960p pesam demais; a resolução dinâmica ajusta o resto)
+      if (this.isTouch) q = mem <= 3 || cores <= 4 ? 'low' : 'medium';
       else q = 'high';
       if (small && q === 'high') q = 'medium';
     } else q = settings.quality;
@@ -420,6 +422,13 @@ export class Game {
     this.last = performance.now();
   }
 
+  /** Há versão nova publicada: confirmação no menu/pausa; durante a partida, só um botão discreto. */
+  notifyUpdate(apply: () => void) {
+    const busy = this.state === 'playing' || this.state === 'comic' || this.state === 'continue';
+    if (busy) this.menus.showUpdatePill(apply, () => this.pause());
+    else this.menus.showUpdate(apply);
+  }
+
   private gameOver() {
     if (this.state !== 'playing') return;
     this.state = 'gameover';
@@ -496,7 +505,7 @@ export class Game {
   private applyDebugParams(w: World) {
     const q = new URLSearchParams(location.search);
     if (q.get('god') === '1') w.invulnerable = true;
-    if (q.get('qa') === '1') (window as unknown as { __kg?: unknown }).__kg = { game: this, world: w }; // QA no navegador
+    if (q.get('qa') === '1') (window as unknown as { __kg?: unknown }).__kg = { game: this, world: w, art: getArt() }; // QA no navegador
     const tp = q.get('tp');
     if (tp) {
       const tx = parseFloat(tp);
@@ -661,23 +670,32 @@ export class Game {
     if (this.drsAcc < 1.2) return;
     const avg = this.drsAcc / this.drsN;
     this.drsAcc = this.drsN = 0;
-    if (avg > 1 / 47 && this.renderScale > 0.61) {
-      this.renderScale = Math.max(0.6, +(this.renderScale - 0.1).toFixed(2));
-      this.drsGood = 0;
-      this.resize();
+    const minScale = this.isTouch ? 0.5 : 0.6;
+    if (avg > 1 / 47 && this.renderScale > minScale + 0.01) {
+      // só baixa com lentidão sustentada (2 janelas seguidas): cada troca realoca o canvas
+      if (++this.drsBad >= 2) {
+        this.renderScale = Math.max(minScale, +(this.renderScale - 0.1).toFixed(2));
+        this.drsBad = 0;
+        this.drsGood = 0;
+        this.resize();
+      }
     } else if (avg < 1 / 57 && this.renderScale < 1) {
-      if (++this.drsGood >= 4) {
+      this.drsBad = 0;
+      if (++this.drsGood >= 6) {
         this.renderScale = Math.min(1, +(this.renderScale + 0.05).toFixed(2));
         this.drsGood = 0;
         this.resize();
       }
-    } else this.drsGood = 0;
+    } else {
+      this.drsGood = 0;
+      this.drsBad = 0;
+    }
   }
 
   private autoQuality(dt: number, now: number) {
     this.dynamicResolution(dt);
     // só troca a qualidade se nem a resolução mínima der conta
-    if (settings.quality !== 'auto' || this.state !== 'playing' || this.renderScale > 0.61) {
+    if (settings.quality !== 'auto' || this.state !== 'playing' || this.renderScale > (this.isTouch ? 0.51 : 0.61)) {
       this.frameTimes.length = 0;
       return;
     }

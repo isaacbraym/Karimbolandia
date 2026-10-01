@@ -871,3 +871,31 @@ kbd {
 .panel-back .panel {
   margin-top: 34px;
 }
+
+/* aviso de versão nova */
+.update-pill {
+  position: fixed;
+  top: calc(var(--sat) + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 45;
+  font-family: var(--display);
+  font-size: 13px;
+  letter-spacing: 0.5px;
+  color: #3a1d00;
+  background: linear-gradient(180deg, #ffe66a, #ffb01f);
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+  padding: 6px 14px;
+  box-shadow: 0 3px 0 var(--ink), 0 6px 18px rgba(0, 0, 0, 0.4);
+  cursor: pointer;
+  animation: upd-pulse 1.2s ease-in-out infinite alternate;
+}
+@keyframes upd-pulse {
+  to {
+    transform: translateX(-50%) scale(1.06);
+  }
+}
+#update {
+  z-index: 60;
+}
