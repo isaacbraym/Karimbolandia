@@ -733,7 +733,7 @@ export class World {
     const cx = this.camera.x + this.camera.w / 2;
     const cy = this.camera.y + this.camera.h / 2;
     // entrada do Felipão: o resto do mundo espera (ninguém ataca durante a cena)
-    const introFreeze = this.director.longIntroActive();
+    const introFreeze = this.director.longIntroActive() || this.director.soldierIntroActive();
     for (const e of this.enemies) {
       if (!e.alive) continue;
       if (introFreeze && !e.isBoss) continue;

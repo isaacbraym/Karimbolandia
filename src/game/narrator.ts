@@ -217,6 +217,7 @@ export class Narrator {
     const c = d.cine;
     if (c) {
       if (c.kind === 'opening') return id === 1;
+      if (c.kind === 'soldier') return id === 2;
       if (c.kind === 'bossDeath') return id === 28;
       return false; // apresentação do Nômad (voz do Karimbo) e entrada do Felipão
     }
@@ -260,7 +261,7 @@ export class Narrator {
     // 2 — primeiro soldado parado
     if (!has(2)) {
       prep(2, this.xShoot);
-      if (x >= this.xShoot - 2 * TILE) {
+      if (x >= this.xShoot - 2 * TILE && !d.soldierIntroActive()) {
         const id = this.firstSoldier;
         this.request(2, 7, () => !w.killedEnemies.has(id) && w.player.x < this.xShoot + 22 * TILE);
       }

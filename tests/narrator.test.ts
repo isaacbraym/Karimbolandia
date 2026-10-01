@@ -95,6 +95,46 @@ describe('Narrador', () => {
     expect(w.player.lockInput).toBe(false);
   });
 
+  it('primeiro soldado: trava longe, mostra o alvo e espera a fala completa', () => {
+    const w = makeWorld();
+    const soldier = w.enemies.find((e) => e.spawn.type === 'rifle' && e.spawn.id >= 0)!;
+    let ready = false;
+    let playing = true;
+    w.hooks.narrReady = (id) => id !== 2 || ready;
+    w.hooks.narrPlaying = (id) => id === 2 && playing;
+    teleport(w, M(20), 32);
+    const startX = w.player.x;
+    const hp = soldier.hp;
+    expect(soldier.x - startX).toBeGreaterThan(560);
+    const ctl = newCtl();
+    ctl.moveX = 1;
+    ctl.fire.held = true;
+    ctl.grenade.pressed = true;
+    for (let i = 0; i < 60 * 5; i++) w.update(1 / 60, ctl);
+    expect(w.director.soldierIntroActive()).toBe(true);
+    expect(w.player.lockInput).toBe(true);
+    expect(w.player.x).toBeCloseTo(startX, 0);
+    expect(w.camera.focus?.x).toBe(soldier.x - 150);
+    expect(w.camera.zoomTarget).toBe(0.9);
+    expect(soldier.hp).toBe(hp);
+    expect(w.bullets).toHaveLength(0);
+    expect(w.grenades).toHaveLength(0);
+    ready = true;
+    for (let i = 0; i < 60 * 18; i++) w.update(1 / 60, ctl);
+    expect(w.narrator.played.has(2)).toBe(true);
+    expect(w.narrator.t).toBeGreaterThan(NARR_LEN[2]);
+    expect(w.director.soldierIntroActive()).toBe(true);
+    expect(w.player.lockInput).toBe(true);
+    expect(w.player.x).toBeCloseTo(startX, 0);
+    expect(soldier.hp).toBe(hp);
+    playing = false;
+    for (let i = 0; i < 3; i++) w.update(1 / 60, newCtl());
+    expect(w.director.soldierIntroActive()).toBe(false);
+    expect(w.player.lockInput).toBe(false);
+    expect(w.camera.focus).toBe(null);
+    expect(w.narrator.log.filter((entry) => entry.id === 2)).toHaveLength(1);
+  });
+
   it('a apresentação do Nômad espera o narrador: a voz do Karimbo nunca cruza com ele', () => {
     const w = makeWorld();
     const { narr, voices } = spy(w);

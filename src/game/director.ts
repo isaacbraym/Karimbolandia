@@ -32,7 +32,7 @@ interface ArenaState {
 }
 
 interface Cine {
-  kind: 'nomad' | 'bossDeath' | 'bossIntro' | 'opening';
+  kind: 'nomad' | 'bossDeath' | 'bossIntro' | 'opening' | 'soldier';
   t: number;
   stage: number;
   /** entrada longa do chefe (primeira vez da partida, guiada pelo áudio) */
@@ -134,12 +134,17 @@ export class Director {
   private hordeFrom = 0;
   private hordeTo = 0;
   private enemySpawnById = new Map<number, EnemySpawn>();
+  private firstSoldier: EnemySpawn | null = null;
   /** Busca espacial das decorações; a ordenação original é preservada ao desenhar. */
   private decoBuckets = { back: new Map<number, number[]>(), front: new Map<number, number[]>() };
 
   constructor(w: World) {
     this.w = w;
     for (const spawn of w.data.enemies) this.enemySpawnById.set(spawn.id, spawn);
+    const shootX = w.data.triggers.find((t) => t.id === 'hint:shoot')?.rect.x ?? 0;
+    this.firstSoldier = w.data.enemies
+      .filter((e) => !e.arena && e.type === 'rifle' && e.x >= shootX)
+      .reduce<EnemySpawn | null>((best, e) => !best || e.x < best.x ? e : best, null);
     w.data.decos.forEach((d, i) => {
       const key = Math.floor(d.x / 512);
       const buckets = this.decoBuckets[d.layer];
@@ -205,6 +210,7 @@ export class Director {
     }
     if (this.cine?.long) this.w.hooks.onBossIntroEnd?.();
     this.cine = null;
+    this.w.player.lockInput = false;
     this.cracks.length = 0;
     if (!this.supportUsed) {
       this.support = null;
@@ -646,6 +652,17 @@ export class Director {
     const w = this.w;
     if (once) this.triggered.add(id);
     switch (id) {
+      case 'soldierMeet':
+        if (this.firstSoldier && w.player.mode === 'foot' && !this.cine && !w.killedEnemies.has(this.firstSoldier.id) && !w.narrator.played.has(2)) {
+          this.cine = { kind: 'soldier', t: 0, stage: 0 };
+          w.player.lockInput = true;
+          w.player.body.vx = 0;
+          // Disparos lançados antes da trava não podem atingir o soldado durante a fala.
+          w.bullets = w.bullets.filter((b) => b.team !== 0);
+          w.grenades = w.grenades.filter((g) => g.team !== 0);
+          w.narrator.request(2, 15, undefined, 3);
+        }
+        break;
       case 'nomadMeet':
         if (!w.nomadUsed && !w.nomadLost && w.player.mode === 'foot') {
           this.cine = { kind: 'nomad', t: 0, stage: 0 };
@@ -677,7 +694,18 @@ export class Director {
     const c = this.cine!;
     const p = w.player;
     c.t += dt;
-    if (c.kind === 'nomad') {
+    if (c.kind === 'soldier') {
+      const soldier = this.firstSoldier;
+      if (!soldier) { this.endSoldierMeet(); return; }
+      w.camera.focus = { x: soldier.x - 150, y: soldier.y - 65, rate: 3.2 };
+      w.camera.zoomTarget = 0.9;
+      p.lockInput = true;
+      p.body.vx = 0;
+      // Espera a decodificação e depois a duração real do áudio, mesmo além da estimativa.
+      const nr = w.narrator;
+      if (!nr.played.has(2) && nr.pending(2)) return;
+      if (!nr.busy()) this.endSoldierMeet();
+    } else if (c.kind === 'nomad') {
       const ns = w.data.nomadSpawn;
       w.camera.focus = { x: ns.x - 20, y: ns.y - 64, rate: 3.2 };
       w.camera.zoomTarget = 1.4;
@@ -727,6 +755,17 @@ export class Director {
     } else if (c.kind === 'bossDeath') {
       this.updateBossDeath(dt, c);
     }
+  }
+
+  soldierIntroActive() {
+    return this.cine?.kind === 'soldier';
+  }
+
+  private endSoldierMeet() {
+    this.cine = null;
+    this.w.player.lockInput = false;
+    this.w.camera.focus = null;
+    this.w.camera.zoomTarget = BASE_ZOOM;
   }
 
   // ------------------------------------------------------------------ arenas

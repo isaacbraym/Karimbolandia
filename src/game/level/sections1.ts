@@ -17,6 +17,7 @@ export function section1(b: LevelBuilder) {
 
   // dicas contextuais (aparecem uma vez e somem sozinhas)
   b.trigger('hint:move', 6, 0, 3, 46);
+  b.trigger('soldierMeet', 20, 0, 2, 46);
   b.trigger('hint:shoot', 26, 0, 3, 46);
   b.trigger('hint:jump', 46, 0, 3, 46);
   b.trigger('hint:swap', 96, 0, 3, 46);
