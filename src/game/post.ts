@@ -39,6 +39,8 @@ export class PostFX {
   private lastCamY = 0;
   /** 0..1: intensidade atual da chuva (some em ambientes cobertos) */
   rain = 0;
+  /** fase atual: a selva (2) é ensolarada, sem chuva, com tons quentes/verdes */
+  stage = 1;
   private lightningT = 8;
   private flash = 0;
   private flashSeq: number[] = [];
@@ -64,7 +66,7 @@ export class PostFX {
     const L = w.level;
     let covered = false;
     for (let k = 3; k < 14 && !covered; k++) if (L.solidAtPx(p.x, p.y - k * 32)) covered = true;
-    const target = covered ? 0 : 1;
+    const target = covered || this.stage === 2 ? 0 : 1;
     this.rain += (target - this.rain) * Math.min(1, dt * 1.2);
 
     const n = q === 'high' ? 170 : q === 'medium' ? 110 : 60;
@@ -244,17 +246,23 @@ export class PostFX {
     g.restore();
   }
 
-  private gradeCache: { H: number; gr: CanvasGradient | null } = { H: -1, gr: null };
+  private gradeCache: { H: number; gr: CanvasGradient | null; stage?: number } = { H: -1, gr: null };
   private grainPat: CanvasPattern | null = null;
   /** Gradação de cor + granulação (espaço de tela lógico). */
   grade(g: CanvasRenderingContext2D, W: number, H: number, q: Quality) {
     void q;
-    if (this.gradeCache.H !== H || !this.gradeCache.gr) {
+    if (this.gradeCache.H !== H || !this.gradeCache.gr || this.gradeCache.stage !== this.stage) {
       const gr = g.createLinearGradient(0, 0, 0, H);
-      gr.addColorStop(0, 'rgba(255,60,190,0.32)');
-      gr.addColorStop(0.55, 'rgba(120,80,255,0.08)');
-      gr.addColorStop(1, 'rgba(40,230,255,0.28)');
-      this.gradeCache = { H, gr };
+      if (this.stage === 2) {
+        gr.addColorStop(0, 'rgba(255,226,140,0.30)');
+        gr.addColorStop(0.55, 'rgba(120,220,140,0.06)');
+        gr.addColorStop(1, 'rgba(30,140,120,0.22)');
+      } else {
+        gr.addColorStop(0, 'rgba(255,60,190,0.32)');
+        gr.addColorStop(0.55, 'rgba(120,80,255,0.08)');
+        gr.addColorStop(1, 'rgba(40,230,255,0.28)');
+      }
+      this.gradeCache = { H, gr, stage: this.stage };
     }
     g.save();
     g.globalCompositeOperation = 'soft-light';

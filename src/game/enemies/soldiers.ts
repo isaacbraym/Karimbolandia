@@ -2,7 +2,7 @@ import { Enemy, type HurtInfo } from './enemy';
 import type { World } from '../world';
 import type { EnemySpawn } from '../level';
 import { clamp, rand, approach, angleDiff, TAU } from '../../core/math';
-import { getArt } from '../../art';
+import { soldierSet } from '../../art';
 import { drawSoldier, soldierMuzzle, GUN_LEN, type SoldierStyle, type SState } from '../../art/soldiers';
 import { PK } from '../fx';
 import { moveBody } from '../physics';
@@ -132,14 +132,14 @@ abstract class Soldier extends Enemy {
     w.fx.sparks(this.x, this.y, 10, '#ffd0a0', 260);
     w.fx.smoke(this.x, this.y, 3, '#6b6480', 9, 26, 0.7);
     w.corpses.push(new Corpse(this.x, this.y, dir * rand.range(120, 240) + (info?.kx ?? 0) * 0.3, -rand.range(280, 420), (g, x, y, rot, alpha) => {
-      const art = getArt().soldiers[this.style];
+      const art = soldierSet()[this.style];
       drawSoldier(g, art, x, y + this.stats.h / 2, { facing: this.facing, state: 'hurt', t: 0, runPhase: 0, aim: this.aim, aiming: false, flash: false, alpha, kick: 0, charge: 0, style: this.style, rot });
     }));
     w.fx.explosion(this.x, this.y - 6, 9);
   }
 
   draw(g: CanvasRenderingContext2D, w: World) {
-    const art = getArt().soldiers[this.style];
+    const art = soldierSet()[this.style];
     const b = this.body;
     this.drawExtra(g, w, false);
     drawSoldier(g, art, this.x, this.feetY, {

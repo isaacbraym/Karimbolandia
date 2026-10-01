@@ -20,6 +20,8 @@ import { softDot, drawSpr } from '../art/kit';
 import { Corpse } from './corpse';
 import { Crowd } from './civilians';
 import { Narrator } from './narrator';
+import { Waters } from './water';
+import { drawWaterBack, drawWaterFront } from '../art/waterDraw';
 
 export interface Stats {
   kills: number;
@@ -101,6 +103,10 @@ export class World {
   smash!: Smasher;
   /** moradores da cidade (não são alvos nem sólidos) */
   crowd = new Crowd();
+  /** pântanos e lagos (fase 2): nado, peixes, bolhas */
+  water!: Waters;
+  /** 0..1 cabeça do Karimbo debaixo d'água (som abafado, tom da tela) */
+  underwater = 0;
   /** combo: abates em sequência (janela de 3 s) multiplicam a pontuação */
   combo = 0;
   comboT = 0;
@@ -151,6 +157,7 @@ export class World {
     this.level = data.level;
     this.baseTiles = data.level.tiles.slice();
     this.baseTheme = data.level.theme.slice();
+    this.water = new Waters(data.water ?? [], this.level, data.decos);
     this.director = new Director(this);
     this.narrator = new Narrator(this);
     this.computePits();
@@ -181,7 +188,7 @@ export class World {
     this.stats = { kills: 0, deaths: 0, damageTaken: 0, dashes: 0, shots: 0, pitFalls: 0, time: 0 };
     this.checkpointIdx = -1;
     this.checkpointSnap = null;
-    this.nomadLost = false;
+    this.nomadLost = this.data.stage === 2; // selva: não há Nômad
     this.nomadUsed = false;
     this.parkedNomad = null;
     this.lives = MAX_LIVES;
@@ -192,6 +199,7 @@ export class World {
     this.bestCombo = 0;
     this.smash?.reset();
     this.narrator?.reset();
+    this.water?.reset();
     this.finished = false;
     this.player.resetInventory();
     this.director.reset();
@@ -721,6 +729,7 @@ export class World {
     this.director.update(dt, ctl);
     this.narrator.update(dt);
     p.update(this, dt, ctl);
+    if (this.water.zones.length) this.water.update(dt, p.x, p.y, p.swimming, this.camera.x, this.camera.x + this.camera.w);
     // BZZZ do pernilongo enquanto plana (tom varia com velocidade e subida/descida)
     if (p.glide && p.mode === 'foot') audioEngine.loop('glide', true, clamp(Math.abs(p.body.vx) / 218, 0, 1), clamp(-p.body.vy / 220, -1, 1));
     else audioEngine.loop('glide', false);
@@ -808,6 +817,7 @@ export class World {
       const m = 90;
       this.fx.view = { x0: c.x - m, y0: c.y - m, x1: c.x + c.w + m, y1: c.y + c.h + m };
     }
+    if (this.water.zones.length) drawWaterBack(g, this);
     this.director.drawDecos(g, 'back');
     // tiles
     art.tiles.render(g, L, cam.x, cam.y, cam.w, cam.h, this.time);
@@ -850,6 +860,7 @@ export class World {
     for (const gr of this.grenades) gr.draw(g);
     for (const b of this.bullets) b.draw(g);
     this.director.drawWorldOverlays(g);
+    if (this.water.zones.length) drawWaterFront(g, this);
     this.fx.draw(g, true);
     this.director.drawDecos(g, 'front');
     this.crowd.drawBalloon(g, this);

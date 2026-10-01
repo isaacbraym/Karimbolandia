@@ -8,7 +8,9 @@ export const T = { EMPTY: 0, SOLID: 1, ONEWAY: 2, HAZARD: 3 } as const;
 export type TileId = (typeof T)[keyof typeof T];
 
 /** Temas visuais (afetam só a arte dos tiles). */
-export const THEME = { STREET: 0, STEEL: 1, RUINS: 2, HANGAR: 3 } as const;
+export const THEME = { STREET: 0, STEEL: 1, RUINS: 2, HANGAR: 3, EARTH: 4, WOOD: 5, TEMPLE: 6, MUD: 7 } as const;
+/** temas da selva (fase 2): chão de terra, madeira, pedra do templo e lama do pântano */
+export const isJungleTheme = (th: number) => th >= 4;
 
 export class Level {
   readonly w: number;
@@ -213,7 +215,20 @@ export interface CivilianSpawn {
   look?: CivLook;
 }
 
+/** Água: pântano (raso, anda devagar) ou lago (fundo, nada com traje de mergulho). y = superfície. */
+export interface WaterZone {
+  id: number;
+  kind: 'swamp' | 'lake';
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
 export interface LevelData {
+  /** 1 = cidade (Felipão), 2 = selva */
+  stage: number;
+  water: WaterZone[];
   level: Level;
   playerStart: { x: number; y: number };
   nomadSpawn: { x: number; y: number };

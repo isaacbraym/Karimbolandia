@@ -3,7 +3,7 @@ import {
   Level, T, TILE, THEME,
   type EnemySpawn, type EnemyType, type PropSpawn, type PropKind, type LootKind, type PickupSpawn, type PickupKind,
   type Checkpoint, type Arena, type CamZone, type DecoSpawn, type Trigger, type SecretRoom, type LevelData, type Wave,
-  type CivilianSpawn, type CivMood,
+  type CivilianSpawn, type CivMood, type WaterZone,
 } from '../level';
 
 export const G = 32; // linha do chão principal
@@ -24,6 +24,8 @@ export class LevelBuilder {
   triggers: Trigger[] = [];
   secretRooms: SecretRoom[] = [];
   civilians: CivilianSpawn[] = [];
+  water: WaterZone[] = [];
+  stage = 1;
   sections: { name: string; x: number; y: number }[] = [];
   atmosphere: { x: number; sky: number; ruin: number }[] = [];
   playerStart = { x: 0, y: 0 };
@@ -153,6 +155,11 @@ export class LevelBuilder {
   section(name: string, x: number, row: number) {
     this.sections.push({ name, x: this.px(x), y: this.py(row) });
   }
+  /** Água entre as colunas [x0,x1): superfície `off` px abaixo do topo da linha `row`, fundo na linha `bottom`. */
+  waterZone(kind: WaterZone['kind'], x0: number, x1: number, row: number, bottom: number, off = 0) {
+    const y = row * TILE + off;
+    this.water.push({ id: this.water.length, kind, x: x0 * TILE, y, w: (x1 - x0) * TILE, h: bottom * TILE - y });
+  }
   atmos(x: number, sky: number, ruin = 0) {
     this.atmosphere.push({ x: x * TILE, sky, ruin });
   }
@@ -241,6 +248,8 @@ export class LevelBuilder {
 
   build(bossArenaId = 'boss'): LevelData {
     return {
+      stage: this.stage,
+      water: this.water,
       level: this.level,
       playerStart: this.playerStart,
       nomadSpawn: this.nomadSpawn,

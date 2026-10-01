@@ -77,6 +77,7 @@ export function applyCuts(b: LevelBuilder) {
   for (const t of b.triggers) t.rect.x = mapPx(t.rect.x);
   for (const s of b.sections) s.x = mapPx(s.x);
   for (const a of b.atmosphere) a.x = mapPx(a.x);
+  for (const z of b.water) z.x = mapPx(z.x);
   b.playerStart.x = mapPx(b.playerStart.x);
   b.nomadSpawn.x = mapPx(b.nomadSpawn.x);
   b.finishX = mapPx(b.finishX);

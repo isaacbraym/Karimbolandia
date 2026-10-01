@@ -4,6 +4,8 @@ import { formatTime } from '../core/math';
 
 export interface MenuCallbacks {
   onPlay(): void;
+  /** prévia da fase 2 (selva) */
+  onPlayJungle(): void;
   onSettingsChanged(): void;
   onResume(): void;
   onRestart(): void;
@@ -112,6 +114,7 @@ export class Menus {
     const btns = el('div', 'btns');
     btns.append(
       this.btn('JOGAR', 'primary', () => this.cb.onPlay()),
+      this.btn('FASE 2 • SELVA', 'primary', () => this.cb.onPlayJungle()),
       this.btn('CONFIGURAÇÕES', 'alt', () => this.showSettings('main')),
       this.btn('CONTROLES', 'alt', () => this.showControls('main')),
       this.btn('CRÉDITOS', 'alt', () => this.showCredits('main'))

@@ -117,6 +117,19 @@ export class Player {
   flapCd = 0;
   wasGround = true;
   landSquash = 0;
+  /** dentro do lago (nadando) */
+  swimming = false;
+  /** 0..1 traje de mergulho (capacete de latão + cilindro) */
+  suit = 0;
+  suitOn = false;
+  private suitShown = false;
+  private dryT = 0;
+  /** salto para fora d'água: sem o corte de altura do pulo curto */
+  private leapT = 0;
+  swimPhase = 0;
+  strokeT = 0;
+  private bubbleT = 0;
+  private wadeStep = 0;
   runPhase = 0;
   stepAcc = 0;
   animT = 0;
@@ -207,6 +220,10 @@ export class Player {
     this.lastSafe = { x, y: feetY };
     this.safeT = 0;
     this.landSquash = 0;
+    this.swimming = false;
+    this.suit = 0;
+    this.suitOn = false;
+    this.leapT = 0;
   }
 
   resetInventory() {
@@ -476,8 +493,17 @@ export class Player {
       return;
     }
     const c = this.lockInput ? nullControls : ctl;
+    if (this.leapT > 0) this.leapT -= dt;
     if (this.nomad) this.updateNomad(w, dt, c);
-    else this.updateFoot(w, dt, c);
+    else {
+      const lake = w.water.zones.length && this.mode === 'foot' && this.leapT < 0.28 ? w.water.lakeAt(this.x, this.body.y) : null;
+      if (lake) this.updateSwim(w, dt, c, lake);
+      else {
+        if (this.swimming) this.swimming = false;
+        this.updateFoot(w, dt, c);
+      }
+    }
+    if (w.water.zones.length) this.updateSuit(w, dt);
 
     // queda no abismo
     if (this.y > w.deathY()) this.fellIntoPit(w);
@@ -605,9 +631,11 @@ export class Player {
     else if (!wantCrouch && wasCrouch && this.canStand(w)) this.setCrouch(false, w);
     if (this.crouch && !b.onGround) this.setCrouch(false, w);
 
-    // horizontal
+    // horizontal (no pântano a água segura as pernas)
+    const wade = w.water.zones.length ? w.water.wadeDepth(this.x, this.feetY) : 0;
     let tx = 0;
-    if (!hurt) tx = ctl.moveX * (this.crouch ? CROUCH_SPEED : this.glide ? GLIDE_SPEED : RUN);
+    if (!hurt) tx = ctl.moveX * (this.crouch ? CROUCH_SPEED : this.glide ? GLIDE_SPEED : RUN) * (wade > 0 ? 0.72 : 1);
+    if (wade > 0) this.wadeFx(w, dt, wade);
     const grounded = b.onGround;
     const acc = grounded ? (Math.abs(tx) > 0 ? RUN_ACC : RUN_DEC) : Math.abs(tx) > 0 ? AIR_ACC : AIR_DEC;
     if (this.slideT > 0 && grounded) {
@@ -654,7 +682,7 @@ export class Player {
       w.fx.add(PK.Dust, this.x, this.feetY, -b.vx * 0.1, -6, 0.35, 8, '#b9b0c8', { size1: 2, a0: 0.5 });
     }
     // altura variável
-    if (this.jumping && !ctl.jump.held && b.vy < -150) {
+    if (this.jumping && !ctl.jump.held && b.vy < -150 && this.leapT <= 0) {
       b.vy *= 0.55;
       this.jumping = false;
     }
@@ -693,7 +721,7 @@ export class Player {
     } else {
       // gravidade normal
       b.vy = Math.min(FALL_MAX, b.vy + GRAV * dt);
-      if (b.vy < 0 && !ctl.jump.held && this.recoilT <= 0) b.vy += GRAV * 0.6 * dt; // corte mais firme
+      if (b.vy < 0 && !ctl.jump.held && this.recoilT <= 0 && this.leapT <= 0) b.vy += GRAV * 0.6 * dt; // corte mais firme
     }
     // ear glide anim
     this.earGlide = damp(this.earGlide, this.glide || this.slam ? 1 : 0, this.glide || this.slam ? 18 : 22, dt);
@@ -732,6 +760,144 @@ export class Player {
         if (w.fx.opt()) w.fx.add(PK.Dust, this.x - this.facing * 4, this.feetY - 1, -this.facing * 14, -6, 0.3, 5, '#b9b0c8', { size1: 1, a0: 0.4 });
       }
     } else if (grounded) this.runPhase = damp(this.runPhase, Math.round(this.runPhase / Math.PI) * Math.PI, 12, dt);
+    this.wasGround = b.onGround;
+  }
+
+  // ------------------------------------------------------------------ água
+  /** Pântano: ondinhas e respingos ao andar, barulho de água nos passos. */
+  private wadeFx(w: World, dt: number, depth: number) {
+    const b = this.body;
+    const sy = this.feetY - depth;
+    if (Math.abs(b.vx) > 30 && b.onGround) {
+      this.wadeStep += Math.abs(b.vx) * dt;
+      if (this.wadeStep > 30) {
+        this.wadeStep = 0;
+        w.audio('wade', 0.7, this.x);
+        w.water.ripple(this.x + rand.spread(6), sy, 12 + rand.range(0, 8), 0.7);
+        for (let i = 0; i < 4; i++) w.fx.add(PK.Drop, this.x + rand.spread(10), sy, rand.spread(70) + b.vx * 0.2, -rand.range(70, 160), 0.4, rand.range(1.2, 2.2), '#9fc8a0', { g: 900 });
+      }
+    } else if (Math.random() < dt * 1.2) w.water.ripple(this.x, sy, 10, 0.9);
+  }
+
+  /** Mergulho no lago: amortece a queda, espirra água e veste o traje. */
+  private enterWater(w: World, z: { y: number }) {
+    const b = this.body;
+    this.swimming = true;
+    this.glide = false;
+    this.slam = false;
+    this.earGlide = 0;
+    const hard = b.vy > 380;
+    w.audio(hard ? 'bigSplash' : 'splash', hard ? 1 : 0.7, this.x);
+    const n = hard ? 26 : 12;
+    for (let i = 0; i < n; i++) {
+      w.fx.add(PK.Drop, this.x + rand.spread(22), z.y, rand.spread(150), -rand.range(160, hard ? 520 : 320), rand.range(0.5, 0.9), rand.range(1.5, 3.2), i % 3 ? '#bfefff' : '#ffffff', { g: 1100 });
+    }
+    w.fx.add(PK.Ring, this.x, z.y, 0, 0, 0.5, 8, '#dff9ff', { size1: hard ? 70 : 44, a0: 0.7, front: true });
+    w.water.ripple(this.x, z.y, hard ? 40 : 24, 1.2);
+    for (let i = 0; i < 16; i++) w.water.addBubble(this.x + rand.spread(20), z.y + rand.range(10, 60), rand.range(1, 3.6), z.y);
+    b.vy *= hard ? 0.3 : 0.45;
+    b.vx *= 0.6;
+    if (hard) w.fx.addShake(2, 0.2);
+    if (!this.suitOn) {
+      this.suitOn = true;
+      w.audio('suitOn', 0.9, this.x);
+      w.fx.add(PK.Ring, this.x, this.y - 18, 0, 0, 0.35, 6, '#ffe27a', { size1: 40, a0: 0.8, front: true });
+      if (!this.suitShown) {
+        this.suitShown = true;
+        w.director.banner('TRAJE DE MERGULHO', 'Explore o fundo do lago!', 2.4);
+      }
+    }
+    this.dryT = 0;
+  }
+
+  /** Traje: veste ao cair no lago e tira depois de um tempo em terra firme. */
+  private updateSuit(w: World, dt: number) {
+    if (this.suitOn && !this.swimming) {
+      this.dryT += this.body.onGround ? dt : 0;
+      if (this.dryT > 1.1) {
+        this.suitOn = false;
+        w.audio('suitOn', 0.5, this.x);
+        w.fx.smoke(this.x, this.y - 20, 4, '#d8f4ff', 12, 20, 0.6);
+      }
+    }
+    this.suit = approach(this.suit, this.suitOn ? 1 : 0, dt * 4);
+    // som abafado com a cabeça debaixo d'água
+    w.underwater = this.swimming && w.water.lakeAt(this.x, this.body.y - 22) ? 1 : 0;
+  }
+
+  /** Nado: afunda devagar, braçadas no pulo, joystick sobe/desce, salto para fora na superfície. */
+  private updateSwim(w: World, dt: number, ctl: ControlState, z: { y: number; h: number }) {
+    const b = this.body;
+    if (!this.swimming) this.enterWater(w, z);
+    const hurt = this.hurtT > 0;
+    if (this.crouch) this.setCrouch(false, w);
+    this.slideT = 0;
+    this.slam = false;
+    if (this.glide) this.stopGlide(w);
+    this.coyote = 0;
+    this.glideFuel = GLIDE_FUEL;
+    this.airTime = 0;
+    this.jumping = false;
+    const depth = b.y - z.y;
+    const atSurface = depth < 16;
+    // horizontal
+    const SW = 150;
+    const tx = hurt ? 0 : ctl.moveX * SW;
+    b.vx = approach(b.vx, tx, (Math.abs(tx) > 0 ? 540 : 240) * dt);
+    if (Math.abs(ctl.moveX) > 0.3) this.facing = ctl.moveX > 0 ? 1 : -1;
+    // vertical: flutua devagar para baixo; joystick sobe/desce
+    let ty = 34;
+    if (!hurt && ctl.moveY < -0.45) ty = -125;
+    else if (!hurt && ctl.moveY > 0.45) ty = 150;
+    b.vy = approach(b.vy, ty, 420 * dt);
+    if (ctl.jump.pressed) this.jumpBuf = JUMP_BUF;
+    else this.jumpBuf -= dt;
+    if (this.jumpBuf > 0 && !hurt) {
+      this.jumpBuf = 0;
+      if (atSurface) {
+        // salta para fora (alto o bastante para alcançar a margem)
+        b.vy = -JUMP_V * 0.98;
+        this.leapT = 0.4;
+        this.swimming = false;
+        w.audio('splash', 0.8, this.x);
+        for (let i = 0; i < 12; i++) w.fx.add(PK.Drop, this.x + rand.spread(14), z.y, rand.spread(90), -rand.range(140, 300), rand.range(0.4, 0.8), rand.range(1.4, 2.6), '#cff4ff', { g: 1100 });
+        w.water.ripple(this.x, z.y, 26, 1);
+      } else {
+        // braçada
+        b.vy = Math.min(b.vy, -255);
+        b.vx += this.facing * 40;
+        this.strokeT = 0.45;
+        w.audio('swim', 0.8, this.x);
+        for (let i = 0; i < 4; i++) w.water.addBubble(this.x - this.facing * 8 + rand.spread(8), this.feetY - 8, rand.range(1, 2.4), z.y);
+      }
+    }
+    // a cabeça não sai d'água nadando: fica boiando na superfície (sobe e desce com a onda)
+    if (this.swimming && b.y < z.y + 10 && b.vy < 0) {
+      b.vy = 0;
+      b.y = z.y + 10 + Math.sin(w.time * 3) * 1.5;
+    }
+    if (this.strokeT > 0) this.strokeT -= dt;
+    // ---- colisão
+    moveBody(b, dt, w.level, w.solidRects, true);
+    // ---- mira + armas (atira debaixo d'água também)
+    const [sx, sy] = this.shoulder;
+    this.aim = this.computeAim(w, ctl, sx, sy);
+    this.aimVis = this.aim;
+    if (ctl.next.pressed) this.cycleWeapon(1, w);
+    if (ctl.prev.pressed) this.cycleWeapon(-1, w);
+    if (!hurt) {
+      if (ctl.fire.held) this.shoot(w);
+      if (ctl.grenade.pressed) this.throwGrenade(w);
+    }
+    // bolhas do capacete
+    this.bubbleT -= dt;
+    if (this.bubbleT <= 0 && depth > 18) {
+      this.bubbleT = 0.5 + Math.random() * 0.9;
+      const n = 1 + Math.floor(Math.random() * 3);
+      for (let i = 0; i < n; i++) w.water.addBubble(this.x + this.facing * 6 + rand.spread(3), this.feetY - 60 + rand.spread(3), rand.range(1, 2.8), z.y);
+      if (Math.random() < 0.4) w.audio('bubble', 0.5, this.x);
+    }
+    this.swimPhase += dt * (3 + Math.hypot(b.vx, b.vy) * 0.03 + (this.strokeT > 0 ? 6 : 0));
     this.wasGround = b.onGround;
   }
 
@@ -1476,14 +1642,25 @@ export class Player {
       return;
     }
     let st: KState = 'idle';
-    if (this.hurtT > 0) st = 'hurt';
+    if (this.swimming) st = 'swim';
+    else if (this.hurtT > 0) st = 'hurt';
     else if (this.slam) st = 'slam';
     else if (this.slideT > 0 && this.crouch) st = 'slide';
     else if (this.glide) st = 'glide';
     else if (!b.onGround) st = b.vy < 0 ? 'jump' : 'fall';
     else if (this.crouch) st = 'crouch';
     else if (Math.abs(b.vx) > 25) st = 'run';
+    // nadando: o corpo inclina para a frente (pivô no quadril), como quem bate as pernas
+    const tilt = this.swimming ? clamp(b.vx / 150, -1, 1) * this.facing * 0.42 - clamp(b.vy / 260, -1, 1) * 0.12 : 0;
+    if (tilt) {
+      g.save();
+      g.translate(this.x, this.feetY - 30);
+      g.rotate(tilt * this.facing);
+      g.translate(-this.x, -(this.feetY - 30));
+    }
     drawKarimbo(g, art.karimbo, this.x, this.feetY, {
+      suit: this.suit,
+      swimPhase: this.swimPhase,
       facing: this.facing,
       state: st,
       t: this.animT,
@@ -1507,6 +1684,7 @@ export class Player {
       melee: this.meleeT > 0 ? 1 - this.meleeT / KNIFE_T : 0,
       meleeUp: this.meleeAlt === 1,
     });
+    if (tilt) g.restore();
     // barra de "combustível" do glide (sutil)
     if (this.glide || (this.glideUsed && !b.onGround && this.glideFuel < GLIDE_FUEL * 0.999 && this.glideFuel > 0)) {
       const f = clamp(this.glideFuel / GLIDE_FUEL, 0, 1);

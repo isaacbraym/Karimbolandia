@@ -26,6 +26,8 @@ export interface BgState {
   ruin: number; // 0..1: mistura da camada próxima (industrial → ruínas verdes)
   refY: number;
   intensity: number; // 0..1 quantidade de efeitos dinâmicos
+  /** câmera debaixo d'água (a selva tira folhas/pólen/fachos) */
+  under?: number;
 }
 
 const SKY_STOPS: string[][] = [

@@ -175,7 +175,7 @@ export class Director {
     this.support = null;
     this.supportClock = 0;
     this.supportUsed = false;
-    this.supportWillArrive = Math.random() < 0.5;
+    this.supportWillArrive = this.w.data.stage !== 2 && Math.random() < 0.5;
     this.supportMounting = false;
     this.nomadGate = null;
     this.hordeT = 0;
@@ -425,10 +425,18 @@ export class Director {
     // cinemática
     if (this.cine) this.updateCine(dt);
 
-    this.updateNomadGate(dt);
-    this.updateMountCheck();
-    this.updateSupport(dt);
-    this.updateHorde(dt);
+    if (w.data.stage !== 2) {
+      this.updateNomadGate(dt);
+      this.updateMountCheck();
+      this.updateSupport(dt);
+      this.updateHorde(dt);
+    } else if (this.finishTimer < 0 && !w.finished && w.data.finishX > 0 && p.x >= w.data.finishX && p.mode !== 'dead') {
+      // selva (prévia): a saída do acampamento encerra a fase
+      this.banner('FIM DA PRÉVIA', 'A selva continua... (fase 2 em construção)', 3.5);
+      w.setMusic('victory');
+      w.audio('victory', 1);
+      this.finishTimer = 3.2;
+    }
 
     // dica sutil do segundo avanço
     this.updateDashHint();

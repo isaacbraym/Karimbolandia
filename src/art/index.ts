@@ -8,6 +8,8 @@ import { bakeRobots, type RobotArt } from './robots';
 import { bakeTiles, type TileArt } from './tiles';
 import { bakeProps, bakePickups } from './props';
 import { Background } from './background';
+import { getJungle } from './jungle';
+import type { JungleBackground } from './jungleBg';
 import { setArtScale, whiteOf, glowSprite, softDot, type Sprite } from './kit';
 import type { PropKind, PickupKind } from '../game/level';
 
@@ -41,6 +43,20 @@ export function getArt(): Art {
   return art;
 }
 export const artReady = () => art !== null;
+
+/** Fase em jogo: a selva (2) troca o fundo e veste os inimigos humanos como bandidos. */
+let artStage = 1;
+export function setArtStage(s: number) {
+  artStage = s;
+}
+export function soldierSet(): Record<SoldierStyle, SoldierArt> {
+  const j = artStage === 2 ? getJungle() : null;
+  return j ? j.bandits : getArt().soldiers;
+}
+export function stageBg(): Background | JungleBackground {
+  const j = artStage === 2 ? getJungle() : null;
+  return j ? j.bg : getArt().bg;
+}
 
 const tick = () => new Promise<void>((r) => setTimeout(r, 0));
 

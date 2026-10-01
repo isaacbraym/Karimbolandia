@@ -12,6 +12,7 @@ const H: Record<string, Record<Device, string>> = {
   swap: { kb: 'Munição é limitada! Troque de arma com Q / E ou a roda do mouse', touch: 'Munição é limitada! Troque de arma no botão ⇄', pad: 'Munição é limitada! Troque de arma com LB / RB' },
   slam: { kb: 'No ar: S + ESPAÇO = ORELHADA (mergulho com onda de choque)!', touch: 'No ar: joystick p/ baixo + PULO = ORELHADA!', pad: 'No ar: baixo + A = ORELHADA (onda de choque)!' },
   melee: { kb: 'Inimigo colado? O tiro vira GOLPE (sem gastar munição, atravessa escudos)', touch: 'Inimigo colado? FOGO vira GOLPE (atravessa escudos)', pad: 'Inimigo colado? O tiro vira GOLPE (atravessa escudos)' },
+  swim: { kb: "Debaixo d'água: ESPAÇO dá braçadas • W/S sobe e desce • na superfície, ESPAÇO pula para fora", touch: "Debaixo d'água: PULO dá braçadas • joystick sobe e desce • na superfície, PULO salta para fora", pad: "Debaixo d'água: A dá braçadas • analógico sobe e desce" },
   crouch: { kb: 'Segure S / ↓ para engatinhar', touch: 'Empurre o joystick para baixo para engatinhar', pad: 'Analógico para baixo para engatinhar' },
 };
 

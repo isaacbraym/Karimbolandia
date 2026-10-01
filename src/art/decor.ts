@@ -3,6 +3,7 @@ import { glowSprite, softDot, drawSpr } from './kit';
 import { Rng, clamp } from '../core/math';
 import type { DecoSpawn } from '../game/level';
 import { getArt } from './index';
+import { JUNGLE_BOUNDS, jungleVariants, paintJungle } from './jungleDecor';
 
 const rngCache = new Map<string, Rng>();
 const seedOf = (d: DecoSpawn) => Math.floor(d.x * 7.13 + d.y * 3.1);
@@ -54,10 +55,11 @@ const STATIC_BOUNDS: Record<string, [number, number, number, number]> = {
   streetTree: [-44, -122, 44, 2],
   kiosk: [-60, -82, 60, 8],
   crateStack: [-18, -58, 46, 2],
+  ...JUNGLE_BOUNDS,
 };
 let decoDensity = 2;
 const baked = new Map<string, HTMLCanvasElement>();
-const MAX_BAKED = 90;
+const MAX_BAKED = 120;
 let bakeBudget = 2;
 /** Chamado uma vez por quadro: limita quantas decorações novas são pré-desenhadas. */
 export function resetDecoBudget(n = 2) {
@@ -108,8 +110,10 @@ function bakeSeed(kind: string, seed: number) {
     case 'streetTree':
     case 'crateStack':
       return (Math.abs(seed) % 8) * 977 + 13;
-    default:
-      return 0;
+    default: {
+      const nv = jungleVariants(kind);
+      return nv ? (Math.abs(seed) % nv) * 977 + 13 : 0;
+    }
   }
 }
 type KeyedDeco = DecoSpawn & { _bk?: string; _bs?: number };
@@ -869,6 +873,7 @@ function paintDeco(g: CanvasRenderingContext2D, kind: string, seed: number, t: n
       break;
     }
     default:
+      paintJungle(g, kind, seed, t);
       break;
   }
 }

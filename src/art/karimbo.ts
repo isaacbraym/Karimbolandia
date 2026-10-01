@@ -326,7 +326,7 @@ export function bakeWeapons(): Record<WeaponId, Sprite> {
 }
 
 // ------------------------------------------------------------------------------------------
-export type KState = 'idle' | 'run' | 'jump' | 'fall' | 'glide' | 'crouch' | 'hurt' | 'slide' | 'slam';
+export type KState = 'idle' | 'run' | 'jump' | 'fall' | 'glide' | 'crouch' | 'hurt' | 'slide' | 'slam' | 'swim';
 
 export interface KPose {
   facing: 1 | -1;
@@ -359,6 +359,10 @@ export interface KPose {
   melee?: number;
   /** golpe de baixo para cima (alterna com o de cima para baixo) */
   meleeUp?: boolean;
+  /** 0..1 traje de mergulho (capacete de latão + cilindro de ar) */
+  suit?: number;
+  /** fase da batida de pernas no nado */
+  swimPhase?: number;
 }
 
 // ombro abaixo do queixo: o braço/arma nunca cobre o rosto
@@ -450,6 +454,12 @@ export function drawKarimbo(g: CanvasRenderingContext2D, art: KarimboArt, x: num
     legSy = 0.92;
     hipY = -8;
     torsoDrop = 10;
+  } else if (p.state === 'swim') {
+    // nado: pernas batendo (crawl), joelhos soltos
+    const k = (p.swimPhase ?? p.t * 3) * 2.3;
+    legF = 0.35 + Math.sin(k) * 0.55;
+    legB = 0.1 - Math.sin(k) * 0.55;
+    hipY = -13;
   } else if (p.state === 'slam') {
     // ORELHADA: pernas encolhidas, corpo compacto
     legF = 1.2;
@@ -468,6 +478,13 @@ export function drawKarimbo(g: CanvasRenderingContext2D, art: KarimboArt, x: num
   const shY = sh[1] + torsoDrop + bob - breath * 10;
   // braço de trás (só quando sem arma)
   if (!p.hasGun) drawSpr(g, art.armBack, sh[0] - 4, shY + 0.5, { rot: 1.1 + Math.sin(c) * (running ? 0.5 : 0), white: w });
+  // cilindro de ar nas costas (traje de mergulho)
+  const suit = p.suit ?? 0;
+  if (suit > 0.02) {
+    const dg = diveGear(art);
+    const s = Math.max(0, easeOutBack(Math.min(1, suit)));
+    drawSpr(g, dg.tank, -6.5, shY + 3, { sx: s, sy: s, white: w });
+  }
   // pernas + shorts + tronco (barriga por cima do shorts)
   drawSpr(g, art.legBack, -2.6, hipY + bob * 0.5, { rot: legB, sy: legSy, white: w });
   drawSpr(g, art.legFront, 2.6, hipY + bob * 0.5, { rot: legF, sy: legSy, white: w });
@@ -508,8 +525,34 @@ export function drawKarimbo(g: CanvasRenderingContext2D, art: KarimboArt, x: num
   g.save();
   g.translate(hx, hy);
   g.rotate(headRot);
-  drawEars(g, art, p, w);
-  drawSpr(g, hd.right, 0, 0, { white: w });
+  if (suit > 0.02) {
+    // capacete de mergulho: o rosto aparece pela escotilha de vidro
+    const dg = diveGear(art);
+    const s = Math.max(0.01, easeOutBack(Math.min(1, suit)));
+    // mangueira do cilindro até o capacete
+    g.strokeStyle = '#2b2a3a';
+    g.lineWidth = 2.2;
+    g.beginPath();
+    g.moveTo(-6.5 - hx, shY + 3 - hy - 8);
+    g.quadraticCurveTo(-12, dg.cy + 4, dg.cx - dg.r * 0.8 * s, dg.cy + dg.r * 0.2);
+    g.stroke();
+    drawSpr(g, dg.back, dg.cx, dg.cy, { sx: s, sy: s, white: w });
+    if (suit > 0.55) {
+      g.save();
+      g.beginPath();
+      g.arc(dg.px, dg.py, dg.pr * s, 0, Math.PI * 2);
+      g.clip();
+      drawSpr(g, hd.right, 0, 0, { white: w });
+      g.restore();
+    } else {
+      drawEars(g, art, p, w);
+      drawSpr(g, hd.right, 0, 0, { white: w });
+    }
+    drawSpr(g, dg.front, dg.cx, dg.cy, { sx: s, sy: s, white: w });
+  } else {
+    drawEars(g, art, p, w);
+    drawSpr(g, hd.right, 0, 0, { white: w });
+  }
   g.restore();
 
   g.restore();
@@ -547,6 +590,177 @@ function drawEars(g: CanvasRenderingContext2D, art: KarimboArt, p: KPose, white:
   const farW = 0.55 + eg * 0.35;
   drawSpr(g, hd.earFar, fx, fy, { rot: tilt + flap * 0.9 + spring, sx: sx * farW * wob, sy, white });
   drawSpr(g, hd.earNear, nx, ny, { rot: -tilt + flap - spring, sx: sx * 0.95 * wob, sy, white });
+}
+
+// ------------------------------------------------------------------ traje de mergulho
+interface DiveGear {
+  back: Sprite;
+  front: Sprite;
+  tank: Sprite;
+  /** centro do capacete e da escotilha (coordenadas do pivô da cabeça) */
+  cx: number;
+  cy: number;
+  r: number;
+  px: number;
+  py: number;
+  pr: number;
+}
+const gearCache = new WeakMap<KarimboArt, DiveGear>();
+
+/** Capacete de escafandro de latão (estilo clássico) assado uma vez, no tamanho da cabeça. */
+function diveGear(art: KarimboArt): DiveGear {
+  const hit = gearCache.get(art);
+  if (hit) return hit;
+  const hd = art.heads.right;
+  const cx = hd.w / 2 - hd.ox;
+  const cy = hd.h / 2 - hd.oy - hd.h * 0.03;
+  const r = Math.max(hd.w, hd.h) * 0.5;
+  const pox = r * 0.1;
+  const poy = r * 0.04;
+  const pr = r * 0.76;
+  const S = 2 * r + 8;
+  const o = S / 2;
+  const brass = '#c8933a';
+  const brassL = '#f2c96a';
+  const brassD = '#7a521c';
+  const back = bake(
+    S,
+    S,
+    (g) => {
+      // esfera de latão
+      const gr = g.createRadialGradient(o - r * 0.35, o - r * 0.4, r * 0.1, o, o, r);
+      gr.addColorStop(0, brassL);
+      gr.addColorStop(0.55, brass);
+      gr.addColorStop(1, brassD);
+      g.fillStyle = gr;
+      g.beginPath();
+      g.arc(o, o, r, 0, Math.PI * 2);
+      g.fill();
+      g.lineWidth = 1.4;
+      g.strokeStyle = OUT;
+      g.stroke();
+      // interior escuro atrás do rosto
+      g.fillStyle = '#16212e';
+      g.beginPath();
+      g.arc(o + pox, o + poy, pr, 0, Math.PI * 2);
+      g.fill();
+      // janelinha lateral (atrás)
+      g.fillStyle = '#1d3a4a';
+      g.beginPath();
+      g.arc(o - r * 0.62, o - r * 0.08, r * 0.2, 0, Math.PI * 2);
+      g.fill();
+      g.strokeStyle = brassD;
+      g.lineWidth = 1.6;
+      g.stroke();
+    },
+    { scale: 3, ox: o, oy: o }
+  );
+  const front = bake(
+    S,
+    S + 8,
+    (g) => {
+      const ex = o + pox;
+      const ey = o + poy;
+      // vidro: reflexo azulado e brilhos
+      g.fillStyle = 'rgba(150,220,255,0.10)';
+      g.beginPath();
+      g.arc(ex, ey, pr, 0, Math.PI * 2);
+      g.fill();
+      g.strokeStyle = 'rgba(255,255,255,0.55)';
+      g.lineWidth = 1.4;
+      g.beginPath();
+      g.arc(ex, ey, pr * 0.8, Math.PI * 1.08, Math.PI * 1.42);
+      g.stroke();
+      g.strokeStyle = 'rgba(255,255,255,0.3)';
+      g.lineWidth = 0.9;
+      g.beginPath();
+      g.arc(ex, ey, pr * 0.62, Math.PI * 1.15, Math.PI * 1.3);
+      g.stroke();
+      g.fillStyle = 'rgba(255,255,255,0.35)';
+      g.beginPath();
+      g.ellipse(ex + pr * 0.42, ey + pr * 0.45, pr * 0.12, pr * 0.06, -0.6, 0, Math.PI * 2);
+      g.fill();
+      // aro de latão da escotilha + parafusos
+      g.lineWidth = r * 0.12;
+      g.strokeStyle = brass;
+      g.beginPath();
+      g.arc(ex, ey, pr + r * 0.07, 0, Math.PI * 2);
+      g.stroke();
+      g.lineWidth = r * 0.05;
+      g.strokeStyle = brassL;
+      g.beginPath();
+      g.arc(ex, ey, pr + r * 0.1, Math.PI * 1.05, Math.PI * 1.6);
+      g.stroke();
+      g.lineWidth = 1;
+      g.strokeStyle = OUT;
+      g.beginPath();
+      g.arc(ex, ey, pr + r * 0.15, 0, Math.PI * 2);
+      g.stroke();
+      g.beginPath();
+      g.arc(ex, ey, pr - 0.2, 0, Math.PI * 2);
+      g.stroke();
+      for (let i = 0; i < 8; i++) {
+        const a = (i / 8) * Math.PI * 2 + 0.2;
+        const bx = ex + Math.cos(a) * (pr + r * 0.07);
+        const by = ey + Math.sin(a) * (pr + r * 0.07);
+        g.fillStyle = brassD;
+        g.beginPath();
+        g.arc(bx, by, r * 0.045, 0, Math.PI * 2);
+        g.fill();
+        g.fillStyle = brassL;
+        g.fillRect(bx - r * 0.02, by - r * 0.03, r * 0.025, r * 0.025);
+      }
+      // grade de proteção (três barras)
+      g.strokeStyle = 'rgba(122,82,28,0.9)';
+      g.lineWidth = r * 0.045;
+      for (const dy of [-0.45, 0, 0.45]) {
+        const hw = Math.sqrt(Math.max(0, 1 - dy * dy)) * pr;
+        g.beginPath();
+        g.moveTo(ex - hw * 0.15, ey + dy * pr);
+        g.lineTo(ex + hw * 0.15, ey + dy * pr);
+        g.stroke();
+      }
+      // válvula no topo
+      shadedRR(g, o - r * 0.16, o - r - 4, r * 0.32, 6, 1.5, brass, { lw: 1 });
+      g.fillStyle = '#e2384a';
+      g.fillRect(o - r * 0.06, o - r - 6, r * 0.12, 2.4);
+      // gola/peitoral (assenta nos ombros)
+      g.beginPath();
+      g.ellipse(o - r * 0.05, o + r * 0.95, r * 0.66, r * 0.2, 0, 0, Math.PI * 2);
+      const cg = g.createLinearGradient(0, o + r * 0.62, 0, o + r * 1.22);
+      cg.addColorStop(0, brassL);
+      cg.addColorStop(1, brassD);
+      g.fillStyle = cg;
+      g.fill();
+      g.lineWidth = 1.2;
+      g.strokeStyle = OUT;
+      g.stroke();
+      for (let i = -2; i <= 2; i++) {
+        g.fillStyle = brassD;
+        g.beginPath();
+        g.arc(o - r * 0.05 + i * r * 0.26, o + r * 0.97, r * 0.04, 0, Math.PI * 2);
+        g.fill();
+      }
+    },
+    { scale: 3, ox: o, oy: o }
+  );
+  const tank = bake(
+    10,
+    22,
+    (g) => {
+      shadedRR(g, 1, 2, 8, 19, 3.6, '#d8d4e4', { lw: 1 });
+      g.fillStyle = '#e2384a';
+      g.fillRect(1.6, 7, 6.8, 2);
+      g.fillRect(1.6, 14, 6.8, 2);
+      shadedRR(g, 3, 0, 4, 3, 1, '#7a7890', { lw: 0.8 });
+      g.fillStyle = 'rgba(255,255,255,0.45)';
+      g.fillRect(2.4, 4, 1.4, 14);
+    },
+    { scale: 3, ox: 5, oy: 2 }
+  );
+  const out: DiveGear = { back, front, tank, cx, cy, r, px: cx + pox, py: cy + poy, pr };
+  gearCache.set(art, out);
+  return out;
 }
 
 export { glowSprite };

@@ -14,7 +14,8 @@ export type SfxName =
   | 'dash' | 'dash2' | 'dashHit' | 'nomadBoot' | 'nomadHop' | 'nomadHurt' | 'nomadDeath' | 'eject' | 'nomadEnter'
   | 'uiClick' | 'uiBack' | 'uiStart' | 'alarm' | 'warning' | 'lock' | 'unlock' | 'missile' | 'laserCharge' | 'laserFire'
   | 'enemyShot' | 'sniperShot' | 'turretShot' | 'stomp' | 'bossRoar' | 'bossHit' | 'bossPhase' | 'bossDie' | 'thruster'
-  | 'victory' | 'servo' | 'spark' | 'slam' | 'burp' | 'burpBig' | 'crush' | 'extraLife' | 'thunder' | 'knife';
+  | 'victory' | 'servo' | 'spark' | 'slam' | 'burp' | 'burpBig' | 'crush' | 'extraLife' | 'thunder' | 'knife'
+  | 'splash' | 'bigSplash' | 'wade' | 'swim' | 'bubble' | 'suitOn' | 'bird' | 'bird2' | 'insect' | 'frog';
 
 type LoopName = 'glide' | 'roll' | 'alarm' | 'laser' | 'thrusterLoop';
 
@@ -49,6 +50,8 @@ const NO_CLIP: ClipHandle = {
 export class AudioEngine {
   ctx: AudioContext | null = null;
   master!: GainNode;
+  private uw: BiquadFilterNode | null = null;
+  private uwK = 0;
   sfxBus!: GainNode;
   musicBus!: GainNode;
   /** vozes e cinemáticas (clipes gravados) */
@@ -105,7 +108,13 @@ export class AudioEngine {
     this.sfxBus.connect(this.comp);
     this.musicBus.connect(this.comp);
     this.voiceBus.connect(this.comp);
-    this.comp.connect(this.master);
+    // filtro "debaixo d'água" (aberto = transparente)
+    this.uw = c.createBiquadFilter();
+    this.uw.type = 'lowpass';
+    this.uw.frequency.value = 20000;
+    this.uw.Q.value = 0.8;
+    this.comp.connect(this.uw);
+    this.uw.connect(this.master);
     this.master.connect(c.destination);
     const len = c.sampleRate * 2;
     this.noiseBuf = c.createBuffer(1, len, c.sampleRate);
@@ -115,6 +124,14 @@ export class AudioEngine {
     if (c.state === 'suspended') void c.resume();
     // clipes baixados na tela de carregamento: decodifica agora que o contexto existe
     for (const n of this.clipData.keys()) this.decodeClip(n);
+  }
+
+  /** 0 = normal, 1 = submerso (tudo abafado). */
+  setUnderwater(k: number) {
+    if (!this.ctx || !this.uw || Math.abs(k - this.uwK) < 0.01) return;
+    this.uwK = k;
+    const f = 20000 * Math.pow(650 / 20000, clamp(k, 0, 1));
+    this.uw.frequency.setTargetAtTime(f, this.ctx.currentTime, 0.08);
   }
 
   get ready() {
@@ -620,6 +637,52 @@ export class AudioEngine {
       case 'step':
         this.noise({ dur: 0.04, vol: 0.06 * v, type: 'lowpass', f0: 1400 * r, f1: 500, pan });
         break;
+      case 'wade':
+        this.noise({ dur: 0.16, vol: 0.12 * v, type: 'bandpass', f0: 900 * r, f1: 380, q: 1.4, pan });
+        this.noise({ dur: 0.08, vol: 0.05 * v, type: 'highpass', f0: 3200, delay: 0.03, pan });
+        break;
+      case 'splash':
+        this.noise({ dur: 0.35, vol: 0.32 * v, type: 'bandpass', f0: 1600 * r, f1: 300, q: 0.8, pan });
+        this.noise({ dur: 0.5, vol: 0.12 * v, type: 'highpass', f0: 4200, f1: 2000, delay: 0.05, pan });
+        this.tone({ type: 'sine', f0: 180, f1: 60, dur: 0.2, vol: 0.15 * v, pan });
+        break;
+      case 'bigSplash':
+        this.noise({ dur: 0.9, vol: 0.5 * v, type: 'lowpass', f0: 3000, f1: 220, q: 0.7, pan });
+        this.noise({ dur: 1.1, vol: 0.18 * v, type: 'highpass', f0: 5200, f1: 2400, delay: 0.08, pan });
+        this.tone({ type: 'sine', f0: 140, f1: 38, dur: 0.5, vol: 0.4 * v, pan });
+        for (let i = 0; i < 5; i++) this.tone({ type: 'sine', f0: 500 + i * 180 * r, f1: 1400 + i * 200, dur: 0.06, vol: 0.05 * v, delay: 0.35 + i * 0.09, pan });
+        break;
+      case 'swim':
+        this.noise({ dur: 0.3, vol: 0.12 * v, type: 'lowpass', f0: 700 * r, f1: 240, q: 1.2, pan });
+        break;
+      case 'bubble':
+        this.tone({ type: 'sine', f0: 420 * r, f1: 1100 * r, dur: 0.07, vol: 0.06 * v, pan });
+        this.tone({ type: 'sine', f0: 600 * r, f1: 1500 * r, dur: 0.05, vol: 0.04 * v, delay: 0.09, pan });
+        break;
+      case 'suitOn':
+        this.tone({ type: 'triangle', f0: 300, f1: 900, dur: 0.25, vol: 0.16 * v });
+        this.noise({ dur: 0.4, vol: 0.14 * v, type: 'bandpass', f0: 2400, f1: 900, q: 1.5, delay: 0.1 });
+        this.tone({ type: 'square', f0: 1200, dur: 0.05, vol: 0.05 * v, delay: 0.32, lp: 3000 });
+        break;
+      case 'bird': {
+        // canto de pássaro: trinados descendentes
+        const f = 2400 + Math.random() * 1400;
+        for (let i = 0; i < 3 + Math.floor(Math.random() * 3); i++) this.tone({ type: 'sine', f0: f * (1 - i * 0.04), f1: f * 0.7, dur: 0.07, vol: 0.05 * v, delay: i * 0.11, pan, vib: 60, vibHz: 30 });
+        break;
+      }
+      case 'bird2': {
+        // pássaro tropical (assobio subindo e descendo)
+        const f = 1100 + Math.random() * 500;
+        this.tone({ type: 'sine', f0: f, f1: f * 1.8, dur: 0.18, vol: 0.06 * v, pan });
+        this.tone({ type: 'sine', f0: f * 1.8, f1: f * 1.1, dur: 0.24, vol: 0.05 * v, delay: 0.2, pan });
+        break;
+      }
+      case 'insect':
+        this.tone({ type: 'sawtooth', f0: 4200 + Math.random() * 900, dur: 0.9, vol: 0.012 * v, pan, lp: 6000, vib: 300, vibHz: 42 });
+        break;
+      case 'frog':
+        for (let i = 0; i < 2; i++) this.tone({ type: 'square', f0: 140 * r, f1: 95, dur: 0.12, vol: 0.05 * v, delay: i * 0.18, pan, lp: 700 });
+        break;
       case 'hurt':
         this.tone({ type: 'sawtooth', f0: 520, f1: 140, dur: 0.28, vol: 0.28 * v, lp: 2000 });
         this.noise({ dur: 0.12, vol: 0.2 * v, type: 'bandpass', f0: 1500, f1: 400 });
@@ -998,6 +1061,11 @@ export class AudioEngine {
 }
 
 const MIN_GAP: Partial<Record<SfxName, number>> = {
+  wade: 0.12,
+  swim: 0.2,
+  bubble: 0.08,
+  splash: 0.15,
+  insect: 0.6,
   burp: 0.5,
   burpBig: 0.9,
   crush: 0.05,

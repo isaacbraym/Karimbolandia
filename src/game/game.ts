@@ -11,7 +11,9 @@ import { setDecoDensity } from '../art/decor';
 import { music, MIX, type ThemeName } from '../core/music';
 import { settings, progress, saveProgress } from '../core/storage';
 import { clamp } from '../core/math';
-import { buildArt, getArt, artReady, type Quality } from '../art';
+import { buildArt, getArt, artReady, setArtStage, stageBg, type Quality } from '../art';
+import { loadJungle, getJungle } from '../art/jungle';
+import { buildJungle } from './level/jungle';
 import { World, type MusicState } from './world';
 import { buildLevel } from './level/index';
 import { Hud, setHudTextScale } from './hud';
@@ -84,6 +86,11 @@ export class Game {
   private drsGood = 0;
   private drsBad = 0;
 
+  /** fase escolhida (1 = cidade, 2 = selva) */
+  stage = new URLSearchParams(location.search).get('fase') === '2' ? 2 : 1;
+  private base = './';
+  private ambT = 3;
+
   constructor(canvas: HTMLCanvasElement, ui: HTMLElement) {
     this.canvas = canvas;
     this.ui = ui;
@@ -93,11 +100,13 @@ export class Game {
 
   // ------------------------------------------------------------------ boot
   async boot(base: string) {
+    this.base = base;
     const app = document.getElementById('app') as HTMLElement;
     this.input.attach(app);
     this.touch = new TouchUI(this.ui, this.input);
     this.menus = new Menus(this.ui, {
-      onPlay: () => this.play(),
+      onPlay: () => this.play(false, this.stage === 2 && new URLSearchParams(location.search).get('fase') === '2' ? 2 : 1),
+      onPlayJungle: () => this.play(false, 2),
       onSettingsChanged: () => this.applySettings(),
       onResume: () => this.resume(),
       onRestart: () => this.restartLevel(),
@@ -157,6 +166,8 @@ export class Game {
     this.toMenu(true);
     this.applySettings();
     requestAnimationFrame((t) => this.frame(t));
+    // selva (fase 2): prepara em segundo plano, para abrir na hora
+    window.setTimeout(() => void loadJungle(base, this.quality).catch(() => undefined), 1200);
   }
 
   private pickQuality() {
@@ -175,7 +186,7 @@ export class Game {
 
   applySettings() {
     audio.setVolumes(settings.music, settings.sfx);
-    if (this.world) this.world.narrator.enabled = settings.narrator;
+    if (this.world) this.world.narrator.enabled = settings.narrator && this.world.data.stage === 1;
     this.touch.applySettings();
     this.hud.showFps = settings.showFps;
     if (settings.quality !== 'auto' && settings.quality !== this.quality) {
@@ -274,7 +285,17 @@ export class Game {
     }
   }
 
-  play(again = false) {
+  play(again = false, stage = this.world?.data.stage ?? this.stage) {
+    if (stage === 2 && !getJungle()) {
+      // ainda preparando a selva: espera e entra sozinho
+      audio.init();
+      this.menus.toast('Entrando na selva...');
+      void loadJungle(this.base, this.quality).then(() => this.play(again, 2)).catch(() => this.menus.toast('Não foi possível carregar a selva'));
+      return;
+    }
+    this.stage = stage;
+    setArtStage(stage);
+    this.post.stage = stage;
     audio.init();
     audio.play('uiStart', 1);
     void this.requestFullscreenLandscape();
@@ -283,15 +304,15 @@ export class Game {
     this.menus.fade(false);
     this.stopIntroAudio();
     this.stopNarr(0.2);
-    if (!this.world || again || this.state === 'complete') {
-      this.world = new World(buildLevel());
+    if (!this.world || again || this.state === 'complete' || this.world.data.stage !== stage) {
+      this.world = new World(stage === 2 ? buildJungle() : buildLevel());
       this.bindWorld(this.world);
     } else {
       this.world.restart();
     }
     const w = this.world;
     w.director.introArt = this.intro;
-    w.narrator.enabled = settings.narrator;
+    w.narrator.enabled = settings.narrator && stage === 1;
     w.camera.viewW = this.viewW;
     w.camera.viewH = this.viewH;
     this.applyFxCaps();
@@ -308,7 +329,7 @@ export class Game {
     this.wasMusic = null;
     this.setMusic(w.musicState);
     // abertura narrada (câmera pelas ruínas até o herói)
-    if (settings.narrator && !this.noOpening) w.director.startOpening();
+    if (settings.narrator && !this.noOpening && stage === 1) w.director.startOpening();
     this.last = performance.now();
   }
 
@@ -372,6 +393,7 @@ export class Game {
     this.input.enabled = false;
     this.touch.show(false);
     this.menus.showPause();
+    audio.setUnderwater(0);
     this.introClip?.pause();
     this.narrClip?.pause();
     audio.setDuck(0.3);
@@ -415,6 +437,7 @@ export class Game {
 
   toMenu(first = false) {
     this.stopIntroAudio();
+    audio.setUnderwater(0);
     this.stopNarr(0.2);
     this.state = 'menu';
     this.input.enabled = false;
@@ -757,6 +780,8 @@ export class Game {
       if (this.state !== 'playing') break; // a HQ congelou o mundo
     }
     this.updateNarrDuck(w);
+    audio.setUnderwater(w.underwater);
+    if (w.data.stage === 2) this.jungleAmbience(w, dt);
     if (w.director.skyPulse > 0) {
       this.post.skyFlash(w.director.skyPulse);
       w.director.skyPulse = 0;
@@ -766,6 +791,23 @@ export class Game {
     w.rainLevel = this.post.rain;
     // dicas contextuais
     this.processHints(w);
+  }
+
+  /** Sons da selva: pássaros, insetos e sapos (perto do pântano) em intervalos aleatórios. */
+  private jungleAmbience(w: World, dt: number) {
+    this.ambT -= dt;
+    if (this.ambT > 0) return;
+    this.ambT = 0.8 + Math.random() * 2.6;
+    const pan = Math.random() * 1.6 - 0.8;
+    const near = w.water.zones.some((z) => z.kind === 'swamp' && Math.abs(z.x + z.w / 2 - w.player.x) < 700);
+    const under = w.underwater > 0;
+    const r = Math.random();
+    if (under) {
+      if (r < 0.5) audio.play('bubble', 0.4, pan);
+    } else if (near && r < 0.35) audio.play('frog', 0.7, pan);
+    else if (r < 0.62) audio.play('bird', 0.6, pan);
+    else if (r < 0.82) audio.play('bird2', 0.6, pan);
+    else audio.play('insect', 0.7, pan);
   }
 
   private processHints(w: World) {
@@ -892,10 +934,10 @@ export class Game {
     }
     if (!w) return;
     const cam = w.camera;
-    const art = getArt();
+    const bg = stageBg();
     // fundo (espaço de tela)
     const atm = this.atmosphere(w);
-    art.bg.draw(g, { camX: cam.x, camY: cam.y, viewW: W, viewH: H, time: w.time, sky: atm.sky, ruin: atm.ruin, refY: w.data.playerStart.y - 200, intensity: w.musicState.startsWith('boss') || w.musicState === 'combat' ? 1 : 0.6 }, this.state === 'playing' ? dt : 0);
+    bg.draw(g, { camX: cam.x, camY: cam.y, viewW: W, viewH: H, time: w.time, sky: atm.sky, ruin: atm.ruin, refY: w.data.playerStart.y - 200, intensity: w.musicState.startsWith('boss') || w.musicState === 'combat' ? 1 : 0.6 }, this.state === 'playing' ? dt : 0);
     this.post.drawSkyFlash(g, W, H);
     // mundo
     const z = cam.zoom * k;
@@ -905,11 +947,11 @@ export class Game {
     w.drawWorld(g);
     // primeiro plano e HUD
     g.setTransform(k, 0, 0, k, 0, 0);
-    art.bg.drawForeground(g, { camX: cam.x, camY: cam.y, viewW: W, viewH: H, time: w.time, sky: atm.sky, ruin: atm.ruin, refY: 0, intensity: 0.6 }, this.state === 'playing' ? dt : 0);
+    bg.drawForeground(g, { camX: cam.x, camY: cam.y, viewW: W, viewH: H, time: w.time, sky: atm.sky, ruin: atm.ruin, refY: 0, intensity: 0.6, under: w.underwater }, this.state === 'playing' ? dt : 0);
     if (this.state === 'playing') this.post.drawRain(g, w, W, H);
     this.post.bloom(g, this.canvas, this.quality);
     this.post.grade(g, W, H, this.quality);
-    art.bg.drawVignette(g, W, H, 0.9);
+    bg.drawVignette(g, W, H, 0.9);
     this.post.hurt(g, this.canvas, w.player.mode === 'dead' ? 0 : clamp(w.player.hurtT / 0.28, 0, 1));
     this.hud.drawScreenFx(g, w, W, H);
     if (this.state === 'comic' && this.comic) this.comic.draw(g, W, H);
