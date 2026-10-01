@@ -40,13 +40,30 @@ const PRECACHE = ${JSON.stringify(['./', ...list])};
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(VERSION).then((c) => c.addAll(PRECACHE)).then(() => self.skipWaiting()));
 });
+// páginas que responderam "sei me atualizar sozinha" (versões novas do jogo)
+const acked = new Set();
+// Ao ativar: avisa as páginas abertas; as que não respondem em 1,5 s são de versões antigas
+// (ex.: a v1 guardada no cache do celular) e são recarregadas — saem direto na versão nova.
+function refreshOldPages() {
+  return self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
+    for (const c of list) {
+      try { c.postMessage('kg-sw-updated'); } catch (err) { /* ignora */ }
+    }
+    return new Promise((r) => setTimeout(r, 1500)).then(() =>
+      Promise.all(list.filter((c) => !acked.has(c.id) && 'navigate' in c).map((c) => c.navigate(c.url).catch(() => undefined)))
+    );
+  });
+}
 self.addEventListener('activate', (e) => {
   e.waitUntil(
-    caches.keys().then((keys) => Promise.all(keys.filter((k) => k !== VERSION).map((k) => caches.delete(k)))).then(() => self.clients.claim())
+    caches.keys().then((keys) => Promise.all(keys.filter((k) => k !== VERSION).map((k) => caches.delete(k))))
+      .then(() => self.clients.claim())
+      .then(() => refreshOldPages())
   );
 });
 self.addEventListener('message', (e) => {
   if (e.data === 'skipWaiting') self.skipWaiting();
+  if (e.data === 'kg-ack' && e.source) acked.add(e.source.id);
 });
 self.addEventListener('fetch', (e) => {
   const req = e.request;

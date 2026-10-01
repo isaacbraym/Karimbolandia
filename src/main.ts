@@ -20,6 +20,14 @@ async function boot() {
   const ui = document.getElementById('ui') as HTMLElement;
   const game = new Game(canvas, ui);
   (window as unknown as { __karim: Game }).__karim = game;
+  // versão mais nova sempre: confere já na tela de carregamento e recarrega sozinho se houver
+  // (no meio de uma partida espera ela acabar / voltar ao menu)
+  if (import.meta.env.PROD) {
+    startUpdateWatch(base, {
+      isSafe: () => game.state === 'loading' || game.state === 'menu' || game.state === 'complete' || game.state === 'gameover',
+      onUpdate: (apply) => game.notifyUpdate(apply),
+    });
+  }
   void import('./core/audio').then((a) => import('./core/music').then((m) => ((window as unknown as Record<string, unknown>).__snd = { audio: a.audio, music: m.music, MIX: m.MIX })));
   await game.boot(base);
   if ('serviceWorker' in navigator && import.meta.env.PROD) {
@@ -27,8 +35,6 @@ async function boot() {
     if (document.readyState === 'complete') void reg();
     else window.addEventListener('load', () => void reg());
   }
-  // aviso de versão nova (só no build publicado)
-  if (import.meta.env.PROD) startUpdateWatch(base, { onUpdate: (apply) => game.notifyUpdate(apply) });
   if (params.get('autoplay') === '1') game.play();
 }
 
