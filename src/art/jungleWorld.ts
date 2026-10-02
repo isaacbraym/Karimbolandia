@@ -243,6 +243,10 @@ export function drawRoomBack(g: CanvasRenderingContext2D, w: World) {
     const x1 = Math.min(r.x + r.w, c.x + c.w + 8);
     const y0 = Math.max(r.y, c.y - 8);
     const y1 = Math.min(r.y + r.h, c.y + c.h + 8);
+    if (r.kind === 'club') {
+      drawClubBack(g, w, x0, y0, x1, y1, r);
+      continue;
+    }
     // a textura acompanha o mundo (não a câmera): parede parada atrás de tudo
     let ty = r.y + Math.floor((y0 - r.y) / 256) * 256;
     for (; ty < y1; ty += 256) {
@@ -266,6 +270,10 @@ export function drawRoomDark(g: CanvasRenderingContext2D, w: World) {
   const p = w.player;
   for (const r of w.data.rooms) {
     if (!roomVisible(w, r)) continue;
+    if (r.kind === 'club') {
+      drawClubLights(g, w, r);
+      continue;
+    }
     const x0 = Math.max(r.x, c.x - 8);
     const x1 = Math.min(r.x + r.w, c.x + c.w + 8);
     const y0 = Math.max(r.y, c.y - 8);
@@ -344,6 +352,10 @@ export function drawDrums(g: CanvasRenderingContext2D, w: World) {
   for (const d of w.data.drums) {
     if (!cam.visible(d.x, d.y + 30, d.w + 40)) continue;
     const hit = w.drumHit.get(d.id) ?? 0;
+    if (d.style === 'speaker') {
+      drawSpeaker(g, d, hit, w.rhythm.active ? musicBeat() : 1);
+      continue;
+    }
     // luz quente em volta de cada tambor (mais forte na batida e no quique)
     g.globalCompositeOperation = 'lighter';
     g.globalAlpha = 0.22 + (1 - beat) * 0.18 + hit * 0.3;
@@ -403,5 +415,164 @@ export function drawDrums(g: CanvasRenderingContext2D, w: World) {
       g.globalAlpha = 1;
       g.globalCompositeOperation = 'source-over';
     }
+  }
+}
+
+// ------------------------------------------------------------------ boate (fase 1)
+let clubWall: HTMLCanvasElement | null = null;
+/** Parede da boate: painéis escuros com grade de neon (repete sem emenda). */
+function clubTexture() {
+  if (clubWall) return clubWall;
+  const c = makeCanvas(256, 256);
+  const g = c.getContext('2d')!;
+  g.fillStyle = '#120a26';
+  g.fillRect(0, 0, 256, 256);
+  for (let y = 0; y < 256; y += 64) {
+    for (let x = 0; x < 256; x += 64) {
+      g.fillStyle = (x + y) % 128 ? '#1a1036' : '#160c2e';
+      g.fillRect(x + 2, y + 2, 60, 60);
+    }
+  }
+  g.strokeStyle = 'rgba(255,63,180,0.35)';
+  g.lineWidth = 1.4;
+  for (let i = 0; i <= 256; i += 64) {
+    g.beginPath();
+    g.moveTo(i, 0);
+    g.lineTo(i, 256);
+    g.moveTo(0, i);
+    g.lineTo(256, i);
+    g.stroke();
+  }
+  g.fillStyle = 'rgba(57,240,255,0.5)';
+  for (let i = 0; i < 256; i += 64) for (let j = 0; j < 256; j += 64) g.fillRect(i - 1.5, j - 1.5, 3, 3);
+  clubWall = c;
+  return c;
+}
+
+/** Fundo da boate (paredes de neon + equalizador gigante pulsando na música). */
+export function drawClubBack(g: CanvasRenderingContext2D, w: World, x0: number, y0: number, x1: number, y1: number, r: RoomZone) {
+  const tx = clubTexture();
+  let ty = r.y + Math.floor((y0 - r.y) / 256) * 256;
+  for (; ty < y1; ty += 256) {
+    let xx = r.x + Math.floor((x0 - r.x) / 256) * 256;
+    for (; xx < x1; xx += 256) {
+      const sx = Math.max(0, x0 - xx);
+      const sy = Math.max(0, y0 - ty);
+      const ex = Math.min(256, x1 - xx);
+      const ey = Math.min(256, y1 - ty);
+      if (ex > sx && ey > sy) g.drawImage(tx, sx, sy, ex - sx, ey - sy, xx + sx, ty + sy, ex - sx, ey - sy);
+    }
+  }
+  // equalizador: barras subindo e descendo com a batida
+  const beat = music.beat();
+  const n = Math.floor(r.w / 40);
+  g.globalCompositeOperation = 'lighter';
+  for (let i = 0; i < n; i++) {
+    const x = r.x + 20 + i * 40;
+    if (x < x0 - 40 || x > x1 + 40) continue;
+    const lv = 0.25 + 0.75 * Math.abs(Math.sin(i * 1.7 + w.time * (2 + (i % 3)))) * (0.55 + 0.45 * (1 - beat));
+    const h = r.h * 0.45 * lv;
+    g.globalAlpha = 0.16;
+    g.fillStyle = i % 3 === 0 ? '#ff3fb4' : i % 3 === 1 ? '#39f0ff' : '#b07aff';
+    for (let k = 0; k < h; k += 12) g.fillRect(x - 12, r.y + r.h - 40 - k, 24, 8);
+  }
+  g.globalAlpha = 1;
+  g.globalCompositeOperation = 'source-over';
+}
+
+/** Luzes da pista: fachos coloridos girando e um "flash" a cada batida. */
+export function drawClubLights(g: CanvasRenderingContext2D, w: World, r: RoomZone) {
+  const c = w.camera;
+  const beat = music.beat();
+  g.save();
+  g.beginPath();
+  g.rect(r.x, r.y, r.w, r.h);
+  g.clip();
+  g.globalCompositeOperation = 'lighter';
+  const cols = ['#ff3fb4', '#39f0ff', '#ffd23a', '#9a7aff'];
+  for (let i = 0; i < 5; i++) {
+    const ox = r.x + (i + 0.5) * (r.w / 5);
+    if (ox < c.x - 300 || ox > c.x + c.w + 300) continue;
+    const a = Math.sin(w.time * (0.8 + i * 0.13) + i) * 0.6;
+    g.globalAlpha = 0.09 + (1 - beat) * 0.05;
+    g.fillStyle = cols[i % 4];
+    g.beginPath();
+    g.moveTo(ox, r.y + 4);
+    g.lineTo(ox + Math.sin(a - 0.12) * r.h * 1.2, r.y + Math.cos(a - 0.12) * r.h * 1.2);
+    g.lineTo(ox + Math.sin(a + 0.12) * r.h * 1.2, r.y + Math.cos(a + 0.12) * r.h * 1.2);
+    g.closePath();
+    g.fill();
+  }
+  // flash da batida e o "drop" piscando forte
+  const drop = w.rhythm.done && w.rhythm.club;
+  const fl = Math.max(0, 1 - beat * 4) * (drop ? 0.16 : 0.06);
+  if (fl > 0.005) {
+    g.globalAlpha = fl;
+    g.fillStyle = drop ? cols[Math.floor(w.time * 4) % 4] : '#ffffff';
+    g.fillRect(Math.max(r.x, c.x), Math.max(r.y, c.y), Math.min(r.w, c.w), Math.min(r.h, c.h));
+  }
+  g.globalAlpha = 1;
+  g.globalCompositeOperation = 'source-over';
+  g.restore();
+}
+
+/** Lasers da boate: feixe forte aceso, linha fina avisando quando vai acender. */
+export function drawBeams(g: CanvasRenderingContext2D, w: World) {
+  const c = w.camera;
+  const glow = glowSprite('#ff3fb4', 32);
+  for (const b of w.data.beams) {
+    if (b.x < c.x - 40 || b.x > c.x + c.w + 40) continue;
+    const on = w.beamOn[b.id];
+    // emissores no teto e no chão
+    g.fillStyle = '#2a2a3a';
+    g.fillRect(b.x - 9, b.y0 - 2, 18, 8);
+    g.fillRect(b.x - 9, b.y1 - 6, 18, 8);
+    g.fillStyle = on ? '#ff3fb4' : '#5a2a4a';
+    g.fillRect(b.x - 4, b.y0 + 5, 8, 3);
+    g.fillRect(b.x - 4, b.y1 - 8, 8, 3);
+    g.globalCompositeOperation = 'lighter';
+    if (on) {
+      g.globalAlpha = 0.5;
+      g.drawImage(glow.c, b.x - 22, b.y0, 44, b.y1 - b.y0);
+      g.globalAlpha = 1;
+      g.fillStyle = '#ffd0f0';
+      g.fillRect(b.x - 2, b.y0 + 6, 4, b.y1 - b.y0 - 12);
+      g.fillStyle = '#ff3fb4';
+      g.globalAlpha = 0.8;
+      g.fillRect(b.x - 4, b.y0 + 6, 8, b.y1 - b.y0 - 12);
+    } else {
+      // aviso: linha tracejada fraca
+      g.globalAlpha = 0.25;
+      g.fillStyle = '#ff3fb4';
+      for (let y = b.y0 + 8; y < b.y1 - 8; y += 14) g.fillRect(b.x - 1, y, 2, 7);
+    }
+    g.globalAlpha = 1;
+    g.globalCompositeOperation = 'source-over';
+  }
+}
+
+/** Caixa de som da boate (trampolim): gabinete com alto-falantes que pulsam. */
+export function drawSpeaker(g: CanvasRenderingContext2D, d: { x: number; y: number; w: number }, hit: number, beat: number) {
+  const hw = d.w / 2;
+  const H = 62;
+  const top = d.y + 2 + hit * 5;
+  g.fillStyle = '#16141f';
+  g.fillRect(d.x - hw, top, d.w, H - (top - d.y));
+  g.strokeStyle = '#39f0ff';
+  g.lineWidth = 1.6;
+  g.strokeRect(d.x - hw + 1, top + 1, d.w - 2, H - (top - d.y) - 2);
+  const pulse = 1 + (1 - beat) * 0.08 + hit * 0.15;
+  for (const [cy, r] of [[top + 18, 11], [top + 44, 7]] as [number, number][]) {
+    g.fillStyle = '#2a2838';
+    g.beginPath();
+    g.arc(d.x, cy, r * pulse, 0, Math.PI * 2);
+    g.fill();
+    g.strokeStyle = '#ff3fb4';
+    g.lineWidth = 1.2;
+    g.stroke();
+    g.fillStyle = '#0c0b12';
+    g.beginPath();
+    g.arc(d.x, cy, r * 0.4 * pulse, 0, Math.PI * 2);
+    g.fill();
   }
 }

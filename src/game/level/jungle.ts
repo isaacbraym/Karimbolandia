@@ -225,8 +225,15 @@ function templeInterior(b: LevelBuilder) {
   torch(14, 28);
 
   // primeiro plano com paralaxe: teias com aranhas nos cantos, raízes e colunas escuras
-  for (const [x, row, flip] of [[10, 6, false], [58, 6, true], [100, 6, false], [140, 19, true], [90, 19, false], [40, 19, true], [8, 35, false], [76, 35, true], [130, 35, false]] as [number, number, boolean][]) {
-    b.deco('pWeb', x, row, 'front', { flip, par: 0.32 });
+  // teias variadas: de canto (com aranha), com mosquinha presa, redonda e rasgada — lados alternados
+  const webs: [string, number, number, boolean][] = [
+    ['pWeb', 10, 6, false], ['pWebOrb', 58, 5, false], ['pWebFly', 100, 6, true], ['pWebTorn', 140, 19, true],
+    ['pWebFly', 90, 19, false], ['pWebOrb', 40, 18, false], ['pWeb', 8, 35, false], ['pWebTorn', 76, 35, false], ['pWebFly', 130, 35, true],
+  ];
+  for (const [k, x, row, flip] of webs) b.deco(k, x, row, 'front', { flip, par: 0.32 });
+  // lagartixas nas paredes (fogem para o buraco e ficam espiando)
+  for (const [x, row, flip] of [[24, 11, false], [70, 10, true], [118, 25, false], [56, 24, true], [30, 41, false], [96, 40, true]] as [number, number, boolean][]) {
+    b.deco('jLizard', x, row, 'back', { flip });
   }
   for (const [x, row] of [[30, 6], [84, 6], [120, 19], [64, 19], [22, 35], [100, 35]] as [number, number][]) b.deco('pRoots', x, row, 'front', { par: 0.25 });
   for (const [x, row] of [[46, 14], [112, 14], [134, 28], [70, 28], [16, 28], [58, 45], [104, 45], [138, 45]] as [number, number][]) b.deco('pPillar', x, row + 1, 'front', { par: 0.42 });
@@ -410,6 +417,8 @@ export function buildJungle(): LevelData {
   b.enemy('shield', 444, G, { facing: -1, patrol: 40 });
   b.enemy('rifle', 448, G - 5, { facing: -1, idle: true });
   b.deco('jStoneHead', 450, G, 'back');
+  b.deco('jLizard', 398, G - 2, 'back');
+  b.deco('jLizard', 420, G - 2, 'back', { flip: true });
   // abismo com ponte de corda
   b.pit(454, 460);
   b.plat(453, G, 8, THEME.WOOD);

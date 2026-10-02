@@ -7,6 +7,17 @@ import { makeCanvas, glowSprite, softDot } from './kit';
 import { Rng, clamp, mixColor } from '../core/math';
 import type { BgState } from './background';
 
+/** Ave de um bando que cruza a tela (espécies variadas). */
+interface Bird {
+  x: number;
+  y: number;
+  vx: number;
+  ph: number;
+  s: number;
+  col: number;
+  sp: 'parrot' | 'toucan' | 'egret' | 'swift';
+}
+
 interface Layer {
   c: HTMLCanvasElement;
   w: number;
@@ -83,7 +94,7 @@ export class JungleBackground {
   private cloud: HTMLCanvasElement;
   private clouds: { x: number; y: number; s: number; v: number }[] = [];
   /** bandos de araras/papagaios cruzando a tela de vez em quando */
-  private flock: { x: number; y: number; vx: number; ph: number; s: number; col: number }[] = [];
+  private flock: Bird[] = [];
   private flockCd = 4;
   private parrots: HTMLCanvasElement[] = [];
   private birds: { x: number; y: number; s: number; v: number; ph: number }[] = [];
@@ -510,13 +521,23 @@ export class JungleBackground {
     if (!this.flock.length) {
       this.flockCd -= dt;
       if (this.flockCd <= 0) {
-        this.flockCd = 12 + Math.random() * 16;
+        this.flockCd = 10 + Math.random() * 14;
         const dir = Math.random() < 0.5 ? 1 : -1;
-        const n = 3 + Math.floor(Math.random() * 4);
+        // espécie do bando: araras (3 cores), tucanos, garças planando ou andorinhas rápidas
+        const roll = Math.random();
+        const sp: Bird['sp'] = roll < 0.4 ? 'parrot' : roll < 0.6 ? 'toucan' : roll < 0.8 ? 'egret' : 'swift';
+        const n = sp === 'swift' ? 7 + Math.floor(Math.random() * 5) : sp === 'egret' ? 2 + Math.floor(Math.random() * 3) : sp === 'toucan' ? 2 + Math.floor(Math.random() * 2) : 3 + Math.floor(Math.random() * 4);
         const y0 = 30 + Math.random() * 90;
         const col = Math.floor(Math.random() * this.parrots.length);
+        const speed = sp === 'swift' ? 330 : sp === 'egret' ? 170 : sp === 'toucan' ? 210 : 240;
         for (let i = 0; i < n; i++) {
-          this.flock.push({ x: s.camX * FLOCK_P + (dir > 0 ? -40 - i * 34 : W + 40 + i * 34), y: y0 + (i % 2) * 16 + Math.random() * 10, vx: dir * (230 + Math.random() * 40), ph: Math.random() * 6, s: 0.8 + Math.random() * 0.35, col: (col + (i % 3 === 2 ? 1 : 0)) % this.parrots.length });
+          // garças em V; andorinhas espalhadas; os outros em fila solta
+          const gap = sp === 'swift' ? 18 : sp === 'egret' ? 46 : 34;
+          const vy = sp === 'egret' ? Math.abs(i - (n - 1) / 2) * 14 : sp === 'swift' ? Math.random() * 40 - 20 : (i % 2) * 16;
+          this.flock.push({
+            x: s.camX * FLOCK_P + (dir > 0 ? -40 - i * gap : W + 40 + i * gap), y: y0 + vy + Math.random() * 8, vx: dir * (speed + Math.random() * 40),
+            ph: Math.random() * 6, s: (sp === 'swift' ? 0.55 : sp === 'egret' ? 1.15 : 0.85) + Math.random() * 0.3, col: (col + (i % 3 === 2 ? 1 : 0)) % this.parrots.length, sp,
+          });
         }
       }
       return;
@@ -524,35 +545,145 @@ export class JungleBackground {
     for (let i = this.flock.length - 1; i >= 0; i--) {
       const b = this.flock[i];
       b.x += b.vx * dt;
-      b.ph += dt * 13;
+      b.ph += dt * (b.sp === 'swift' ? 22 : b.sp === 'egret' ? 6 : b.sp === 'toucan' ? 10 : 13);
       // em profundidade: acompanha a câmera (andar/pular) como o resto do cenário, sem "travar" no ar
       const sx = b.x - s.camX * FLOCK_P;
-      const y = b.y + Math.sin(b.ph * 0.25) * 6 - (s.camY - s.refY) * 0.4;
+      const wob = b.sp === 'swift' ? Math.sin(b.ph * 0.31) * 14 : Math.sin(b.ph * 0.25) * 6;
+      const y = b.y + wob - (s.camY - s.refY) * 0.4;
       const dir = b.vx > 0 ? 1 : -1;
-      const flap = Math.sin(b.ph);
+      // garças planam a maior parte do tempo (bate a asa de vez em quando)
+      const flap = b.sp === 'egret' ? (Math.sin(b.ph * 0.35) > 0.4 ? Math.sin(b.ph) : 0.15) : Math.sin(b.ph);
       g.save();
       g.translate(sx, y);
       g.scale(dir * b.s, b.s);
-      // asa de trás
-      g.fillStyle = '#1d4a9a';
-      g.beginPath();
-      g.moveTo(-2, -1);
-      g.quadraticCurveTo(-8, -1 - flap * 16, -16, -flap * 22);
-      g.lineTo(6, -1);
-      g.closePath();
-      g.fill();
-      g.drawImage(this.parrots[b.col], -32, -32, 64, 64);
-      // asa da frente
-      g.fillStyle = b.col === 0 ? '#2a6ad8' : b.col === 1 ? '#ffd23a' : '#e2382a';
-      g.beginPath();
-      g.moveTo(0, 0);
-      g.quadraticCurveTo(-4, -flap * 20, -12, -flap * 26 + 4);
-      g.lineTo(8, 1);
-      g.closePath();
-      g.fill();
+      if (b.sp === 'parrot') this.parrot(g, b.col, flap);
+      else if (b.sp === 'toucan') this.toucan(g, flap);
+      else if (b.sp === 'egret') this.egret(g, flap);
+      else this.swift(g, flap);
       g.restore();
-      if (sx < -160 || sx > W + 160) this.flock.splice(i, 1);
+      if (sx < -200 || sx > W + 200) this.flock.splice(i, 1);
     }
+  }
+
+  private parrot(g: CanvasRenderingContext2D, col: number, flap: number) {
+    g.fillStyle = '#1d4a9a';
+    g.beginPath();
+    g.moveTo(-2, -1);
+    g.quadraticCurveTo(-8, -1 - flap * 16, -16, -flap * 22);
+    g.lineTo(6, -1);
+    g.closePath();
+    g.fill();
+    g.drawImage(this.parrots[col], -32, -32, 64, 64);
+    g.fillStyle = col === 0 ? '#2a6ad8' : col === 1 ? '#ffd23a' : '#e2382a';
+    g.beginPath();
+    g.moveTo(0, 0);
+    g.quadraticCurveTo(-4, -flap * 20, -12, -flap * 26 + 4);
+    g.lineTo(8, 1);
+    g.closePath();
+    g.fill();
+  }
+
+  private toucan(g: CanvasRenderingContext2D, flap: number) {
+    g.fillStyle = '#121212';
+    g.beginPath();
+    g.moveTo(-2, -1);
+    g.quadraticCurveTo(-10, -2 - flap * 14, -18, -flap * 18);
+    g.lineTo(6, 0);
+    g.closePath();
+    g.fill();
+    // corpo preto, peito branco, bico enorme laranja
+    g.beginPath();
+    g.ellipse(0, 1, 12, 6, -0.05, 0, Math.PI * 2);
+    g.fill();
+    g.fillRect(-20, 0, 9, 4);
+    g.fillStyle = '#f4f0e0';
+    g.beginPath();
+    g.ellipse(8, 2, 5, 4.4, 0, 0, Math.PI * 2);
+    g.fill();
+    g.fillStyle = '#ff8a1a';
+    g.beginPath();
+    g.moveTo(11, -2);
+    g.quadraticCurveTo(26, -3, 28, 2);
+    g.quadraticCurveTo(22, 5, 11, 3);
+    g.closePath();
+    g.fill();
+    g.fillStyle = '#ffd23a';
+    g.fillRect(12, -2, 8, 2);
+    g.fillStyle = '#121212';
+    g.fillRect(26, 0, 2, 2);
+    g.fillStyle = '#5affc0';
+    g.beginPath();
+    g.arc(9, -1, 1.6, 0, Math.PI * 2);
+    g.fill();
+    g.fillStyle = '#1a1a1a';
+    g.beginPath();
+    g.moveTo(0, 0);
+    g.quadraticCurveTo(-5, -flap * 18, -14, -flap * 22 + 3);
+    g.lineTo(8, 1);
+    g.closePath();
+    g.fill();
+  }
+
+  private egret(g: CanvasRenderingContext2D, flap: number) {
+    // garça branca: pescoço em S, pernas compridas para trás, asas largas
+    g.fillStyle = '#e8eef0';
+    g.beginPath();
+    g.moveTo(-4, 0);
+    g.quadraticCurveTo(-14, -6 - flap * 22, -30, -2 - flap * 26);
+    g.lineTo(8, 0);
+    g.closePath();
+    g.fill();
+    g.beginPath();
+    g.ellipse(0, 1, 12, 4.6, 0, 0, Math.PI * 2);
+    g.fill();
+    g.strokeStyle = '#e8eef0';
+    g.lineWidth = 3;
+    g.beginPath();
+    g.moveTo(10, 0);
+    g.quadraticCurveTo(14, -6, 19, -5);
+    g.stroke();
+    g.fillStyle = '#ffd23a';
+    g.beginPath();
+    g.moveTo(21, -6);
+    g.lineTo(30, -4.6);
+    g.lineTo(21, -3.4);
+    g.closePath();
+    g.fill();
+    g.strokeStyle = '#2a2a2a';
+    g.lineWidth = 1.2;
+    g.beginPath();
+    g.moveTo(-10, 2);
+    g.lineTo(-26, 4);
+    g.stroke();
+    g.fillStyle = '#ffffff';
+    g.beginPath();
+    g.moveTo(-2, 0);
+    g.quadraticCurveTo(-10, -flap * 24, -26, -flap * 30 + 4);
+    g.lineTo(9, 1);
+    g.closePath();
+    g.fill();
+  }
+
+  private swift(g: CanvasRenderingContext2D, flap: number) {
+    // andorinha: silhueta escura em foice, cauda bifurcada
+    g.fillStyle = '#1e2a30';
+    g.beginPath();
+    g.ellipse(0, 0, 7, 2.6, 0, 0, Math.PI * 2);
+    g.fill();
+    g.beginPath();
+    g.moveTo(-6, 0);
+    g.lineTo(-13, -3);
+    g.lineTo(-10, 0);
+    g.lineTo(-13, 3);
+    g.closePath();
+    g.fill();
+    g.strokeStyle = '#1e2a30';
+    g.lineWidth = 2;
+    g.beginPath();
+    g.moveTo(-14, -6 - flap * 8);
+    g.quadraticCurveTo(-4, -2, 0, 0);
+    g.quadraticCurveTo(-2, -flap * 10 - 4, 8, -10 - flap * 6);
+    g.stroke();
   }
 
   drawVignette(g: CanvasRenderingContext2D, W: number, H: number, strength = 1) {

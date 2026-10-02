@@ -136,6 +136,20 @@ export class AudioEngine {
     this.tone({ type: 'triangle', f0: f * 2, dur: 0.3, vol: 0.05 * vol, att: 0.03, delay });
     this.noise({ dur: 0.08, vol: 0.05 * vol, type: 'bandpass', f0: f * 2, q: 4, delay });
   }
+  /** Nota de sintetizador (boate): serra + quadrado com filtro abrindo. */
+  synth(midi: number, when = 0, vol = 1) {
+    if (!this.ctx || this.ctx.state !== 'running' || this.muted) return;
+    const f = 440 * Math.pow(2, (midi - 69) / 12);
+    const delay = Math.max(0, when - this.ctx.currentTime);
+    this.tone({ type: 'sawtooth', f0: f, dur: 0.3, vol: 0.12 * vol, delay, lp: 3400 });
+    this.tone({ type: 'square', f0: f * 2, dur: 0.18, vol: 0.05 * vol, delay, lp: 5000, detune: 7 });
+  }
+  /** Caixa de som (boate): "wub" grave ao quicar. */
+  wub(pitch: number, vol = 1) {
+    if (!this.ctx || this.ctx.state !== 'running' || this.muted) return;
+    this.tone({ type: 'sawtooth', f0: 110 + pitch * 80, f1: 38, dur: 0.28, vol: 0.32 * vol, lp: 700 });
+    this.tone({ type: 'sine', f0: 70, f1: 40, dur: 0.3, vol: 0.4 * vol });
+  }
   /** Batida de tambor (tambores-trampolim): `pitch` 0..1 do grave ao agudo. */
   drum(pitch: number, vol = 1, pan = 0) {
     if (!this.ctx || this.ctx.state !== 'running' || this.muted) return;

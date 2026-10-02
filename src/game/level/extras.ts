@@ -229,3 +229,67 @@ export function addForeground(b: LevelBuilder) {
     else b.deco('pcDebris', tx, row + 3, 'front', { par: 0.4 });
   }
 }
+
+/**
+ * PISTA DE NEON (fase 1): uma boate secreta embaixo da rua, num trecho plano e repetitivo, para
+ * quebrar o ritmo. Entra-se por uma porta de neon na calçada (↑) e sai-se mais adiante.
+ * O desafio é musical e eletrônico: lasers que acendem em tempos alternados da batida (é preciso
+ * "dançar" entre eles), caixas de som que viram trampolim (wub!) e notas de sintetizador que
+ * tocam a melodia da fase — cada uma aparece duas vezes. Completando: o DROP.
+ * Retorna o x (tile) da entrada, ou -1 se não achou lugar.
+ */
+export function addClub(b: LevelBuilder): number {
+  const L = b.level;
+  const W = 52;
+  const doorFree = (tx: number) => {
+    for (const dx of [-1, 0, 1]) {
+      if (L.get(tx + dx, G) !== T.SOLID) return false;
+      for (let k = 1; k <= 3; k++) if (L.get(tx + dx, G - k) !== T.EMPTY) return false;
+    }
+    return !b.props.some((p) => Math.abs(p.x - (tx * TILE + 16)) < 3 * TILE);
+  };
+  const ok = (x0: number) => {
+    // subsolo inteiro maciço (sem buracos da rua) e calçada livre nas duas portas
+    for (let tx = x0 - 1; tx < x0 + W + 1; tx++) for (let ty = G + 1; ty < L.h; ty++) if (L.get(tx, ty) !== T.SOLID) return false;
+    if (!doorFree(x0 + 2) || !doorFree(x0 + W - 2)) return false;
+    const px0 = (x0 - 6) * TILE;
+    const px1 = (x0 + W + 6) * TILE;
+    if (b.arenas.some((a) => a.rect.x < px1 && a.rect.x + a.rect.w > px0)) return false;
+    if (b.triggers.some((t) => !t.id.startsWith('hint:') && t.rect.x < px1 && t.rect.x + t.rect.w > px0)) return false;
+    if (b.secretRooms.some((s) => s.rect.x < px1 && s.rect.x + s.rect.w > px0)) return false;
+    return true;
+  };
+  let x0 = -1;
+  for (let x = 120; x < Math.min(L.w - W - 10, 700) && x0 < 0; x++) if (ok(x)) x0 = x;
+  if (x0 < 0) return -1;
+  const TOP = 34;
+  const FLOOR = 45;
+  b.fill(x0 - 1, G + 1, W + 2, L.h - G - 1, T.SOLID, THEME.HANGAR);
+  b.clear(x0, TOP, W, FLOOR - TOP);
+  b.room(x0 - 1, TOP - 1, W + 2, FLOOR - TOP + 2, 'club');
+  b.camZones.unshift({ rect: { x: (x0 - 1) * TILE, y: (TOP - 1) * TILE, w: (W + 2) * TILE, h: (FLOOR - TOP + 2) * TILE } });
+  b.secretRoom('club', x0, TOP, W, FLOOR - TOP);
+  // portas na calçada (entrada e saída mais adiante)
+  b.door(x0 + 2, G, x0 + 3, FLOOR, 'in');
+  b.door(x0 + W - 4, FLOOR, x0 + W - 2, G, 'out');
+  b.deco('clubDoor', x0 + 2, G, 'back');
+  b.deco('clubExit', x0 + W - 2, G, 'back');
+  b.trigger('hint:door', x0 - 1, 0, 6, G);
+  // ---- dentro: aquecimento com uma caixa de som e uma plataforma
+  b.drum(x0 + 7, FLOOR - 1, 2, 'speaker');
+  b.plat(x0 + 10, FLOOR - 5, 4, THEME.HANGAR);
+  // corredor de lasers (tempos alternados) com caixas de som entre eles
+  const lasers: [number, 0 | 1][] = [[16, 0], [20, 1], [25, 0], [29, 1], [34, 0], [38, 1]];
+  for (const [i, ph] of lasers) b.beam(x0 + i, TOP, FLOOR, ph);
+  for (const i of [22, 31, 40]) b.drum(x0 + i, FLOOR - 1, 2, 'speaker');
+  // plataformas de neon no alto (rota de cima, mais notas)
+  b.plat(x0 + 17, FLOOR - 6, 2, THEME.HANGAR);
+  b.plat(x0 + 26, FLOOR - 7, 2, THEME.HANGAR);
+  b.plat(x0 + 35, FLOOR - 6, 2, THEME.HANGAR);
+  // notas de sintetizador (cada uma volta uma vez)
+  const notes: [number, number][] = [[8, 40], [11, 39], [13, 38], [18, 41], [22, 38], [23, 36], [27, 37], [27, 41], [31, 38], [32, 36], [36, 41], [36, 38], [40, 37], [41, 39]];
+  for (const [i, row] of notes) b.pickup('note', x0 + i, row);
+  b.tokens(x0 + 43, FLOOR - 1, 5);
+  b.deco('clubDJ', x0 + 46, FLOOR, 'back');
+  return x0;
+}

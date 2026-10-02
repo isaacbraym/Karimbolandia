@@ -3,7 +3,7 @@ import {
   Level, T, TILE, THEME,
   type EnemySpawn, type EnemyType, type PropSpawn, type PropKind, type LootKind, type PickupSpawn, type PickupKind,
   type Checkpoint, type Arena, type CamZone, type DecoSpawn, type Trigger, type SecretRoom, type LevelData, type Wave,
-  type CivilianSpawn, type CivMood, type WaterZone, type VineSpawn, type DoorSpawn, type RoomZone, type DrumSpawn,
+  type CivilianSpawn, type CivMood, type WaterZone, type VineSpawn, type DoorSpawn, type RoomZone, type DrumSpawn, type BeamSpawn,
 } from '../level';
 
 export const G = 32; // linha do chão principal
@@ -29,6 +29,7 @@ export class LevelBuilder {
   doors: DoorSpawn[] = [];
   rooms: RoomZone[] = [];
   drums: DrumSpawn[] = [];
+  beams: BeamSpawn[] = [];
   stage = 1;
   sections: { name: string; x: number; y: number }[] = [];
   atmosphere: { x: number; sky: number; ruin: number }[] = [];
@@ -173,13 +174,17 @@ export class LevelBuilder {
     this.doors.push({ id: this.doors.length, x: this.px(x), y: this.py(row), tx: this.px(tx), ty: this.py(trow), kind });
   }
   /** Tambor-trampolim com o topo na linha `row` (w tiles); o couro é uma plataforma one-way. */
-  drum(x: number, row: number, w = 2) {
-    this.plat(x, row, w, 5);
-    this.drums.push({ id: this.drums.length, x: x * TILE + (w * TILE) / 2, y: row * TILE, w: w * TILE });
+  drum(x: number, row: number, w = 2, style: 'drum' | 'speaker' = 'drum') {
+    this.plat(x, row, w, style === 'drum' ? 5 : 3);
+    this.drums.push({ id: this.drums.length, x: x * TILE + (w * TILE) / 2, y: row * TILE, w: w * TILE, style });
+  }
+  /** Laser que pisca na batida, na coluna x, das linhas row0 a row1. */
+  beam(x: number, row0: number, row1: number, phase: 0 | 1) {
+    this.beams.push({ id: this.beams.length, x: this.px(x), y0: row0 * TILE, y1: row1 * TILE, phase });
   }
   /** Interior coberto (templo) em tiles. */
-  room(x: number, y: number, w: number, h: number) {
-    this.rooms.push({ x: x * TILE, y: y * TILE, w: w * TILE, h: h * TILE });
+  room(x: number, y: number, w: number, h: number, kind: 'temple' | 'club' = 'temple') {
+    this.rooms.push({ x: x * TILE, y: y * TILE, w: w * TILE, h: h * TILE, kind });
   }
   atmos(x: number, sky: number, ruin = 0) {
     this.atmosphere.push({ x: x * TILE, sky, ruin });
@@ -275,6 +280,7 @@ export class LevelBuilder {
       doors: this.doors,
       rooms: this.rooms,
       drums: this.drums,
+      beams: this.beams,
       level: this.level,
       playerStart: this.playerStart,
       nomadSpawn: this.nomadSpawn,

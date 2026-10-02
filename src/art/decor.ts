@@ -3,7 +3,7 @@ import { glowSprite, softDot, drawSpr } from './kit';
 import { Rng, clamp } from '../core/math';
 import type { DecoSpawn } from '../game/level';
 import { getArt } from './index';
-import { JUNGLE_BOUNDS, jungleVariants, paintJungle } from './jungleDecor';
+import { JUNGLE_BOUNDS, jungleVariants, paintJungle, setDecoAt } from './jungleDecor';
 
 const rngCache = new Map<string, Rng>();
 const seedOf = (d: DecoSpawn) => Math.floor(d.x * 7.13 + d.y * 3.1);
@@ -128,6 +128,7 @@ export function drawDeco(g: CanvasRenderingContext2D, d: DecoSpawn, t: number) {
     kd._bk = d.kind + '|' + kd._bs + '|' + s;
   }
   const seed = b ? kd._bs! : seedOf(d);
+  if (!b) setDecoAt(d.x, d.y, !!d.flip);
   g.save();
   g.translate(d.x, d.y);
   if (d.flip) g.scale(-1, 1);

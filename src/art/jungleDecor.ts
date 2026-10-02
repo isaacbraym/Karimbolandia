@@ -1179,6 +1179,15 @@ export function paintJungle(g: CanvasRenderingContext2D, kind: string, seed: num
 }
 
 // ------------------------------------------------------------------ animadas
+function neon(g: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, color: string, flick: number) {
+  const spr = glowSprite(color, 32);
+  g.globalCompositeOperation = 'lighter';
+  g.globalAlpha = 0.5 * flick;
+  g.drawImage(spr.c, x - w * 0.6, y - h * 0.6, w * 2.2, h * 2.2);
+  g.globalAlpha = 1;
+  g.globalCompositeOperation = 'source-over';
+}
+
 const sprCache = new Map<string, Sprite>();
 /**
  * Peça pronta (assada uma vez). `blur` > 0: desfoque de lente para o que passa "colado na câmera"
@@ -1705,86 +1714,15 @@ function paintAnimated(g: CanvasRenderingContext2D, kind: string, seed: number, 
       g.restore();
       return true;
     }
-    case 'pWeb': {
-      // teia no canto (perto da câmera) com uma aranha subindo e descendo no fio
-      const web = piece('pweb', 180, 180, 0, 0, (c) => {
-        c.strokeStyle = 'rgba(235,235,245,0.55)';
-        c.lineWidth = 1;
-        const n = 7;
-        const ends: [number, number][] = [];
-        for (let i = 0; i < n; i++) {
-          const a = (i / (n - 1)) * (Math.PI / 2);
-          const L = 150 + (i % 2) * 20;
-          ends.push([Math.cos(a) * L, Math.sin(a) * L]);
-          c.beginPath();
-          c.moveTo(0, 0);
-          c.lineTo(Math.cos(a) * L, Math.sin(a) * L);
-          c.stroke();
-        }
-        c.strokeStyle = 'rgba(235,235,245,0.35)';
-        for (let k = 1; k <= 7; k++) {
-          const f = k / 7.5;
-          c.beginPath();
-          for (let i = 0; i < n; i++) {
-            const [ex, ey] = ends[i];
-            const x = ex * f;
-            const y = ey * f;
-            if (i === 0) c.moveTo(x, y);
-            else {
-              const [px, py] = ends[i - 1];
-              c.quadraticCurveTo(((px + ex) / 2) * f * 0.92, ((py + ey) / 2) * f * 0.92, x, y);
-            }
-          }
-          c.stroke();
-        }
-      });
-      drawPiece(g, web);
-      // aranha: desce devagar, para, sobe rápido
-      const ph = (t * 0.22 + (Math.abs(seed) % 10) * 0.1) % 1;
-      const drop = ph < 0.6 ? ph / 0.6 : ph < 0.8 ? 1 : 1 - (ph - 0.8) / 0.2;
-      const ax = 70;
-      const ay = 60;
-      const sy = ay + drop * 120 + Math.sin(t * 3 + seed) * 2;
-      g.strokeStyle = 'rgba(235,235,245,0.6)';
-      g.lineWidth = 0.8;
-      g.beginPath();
-      g.moveTo(ax, ay);
-      g.lineTo(ax, sy);
-      g.stroke();
-      g.save();
-      g.translate(ax, sy + 8);
-      const wig = Math.sin(t * 14 + seed) * 0.15;
-      g.strokeStyle = '#140c0c';
-      g.lineWidth = 1.6;
-      for (const sgn of [-1, 1]) {
-        for (let i = 0; i < 4; i++) {
-          const a = (-0.9 + i * 0.55 + (i % 2 ? wig : -wig)) * sgn;
-          g.beginPath();
-          g.moveTo(0, 0);
-          g.lineTo(sgn * 8 * Math.cos(a), -4 + 8 * Math.sin(Math.abs(a)));
-          g.lineTo(sgn * 13 * Math.cos(a * 0.8), 4 + 8 * Math.sin(Math.abs(a)));
-          g.stroke();
-        }
-      }
-      g.fillStyle = '#1a1010';
-      g.beginPath();
-      g.ellipse(0, 3, 5.5, 7, 0, 0, Math.PI * 2);
-      g.fill();
-      g.beginPath();
-      g.arc(0, -5, 3.6, 0, Math.PI * 2);
-      g.fill();
-      g.fillStyle = '#c8202a';
-      g.beginPath();
-      g.moveTo(0, 0);
-      g.lineTo(2.4, 4);
-      g.lineTo(0, 8);
-      g.lineTo(-2.4, 4);
-      g.closePath();
-      g.fill();
-      g.fillStyle = '#ff6a5a';
-      g.fillRect(-2, -6.5, 1.2, 1.2);
-      g.fillRect(0.8, -6.5, 1.2, 1.2);
-      g.restore();
+    case 'pWeb':
+    case 'pWebFly':
+    case 'pWebOrb':
+    case 'pWebTorn': {
+      drawWeb(g, kind, seed, t);
+      return true;
+    }
+    case 'jLizard': {
+      drawLizard(g, seed, t);
       return true;
     }
     case 'pRoots': {
@@ -2037,10 +1975,385 @@ function paintAnimated(g: CanvasRenderingContext2D, kind: string, seed: number, 
       drawPiece(g, s, Math.sin(t * 0.9 + seed) * 0.04, 0.9);
       return true;
     }
+    case 'clubDoor':
+    case 'clubExit': {
+      // porta da boate na calçada: escada descendo, letreiro de neon piscando no ritmo
+      const exit = kind === 'clubExit';
+      g.fillStyle = '#16121f';
+      g.fillRect(-26, -78, 52, 78);
+      g.fillStyle = '#05040a';
+      g.fillRect(-20, -70, 40, 70);
+      g.fillStyle = '#2a2438';
+      for (let i = 0; i < 4; i++) g.fillRect(-20 + i * 4, -18 + i * 5, 40 - i * 8, 3);
+      g.strokeStyle = '#170f2e';
+      g.lineWidth = 1.5;
+      g.strokeRect(-26, -78, 52, 78);
+      const on = Math.sin(t * 8 + seed) > -0.6;
+      const col = exit ? '#39f0ff' : '#ff3fb4';
+      neon(g, -34, -112, 68, 26, col, on ? 1 : 0.35);
+      g.fillStyle = '#0c0a14';
+      g.fillRect(-36, -114, 72, 30);
+      g.strokeStyle = col;
+      g.globalAlpha = on ? 1 : 0.4;
+      g.lineWidth = 2;
+      g.strokeRect(-34, -112, 68, 26);
+      g.fillStyle = col;
+      g.font = '400 15px "Lilita One", Impact, sans-serif';
+      g.textAlign = 'center';
+      g.fillText(exit ? 'SAÍDA' : 'CLUB ♪', 0, -93);
+      g.textAlign = 'left';
+      g.globalAlpha = 1;
+      return true;
+    }
+    case 'clubDJ': {
+      // cabine do DJ: mesa com luzes e um robozinho mexendo a cabeça no ritmo
+      const bop = Math.abs(Math.sin(t * Math.PI * (124 / 60)));
+      g.fillStyle = '#1c1830';
+      g.fillRect(-60, -46, 120, 46);
+      g.strokeStyle = '#39f0ff';
+      g.lineWidth = 2;
+      g.strokeRect(-60, -46, 120, 46);
+      for (let i = 0; i < 8; i++) {
+        g.fillStyle = (Math.floor(t * 6) + i) % 3 === 0 ? '#ff3fb4' : (Math.floor(t * 6) + i) % 3 === 1 ? '#39f0ff' : '#ffd23a';
+        g.fillRect(-52 + i * 13, -38, 9, 5);
+      }
+      for (const x of [-30, 30]) {
+        g.fillStyle = '#0a0812';
+        g.beginPath();
+        g.arc(x, -24, 12, 0, Math.PI * 2);
+        g.fill();
+        g.strokeStyle = '#7ff9ff';
+        g.lineWidth = 1;
+        g.beginPath();
+        g.arc(x, -24, 12, t * 6, t * 6 + 1.2);
+        g.stroke();
+      }
+      g.fillStyle = '#4a4f6e';
+      g.fillRect(-12, -78 - bop * 4, 24, 26);
+      g.fillStyle = '#ff3fb4';
+      g.fillRect(-9, -72 - bop * 4, 18, 5);
+      g.strokeStyle = '#2a2a3a';
+      g.lineWidth = 3;
+      g.beginPath();
+      g.arc(0, -70 - bop * 4, 16, Math.PI * 1.05, Math.PI * 1.95);
+      g.stroke();
+      return true;
+    }
     case 'jChasm': {
       return true;
     }
     default:
       return false;
+  }
+}
+
+// ------------------------------------------------------------------ teias e lagartixas
+/** Posição do Karimbo e da decoração sendo desenhada (para bichos que reagem a ele). */
+const focus = { x: 0, y: 0, dx: 0, dy: 0, flip: false };
+export function setDecoFocus(x: number, y: number) {
+  focus.x = x;
+  focus.y = y;
+}
+export function setDecoAt(x: number, y: number, flip: boolean) {
+  focus.dx = x;
+  focus.dy = y;
+  focus.flip = !!flip;
+}
+
+function spider(g: CanvasRenderingContext2D, x: number, y: number, t: number, seed: number, s = 1) {
+  g.save();
+  g.translate(x, y);
+  g.scale(s, s);
+  const wig = Math.sin(t * 14 + seed) * 0.15;
+  g.strokeStyle = '#140c0c';
+  g.lineWidth = 1.6;
+  for (const sgn of [-1, 1]) {
+    for (let i = 0; i < 4; i++) {
+      const a = (-0.9 + i * 0.55 + (i % 2 ? wig : -wig)) * sgn;
+      g.beginPath();
+      g.moveTo(0, 0);
+      g.lineTo(sgn * 8 * Math.cos(a), -4 + 8 * Math.sin(Math.abs(a)));
+      g.lineTo(sgn * 13 * Math.cos(a * 0.8), 4 + 8 * Math.sin(Math.abs(a)));
+      g.stroke();
+    }
+  }
+  g.fillStyle = '#1a1010';
+  g.beginPath();
+  g.ellipse(0, 3, 5.5, 7, 0, 0, Math.PI * 2);
+  g.fill();
+  g.beginPath();
+  g.arc(0, -5, 3.6, 0, Math.PI * 2);
+  g.fill();
+  g.fillStyle = '#c8202a';
+  g.beginPath();
+  g.moveTo(0, 0);
+  g.lineTo(2.4, 4);
+  g.lineTo(0, 8);
+  g.lineTo(-2.4, 4);
+  g.closePath();
+  g.fill();
+  g.fillStyle = '#ff6a5a';
+  g.fillRect(-2, -6.5, 1.2, 1.2);
+  g.fillRect(0.8, -6.5, 1.2, 1.2);
+  g.restore();
+}
+
+/** Teia de canto (|__) com fios radiais e espirais. */
+function cornerWeb(c: CanvasRenderingContext2D, torn: boolean, seed: number) {
+  const r = new Rng(seed);
+  c.strokeStyle = 'rgba(235,235,245,0.55)';
+  c.lineWidth = 1;
+  const n = 7;
+  const ends: [number, number][] = [];
+  for (let i = 0; i < n; i++) {
+    const a = (i / (n - 1)) * (Math.PI / 2);
+    const L = 150 + (i % 2) * 20 - (torn && i === 3 ? 70 : 0);
+    ends.push([Math.cos(a) * L, Math.sin(a) * L]);
+    c.beginPath();
+    c.moveTo(0, 0);
+    c.lineTo(Math.cos(a) * L, Math.sin(a) * L);
+    c.stroke();
+  }
+  c.strokeStyle = 'rgba(235,235,245,0.35)';
+  for (let k = 1; k <= 7; k++) {
+    const f = k / 7.5;
+    c.beginPath();
+    for (let i = 0; i < n; i++) {
+      const [ex, ey] = ends[i];
+      const x = ex * f;
+      const y = ey * f;
+      // rasgada: alguns trechos da espiral faltam e pendem soltos
+      if (torn && i > 2 && i < 5 && k > 3) {
+        c.moveTo(x, y);
+        continue;
+      }
+      if (i === 0) c.moveTo(x, y);
+      else {
+        const [px, py] = ends[i - 1];
+        c.quadraticCurveTo(((px + ex) / 2) * f * 0.92, ((py + ey) / 2) * f * 0.92, x, y);
+      }
+    }
+    c.stroke();
+  }
+  if (torn) {
+    c.strokeStyle = 'rgba(235,235,245,0.4)';
+    for (let i = 0; i < 4; i++) {
+      const x = r.range(50, 110);
+      const y = r.range(50, 110);
+      c.beginPath();
+      c.moveTo(x, y);
+      c.quadraticCurveTo(x + r.range(-10, 10), y + 30, x + r.range(-6, 6), y + r.range(40, 70));
+      c.stroke();
+    }
+  }
+}
+
+/** Teia redonda (orbe) com raios e espiral contínua. */
+function orbWeb(c: CanvasRenderingContext2D) {
+  c.strokeStyle = 'rgba(235,235,245,0.55)';
+  c.lineWidth = 1;
+  const R = 80;
+  for (let i = 0; i < 14; i++) {
+    const a = (i / 14) * Math.PI * 2;
+    c.beginPath();
+    c.moveTo(0, 0);
+    c.lineTo(Math.cos(a) * R, Math.sin(a) * R);
+    c.stroke();
+  }
+  c.strokeStyle = 'rgba(235,235,245,0.38)';
+  c.beginPath();
+  for (let a = 0; a < Math.PI * 2 * 7; a += 0.12) {
+    const rr = 10 + (a / (Math.PI * 2 * 7)) * (R - 10);
+    const x = Math.cos(a) * rr;
+    const y = Math.sin(a) * rr;
+    if (a === 0) c.moveTo(x, y);
+    else c.lineTo(x, y);
+  }
+  c.stroke();
+  // fios de sustentação até o teto
+  c.strokeStyle = 'rgba(235,235,245,0.5)';
+  c.beginPath();
+  c.moveTo(-R * 0.7, -R * 0.7);
+  c.lineTo(-R * 1.1, -R * 1.5);
+  c.moveTo(R * 0.7, -R * 0.7);
+  c.lineTo(R * 1.1, -R * 1.5);
+  c.stroke();
+}
+
+function drawWeb(g: CanvasRenderingContext2D, kind: string, seed: number, t: number) {
+  if (kind === 'pWebOrb') {
+    // teia redonda pendurada, balançando de leve; a aranha gira no centro
+    const web = piece('pweborb', 240, 260, 120, 120, (c) => orbWeb(c));
+    g.save();
+    g.translate(0, 130);
+    g.rotate(Math.sin(t * 0.7 + seed) * 0.03);
+    drawPiece(g, web);
+    g.save();
+    g.rotate(t * 0.4 + seed);
+    spider(g, 0, 0, t, seed, 1.1);
+    g.restore();
+    g.restore();
+    return;
+  }
+  const torn = kind === 'pWebTorn';
+  const web = piece(torn ? 'pwebtorn' : 'pweb', 180, 200, 0, 0, (c) => cornerWeb(c, torn, 7));
+  drawPiece(g, web);
+  if (kind === 'pWebFly') {
+    // mosquinha presa se debatendo; a aranha vem descendo até ela e volta
+    const fx = 92;
+    const fy = 70;
+    const buzz = Math.sin(t * 60 + seed) * 1.2;
+    g.fillStyle = '#1a1a1a';
+    g.beginPath();
+    g.ellipse(fx + buzz, fy, 3.4, 2.4, 0.4, 0, Math.PI * 2);
+    g.fill();
+    g.fillStyle = 'rgba(220,240,255,0.7)';
+    const wf = Math.abs(Math.sin(t * 50 + seed));
+    g.beginPath();
+    g.ellipse(fx + buzz - 2, fy - 3, 3, 1.4 + wf, -0.6, 0, Math.PI * 2);
+    g.ellipse(fx + buzz + 2, fy - 3, 3, 1.4 + wf, 0.6, 0, Math.PI * 2);
+    g.fill();
+    g.strokeStyle = 'rgba(235,235,245,0.6)';
+    g.lineWidth = 0.6;
+    g.beginPath();
+    g.moveTo(fx - 8, fy - 6);
+    g.lineTo(fx + 6, fy + 5);
+    g.moveTo(fx + 7, fy - 6);
+    g.lineTo(fx - 6, fy + 6);
+    g.stroke();
+    const ph = (t * 0.12 + (Math.abs(seed) % 10) * 0.1) % 1;
+    const k = ph < 0.5 ? ph / 0.5 : ph < 0.7 ? 1 : 1 - (ph - 0.7) / 0.3;
+    spider(g, 20 + (fx - 26) * k, 20 + (fy - 32) * k, t, seed);
+    return;
+  }
+  if (torn) return;
+  // aranha subindo e descendo no fio
+  const ph = (t * 0.22 + (Math.abs(seed) % 10) * 0.1) % 1;
+  const drop = ph < 0.6 ? ph / 0.6 : ph < 0.8 ? 1 : 1 - (ph - 0.8) / 0.2;
+  const ax = 70;
+  const ay = 60;
+  const sy = ay + drop * 120 + Math.sin(t * 3 + seed) * 2;
+  g.strokeStyle = 'rgba(235,235,245,0.6)';
+  g.lineWidth = 0.8;
+  g.beginPath();
+  g.moveTo(ax, ay);
+  g.lineTo(ax, sy);
+  g.stroke();
+  spider(g, ax, sy + 8, t, seed);
+}
+
+/**
+ * Lagartixa na parede: parada (rabo e cabeça mexendo); quando o Karimbo chega perto, corre e se
+ * esconde no buraco — e de lá os olhinhos acompanham ele. Quando ele se afasta, sai de novo.
+ */
+const lizards = new Map<number, { st: 'idle' | 'run' | 'hid' | 'out'; t: number; far: number }>();
+function drawLizard(g: CanvasRenderingContext2D, seed: number, t: number) {
+  let L = lizards.get(seed);
+  if (!L) {
+    L = { st: 'idle', t, far: 0 };
+    lizards.set(seed, L);
+  }
+  const HOLE = 64;
+  const dxw = focus.x - focus.dx;
+  const dyw = focus.y - (focus.dy - 20);
+  const dist = Math.hypot(dxw, dyw);
+  const el = t - L.t;
+  if (L.st === 'idle' && dist < 210) {
+    L.st = 'run';
+    L.t = t;
+  } else if (L.st === 'run' && el > 0.45) {
+    L.st = 'hid';
+    L.t = t;
+  } else if (L.st === 'hid') {
+    if (dist > 360) L.far += 1 / 60;
+    else L.far = 0;
+    if (L.far > 2.5) {
+      L.st = 'out';
+      L.t = t;
+      L.far = 0;
+    }
+  } else if (L.st === 'out' && el > 1.2) {
+    L.st = 'idle';
+    L.t = t;
+  }
+  // buraco na parede
+  g.fillStyle = '#0a0806';
+  g.beginPath();
+  g.ellipse(HOLE, -20, 11, 8, 0, 0, Math.PI * 2);
+  g.fill();
+  g.strokeStyle = 'rgba(120,110,90,0.5)';
+  g.lineWidth = 1.5;
+  g.stroke();
+  let x = 0;
+  let vis = true;
+  let run = 0;
+  if (L.st === 'run') {
+    const k = Math.min(1, el / 0.45);
+    x = HOLE * k * k;
+    run = k;
+    if (k > 0.92) vis = false;
+  } else if (L.st === 'hid') vis = false;
+  else if (L.st === 'out') {
+    const k = Math.min(1, el / 1.2);
+    x = HOLE * (1 - k);
+    run = 1 - k;
+  }
+  if (vis) {
+    g.save();
+    g.translate(x, -20);
+    const leg = run > 0 ? Math.sin(t * 40) * 0.6 : Math.sin(t * 2 + seed) * 0.05;
+    const tail = Math.sin(t * (run > 0 ? 18 : 2.5) + seed) * 0.35;
+    // rabo
+    g.strokeStyle = '#4a7a2a';
+    g.lineWidth = 3;
+    g.lineCap = 'round';
+    g.beginPath();
+    g.moveTo(-8, 0);
+    g.quadraticCurveTo(-20, 6 * Math.sin(tail), -32, 10 * tail);
+    g.stroke();
+    // patas
+    g.lineWidth = 2;
+    g.strokeStyle = '#3e6a22';
+    for (const [px, s] of [[5, 1], [-5, -1]] as [number, number][]) {
+      for (const sy of [-1, 1]) {
+        g.beginPath();
+        g.moveTo(px, 0);
+        g.lineTo(px + s * 4 + leg * 3 * sy, sy * 7);
+        g.stroke();
+      }
+    }
+    // corpo e cabeça (olhando para o Karimbo quando parada)
+    g.fillStyle = '#5c9a32';
+    g.beginPath();
+    g.ellipse(0, 0, 10, 4.2, 0, 0, Math.PI * 2);
+    g.fill();
+    const look = L.st === 'idle' ? Math.max(-0.3, Math.min(0.3, dyw * 0.002)) : 0;
+    g.beginPath();
+    g.ellipse(12, look * 6, 5, 3.6, look, 0, Math.PI * 2);
+    g.fill();
+    g.fillStyle = '#7cc94a';
+    for (let i = -6; i < 8; i += 4) g.fillRect(i, -1.5, 2, 1);
+    g.fillStyle = '#ffd23a';
+    g.fillRect(13, -2 + look * 6, 2, 2);
+    g.fillStyle = '#000';
+    g.fillRect(13.8, -1.6 + look * 6, 1, 1);
+    g.restore();
+  }
+  if (L.st === 'hid' || (L.st === 'run' && !vis)) {
+    // olhinhos no escuro do buraco seguindo o Karimbo
+    const sgn = focus.flip ? -1 : 1;
+    const ax = Math.max(-1, Math.min(1, (dxw * sgn) / 200));
+    const ay = Math.max(-1, Math.min(1, dyw / 200));
+    const blink = Math.sin(t * 1.3 + seed) > 0.97;
+    for (const ox of [-4, 4]) {
+      g.fillStyle = '#ffd23a';
+      g.beginPath();
+      g.ellipse(HOLE + ox, -21, 2.6, blink ? 0.4 : 2.2, 0, 0, Math.PI * 2);
+      g.fill();
+      if (!blink) {
+        g.fillStyle = '#000';
+        g.fillRect(HOLE + ox - 0.6 + ax * 1.2, -21.6 + ay * 1, 1.2, 1.4);
+      }
+    }
   }
 }

@@ -291,14 +291,59 @@ describe('Fase 2 (selva): sala do ritmo', () => {
     for (let f = 0; f < 5; f++) w.update(1 / 60, ctl);
     expect(w.rhythm.active).toBe(true);
     const notes = w.pickups.filter((p) => p.kind === 'note');
-    expect(notes.length).toBe(w.rhythm.total);
+    // cada nota aparece duas vezes (volta logo depois de pega)
+    expect(w.rhythm.total).toBe(notes.length * 2);
     expect(notes.length).toBeGreaterThanOrEqual(10);
-    const before = w.pickups.length;
     for (const n of notes) {
+      w.collect(n);
+      n.alive = false;
+    }
+    expect(w.rhythm.done).toBe(false);
+    w.player.invuln = 99;
+    for (let f = 0; f < 100; f++) w.update(1 / 60, ctl);
+    const again = w.pickups.filter((p) => p.kind === 'note' && p.alive);
+    expect(again.length).toBe(notes.length);
+    const before = w.pickups.length;
+    for (const n of again) {
       w.collect(n);
       n.alive = false;
     }
     expect(w.rhythm.done).toBe(true);
     expect(w.pickups.length).toBeGreaterThan(before);
+  });
+});
+
+describe('Fase 1: pista de neon (boate secreta)', () => {
+  it('existe, tem porta na calçada, lasers que alternam na batida e notas duplas', async () => {
+    const { buildLevel } = await import('../src/game/level/index');
+    const d = buildLevel();
+    const room = d.rooms.find((r) => r.kind === 'club')!;
+    expect(room).toBeTruthy();
+    expect(d.beams.length).toBeGreaterThanOrEqual(4);
+    expect(d.drums.filter((x) => x.style === 'speaker').length).toBeGreaterThanOrEqual(3);
+    const w = new World(d);
+    w.invulnerable = true;
+    const ctl = newCtl();
+    const inn = d.doors.find((x) => x.kind === 'in' && x.tx > room.x && x.tx < room.x + room.w)!;
+    w.player.reset(inn.x, inn.y);
+    for (let f = 0; f < 10; f++) w.update(1 / 60, ctl);
+    ctl.moveY = -1;
+    for (let f = 0; f < 60; f++) w.update(1 / 60, ctl);
+    ctl.moveY = 0;
+    expect(w.inRoom()).toBe(true);
+    for (let f = 0; f < 5; f++) w.update(1 / 60, ctl);
+    expect(w.rhythm.active).toBe(true);
+    expect(w.rhythm.club).toBe(true);
+    // os lasers acendem em tempos alternados: em algum momento uns acesos e outros apagados
+    let mixed = false;
+    for (let f = 0; f < 120 && !mixed; f++) {
+      w.update(1 / 60, ctl);
+      const on = d.beams.map((b) => w.beamOn[b.id]);
+      if (on.some((x) => x) && on.some((x) => !x)) mixed = true;
+    }
+    expect(mixed).toBe(true);
+    // a saída leva de volta para a rua, mais adiante
+    const out = d.doors.find((x) => x.kind === 'out' && x.x > room.x && x.x < room.x + room.w)!;
+    expect(out.tx).toBeGreaterThan(inn.x);
   });
 });

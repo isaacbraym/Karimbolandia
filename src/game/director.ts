@@ -398,7 +398,9 @@ export class Director {
     if (this.hintCooldown > 0) this.hintCooldown -= dt;
 
     // checkpoints
-    if (p.mode === 'foot' || p.mode === 'nomad') {
+    // dentro de um interior (templo, boate) nada lá de cima dispara: checkpoints, gatilhos, arenas
+    const indoors = w.inRoom();
+    if ((p.mode === 'foot' || p.mode === 'nomad') && !indoors) {
       const cps = w.data.checkpoints;
       for (let i = w.checkpointIdx + 1; i < cps.length; i++) {
         if (p.x >= cps[i].x && !this.insideActiveArena(p.x)) {
@@ -409,6 +411,7 @@ export class Director {
     }
     // gatilhos
     for (const t of w.data.triggers) {
+      if (indoors) break;
       if (this.triggered.has(t.id)) continue;
       const r = t.rect;
       if (p.mode !== 'dead' && p.x >= r.x && p.x <= r.x + r.w && p.y >= r.y && p.y <= r.y + r.h) {
@@ -792,7 +795,7 @@ export class Director {
     const p = w.player;
     if (a.status === 'cleared') return;
     if (a.status === 'idle') {
-      if (p.mode !== 'dead' && p.mode !== 'mounting' && p.x >= a.def.triggerX && p.x < a.def.rect.x + a.def.rect.w && !this.cine) this.startArena(a);
+      if (p.mode !== 'dead' && p.mode !== 'mounting' && p.x >= a.def.triggerX && p.x < a.def.rect.x + a.def.rect.w && !this.cine && !w.inRoom()) this.startArena(a);
       return;
     }
     a.t += dt;

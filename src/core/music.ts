@@ -90,35 +90,39 @@ const BOSS: Theme = {
   tomPat: '..x...x...x.xxxx',
 };
 
-// -------- Tema da selva (fase 2): Lá menor pentatônico, 104 bpm, tribal ------------
+// -------- Tema da selva (fase 2): Sol maior, 128 bpm — tribal animado e "chiclete" --------
+// (na linha de Crash Bandicoot / Donkey Kong Country: refrão curto de flauta + marimba que volta
+// sempre, baixo saltitante, congas e chocalho constantes, frases de pergunta e resposta)
 const JUNGLE: Theme = {
-  bpm: 104,
+  bpm: 128,
   tribal: true,
   chords: [
-    { root: 45, notes: [57, 60, 64, 69] }, // Am
     { root: 43, notes: [55, 59, 62, 67] }, // G
-    { root: 45, notes: [57, 60, 64, 69] }, // Am
+    { root: 43, notes: [55, 59, 62, 67] }, // G
+    { root: 36, notes: [48, 52, 55, 60] }, // C
+    { root: 38, notes: [50, 54, 57, 62] }, // D
+    { root: 43, notes: [55, 59, 62, 67] }, // G
     { root: 40, notes: [52, 55, 59, 64] }, // Em
-    { root: 41, notes: [53, 57, 60, 65] }, // F
-    { root: 43, notes: [55, 59, 62, 67] }, // G
-    { root: 45, notes: [57, 60, 64, 69] }, // Am
-    { root: 40, notes: [52, 56, 59, 64] }, // E (volta)
+    { root: 36, notes: [48, 52, 55, 60] }, // C
+    { root: 38, notes: [50, 54, 57, 62] }, // D (volta para o G)
   ],
-  bassPat: 'x.....x.x...o...',
-  kickPat: 'x.....x...x.....',
-  snarePat: '..x....x..x...x.',
-  hatPat: 'x.xxx.xxx.xxx.xx',
-  arpPat: [0, -1, 2, 1, -1, 3, 2, -1, 0, -1, 2, 3, -1, 1, 2, -1],
-  congaPat: 'l..hm.h.l.hhm.h.',
+  bassPat: 'x..xo.x.x..xo.xo',
+  kickPat: 'x...x...x...x...',
+  snarePat: '....x.......x..x',
+  hatPat: 'xxxxxxxxxxxxxxxx',
+  arpPat: [0, -1, 2, -1, 1, 3, -1, 2, 0, -1, 2, 3, -1, 1, 2, -1],
+  congaPat: 'l.hhm.h.l.hhm.hm',
   lead: [
-    [81, null, null, 79, 76, null, null, null, 74, null, 76, null, null, null, null, null],
-    [79, null, 76, null, 74, null, null, 71, null, null, 74, null, null, null, null, null],
-    [76, null, null, 79, 81, null, 84, null, 81, null, 79, null, 76, null, null, null],
-    [76, null, null, null, 74, null, 71, null, null, null, null, null, null, null, null, null],
-    [77, null, null, 76, 72, null, null, null, 69, null, 72, null, null, null, null, null],
-    [74, null, 76, null, 79, null, null, 81, null, null, 79, null, null, null, null, null],
-    [84, null, null, 81, 79, null, 76, null, 79, null, 81, null, null, null, null, null],
-    [80, null, null, null, 76, null, null, null, 71, null, null, null, null, null, null, null],
+    // refrão (pergunta)
+    [79, null, 83, 86, null, 83, 79, null, 81, null, 83, null, 86, null, null, null],
+    [88, null, 86, 83, null, 81, 79, null, 81, null, 79, null, 76, null, null, null],
+    [76, null, 79, 84, null, 79, 76, null, 79, null, 81, null, 84, null, null, null],
+    [86, null, 84, 81, null, 78, 74, null, 78, null, 81, null, 74, null, null, null],
+    // refrão (resposta, sobe e fecha)
+    [79, null, 83, 86, null, 83, 79, null, 81, null, 83, null, 86, null, null, null],
+    [88, null, 86, 83, null, 79, 76, null, 79, null, 83, null, 88, null, 86, null],
+    [84, null, 81, 79, null, 76, null, 74, 76, null, 79, null, 84, null, null, null],
+    [86, null, 88, null, 86, 81, null, 78, 81, null, 86, null, 91, null, null, null],
   ],
 };
 
@@ -193,6 +197,15 @@ class MusicEngine {
     const bps = THEMES[this.theme].bpm / 60;
     const b = (c.currentTime - this.t0) * bps;
     return b - Math.floor(b);
+  }
+  /** Tempos (batidas) desde o início do tema (−1 sem áudio). */
+  beatPos(): number {
+    const c = audio.ctx;
+    if (!c || !this.theme) return -1;
+    return (c.currentTime - this.t0) * (THEMES[this.theme].bpm / 60);
+  }
+  bpm(): number {
+    return this.theme ? THEMES[this.theme].bpm : 120;
   }
   /** Próximo instante do relógio do áudio que cai na grade (div = subdivisões por tempo). */
   quantize(div = 2): number {
@@ -593,7 +606,9 @@ class MusicEngine {
         let len = 1;
         const seq = th.lead[bar % th.lead.length];
         while (s + len < 16 && seq[s + len] === null && len < 6) len++;
-        this.flute(lay, t, n, stepDur * (len + 1.2), lay === 'lead' ? 0.12 : 0.08);
+        this.flute(lay, t, n, stepDur * (len + 1.2), lay === 'lead' ? 0.12 : 0.09);
+        // marimba dobrando o refrão uma oitava abaixo: dá o "pique" de jogo de plataforma
+        this.marimba(lay, t, n - 12, stepDur * 2.2, lay === 'lead' ? 0.09 : 0.07);
       }
     }
   }
@@ -656,8 +671,16 @@ export const MIX = {
   calm: { pad: 0.8, arp: 0.5, bass: 0.4 } as Partial<Record<Layer, number>>,
   /** sala do ritmo: só percussão e baixo — a melodia é o jogador quem toca */
   rhythm: { pad: 0.45, bass: 0.75, kick: 1, hat: 0.9, tom: 0.9, snare: 0.6 } as Partial<Record<Layer, number>>,
+  /** depois de completar a sala: a música inteira, com melodia, para comemorar */
+  celebrate: { pad: 0.8, bass: 0.9, arp: 0.9, hat: 0.9, kick: 1, snare: 0.9, lead: 1, tom: 0.8, choir: 0.6 } as Partial<Record<Layer, number>>,
+  /** boate: bumbo, chimbal, baixo e caixa (a melodia de sintetizador sai das notas) */
+  club: { pad: 0.5, bass: 1, hat: 1, kick: 1, snare: 0.9, power: 0.35 } as Partial<Record<Layer, number>>,
+  /** "drop" da boate: tudo, com a guitarra e o coro */
+  drop: { pad: 0.8, bass: 1, arp: 0.9, hat: 1, kick: 1, snare: 1, lead: 1, power: 0.9, choir: 0.8, tom: 0.7 } as Partial<Record<Layer, number>>,
   victory: { pad: 1, lead: 0.8, arp: 0.7, bass: 0.6 } as Partial<Record<Layer, number>>,
 };
 
+/** Melodia do tema da cidade (as notas da boate tocam em sintetizador). */
+export const STAGE_MELODY: number[] = STAGE.lead.flat().filter((n): n is number => n !== null);
 /** Melodia da flauta da selva (o que as notas da sala do ritmo tocam, em ordem). */
 export const JUNGLE_MELODY: number[] = JUNGLE.lead.flat().filter((n): n is number => n !== null);

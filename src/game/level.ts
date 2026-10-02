@@ -252,6 +252,17 @@ export interface DrumSpawn {
   x: number;
   y: number;
   w: number;
+  /** tambor tribal (selva) ou caixa de som (boate da cidade) */
+  style?: 'drum' | 'speaker';
+}
+
+/** Laser da boate: coluna (x px) de y0 a y1 que liga/desliga na batida (`phase` 0 = tempos ímpares). */
+export interface BeamSpawn {
+  id: number;
+  x: number;
+  y0: number;
+  y1: number;
+  phase: 0 | 1;
 }
 
 /** Interior (templo): fundo de pedra, escuridão com luz em volta do Karimbo e das tochas. */
@@ -260,6 +271,8 @@ export interface RoomZone {
   y: number;
   w: number;
   h: number;
+  /** estilo do interior: templo (escuro, tochas) ou boate (neon) */
+  kind?: 'temple' | 'club';
 }
 
 export interface LevelData {
@@ -270,6 +283,7 @@ export interface LevelData {
   doors: DoorSpawn[];
   rooms: RoomZone[];
   drums: DrumSpawn[];
+  beams: BeamSpawn[];
   level: Level;
   playerStart: { x: number; y: number };
   nomadSpawn: { x: number; y: number };

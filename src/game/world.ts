@@ -20,13 +20,14 @@ import { softDot, drawSpr } from '../art/kit';
 import { Corpse } from './corpse';
 import { Crowd } from './civilians';
 import { Narrator } from './narrator';
-import { music, JUNGLE_MELODY } from '../core/music';
+import { music, JUNGLE_MELODY, STAGE_MELODY } from '../core/music';
 import { Waters } from './water';
 import { Vine } from './vines';
 import type { DoorSpawn } from './level';
 import { drawWaterBack, drawWaterFront } from '../art/waterDraw';
 import { drawBlockade, COLLAPSE_SHAKE, COLLAPSE_FALL } from '../art/blockade';
-import { drawVines, drawRoomBack, drawRoomDark, drawDoorPrompt, drawDrums } from '../art/jungleWorld';
+import { setDecoFocus } from '../art/jungleDecor';
+import { drawVines, drawRoomBack, drawRoomDark, drawDoorPrompt, drawDrums, drawBeams } from '../art/jungleWorld';
 
 export interface Stats {
   kills: number;
@@ -38,7 +39,7 @@ export interface Stats {
   time: number;
 }
 
-export type MusicState = 'explore' | 'combat' | 'nomad' | 'nomadCombat' | 'boss1' | 'boss2' | 'boss3' | 'silence' | 'calm' | 'victory' | 'rhythm';
+export type MusicState = 'explore' | 'combat' | 'nomad' | 'nomadCombat' | 'boss1' | 'boss2' | 'boss3' | 'silence' | 'calm' | 'victory' | 'rhythm' | 'celebrate' | 'club' | 'drop';
 
 export const MAX_LIVES = 3;
 export const COMBO_WINDOW = 3;
@@ -127,7 +128,10 @@ export class World {
   /** tambores-trampolim (estado da animação do couro) */
   drumHit = new Map<number, number>();
   /** sala do ritmo: notas pegas (cada uma toca a próxima nota da melodia), total e concluída */
-  rhythm = { active: false, got: 0, total: 0, done: false, room: null as { x: number; y: number; w: number; h: number } | null };
+  rhythm = { active: false, got: 0, total: 0, done: false, club: false, room: null as { x: number; y: number; w: number; h: number } | null };
+  /** lasers da boate acesos neste quadro (por id) */
+  beamOn: boolean[] = [];
+  private beamHitCd = 0;
   /** cipós de balançar (fase 2) */
   vines: Vine[] = [];
   /** porta do templo em que o Karimbo está parado (mostra "↑ ENTRAR") */
@@ -244,8 +248,9 @@ export class World {
     this.blackout = 0;
     this.doorGo = null;
     this.drumHit.clear();
-    const rr = this.data.secretRooms.find((s) => s.id === 'ritmo');
-    this.rhythm = { active: false, got: 0, total: this.data.pickups.filter((p) => p.kind === 'note').length, done: false, room: rr ? rr.rect : null };
+    const rr = this.data.secretRooms.find((s) => s.id === 'ritmo' || s.id === 'club');
+    // cada nota aparece duas vezes (volta logo depois de pega): o dobro de pulos no ritmo
+    this.rhythm = { active: false, got: 0, total: this.data.pickups.filter((p) => p.kind === 'note').length * 2, done: false, club: rr?.id === 'club', room: rr ? rr.rect : null };
     this.finished = false;
     this.player.resetInventory();
     this.director.reset();
@@ -299,7 +304,8 @@ export class World {
   hitDrum(id: number) {
     const d = this.data.drums[id];
     const n = this.data.drums.length;
-    audioEngine.drum(n > 1 ? id / (n - 1) : 0.5, 1, 0);
+    if (d.style === 'speaker') audioEngine.wub(n > 1 ? id / (n - 1) : 0.5);
+    else audioEngine.drum(n > 1 ? id / (n - 1) : 0.5, 1, 0);
     this.drumHit.set(id, 1);
     this.fx.add(PK.Ring, d.x, d.y + 2, 0, 0, 0.35, 8, '#ffe27a', { size1: d.w * 1.4, a0: 0.7, front: true });
   }
@@ -311,10 +317,15 @@ export class World {
     const room = r.room!;
     const p = this.player;
     const inside = p.x >= room.x && p.x <= room.x + room.w && p.y >= room.y - 20 && p.y <= room.y + room.h + 20;
-    if (inside && !r.active && !r.done) {
+    if (inside && !r.active) {
       r.active = true;
-      this.setMusic('rhythm');
-      this.hooks.onBanner?.('SALA DO RITMO', 'Pule nos tambores e pegue as notas: você toca a música!', 3.2);
+      // concluída: a música inteira toca enquanto se está na sala (comemoração)
+      if (r.done) this.setMusic(r.club ? 'drop' : 'celebrate');
+      else {
+        this.setMusic(r.club ? 'club' : 'rhythm');
+        if (r.club) this.hooks.onBanner?.('PISTA DE NEON', 'Passe pelos lasers no ritmo e pegue as notas: você toca a música!', 3.4);
+        else this.hooks.onBanner?.('SALA DO RITMO', 'Pule nos tambores e pegue as notas: você toca a música!', 3.2);
+      }
     } else if (!inside && r.active) {
       r.active = false;
       this.setMusic('explore');
@@ -325,29 +336,68 @@ export class World {
   private onNote(pk: Pickup) {
     const r = this.rhythm;
     const idx = r.got++;
-    const midi = JUNGLE_MELODY[idx % JUNGLE_MELODY.length];
-    audioEngine.flute(midi, music.quantize(2));
+    const mel = r.club ? STAGE_MELODY : JUNGLE_MELODY;
+    const midi = mel[idx % mel.length];
+    if (r.club) audioEngine.synth(midi + 12, music.quantize(2));
+    else audioEngine.flute(midi, music.quantize(2));
     this.score += 100;
-    this.fx.popup(pk.x, pk.y - 18, `♪ ${r.got}/${r.total}`, '#ffe27a', 10);
-    this.fx.sparks(pk.x, pk.y, 10, '#ffe27a', 200);
+    const col = r.club ? '#7ff9ff' : '#ffe27a';
+    this.fx.popup(pk.x, pk.y - 18, `♪ ${r.got}/${r.total}`, col, 10);
+    this.fx.sparks(pk.x, pk.y, 10, col, 200);
+    // primeira vez: a nota volta no mesmo lugar logo depois (dá para brincar mais no ritmo)
+    if (pk.itemId === 0 && !r.done) {
+      const x = pk.x;
+      const y = pk.y;
+      this.after(1.3, () => {
+        if (r.done) return;
+        this.pickups.push(new Pickup('note', x, y, -1, 1));
+        this.fx.add(PK.Ring, x, y, 0, 0, 0.35, 4, col, { size1: 30, a0: 0.8, front: true });
+      });
+    }
     if (r.got >= r.total && !r.done) {
       r.done = true;
-      // final: o resto da frase toca sozinho, no ritmo, e o tesouro cai do teto
+      // final: o refrão inteiro toca sozinho, no ritmo, sobre a música completa (e continua
+      // tocando enquanto o Karimbo estiver na sala)
       let t = music.quantize(1);
-      const step = 60 / 104 / 2;
-      for (const m of [...JUNGLE_MELODY.slice(idx + 1, idx + 6), 76, 74, 71, 69]) {
-        audioEngine.flute(m, t, 0.9);
+      const step = 60 / music.bpm() / 2;
+      for (const m of mel.slice(0, 24)) {
+        if (r.club) audioEngine.synth(m + 12, t, 0.9);
+        else audioEngine.flute(m, t, 0.9);
         t += step;
       }
+      this.setMusic(r.club ? 'drop' : 'celebrate');
       this.after(0.4, () => audioEngine.play('secret', 1));
       this.score += 3000;
-      this.hooks.onBanner?.('SINFONIA DA SELVA!', 'Você tocou a música do templo', 3.5);
+      if (r.club) this.hooks.onBanner?.('DROP!', 'A pista é sua — que festa!', 3.5);
+      else this.hooks.onBanner?.('SINFONIA DA SELVA!', 'Você tocou a música do templo', 3.5);
       this.fx.addFlash(0.35, '#ffe27a');
       const cx = r.room!.x + r.room!.w / 2;
       const cy = r.room!.y + 30;
       for (let i = 0; i < 30; i++) this.spawnDrop('token', cx + rand.spread(r.room!.w * 0.4), cy);
       this.spawnDrop('healthBig', cx, cy);
       for (let i = 0; i < 4; i++) this.after(0.3 + i * 0.25, () => this.fx.sparks(cx + rand.spread(200), cy + rand.range(0, 120), 24, i % 2 ? '#ff5ab4' : '#ffe27a', 360));
+    }
+  }
+
+  /** Lasers da boate: acendem em tempos alternados da música; encostar aceso machuca. */
+  private updateBeams(dt: number) {
+    const bp = music.beatPos();
+    const beats = bp >= 0 ? bp : (this.time * 124) / 60;
+    const k = Math.floor(beats) % 2;
+    const frac = beats - Math.floor(beats);
+    if (this.beamHitCd > 0) this.beamHitCd -= dt;
+    const p = this.player;
+    const hb = p.hitbox;
+    for (const b of this.data.beams) {
+      // aceso no seu tempo, apagando um pouco antes do fim (dá para "entrar" no contratempo)
+      const on = k === b.phase && frac < 0.86;
+      this.beamOn[b.id] = on;
+      if (!on || this.beamHitCd > 0 || p.mode === 'dead') continue;
+      if (hb.x < b.x + 5 && hb.x + hb.w > b.x - 5 && hb.y < b.y1 && hb.y + hb.h > b.y0) {
+        this.beamHitCd = 0.6;
+        p.hit(this, 14, Math.sign(p.x - b.x) || -1, { kx: 260, ky: -220 });
+        this.fx.sparks(b.x, p.y, 12, '#ff3fb4', 260);
+      }
     }
   }
 
@@ -991,6 +1041,7 @@ export class World {
     if (this.blockAnimT >= 0) this.updateCollapse(dt);
     if (this.data.doors?.length) this.updateDoors(dt, ctl);
     if (this.rhythm.room) this.updateRhythm(dt);
+    if (this.data.beams?.length) this.updateBeams(dt);
     for (const [id, k] of this.drumHit) {
       const n = k - dt * 4;
       if (n <= 0) this.drumHit.delete(id);
@@ -1083,6 +1134,7 @@ export class World {
       const m = 90;
       this.fx.view = { x0: c.x - m, y0: c.y - m, x1: c.x + c.w + m, y1: c.y + c.h + m };
     }
+    setDecoFocus(this.player.x, this.player.y);
     if (this.water.zones.length) drawWaterBack(g, this);
     if (this.data.rooms?.length) drawRoomBack(g, this);
     this.director.drawDecos(g, 'back');
@@ -1103,6 +1155,11 @@ export class World {
       if (!cam.visible(pr.x, pr.y, 90)) continue;
       pr.draw(g, this.time);
     }
+    // interiores: a escuridão cobre o cenário; o que é de jogo (tambores, lasers, itens, inimigos,
+    // o Karimbo) fica por cima, sempre legível
+    if (this.data.rooms?.length) drawRoomDark(g, this);
+    if (this.data.drums?.length) drawDrums(g, this);
+    if (this.data.beams?.length) drawBeams(g, this);
     this.director.drawBarriers(g);
     for (const pk of this.pickups) if (cam.visible(pk.x, pk.y, 40)) pk.draw(g, this);
     this.drawShadows(g);
@@ -1133,9 +1190,6 @@ export class World {
     this.director.drawWorldOverlays(g);
     if (this.water.zones.length) drawWaterFront(g, this);
     this.fx.draw(g, true);
-    if (this.data.rooms?.length) drawRoomDark(g, this);
-    // tambores por cima da escuridão: a sala do ritmo "acende" com a batida
-    if (this.data.drums?.length) drawDrums(g, this);
     this.director.drawDecos(g, 'front');
     this.crowd.drawBalloon(g, this);
     this.fx.drawPopups(g);

@@ -701,6 +701,9 @@ export class Game {
       case 'nomadCombat': m('stage', MIX.nomad); break;
       case 'calm': m('stage', MIX.calm); break;
       case 'rhythm': m('stage', MIX.rhythm); break;
+      case 'celebrate': m('stage', MIX.celebrate); break;
+      case 'club': m('stage', MIX.club); break;
+      case 'drop': m('stage', MIX.drop); break;
       case 'boss1': m('boss', MIX.boss1); break;
       case 'boss2': m('boss', MIX.boss2); break;
       case 'boss3': m('boss', MIX.boss3); break;
@@ -871,6 +874,7 @@ export class Game {
 
   private processHints(w: World) {
     const p = w.player;
+    if (w.inRoom()) return;
     for (const t of w.data.triggers) {
       if (!t.id.startsWith('hint:')) continue;
       const key = t.id.slice(5);
