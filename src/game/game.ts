@@ -341,6 +341,8 @@ export class Game {
   }
   /** Checkpoint alcançado: grava a partida no navegador. */
   private saveGame() {
+    // Fora da partida, outra aba pode ter restaurado, excluído ou avançado o save.
+    if (this.state !== 'playing' && this.state !== 'paused' && this.state !== 'comic') return;
     const w = this.world;
     if (!w || w.finished || w.player.hp <= 0) return;
     writeSave(captureSave(w));
@@ -545,6 +547,7 @@ export class Game {
 
   toMenu(first = false) {
     if (this.state === 'playing' || this.state === 'paused') this.saveGame();
+    this.world = null;
     this.stopIntroAudio();
     audio.setUnderwater(0);
     this.stopNarr(0.2);
