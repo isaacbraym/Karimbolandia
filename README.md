@@ -2,7 +2,9 @@
 
 Run-and-gun **2.5D moderno** que roda direto no navegador (celular e PC) — uma fase grande e completa numa cidade futurista em guerra, com **Karimbo** (o herói de orelhas gigantes), o robô **Nômad** e o chefe **Felipão**.
 
-▶ **Jogue:** https://isaacbraym.github.io/Karimbolandia/
+▶ **Jogue v5:** https://isaacbraym.github.io/Karimbolandia/v5/
+
+O endereço anterior continua funcionando. A v5 aproveita o progresso já salvo no mesmo navegador e aparelho.
 
 ## Como jogar
 
