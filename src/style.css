@@ -317,6 +317,46 @@ button[hidden] { display: none !important; }
 .settings-tabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-bottom: 12px; }
 .settings-tabs .btn[aria-selected='true'] { background: linear-gradient(#ffe66a, #ffb01f); color: #3a1d00; }
 .settings-group:not(.active) { display: none; }
+.settings-nav { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 1fr); gap: 8px; margin-bottom: 12px; }
+.settings-nav .settings-tabs { margin-bottom: 0; }
+.settings-panel .settings-nav .settings-controls { min-width: 0; font-size: 13px; padding: 6px 4px; }
+
+.panel.stage-picker { width: min(880px, calc(var(--game-width) - 28px)); }
+.stage-picker .stage-picker-note { text-align: center; margin: 0 0 12px; color: #cbc4eb; }
+.stage-cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.stage-card {
+  --stage-accent: #66e9ff;
+  display: grid; gap: 6px; min-width: 0; padding: 16px;
+  border: 2px solid #387d9c; border-radius: 16px;
+  background: linear-gradient(145deg, #182d59, #19113b 70%);
+  box-shadow: inset 0 1px 0 #b2f9ff20;
+}
+.stage-jungle {
+  --stage-accent: #f7cc7f;
+  border-color: #688748;
+  background: repeating-linear-gradient(135deg, #6794500a 0 2px, transparent 2px 14px), linear-gradient(145deg, #294c31, #17281c 70%);
+}
+.stage-art { height: 96px; overflow: hidden; border-radius: 8px; background: linear-gradient(#131133, #29245b); }
+.stage-jungle .stage-art { background: radial-gradient(ellipse at 50% 0, #5b7741, #1a3225); }
+.stage-art svg { display: block; width: 100%; height: 100%; }
+.stage-tag { color: var(--stage-accent); font: 700 12px/1.2 var(--ui); letter-spacing: 1px; }
+.stage-card h3 { margin: 0; color: var(--stage-accent); font: 25px/1.1 var(--display); }
+.stage-picker .stage-description, .stage-picker .stage-save-details { margin: 0; color: #d6dfeb; font-size: 14px; }
+.stage-picker .stage-save-details { font-size: 12px; }
+.stage-checkpoint-label { font-size: 11px; font-weight: 700; color: var(--stage-accent); letter-spacing: 1px; }
+.stage-picker .stage-checkpoint { width: 100%; max-width: 100%; min-width: 0; min-height: 40px; }
+.stage-launch { min-height: 44px; font-size: 19px; letter-spacing: 0.5px; }
+.stage-city .stage-launch {
+  color: #082133; text-shadow: 0 1px 0 #c8faff;
+  background: linear-gradient(120deg, #a5faff, #41ccff 65%, #837cff);
+  border-color: #082133; border-radius: 5px 16px 5px 16px;
+}
+.stage-jungle .stage-launch {
+  color: #352615; text-shadow: 0 1px 0 #ffe5a7;
+  background: repeating-linear-gradient(135deg, #62360b0d 0 2px, transparent 2px 8px), linear-gradient(#ffe095, #d6a355);
+  border-color: #352615; border-radius: 15px 5px 15px 5px;
+}
+.stage-launch:disabled { opacity: .6; cursor: wait; }
 .result-actions { width: min(600px, calc(var(--game-width) - 28px)); flex-direction: row; }
 .result-actions .btn { flex: 1; min-width: 0; }
 
@@ -1059,6 +1099,15 @@ kbd {
 }
 
 @container game-ui (max-height: 500px) {
+  .stage-card { padding: 8px; gap: 4px; border-radius: 12px; }
+  .stage-cards { gap: 10px; }
+  .stage-art { height: 44px; }
+  .stage-tag { font-size: 11px; letter-spacing: .5px; }
+  .stage-card h3 { font-size: 22px; }
+  .stage-picker .stage-description { display: none; }
+  .stage-picker .stage-picker-note { font-size: 13px; margin-bottom: 8px; }
+  .stage-picker .stage-checkpoint { min-height: 36px; }
+  .stage-launch { font-size: 16px; min-height: 40px; }
   .settings-group.active {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1093,6 +1142,11 @@ kbd {
 }
 
 @container game-ui (max-height: 340px) {
+  .stage-art, .stage-picker .stage-picker-note { display: none; }
+  .stage-card { padding: 6px; }
+  .stage-card h3 { font-size: 20px; }
+  .stage-tag { font-size: 10px; }
+  .stage-picker .stage-launch { min-height: 38px; }
   #menu .title { font-size: clamp(24px, 6.5cqw, 32px); }
   #menu .sub { display: none; }
   #menu .btn { min-height: 38px; font-size: 15px; }

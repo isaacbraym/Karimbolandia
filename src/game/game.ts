@@ -58,6 +58,7 @@ export class Game {
   pxScale = 2;
   quality: Quality = 'high';
   isTouch = false;
+  private playRequest = 0;
   private last = 0;
   private acc = 0;
   private frameTimes: number[] = [];
@@ -120,8 +121,16 @@ export class Game {
     this.input.attach(app);
     this.touch = new TouchUI(this.ui, this.input);
     this.menus = new Menus(this.ui, {
-      onPlay: () => this.startNewGame(this.stage === 2 && new URLSearchParams(location.search).get('fase') === '2' ? 2 : 1),
-      onPlayJungle: () => this.startNewGame(2),
+      onSelectStage: (stage, save) => {
+        if (!save) this.startNewGame(stage);
+        else {
+          if (save.stage !== stage) return;
+          const current = loadSave();
+          if (JSON.stringify(current) !== JSON.stringify(save)) preserveProfile();
+          this.play(true, stage, save, new SaveSession(current));
+        }
+      },
+      onCancelStageStart: () => this.cancelStageStart(),
       onContinueSave: () => this.continueSave(),
       onDiscardSave: () => {
         clearSave();
@@ -371,6 +380,9 @@ export class Game {
   prepareProfileChange() {
     if (this.state === 'playing' || this.state === 'paused') this.saveGame();
   }
+  cancelStageStart() {
+    this.playRequest++;
+  }
   private startNewGame(stage: number) {
     const start = () => {
       preserveProfile();
@@ -403,12 +415,18 @@ export class Game {
     else this.play();
   }
 
-  play(again = false, stage = this.world?.data.stage ?? this.stage, save?: SaveState, session = new SaveSession(save ?? loadSave())) {
+  play(again = false, stage = this.world?.data.stage ?? this.stage, save?: SaveState, session = new SaveSession(save ?? loadSave()), requestId = ++this.playRequest) {
+    if (requestId !== this.playRequest) return;
     if (stage === 2 && !getJungle()) {
       // ainda preparando a selva: espera e entra sozinho
       audio.init();
+      this.menus.setStageLoading(true);
       this.menus.toast('Entrando na selva...');
-      void loadJungle(this.base, this.quality).then(() => this.play(again, 2, save, session)).catch(() => this.menus.toast('Não foi possível carregar a selva'));
+      void loadJungle(this.base, this.quality).then(() => this.play(again, 2, save, session, requestId)).catch(() => {
+        if (requestId !== this.playRequest) return;
+        this.menus.setStageLoading(false);
+        this.menus.toast('Não foi possível carregar a selva');
+      });
       return;
     }
     this.stage = stage;
@@ -562,6 +580,7 @@ export class Game {
   }
 
   toMenu(first = false) {
+    this.cancelStageStart();
     if (this.state === 'playing' || this.state === 'paused') this.saveGame();
     this.world = null;
     this.stopIntroAudio();

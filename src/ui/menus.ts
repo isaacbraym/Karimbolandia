@@ -9,11 +9,12 @@ import { chooseSkin, coinBalance, ensureWallet } from '../core/skins';
 import { getArt } from '../art';
 import { drawKarimbo } from '../art/karimbo';
 import { listSaveCopies } from '../game/saveSession';
+import { loadSave, type SaveState } from '../game/save';
+import { STAGES, stageCheckpoints, type StageId } from '../game/stageSelect';
 
 export interface MenuCallbacks {
-  onPlay(): void;
-  /** prévia da fase 2 (selva) */
-  onPlayJungle(): void;
+  onSelectStage(stage: StageId, save?: SaveState): void;
+  onCancelStageStart(): void;
   /** voltar ao último checkpoint salvo no navegador */
   onContinueSave(): void;
   /** descartar o save (novo jogo) */
@@ -133,12 +134,10 @@ export class Menus {
     this.shopBtn = this.btn('LOJA DE SKINS', 'alt', () => this.showShop());
     btns.append(
       this.contBtn,
-      this.btn('JOGAR', 'primary', () => this.cb.onPlay()),
-      this.btn('FASE 2 • SELVA', 'primary', () => this.cb.onPlayJungle()),
+      this.btn('JOGAR', 'primary', () => this.showStages()),
       this.shopBtn,
       this.btn('SAVE E CONTA', 'alt', () => this.showSaves('main')),
       this.btn('CONFIGURAÇÕES', 'alt', () => this.showSettings('main')),
-      this.btn('CONTROLES', 'alt', () => this.showControls('main')),
       this.btn('CRÉDITOS', 'alt', () => this.showCredits('main'))
     );
     wrap.append(btns);
@@ -204,7 +203,7 @@ export class Menus {
   }
 
   // ------------------------------------------------------------------ painéis
-  private openPanel(content: HTMLElement, from: 'main' | 'pause') {
+  private openPanel(content: HTMLElement, from: 'main' | 'pause', onBack?: () => void) {
     this.panelReturn = from;
     // voltar SEMPRE visível no canto superior esquerdo (antes ficava no fim do conteúdo, com rolagem)
     const back = el('button', 'btn back-fab', '<span class="arr">←</span> VOLTAR');
@@ -212,7 +211,8 @@ export class Menus {
     back.setAttribute('aria-label', 'Voltar');
     back.addEventListener('click', () => {
       this.cb.onClick();
-      this.closePanel();
+      if (onBack) onBack();
+      else this.closePanel();
     });
     this.panel.replaceChildren(back, content);
     this.panel.classList.remove('hidden');
@@ -222,6 +222,7 @@ export class Menus {
   }
 
   closePanel() {
+    if (this.panel.querySelector('.stage-picker')) this.cb.onCancelStageStart();
     this.saveUnsubscribe?.();
     this.saveUnsubscribe = null;
     this.panel.classList.add('hidden');
@@ -269,6 +270,67 @@ export class Menus {
     return row;
   }
 
+  showStages() {
+    this.closeResume();
+    const panel = el('div', 'panel stage-picker');
+    panel.append(el('h2', '', 'ESCOLHA SUA AVENTURA'));
+    const note = el('p', 'stage-picker-note', 'Escolha a fase e o ponto de partida.');
+    const cards = el('div', 'stage-cards');
+    const current = loadSave();
+    const previous = readStored(profileKey('karimbolandia.before-restore.v1'), validateProfile)?.save;
+    const copies = listSaveCopies().map(copy => copy.save);
+    if (previous) copies.push(previous);
+    for (const stage of STAGES) {
+      const saves = stageCheckpoints(stage.id, current, copies);
+      const card = el('div', `stage-card stage-${stage.theme}`);
+      const visual = el('div', 'stage-art');
+      visual.setAttribute('aria-hidden', 'true');
+      visual.innerHTML = stage.theme === 'city'
+        ? `<svg viewBox="0 0 240 80"><circle cx="191" cy="25" r="19" fill="#925aff" opacity=".6"/><path d="M12 76V34h29v42M49 76V12h32v64M94 76V45h28v31M135 76V25h35v51M184 76V49h41v27" fill="#121b45" stroke="#50eaff" stroke-width="2"/><path d="M57 25h16m-16 13h16m-16 13h16M144 38h17m-17 13h17M20 48h14M193 60h23M0 78h240" stroke="#50eaff" stroke-width="2"/><path d="M0 6h40l10 8h66m124 50h-26l-10-8h-23" fill="none" stroke="#ed69ff" opacity=".7"/></svg>`
+        : `<svg viewBox="0 0 240 80"><circle cx="120" cy="30" r="24" fill="#ffc45a" opacity=".35"/><path d="M59 77l14-14h10V50h13V37h15V25h18v12h15v13h13v13h10l14 14Z" fill="#937246" stroke="#f5ca79" stroke-width="2"/><path d="M110 77V56h20v21" fill="#253d24"/><path d="M5 0q38 27 15 80M236 0q-38 28-14 80M33 0q16 8 4 35" fill="none" stroke="#58b768" stroke-width="4"/><path d="M24 32Q0 10 3 42q16 8 21-10m-2 17q31-26 27 1-18 15-27-1m199-16q27-25 22 6-14 9-22-6m-1 23q-33-22-25 4 20 12 25-4" fill="#62ce75"/><path d="M88 64h62M100 49h40" stroke="#473c2d" stroke-width="3"/></svg>`;
+      const tag = el('div', 'stage-tag', `FASE ${String(stage.id).padStart(2, '0')} · ${stage.tag}`);
+      card.append(visual, tag, el('h3', '', stage.name), el('p', 'stage-description', stage.description));
+      const label = el('label', 'stage-checkpoint-label', 'PONTO DE PARTIDA');
+      const select = el('select', 'stage-checkpoint');
+      select.id = `stage-checkpoint-${stage.id}`;
+      label.htmlFor = select.id;
+      select.setAttribute('aria-label', `Ponto de partida da Fase ${stage.id}`);
+      const start = el('option');
+      start.value = 'new'; start.textContent = 'Início — nova partida';
+      select.append(start);
+      saves.forEach((save, index) => {
+        const option = el('option');
+        option.value = String(index);
+        option.textContent = `Continuar — ${save.cpName}`;
+        select.append(option);
+      });
+      select.value = saves.length ? '0' : 'new';
+      const details = el('p', 'stage-save-details');
+      const selectedSave = () => select.value === 'new' ? undefined : saves[Number(select.value)];
+      const launch = this.btn('', 'stage-launch', () => this.cb.onSelectStage(stage.id, selectedSave()));
+      const update = () => {
+        const save = selectedSave();
+        details.textContent = save ? `${save.tokens} fichas · ${save.lives} vidas · progresso salvo` : 'Começar a fase desde o início';
+        launch.textContent = `${save ? 'CONTINUAR' : 'JOGAR'} FASE ${stage.id}`;
+        launch.setAttribute('aria-label', `${save ? 'Continuar' : 'Jogar'} Fase ${stage.id} — ${stage.name}`);
+      };
+      select.addEventListener('change', update);
+      update();
+      card.append(label, select, details, launch);
+      cards.append(card);
+    }
+    panel.append(note, cards);
+    this.openPanel(panel, 'main');
+  }
+
+  setStageLoading(loading: boolean) {
+    const panel = this.panel.querySelector('.stage-picker');
+    if (!panel) return;
+    panel.setAttribute('aria-busy', String(loading));
+    panel.querySelectorAll<HTMLButtonElement | HTMLSelectElement>('.stage-launch, select').forEach(control => { control.disabled = loading; });
+    panel.querySelector('.stage-picker-note')!.textContent = loading ? 'Preparando a selva… Você pode voltar para cancelar.' : 'Escolha a fase e o ponto de partida.';
+  }
+
   showSettings(from: 'main' | 'pause') {
     const c = el('div', 'panel settings-panel');
     c.append(el('h2', '', 'CONFIGURAÇÕES'));
@@ -293,7 +355,9 @@ export class Menus {
       groups[index].setAttribute('aria-labelledby', tab.id);
       tabs.append(tab);
     });
-    c.append(tabs, ...groups);
+    const nav = el('div', 'settings-nav');
+    nav.append(tabs, this.btn('CONTROLES', 'alt small settings-controls', () => this.showControls(from, true)));
+    c.append(nav, ...groups);
     audio.append(
       this.slider('Música', () => settings.music, (v) => (settings.music = v)),
       this.slider('Efeitos sonoros', () => settings.sfx, (v) => (settings.sfx = v)),
@@ -337,7 +401,7 @@ export class Menus {
     this.openPanel(c, from);
   }
 
-  showControls(from: 'main' | 'pause') {
+  showControls(from: 'main' | 'pause', settingsReturn = false) {
     const c = el('div', 'panel');
     c.append(el('h2', '', 'CONTROLES'));
     c.append(
@@ -366,7 +430,7 @@ export class Menus {
     const act = el('div', 'actions');
 
     c.append(act);
-    this.openPanel(c, from);
+    this.openPanel(c, from, settingsReturn ? () => this.showSettings(from) : undefined);
   }
 
   showCredits(from: 'main' | 'pause') {
@@ -673,7 +737,7 @@ export class Menus {
     buttons.append(
       this.btn('CONTINUAR PARTIDA SALVA', 'primary', () => { this.closeResume(); this.cb.onContinueSave(); }),
       this.btn('COMEÇAR NOVA PARTIDA', 'alt', () => { this.closeResume(); start(); }),
-      this.btn('VOLTAR', 'alt small', () => { this.closeResume(); this.collectFocus(this.main); })
+      this.btn('VOLTAR', 'alt small', () => { this.closeResume(); this.collectFocus(this.panelOpen ? this.panel : this.main); })
     );
     panel.append(buttons); overlay.append(panel); this.root.append(overlay);
     this.resumeEl = overlay; this.collectFocus(overlay);
@@ -817,7 +881,11 @@ export class Menus {
   handleKey(code: string): boolean {
     if (code === 'Escape' && this.resumeEl) {
       this.closeResume();
-      this.collectFocus(this.main);
+      this.collectFocus(this.panelOpen ? this.panel : this.main);
+      return true;
+    }
+    if (code === 'Escape' && this.panelOpen) {
+      this.panel.querySelector<HTMLButtonElement>('.back-fab')?.click();
       return true;
     }
     if (!this.focusable.length) return false;
@@ -833,10 +901,6 @@ export class Menus {
     }
     if (code === 'Enter' || code === 'Space') {
       this.focusable[this.focusIdx]?.click();
-      return true;
-    }
-    if (code === 'Escape' && this.panelOpen) {
-      this.closePanel();
       return true;
     }
     return false;
