@@ -45,6 +45,10 @@ export const JUNGLE_BOUNDS: Record<string, [number, number, number, number]> = {
   jSandbags: [-44, -30, 44, 2],
   jAmmo: [-30, -34, 30, 2],
   jFlag: [-6, -150, 60, 2],
+  jBranch: [-176, -70, 20, 24],
+  jDoorway: [-42, -90, 42, 2],
+  jDoorExit: [-30, -74, 30, 2],
+  jIdol: [-22, -52, 22, 2],
 };
 
 /** Quantas variações assadas por tipo (o resto da semente é ignorado). */
@@ -1055,6 +1059,98 @@ export function paintJungle(g: CanvasRenderingContext2D, kind: string, seed: num
       g.fillText('MUNIÇÃO', -22, -6);
       return true;
     }
+    case 'jBranch': {
+      // galho grosso saindo de uma árvore gigante (o cipó fica preso na ponta)
+      g.fillStyle = BARK_D;
+      g.beginPath();
+      g.moveTo(-170, -14);
+      g.quadraticCurveTo(-60, -26, 10, -6);
+      g.lineTo(12, 6);
+      g.quadraticCurveTo(-60, -6, -170, 14);
+      g.closePath();
+      g.fill();
+      g.strokeStyle = OUT;
+      g.lineWidth = 1.4;
+      g.stroke();
+      g.fillStyle = BARK;
+      g.fillRect(-160, -10, 150, 4);
+      g.fillStyle = MOSS;
+      for (let i = 0; i < 5; i++) {
+        g.beginPath();
+        g.ellipse(-150 + i * 34, -12, 14, 4, 0, 0, Math.PI * 2);
+        g.fill();
+      }
+      crownBlob(g, r, -40, -34, 30);
+      for (let i = 0; i < 6; i++) leafBlade(g, r.range(-150, 0), r.range(-6, 10), r.range(10, 16), r.range(0.4, 2.6), 4, r.pick(LEAF));
+      // amarração do cipó
+      g.fillStyle = '#c8a46a';
+      g.fillRect(-4, -6, 8, 12);
+      return true;
+    }
+    case 'jDoorway': {
+      // portal do templo no topo da pirâmide (entrada): batentes de pedra, verga entalhada, escuro
+      g.fillStyle = '#0c0f0c';
+      g.beginPath();
+      g.moveTo(-20, 0);
+      g.lineTo(-20, -60);
+      g.quadraticCurveTo(0, -78, 20, -60);
+      g.lineTo(20, 0);
+      g.closePath();
+      g.fill();
+      stoneBlock(g, -32, -66, 12, 66, r);
+      stoneBlock(g, 20, -66, 12, 66, r);
+      shadedRR(g, -38, -84, 76, 20, 3, STONE_L, { lw: 1.2 });
+      g.strokeStyle = 'rgba(30,36,28,0.6)';
+      g.lineWidth = 1.4;
+      for (let i = -2; i <= 2; i++) {
+        g.beginPath();
+        g.arc(i * 13, -74, 4, 0, Math.PI * 2);
+        g.stroke();
+      }
+      // brilho dourado lá dentro
+      g.fillStyle = 'rgba(255,200,90,0.25)';
+      g.beginPath();
+      g.ellipse(0, -18, 12, 18, 0, 0, Math.PI * 2);
+      g.fill();
+      return true;
+    }
+    case 'jDoorExit': {
+      // passagem estreita (saída / porta interna)
+      g.fillStyle = '#0c0f0c';
+      g.fillRect(-16, -56, 32, 56);
+      stoneBlock(g, -26, -60, 10, 60, r);
+      stoneBlock(g, 16, -60, 10, 60, r);
+      shadedRR(g, -30, -70, 60, 14, 2, STONE_L, { lw: 1.1 });
+      g.fillStyle = '#9ad14a';
+      g.beginPath();
+      g.moveTo(0, -66);
+      g.lineTo(5, -60);
+      g.lineTo(-5, -60);
+      g.closePath();
+      g.fill();
+      return true;
+    }
+    case 'jIdol': {
+      // ídolo dourado num altar
+      shadedRR(g, -20, -18, 40, 18, 2, STONE, { lw: 1.2 });
+      g.fillStyle = '#e8b030';
+      g.beginPath();
+      g.ellipse(0, -34, 11, 15, 0, 0, Math.PI * 2);
+      g.fill();
+      g.strokeStyle = '#7a5214';
+      g.lineWidth = 1.2;
+      g.stroke();
+      g.fillStyle = '#7a5214';
+      g.fillRect(-6, -38, 4, 3);
+      g.fillRect(2, -38, 4, 3);
+      g.fillRect(-4, -30, 8, 2);
+      g.fillStyle = '#5affc0';
+      g.fillRect(-5, -37.4, 2, 1.6);
+      g.fillRect(3, -37.4, 2, 1.6);
+      g.fillStyle = 'rgba(255,255,255,0.6)';
+      g.fillRect(-6, -44, 3, 6);
+      return true;
+    }
     case 'jFlag': {
       g.fillStyle = BARK;
       g.fillRect(-3, -150, 5, 152);
@@ -1440,6 +1536,325 @@ function paintAnimated(g: CanvasRenderingContext2D, kind: string, seed: number, 
       g.beginPath();
       g.ellipse(0, -3, 5, 2.4, 0, 0, Math.PI * 2);
       g.fill();
+      return true;
+    }
+    case 'jFrog':
+    case 'jFrogLily': {
+      // sapo: fica parado, infla o papo coaxando e às vezes pula para lá e para cá
+      const lily = kind === 'jFrogLily';
+      const base = lily ? -25 : 0;
+      if (lily) {
+        g.fillStyle = '#5f9a3a';
+        g.beginPath();
+        g.ellipse(0, base + 1, 15, 4.4, 0, 0.3, Math.PI * 2);
+        g.lineTo(0, base + 1);
+        g.closePath();
+        g.fill();
+        g.strokeStyle = '#2f5a1e';
+        g.lineWidth = 1;
+        g.stroke();
+      }
+      const P = 5 + (Math.abs(seed) % 3);
+      const ph = (t + (Math.abs(seed) % 7)) % P;
+      const cyc = Math.floor((t + (Math.abs(seed) % 7)) / P);
+      const dir = lily ? 0 : cyc % 2 ? 1 : -1;
+      let x = 0;
+      let y = base;
+      let squat = 0;
+      if (!lily && ph < 0.45) {
+        const k = ph / 0.45;
+        x = dir * (k * 22 - 11);
+        y = base - Math.sin(k * Math.PI) * 16;
+      } else if (!lily) x = dir * 11;
+      if (ph > 0.45 && ph < 0.6) squat = 1 - (ph - 0.45) / 0.15;
+      const croak = ph > 2 && ph < 2.9 ? Math.max(0, Math.sin(((ph - 2) / 0.9) * Math.PI * 3)) : 0;
+      g.save();
+      g.translate(x, y);
+      if (dir < 0) g.scale(-1, 1);
+      // pernas
+      g.fillStyle = '#3f7f2a';
+      g.beginPath();
+      g.ellipse(-5, -2, 6, 3 - squat, 0.3, 0, Math.PI * 2);
+      g.fill();
+      // corpo
+      g.fillStyle = '#5aa63a';
+      g.beginPath();
+      g.ellipse(0, -5 + squat, 8, 5.5 - squat, -0.1, 0, Math.PI * 2);
+      g.fill();
+      g.strokeStyle = '#1d3a14';
+      g.lineWidth = 0.9;
+      g.stroke();
+      g.fillStyle = '#3a7a24';
+      g.beginPath();
+      g.arc(-2, -7, 1.6, 0, Math.PI * 2);
+      g.arc(2.4, -5, 1.2, 0, Math.PI * 2);
+      g.fill();
+      // papo (coaxando)
+      if (croak > 0.05) {
+        g.fillStyle = 'rgba(255,240,200,0.9)';
+        g.beginPath();
+        g.ellipse(6, -2, 2 + croak * 4, 1.6 + croak * 3.4, 0, 0, Math.PI * 2);
+        g.fill();
+      }
+      // olhos saltados
+      for (const ex of [2, 6]) {
+        g.fillStyle = '#7cc94a';
+        g.beginPath();
+        g.arc(ex, -10 + squat, 2.4, 0, Math.PI * 2);
+        g.fill();
+        g.fillStyle = '#1a1a1a';
+        g.fillRect(ex - 0.4, -10.8 + squat, 1.4, 1.4);
+      }
+      g.restore();
+      return true;
+    }
+    case 'jDragonfly': {
+      // libélula: voa em oito, para no ar de vez em quando, asas tremendo
+      const s = seed * 0.37;
+      const slow = 0.6 + 0.4 * Math.sin(t * 0.5 + s);
+      const tt = t * slow;
+      const x = Math.sin(tt * 0.9 + s) * 70 + Math.sin(tt * 2.3 + s) * 12;
+      const y = -20 + Math.sin(tt * 1.8 + s) * 16;
+      const dx = Math.cos(tt * 0.9 + s) * 0.9;
+      g.save();
+      g.translate(x, y);
+      if (dx < 0) g.scale(-1, 1);
+      g.strokeStyle = '#1f8aa8';
+      g.lineWidth = 1.6;
+      g.beginPath();
+      g.moveTo(-10, 1);
+      g.lineTo(4, 0);
+      g.stroke();
+      g.fillStyle = '#2fc0d0';
+      g.beginPath();
+      g.arc(5, -0.4, 2, 0, Math.PI * 2);
+      g.fill();
+      const fl = Math.sin(t * 70 + s) > 0 ? 0.55 : 0.3;
+      g.fillStyle = '#dcfaff';
+      const a0 = g.globalAlpha;
+      g.globalAlpha = a0 * fl;
+      for (const [wx, a] of [[1, -0.5], [1, 0.5], [-2, -0.35], [-2, 0.35]] as [number, number][]) {
+        g.save();
+        g.translate(wx, -1);
+        g.rotate(a - Math.PI / 2);
+        g.beginPath();
+        g.ellipse(0, -6, 1.8, 6, 0, 0, Math.PI * 2);
+        g.fill();
+        g.restore();
+      }
+      g.globalAlpha = a0;
+      g.restore();
+      return true;
+    }
+    case 'jButterfly': {
+      const s = seed * 0.51;
+      const x = Math.sin(t * 0.45 + s) * 60 + Math.sin(t * 1.3 + s * 2) * 14;
+      const y = -24 + Math.sin(t * 0.8 + s) * 20 + Math.sin(t * 7 + s) * 2;
+      const flap = Math.abs(Math.sin(t * 11 + s));
+      const col = ['#ff8a3a', '#3a8aff', '#ffd23a', '#ff5ab4'][Math.abs(seed) % 4];
+      g.save();
+      g.translate(x, y);
+      g.fillStyle = col;
+      for (const sgn of [-1, 1]) {
+        g.save();
+        g.scale(sgn * (0.25 + flap * 0.75), 1);
+        g.beginPath();
+        g.ellipse(4, -3, 4.6, 3.6, -0.4, 0, Math.PI * 2);
+        g.ellipse(3.4, 3, 3, 2.4, 0.4, 0, Math.PI * 2);
+        g.fill();
+        g.restore();
+      }
+      g.fillStyle = '#1a1a1a';
+      g.fillRect(-0.7, -4, 1.4, 8);
+      g.restore();
+      return true;
+    }
+    case 'pWeb': {
+      // teia no canto (perto da câmera) com uma aranha subindo e descendo no fio
+      const web = piece('pweb', 180, 180, 0, 0, (c) => {
+        c.strokeStyle = 'rgba(235,235,245,0.55)';
+        c.lineWidth = 1;
+        const n = 7;
+        const ends: [number, number][] = [];
+        for (let i = 0; i < n; i++) {
+          const a = (i / (n - 1)) * (Math.PI / 2);
+          const L = 150 + (i % 2) * 20;
+          ends.push([Math.cos(a) * L, Math.sin(a) * L]);
+          c.beginPath();
+          c.moveTo(0, 0);
+          c.lineTo(Math.cos(a) * L, Math.sin(a) * L);
+          c.stroke();
+        }
+        c.strokeStyle = 'rgba(235,235,245,0.35)';
+        for (let k = 1; k <= 7; k++) {
+          const f = k / 7.5;
+          c.beginPath();
+          for (let i = 0; i < n; i++) {
+            const [ex, ey] = ends[i];
+            const x = ex * f;
+            const y = ey * f;
+            if (i === 0) c.moveTo(x, y);
+            else {
+              const [px, py] = ends[i - 1];
+              c.quadraticCurveTo(((px + ex) / 2) * f * 0.92, ((py + ey) / 2) * f * 0.92, x, y);
+            }
+          }
+          c.stroke();
+        }
+      });
+      drawPiece(g, web);
+      // aranha: desce devagar, para, sobe rápido
+      const ph = (t * 0.22 + (Math.abs(seed) % 10) * 0.1) % 1;
+      const drop = ph < 0.6 ? ph / 0.6 : ph < 0.8 ? 1 : 1 - (ph - 0.8) / 0.2;
+      const ax = 70;
+      const ay = 60;
+      const sy = ay + drop * 120 + Math.sin(t * 3 + seed) * 2;
+      g.strokeStyle = 'rgba(235,235,245,0.6)';
+      g.lineWidth = 0.8;
+      g.beginPath();
+      g.moveTo(ax, ay);
+      g.lineTo(ax, sy);
+      g.stroke();
+      g.save();
+      g.translate(ax, sy + 8);
+      const wig = Math.sin(t * 14 + seed) * 0.15;
+      g.strokeStyle = '#140c0c';
+      g.lineWidth = 1.6;
+      for (const sgn of [-1, 1]) {
+        for (let i = 0; i < 4; i++) {
+          const a = (-0.9 + i * 0.55 + (i % 2 ? wig : -wig)) * sgn;
+          g.beginPath();
+          g.moveTo(0, 0);
+          g.lineTo(sgn * 8 * Math.cos(a), -4 + 8 * Math.sin(Math.abs(a)));
+          g.lineTo(sgn * 13 * Math.cos(a * 0.8), 4 + 8 * Math.sin(Math.abs(a)));
+          g.stroke();
+        }
+      }
+      g.fillStyle = '#1a1010';
+      g.beginPath();
+      g.ellipse(0, 3, 5.5, 7, 0, 0, Math.PI * 2);
+      g.fill();
+      g.beginPath();
+      g.arc(0, -5, 3.6, 0, Math.PI * 2);
+      g.fill();
+      g.fillStyle = '#c8202a';
+      g.beginPath();
+      g.moveTo(0, 0);
+      g.lineTo(2.4, 4);
+      g.lineTo(0, 8);
+      g.lineTo(-2.4, 4);
+      g.closePath();
+      g.fill();
+      g.fillStyle = '#ff6a5a';
+      g.fillRect(-2, -6.5, 1.2, 1.2);
+      g.fillRect(0.8, -6.5, 1.2, 1.2);
+      g.restore();
+      return true;
+    }
+    case 'pRoots': {
+      // raízes escuras penduradas do teto (primeiro plano)
+      const v = Math.abs(seed) % 2;
+      const s = piece('proots' + v, 220, 260, 110, 0, (c) => {
+        const r = new Rng(v * 7 + 2);
+        c.strokeStyle = '#0d0a08';
+        c.lineCap = 'round';
+        for (let i = 0; i < 9; i++) {
+          const x0 = r.range(-100, 100);
+          const len = r.range(90, 250);
+          c.lineWidth = r.range(4, 11);
+          c.beginPath();
+          c.moveTo(x0, -4);
+          c.bezierCurveTo(x0 + r.range(-30, 30), len * 0.35, x0 + r.range(-40, 40), len * 0.7, x0 + r.range(-20, 20), len);
+          c.stroke();
+        }
+        c.fillStyle = '#0d0a08';
+        c.fillRect(-110, -10, 220, 14);
+      });
+      drawPiece(g, s, Math.sin(t * 0.5 + seed) * 0.02, 0.92);
+      return true;
+    }
+    case 'pPillar': {
+      // coluna escura bem perto da câmera (atravessa a tela mais rápido que o cenário)
+      const s = piece('ppillar', 90, 520, 45, 520, (c) => {
+        c.fillStyle = '#080a08';
+        c.fillRect(-34, -500, 68, 500);
+        c.fillRect(-45, -26, 90, 26);
+        c.fillRect(-45, -520, 90, 30);
+        c.fillStyle = 'rgba(90,110,80,0.14)';
+        c.fillRect(-30, -500, 8, 474);
+        c.strokeStyle = 'rgba(0,0,0,0.5)';
+        c.lineWidth = 2;
+        for (let y = -470; y < -30; y += 46) {
+          c.beginPath();
+          c.moveTo(-34, y);
+          c.lineTo(34, y);
+          c.stroke();
+        }
+        c.fillStyle = 'rgba(60,100,50,0.35)';
+        for (let i = 0; i < 6; i++) {
+          c.beginPath();
+          c.ellipse(-20 + (i % 3) * 18, -480 + i * 80, 14, 5, 0, 0, Math.PI * 2);
+          c.fill();
+        }
+      });
+      drawPiece(g, s, 0, 0.95);
+      return true;
+    }
+    case 'pBranch': {
+      // galho com folhas escuras no alto da tela (primeiro plano)
+      const v = Math.abs(seed) % 2;
+      const s = piece('pbranch' + v, 420, 200, 210, 0, (c) => {
+        const r = new Rng(v * 5 + 11);
+        c.strokeStyle = '#06100a';
+        c.lineWidth = 16;
+        c.lineCap = 'round';
+        c.beginPath();
+        c.moveTo(-210, 10);
+        c.quadraticCurveTo(-40, 40, 160, 20);
+        c.stroke();
+        c.lineWidth = 6;
+        for (let i = 0; i < 5; i++) {
+          const x = r.range(-160, 120);
+          c.beginPath();
+          c.moveTo(x, 26);
+          c.quadraticCurveTo(x + 20, 70, x + r.range(-10, 40), r.range(90, 140));
+          c.stroke();
+        }
+        for (let i = 0; i < 26; i++) {
+          c.save();
+          c.translate(r.range(-200, 180), r.range(10, 170));
+          c.rotate(r.range(0, 6.28));
+          c.fillStyle = i % 2 ? '#08160c' : '#0b1d10';
+          c.beginPath();
+          c.ellipse(16, 0, 22, 8, 0, 0, Math.PI * 2);
+          c.fill();
+          c.restore();
+        }
+      });
+      drawPiece(g, s, Math.sin(t * 0.7 + seed) * 0.025, 0.95);
+      return true;
+    }
+    case 'pLeaves': {
+      // folhagem escura subindo do pé da tela (primeiro plano)
+      const v = Math.abs(seed) % 2;
+      const s = piece('pleaves' + v, 360, 200, 180, 200, (c) => {
+        const r = new Rng(v * 3 + 17);
+        for (let i = 0; i < 14; i++) {
+          const a = -Math.PI / 2 + r.range(-1.2, 1.2);
+          const l = r.range(110, 190);
+          c.save();
+          c.translate(r.range(-120, 120), 0);
+          c.rotate(a);
+          c.fillStyle = i % 2 ? '#07130a' : '#0a1a0e';
+          c.beginPath();
+          c.moveTo(0, 0);
+          c.quadraticCurveTo(l * 0.5, -26, l, 0);
+          c.quadraticCurveTo(l * 0.5, 26, 0, 0);
+          c.fill();
+          c.restore();
+        }
+      });
+      drawPiece(g, s, Math.sin(t * 0.9 + seed) * 0.03, 0.96);
       return true;
     }
     case 'jChasm': {

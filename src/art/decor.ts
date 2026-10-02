@@ -502,6 +502,61 @@ function paintDeco(g: CanvasRenderingContext2D, kind: string, seed: number, t: n
       g.globalAlpha = 1;
       break;
     }
+    case 'crane3':
+    case 'crane4':
+    case 'crane5':
+    case 'crane6':
+    case 'crane7':
+    case 'crane8': {
+      // viga de aço pendurada por cabos no gancho de um guindaste (o guindaste fica lá no alto)
+      const n = +kind.slice(5);
+      const hw = n * 16;
+      const sway = Math.sin(t * 0.8 + seed) * 2.5;
+      const hy = -150;
+      // alma da viga em I por baixo do piso
+      g.fillStyle = '#2a3a48';
+      g.fillRect(-hw + 2, 10, hw * 2 - 4, 5);
+      g.fillStyle = '#3d5566';
+      g.fillRect(-hw + 2, 15, hw * 2 - 4, 3);
+      // placas zebradas nas pontas
+      for (const s of [-1, 1]) {
+        g.fillStyle = '#ffd23a';
+        g.fillRect(s < 0 ? -hw : hw - 10, 2, 10, 8);
+        g.fillStyle = '#1a1a1a';
+        g.fillRect(s < 0 ? -hw + 3 : hw - 7, 2, 3, 8);
+      }
+      // lingas: cabos das pontas até o gancho
+      g.strokeStyle = '#8a92b4';
+      g.lineWidth = 1.6;
+      g.beginPath();
+      g.moveTo(-hw + 6, 2);
+      g.lineTo(sway - 4, hy + 18);
+      g.moveTo(hw - 6, 2);
+      g.lineTo(sway + 4, hy + 18);
+      g.stroke();
+      // gancho + moitão
+      g.fillStyle = '#ffb83a';
+      g.fillRect(sway - 9, hy - 6, 18, 20);
+      g.fillStyle = '#1a1a1a';
+      g.fillRect(sway - 9, hy + 2, 18, 3);
+      g.strokeStyle = '#3a3f55';
+      g.lineWidth = 2.6;
+      g.beginPath();
+      g.arc(sway, hy + 20, 5, -0.2, Math.PI + 0.6);
+      g.stroke();
+      // cabo de aço subindo até a lança (fora da tela)
+      g.strokeStyle = '#8a92b4';
+      g.lineWidth = 1.4;
+      g.beginPath();
+      g.moveTo(sway - 3, hy - 6);
+      g.lineTo(sway * 0.3 - 3, -760);
+      g.moveTo(sway + 3, hy - 6);
+      g.lineTo(sway * 0.3 + 3, -760);
+      g.stroke();
+      // luz de aviso piscando no moitão
+      if (Math.sin(t * 4 + seed) > 0.3) neon(g, sway - 2, hy - 10, 4, 4, '#ff3a2a', 1);
+      break;
+    }
     case 'antenna': {
       g.strokeStyle = '#2c2560';
       g.lineWidth = 3;

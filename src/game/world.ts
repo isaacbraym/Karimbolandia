@@ -21,7 +21,11 @@ import { Corpse } from './corpse';
 import { Crowd } from './civilians';
 import { Narrator } from './narrator';
 import { Waters } from './water';
+import { Vine } from './vines';
+import type { DoorSpawn } from './level';
 import { drawWaterBack, drawWaterFront } from '../art/waterDraw';
+import { drawBlockade, COLLAPSE_SHAKE, COLLAPSE_FALL } from '../art/blockade';
+import { drawVines, drawRoomBack, drawRoomDark, drawDoorPrompt } from '../art/jungleWorld';
 
 export interface Stats {
   kills: number;
@@ -65,6 +69,8 @@ export interface Hooks {
   narrPlaying?: (id: number) => boolean;
   /** narrador: comece a preparar (decodificar) a fala N */
   onNarrPrepare?: (id: number) => void;
+  /** checkpoint alcançado (o jogo salva o progresso no navegador) */
+  onCheckpoint?: (idx: number) => void;
 }
 
 export interface Wreck {
@@ -107,6 +113,27 @@ export class World {
   water!: Waters;
   /** 0..1 cabeça do Karimbo debaixo d'água (som abafado, tom da tela) */
   underwater = 0;
+  /**
+   * Escombros que fecham o caminho de volta depois de um checkpoint (x em px; -Infinity = nenhum).
+   * Tudo o que fica atrás deles sai do mundo: menos inimigos, caixas e itens percorridos a cada
+   * quadro — a fase fica tão leve no fim quanto no começo.
+   */
+  blockX = -Infinity;
+  blockY = 0;
+  /** animação do desmoronamento (s desde o início; -1 = parado) */
+  blockAnimT = -1;
+  private blockImpact = false;
+  /** cipós de balançar (fase 2) */
+  vines: Vine[] = [];
+  /** porta do templo em que o Karimbo está parado (mostra "↑ ENTRAR") */
+  doorNear: DoorSpawn | null = null;
+  /** transição de porta: escurece, teletransporta e clareia */
+  doorT = -1;
+  private doorGo: DoorSpawn | null = null;
+  /** 0..1 tela preta da transição (o jogo desenha por cima do mundo) */
+  blackout = 0;
+  private lastMoveY = 0;
+  private roomShown = false;
   /** combo: abates em sequência (janela de 3 s) multiplicam a pontuação */
   combo = 0;
   comboT = 0;
@@ -158,6 +185,7 @@ export class World {
     this.baseTiles = data.level.tiles.slice();
     this.baseTheme = data.level.theme.slice();
     this.water = new Waters(data.water ?? [], this.level, data.decos);
+    this.vines = (data.vines ?? []).map((v) => new Vine(v));
     this.director = new Director(this);
     this.narrator = new Narrator(this);
     this.computePits();
@@ -188,6 +216,8 @@ export class World {
     this.stats = { kills: 0, deaths: 0, damageTaken: 0, dashes: 0, shots: 0, pitFalls: 0, time: 0 };
     this.checkpointIdx = -1;
     this.checkpointSnap = null;
+    this.blockX = -Infinity;
+    this.blockAnimT = -1;
     this.nomadLost = this.data.stage === 2; // selva: não há Nômad
     this.nomadUsed = false;
     this.parkedNomad = null;
@@ -200,6 +230,14 @@ export class World {
     this.smash?.reset();
     this.narrator?.reset();
     this.water?.reset();
+    for (const v of this.vines) {
+      v.held = false;
+      v.a = 0;
+      v.av = 0;
+    }
+    this.doorT = -1;
+    this.blackout = 0;
+    this.doorGo = null;
     this.finished = false;
     this.player.resetInventory();
     this.director.reset();
@@ -240,6 +278,149 @@ export class World {
       this.pickups.push(new Pickup(p.kind, p.x, p.y, p.id, p.itemId ?? 0));
     }
     this.crowd.reset(this.data.civilians);
+    this.solidsDirty = true;
+    this.applyBlock();
+  }
+
+  /** O Karimbo está dentro de um interior (templo)? */
+  inRoom() {
+    const rs = this.data.rooms;
+    if (!rs || !rs.length) return false;
+    const p = this.player;
+    for (const r of rs) if (p.x >= r.x && p.x <= r.x + r.w && p.y >= r.y && p.y <= r.y + r.h) return true;
+    return false;
+  }
+
+  /** Portas do templo: parado na porta, ↑ ou ↓ entra; a tela escurece e o Karimbo aparece do outro lado. */
+  private updateDoors(dt: number, ctl: ControlState) {
+    const p = this.player;
+    const my = ctl.moveY;
+    const edge = Math.abs(my) > 0.6 && Math.abs(this.lastMoveY) <= 0.6;
+    this.lastMoveY = my;
+    if (this.doorT >= 0) {
+      this.doorT += dt;
+      const T_OUT = 0.28;
+      this.blackout = this.doorT < T_OUT ? this.doorT / T_OUT : Math.max(0, 1 - (this.doorT - T_OUT - 0.08) / 0.3);
+      p.lockInput = true;
+      p.body.vx = 0;
+      if (this.doorGo && this.doorT >= T_OUT) {
+        const d = this.doorGo;
+        this.doorGo = null;
+        p.body.x = d.tx;
+        p.body.y = d.ty - p.body.h / 2 - 0.5;
+        p.body.vx = 0;
+        p.body.vy = 0;
+        p.lastSafe = { x: d.tx, y: d.ty };
+        this.cameraSnap();
+        if (d.kind === 'in' && !this.roomShown) {
+          this.roomShown = true;
+          this.director.banner('TEMPLO ESQUECIDO', 'Dois caminhos... ache a saída', 2.6);
+        } else if (d.kind === 'out') this.director.banner('DE VOLTA À SELVA', undefined, 1.6);
+      }
+      if (this.doorT > T_OUT + 0.4) {
+        this.doorT = -1;
+        this.blackout = 0;
+        p.lockInput = false;
+      }
+      return;
+    }
+    this.doorNear = null;
+    if (p.mode !== 'foot' || p.vine || !p.body.onGround) return;
+    for (const d of this.data.doors) {
+      if (Math.abs(p.x - d.x) < 24 && Math.abs(p.feetY - d.y) < 10) {
+        this.doorNear = d;
+        if (edge) {
+          this.doorGo = d;
+          this.doorT = 0;
+          this.audio('lock', 0.8, d.x);
+          this.doorNear = null;
+        }
+        return;
+      }
+    }
+  }
+
+  /** Passou o checkpoint `idx`: fecha o caminho de volta (num trecho de chão firme, fora de arenas). */
+  blockBehind(idx: number, fx = true) {
+    const cps = this.data.checkpoints;
+    if (idx < 1 || idx >= cps.length) return;
+    const cp = cps[idx];
+    const L = this.level;
+    // perto do checkpoint (o desmoronamento acontece à vista), procurando para trás um chão firme
+    const xMin = Math.max(cps[idx - 1].x + 4 * TILE, cp.x - 30 * TILE);
+    const inArena = (x: number) => this.data.arenas.some((a) => x > a.rect.x - 3 * TILE && x < a.rect.x + a.rect.w + 3 * TILE);
+    const inWater = (x: number) => this.data.water.some((z) => x > z.x - 2 * TILE && x < z.x + z.w + 2 * TILE);
+    for (let k = 0; k < 12; k++) {
+      const x = Math.floor((cp.x - (3 + k) * TILE) / TILE) * TILE + TILE / 2;
+      if (x < xMin || x <= this.blockX + TILE) return;
+      if (inArena(x) || inWater(x)) continue;
+      const gy = L.groundBelow(x, cp.y - 260, 640);
+      if (gy === null) continue;
+      // chão sólido largo o bastante, sem teto/obstáculo e sem buraco embaixo
+      let ok = true;
+      for (const ox of [-TILE, 0, TILE]) {
+        const g2 = L.groundBelow(x + ox, gy - 40, 80);
+        if (g2 === null || Math.abs(g2 - gy) > 1 || !L.isSolid(Math.floor((x + ox) / TILE), Math.floor(gy / TILE))) ok = false;
+        for (const oy of [16, 60, 110]) if (L.solidAtPx(x + ox, gy - oy)) ok = false;
+      }
+      if (!ok) continue;
+      this.blockX = x;
+      this.blockY = gy;
+      this.applyBlock();
+      if (fx) {
+        // começa o desmoronamento: treme, range/estala... e desaba fechando a volta
+        this.blockAnimT = 0;
+        this.blockImpact = false;
+        this.audio(this.data.stage === 2 ? 'creak' : 'rumble', 1, x);
+      }
+      return;
+    }
+  }
+
+  /** Desmoronamento: poeira/fagulhas tremendo, queda e impacto (tremor, estrondo, destroços). */
+  private updateCollapse(dt: number) {
+    const x = this.blockX;
+    const y = this.blockY;
+    const jungle = this.data.stage === 2;
+    this.blockAnimT += dt;
+    const t = this.blockAnimT;
+    if (t < COLLAPSE_SHAKE) {
+      if (Math.random() < dt * 30) this.fx.add(PK.Dust, x + 46 + rand.spread(30), y - rand.range(60, 260), rand.spread(20), rand.range(30, 90), 0.8, rand.range(3, 6), jungle ? '#8a6a44' : '#9a94b0', { g: 300, a0: 0.7 });
+      if (!jungle && Math.random() < dt * 20) this.fx.add(PK.Ember, x + 46 + rand.spread(30), y - 270, rand.spread(40), -rand.range(60, 140), 1.2, rand.range(2, 3.5), '#ffb347', { a0: 1, drag: 0.4 });
+      this.fx.addShake(1.2, 0.05);
+    } else if (!this.blockImpact && t >= COLLAPSE_SHAKE + COLLAPSE_FALL) {
+      this.blockImpact = true;
+      this.audio(jungle ? 'crush' : 'bigExplosion', 1, x);
+      this.audio('debris', 1, x);
+      this.fx.addShake(8, 0.5);
+      this.fx.smoke(x - 40, y - 20, 14, jungle ? '#8a7a5a' : '#8b84a3', 50, 40, 1.2);
+      for (let i = 0; i < 26; i++) {
+        this.fx.add(PK.Debris, x - 60 + rand.spread(120), y - rand.range(10, 60), rand.spread(260), -rand.range(120, 420), rand.range(0.8, 1.4), rand.range(2.5, 5), jungle ? rand.pick(['#5a4030', '#3f9446', '#7a5a40']) : rand.pick(['#5a5f7a', '#6a6f8a', '#3a3f55']), { g: 1200, rot: rand.range(0, 6), vr: rand.spread(14), bounce: 0.3 });
+      }
+      if (!jungle) for (let i = 0; i < 14; i++) this.fx.add(PK.Ember, x + rand.spread(70), y - rand.range(20, 90), rand.spread(120), -rand.range(80, 260), rand.range(1, 1.8), rand.range(2, 4), '#ffb347', { a0: 1, drag: 0.4 });
+      this.fx.add(PK.Ring, x - 30, y - 6, 0, 0, 0.45, 10, '#e8e0d0', { size1: 120, a0: 0.6 });
+    }
+    if (t > COLLAPSE_SHAKE + COLLAPSE_FALL + 0.1) this.blockAnimT = -1;
+  }
+
+  /** Tira do mundo o que ficou atrás dos escombros e (re)coloca a parede sólida. */
+  private applyBlock() {
+    if (!Number.isFinite(this.blockX)) return;
+    const cut = this.blockX;
+    // a masmorra do templo (interior isolado) nunca é apagada: só se chega lá pela porta
+    const rooms = this.data.rooms ?? [];
+    const keep = (x: number, y: number) => x >= cut || rooms.some((r) => x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h);
+    this.enemies = this.enemies.filter((e) => e.isBoss || e.spawnedByArena || keep(e.x, e.y));
+    this.props = this.props.filter((p) => p.spawn.id === -950 ? false : p.barrier || keep(p.x, p.y));
+    this.pickups = this.pickups.filter((p) => keep(p.x, p.y));
+    this.corpses = this.corpses.filter((c) => c.x >= cut);
+    this.wrecks = this.wrecks.filter((wk) => wk.x >= cut);
+    this.crowd.list = this.crowd.list.filter((c) => c.x >= cut);
+    const h = 16 * TILE;
+    const wall = new Prop({ id: -950, kind: 'wall', x: this.blockX, y: this.blockY, w: 60, h, solid: true, critical: true });
+    wall.barrier = true;
+    wall.hittable = false;
+    this.props.push(wall);
     this.solidsDirty = true;
   }
 
@@ -730,6 +911,9 @@ export class World {
     this.narrator.update(dt);
     p.update(this, dt, ctl);
     if (this.water.zones.length) this.water.update(dt, p.x, p.y, p.swimming, this.camera.x, this.camera.x + this.camera.w);
+    for (const v of this.vines) if (Math.abs(v.x - p.x) < 1400) v.update(dt, this.time);
+    if (this.blockAnimT >= 0) this.updateCollapse(dt);
+    if (this.data.doors?.length) this.updateDoors(dt, ctl);
     // BZZZ do pernilongo enquanto plana (tom varia com velocidade e subida/descida)
     if (p.glide && p.mode === 'foot') audioEngine.loop('glide', true, clamp(Math.abs(p.body.vx) / 218, 0, 1), clamp(-p.body.vy / 220, -1, 1));
     else audioEngine.loop('glide', false);
@@ -818,6 +1002,7 @@ export class World {
       this.fx.view = { x0: c.x - m, y0: c.y - m, x1: c.x + c.w + m, y1: c.y + c.h + m };
     }
     if (this.water.zones.length) drawWaterBack(g, this);
+    if (this.data.rooms?.length) drawRoomBack(g, this);
     this.director.drawDecos(g, 'back');
     // tiles
     art.tiles.render(g, L, cam.x, cam.y, cam.w, cam.h, this.time);
@@ -825,8 +1010,12 @@ export class World {
     this.drawPits(g);
     // destroços do Nômad
     for (const w of this.wrecks) if (cam.visible(w.x, w.y, 160)) this.drawWreck(g, w);
+    // escombros fechando o caminho de volta
+    if (Number.isFinite(this.blockX) && cam.visible(this.blockX, this.blockY - 100, 320)) drawBlockade(g, this.data.stage, this.blockX, this.blockY, this.blockAnimT, this.time);
     // Nômad estacionado / aguardando
     this.director.drawNomadWorld(g);
+    if (this.vines.length) drawVines(g, this);
+    if (this.doorNear) drawDoorPrompt(g, this, this.doorNear);
     // props
     for (const pr of this.props) {
       if (!cam.visible(pr.x, pr.y, 90)) continue;
@@ -862,6 +1051,7 @@ export class World {
     this.director.drawWorldOverlays(g);
     if (this.water.zones.length) drawWaterFront(g, this);
     this.fx.draw(g, true);
+    if (this.data.rooms?.length) drawRoomDark(g, this);
     this.director.drawDecos(g, 'front');
     this.crowd.drawBalloon(g, this);
     this.fx.drawPopups(g);
@@ -912,6 +1102,15 @@ export class World {
       if (p.y < cam.y - 80 || p.y > cam.y + cam.h + 200) continue;
       const wdt = p.x1 - p.x0;
       const k = (wdt / 100) * dt * this.fx.density;
+      if (this.data.stage === 2) {
+        // selva: névoa subindo do desfiladeiro (sem brasas)
+        let nm = k * 4;
+        while (nm > 0) {
+          if (Math.random() < nm) this.fx.add(PK.Smoke, p.x0 + Math.random() * wdt, p.y + 60, rand.spread(10), -rand.range(20, 40), rand.range(2.4, 3.4), rand.range(22, 30), rand.pick(['#e6f2dc', '#d4e8d0', '#c8dccc']), { size1: 60, a0: 0.32, drag: 0.3 });
+          nm -= 1;
+        }
+        continue;
+      }
       let ns = k * 5;
       while (ns > 0) {
         if (Math.random() < ns) {
@@ -946,6 +1145,11 @@ export class World {
       // calor subindo: brilho forte no fundo do buraco e um "véu" acima da borda (visível na altura do jogador)
       // (degradês pré-desenhados uma vez; a pulsação é a transparência — mesmo visual, sem gradiente por quadro)
       const sp = pitSprites();
+      if (this.data.stage === 2) {
+        // desfiladeiro da selva: escuro e enevoado
+        g.drawImage(sp.dark, p.x0, p.y + 20, p.x1 - p.x0, 220);
+        continue;
+      }
       g.save();
       // fundo escuro do buraco (contraste com o chão)
       g.drawImage(sp.dark, p.x0, p.y, p.x1 - p.x0, 120);

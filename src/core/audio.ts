@@ -15,7 +15,7 @@ export type SfxName =
   | 'uiClick' | 'uiBack' | 'uiStart' | 'alarm' | 'warning' | 'lock' | 'unlock' | 'missile' | 'laserCharge' | 'laserFire'
   | 'enemyShot' | 'sniperShot' | 'turretShot' | 'stomp' | 'bossRoar' | 'bossHit' | 'bossPhase' | 'bossDie' | 'thruster'
   | 'victory' | 'servo' | 'spark' | 'slam' | 'burp' | 'burpBig' | 'crush' | 'extraLife' | 'thunder' | 'knife'
-  | 'splash' | 'bigSplash' | 'wade' | 'swim' | 'bubble' | 'suitOn' | 'bird' | 'bird2' | 'insect' | 'frog';
+  | 'splash' | 'bigSplash' | 'wade' | 'swim' | 'bubble' | 'suitOn' | 'bird' | 'bird2' | 'insect' | 'frog' | 'creak' | 'rumble';
 
 type LoopName = 'glide' | 'roll' | 'alarm' | 'laser' | 'thrusterLoop';
 
@@ -52,6 +52,7 @@ export class AudioEngine {
   master!: GainNode;
   private uw: BiquadFilterNode | null = null;
   private uwK = 0;
+  private lastEnd = 0;
   sfxBus!: GainNode;
   musicBus!: GainNode;
   /** vozes e cinemáticas (clipes gravados) */
@@ -83,7 +84,7 @@ export class AudioEngine {
   /** Deve ser chamado a partir de um gesto do usuário. */
   init() {
     if (this.ctx) {
-      if (this.ctx.state === 'suspended') void this.ctx.resume();
+      this.wake();
       return;
     }
     const AC = (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext) as typeof AudioContext | undefined;
@@ -132,6 +133,27 @@ export class AudioEngine {
     this.uwK = k;
     const f = 20000 * Math.pow(650 / 20000, clamp(k, 0, 1));
     this.uw.frequency.setTargetAtTime(f, this.ctx.currentTime, 0.08);
+  }
+
+  /**
+   * Acorda o contexto de áudio. Ao minimizar/trocar de app o sistema suspende o áudio ('suspended'
+   * no Chrome, 'interrupted' no Safari) e ele não volta sozinho: chamado em todo toque/tecla e ao
+   * voltar para a aba.
+   */
+  wake() {
+    const c = this.ctx;
+    if (!c) return;
+    const st = c.state as string;
+    if (st !== 'running' && st !== 'closed') {
+      try {
+        const p = c.resume();
+        if (p && typeof p.catch === 'function') p.catch(() => undefined);
+      } catch {
+        /* sem gesto do usuário: tenta de novo no próximo toque */
+      }
+    }
+    // sons que nunca terminaram (contexto parado no meio): não bloqueiam os próximos
+    if (this.active > 0 && c.currentTime - this.lastEnd > 3) this.active = 0;
   }
 
   get ready() {
@@ -197,6 +219,11 @@ export class AudioEngine {
     return first;
   }
 
+  private ended() {
+    this.active = Math.max(0, this.active - 1);
+    if (this.ctx) this.lastEnd = this.ctx.currentTime;
+  }
+
   /** Contexto só para decodificar (24 kHz mono: metade da memória, voz igualmente nítida). */
   private decoder(): BaseAudioContext | null {
     if (this.decoderCtx === undefined) {
@@ -236,15 +263,24 @@ export class AudioEngine {
   }
 
   narrReady(i: number) {
-    return this.narrBuf.has(i);
+    if (!this.narrBuf.has(i)) return false;
+    if (!this.ready) {
+      // primeira partida: o contexto ainda está "acordando" — espera em vez de tocar no vazio
+      this.wake();
+      return false;
+    }
+    return true;
   }
 
   /** Toca a fala N (já decodificada). A memória decodificada é liberada assim que ela começa. */
   playNarr(i: number, vol = 1): ClipHandle {
     const buf = this.narrBuf.get(i);
     if (!buf) return NO_CLIP;
-    this.narrBuf.delete(i); // a fonte de áudio mantém o buffer vivo só enquanto toca
-    return this.playBuffer(buf, { vol, fadeIn: 0.04 });
+    const h = this.playBuffer(buf, { vol, fadeIn: 0.04 });
+    // só libera a memória se a fala começou de verdade (antes: o buffer sumia mesmo sem tocar e a
+    // abertura ficava muda até reiniciar a fase)
+    if (h !== NO_CLIP) this.narrBuf.delete(i);
+    return h;
   }
 
   // ------------------------------------------------------------------ clipes gravados
@@ -433,7 +469,7 @@ export class AudioEngine {
     osc.start(t0);
     osc.stop(t0 + o.dur + 0.05);
     this.active++;
-    osc.onended = () => this.active--;
+    osc.onended = () => this.ended();
   }
 
   private noise(o: {
@@ -459,7 +495,7 @@ export class AudioEngine {
     src.start(t0, Math.random() * 1.5);
     src.stop(t0 + o.dur + 0.05);
     this.active++;
-    src.onended = () => this.active--;
+    src.onended = () => this.ended();
   }
 
   /**
@@ -527,7 +563,7 @@ export class AudioEngine {
       o.stop(t0 + dur + 0.05);
     }
     this.active++;
-    osc.onended = () => this.active--;
+    osc.onended = () => this.ended();
     // "estalo" de garganta no início
     this.noise({ dur: 0.07, vol: 0.25 * v, type: 'bandpass', f0: 700, f1: 300, q: 2, pan });
   }
@@ -537,7 +573,10 @@ export class AudioEngine {
   play(name: SfxName, vol = 1, pan = 0) {
     if (!this.ctx || this.ctx.state !== 'running' || this.muted) return;
     if (!Number.isFinite(vol) || !Number.isFinite(pan)) return; // nunca derruba o quadro por um valor inválido
-    if (this.active > 56) return;
+    if (this.active > 56) {
+      if (this.ctx.currentTime - this.lastEnd > 2) this.active = 0; // contador preso (contexto ficou parado): libera
+      else return;
+    }
     const now = this.ctx.currentTime;
     // anti-spam: mesmo som muito rápido
     const last = this.lastPlay.get(name) ?? -1;
@@ -679,6 +718,18 @@ export class AudioEngine {
       }
       case 'insect':
         this.tone({ type: 'sawtooth', f0: 4200 + Math.random() * 900, dur: 0.9, vol: 0.012 * v, pan, lp: 6000, vib: 300, vibHz: 42 });
+        break;
+      case 'creak':
+        // madeira rangendo e estalando antes de cair
+        this.tone({ type: 'sawtooth', f0: 110 * r, f1: 70, dur: 0.7, vol: 0.12 * v, pan, lp: 900, vib: 18, vibHz: 22 });
+        this.tone({ type: 'sawtooth', f0: 160, f1: 95, dur: 0.5, vol: 0.08 * v, delay: 0.35, pan, lp: 1200, vib: 30, vibHz: 31 });
+        for (let i = 0; i < 4; i++) this.noise({ dur: 0.05, vol: 0.18 * v, type: 'bandpass', f0: 2200, f1: 900, q: 2, delay: 0.25 + i * 0.16, pan });
+        break;
+      case 'rumble':
+        // estrutura cedendo: ronco grave + estalos de concreto
+        this.noise({ dur: 1.1, vol: 0.32 * v, type: 'lowpass', f0: 300, f1: 90, q: 0.8, pan });
+        this.tone({ type: 'sine', f0: 55, f1: 38, dur: 1.0, vol: 0.25 * v, pan });
+        for (let i = 0; i < 5; i++) this.noise({ dur: 0.06, vol: 0.16 * v, type: 'bandpass', f0: 1600, f1: 600, q: 1.5, delay: 0.2 + i * 0.14, pan });
         break;
       case 'frog':
         for (let i = 0; i < 2; i++) this.tone({ type: 'square', f0: 140 * r, f1: 95, dur: 0.12, vol: 0.05 * v, delay: i * 0.18, pan, lp: 700 });

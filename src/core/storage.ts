@@ -25,6 +25,8 @@ export interface Progress {
   dashDiscovered: boolean; // jogador já descobriu o segundo avanço
   emblemsFound: number[]; // ids do melhor conjunto
   secretsFound: number[];
+  /** fases já concluídas (1, 2...) */
+  stagesDone: number[];
 }
 
 const KEY_S = 'karimbolandia.settings.v1';
@@ -53,6 +55,7 @@ export const defaultProgress = (): Progress => ({
   dashDiscovered: false,
   emblemsFound: [],
   secretsFound: [],
+  stagesDone: [],
 });
 
 function load<T extends object>(key: string, def: () => T): T {

@@ -504,9 +504,13 @@ export class Background {
     // E — rodovias
     this.drawLayer(g, this.layers.hwy, s);
     this.drawTraffic(g, s);
-    // G — estruturas próximas (mistura industrial/ruínas)
-    this.drawLayer(g, this.layers.near, s, 1 - s.ruin);
-    if (s.ruin > 0.01) this.drawLayer(g, this.layersRuin, s, s.ruin);
+    // G — estruturas próximas (industrial ou ruínas). Antes as duas camadas eram desenhadas juntas,
+    // com transparência, durante quase toda a segunda metade da fase (dobro de pintura de tela no
+    // celular — era o que fazia o jogo engasgar a partir das ruínas). Agora só uma, e a mistura
+    // acontece apenas na curta faixa de transição.
+    const ru = s.ruin < 0.3 ? 0 : s.ruin > 0.7 ? 1 : (s.ruin - 0.3) / 0.4;
+    if (ru < 0.999) this.drawLayer(g, this.layers.near, s, 1 - ru);
+    if (ru > 0.001) this.drawLayer(g, this.layersRuin, s, ru);
   }
 
   private farC: HTMLCanvasElement | null = null;
@@ -602,8 +606,10 @@ export class Background {
     g.globalAlpha = 1;
     // tinge com o "clima" (mais escuro à noite)
     if (s.sky > 0.05) {
-      g.fillStyle = `rgba(6,4,30,${0.32 * s.sky * alpha})`;
+      g.globalAlpha = 0.32 * s.sky * alpha;
+      g.fillStyle = '#06041e';
       g.fillRect(0, Math.max(0, y), s.viewW, s.viewH - Math.max(0, y));
+      g.globalAlpha = 1;
     }
   }
 
@@ -761,14 +767,20 @@ export class Background {
     }
     g.globalAlpha = 1;
     g.globalCompositeOperation = 'source-over';
-    // fog rasteiro suave (base)
-    const fog = g.createLinearGradient(0, H * 0.72, 0, H);
-    fog.addColorStop(0, 'rgba(80,30,110,0)');
-    fog.addColorStop(1, 'rgba(80,30,110,0.28)');
-    g.fillStyle = fog;
-    g.fillRect(0, H * 0.72, W, H * 0.28);
+    // fog rasteiro suave (base) — degradê criado uma vez
+    if (!this.fogC) {
+      this.fogC = makeCanvas(2, 64);
+      const fg = this.fogC.getContext('2d')!;
+      const fog = fg.createLinearGradient(0, 0, 0, 64);
+      fog.addColorStop(0, 'rgba(80,30,110,0)');
+      fog.addColorStop(1, 'rgba(80,30,110,0.28)');
+      fg.fillStyle = fog;
+      fg.fillRect(0, 0, 2, 64);
+    }
+    g.drawImage(this.fogC, 0, 0, 2, 64, 0, H * 0.72, W, H * 0.28);
   }
 
+  private fogC: HTMLCanvasElement | null = null;
   /** Vinheta e correção de cor (uma vez, em cache por tamanho). */
   private vig: HTMLCanvasElement | null = null;
   private vigKey = '';

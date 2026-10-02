@@ -6,6 +6,10 @@ export interface MenuCallbacks {
   onPlay(): void;
   /** prévia da fase 2 (selva) */
   onPlayJungle(): void;
+  /** voltar ao último checkpoint salvo no navegador */
+  onContinueSave(): void;
+  /** descartar o save (novo jogo) */
+  onDiscardSave(): void;
   onSettingsChanged(): void;
   onResume(): void;
   onRestart(): void;
@@ -112,7 +116,10 @@ export class Menus {
     const wrap = el('div', 'wrap');
     wrap.append(el('div', 'title', 'KARIMBOLÂNDIA<span class="ver">.v4</span>'), el('div', 'sub', 'RUN &amp; GUN 2.5D'));
     const btns = el('div', 'btns');
+    this.contBtn = this.btn('CONTINUAR', 'primary', () => this.cb.onContinueSave());
+    this.contBtn.style.display = 'none';
     btns.append(
+      this.contBtn,
       this.btn('JOGAR', 'primary', () => this.cb.onPlay()),
       this.btn('FASE 2 • SELVA', 'primary', () => this.cb.onPlayJungle()),
       this.btn('CONFIGURAÇÕES', 'alt', () => this.showSettings('main')),
@@ -401,6 +408,52 @@ export class Menus {
   private updateEl: HTMLElement | null = null;
   private updatePill: HTMLElement | null = null;
   /** Janela de confirmação: há uma versão nova do jogo. */
+  private contBtn!: HTMLButtonElement;
+  private resumeEl: HTMLElement | null = null;
+  /** Mostra (ou esconde) o botão CONTINUAR do menu com a descrição do save. */
+  setContinue(label: string | null) {
+    if (!this.contBtn) return;
+    this.contBtn.style.display = label ? '' : 'none';
+    this.contBtn.textContent = label ? `CONTINUAR • ${label}` : 'CONTINUAR';
+  }
+
+  closeResume() {
+    this.resumeEl?.remove();
+    this.resumeEl = null;
+  }
+
+  /** Ao abrir o jogo com um save: pergunta se quer voltar ao último checkpoint. */
+  askResume(label: string) {
+    if (this.resumeEl) return;
+    const o = el('div', 'overlay panel-back');
+    o.id = 'resume';
+    const p = el('div', 'panel');
+    p.style.width = 'min(420px, 92vw)';
+    p.style.textAlign = 'center';
+    p.append(el('h2', '', 'CONTINUAR?'), el('p', '', `Você tem um jogo salvo: ${label}. Quer voltar ao último checkpoint?`));
+    const btns = el('div', 'btns');
+    const close = () => {
+      o.remove();
+      this.resumeEl = null;
+      this.collectFocus(this.main);
+    };
+    btns.append(
+      this.btn('VOLTAR AO CHECKPOINT', 'primary', () => {
+        close();
+        this.cb.onContinueSave();
+      }),
+      this.btn('NOVO JOGO', 'alt small', () => {
+        close();
+        this.cb.onDiscardSave();
+      })
+    );
+    p.append(btns);
+    o.append(p);
+    this.root.append(o);
+    this.resumeEl = o;
+    this.collectFocus(o);
+  }
+
   showUpdate(apply: () => void, onLater?: () => void) {
     this.updatePill?.remove();
     this.updatePill = null;

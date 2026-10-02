@@ -1,4 +1,4 @@
-import { T, TILE } from '../level';
+import { T, TILE, THEME } from '../level';
 import { G } from './builder';
 import type { LevelBuilder } from './builder';
 
@@ -170,4 +170,36 @@ export function addCivilians(b: LevelBuilder) {
   b.civilian(1185, 14, { mood: 'help' });
   b.civilian(1278, 14, { mood: 'scared' });
   b.civilian(1281, 14, { mood: 'help', kneel: true });
+}
+
+/**
+ * Guindastes: algumas plataformas suspensas (não todas) viram vigas de aço penduradas por cabos
+ * num guindaste da obra — só visual (a plataforma continua igual), para dar vida à cidade.
+ */
+export function addCranes(b: LevelBuilder) {
+  const L = b.level;
+  let n = 0;
+  for (let ty = 8; ty < G - 2; ty++) {
+    let tx = 1;
+    while (tx < L.w - 1) {
+      if (L.get(tx, ty) !== T.ONEWAY || L.get(tx - 1, ty) === T.ONEWAY) {
+        tx++;
+        continue;
+      }
+      let e = tx;
+      while (L.get(e, ty) === T.ONEWAY) e++;
+      const w = e - tx;
+      // vão livre em volta (nada logo acima/abaixo) e longe de outras plataformas
+      let free = w >= 3 && w <= 8;
+      for (let x = tx - 1; x <= e && free; x++) {
+        for (let k = 1; k <= 5; k++) if (L.get(x, ty - k) !== T.EMPTY) free = false;
+        for (let k = 1; k <= 2; k++) if (L.get(x, ty + k) !== T.EMPTY) free = false;
+      }
+      if (free && n++ % 3 === 1) {
+        for (let x = tx; x < e; x++) L.set(x, ty, T.ONEWAY, THEME.STEEL);
+        b.deco('crane' + w, (tx + e) / 2 - 0.5, ty, 'back');
+      }
+      tx = e;
+    }
+  }
 }

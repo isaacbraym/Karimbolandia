@@ -6,6 +6,7 @@ import { Bullet, Grenade } from './bullets';
 import { clamp, approach, rand, TAU, damp, angleDiff } from '../core/math';
 import { PK } from './fx';
 import { T, TILE } from './level';
+import type { Vine } from './vines';
 import { getArt } from '../art';
 import { drawKarimbo, karimboMuzzle, type KState } from '../art/karimbo';
 import { drawNomad } from '../art/nomad';
@@ -28,6 +29,11 @@ const SHOTGUN_KICK = 340; // px/s para trás
 const SHOTGUN_HOP = 400; // pulinho do coice (~45 px)
 const SHOTGUN_POGO = 600; // tiro para baixo: impulso para cima (~100 px)
 const SLIDE_V = 430; // px/s no início do deslize
+/** areia movediça: velocidade de afundar (px/s), profundidade fatal, quanto cada pulo puxa para fora */
+export const SINK_RATE = 15;
+export const SINK_MAX = 60;
+const SINK_PULL = 13;
+const SINK_FREE = 7;
 
 export { FOOT_W, FOOT_H, CROUCH_H, NOMAD_W, NOMAD_H };
 export interface NomadState {
@@ -130,6 +136,14 @@ export class Player {
   strokeT = 0;
   private bubbleT = 0;
   private wadeStep = 0;
+  /** pendurado num cipó */
+  vine: Vine | null = null;
+  vineD = 0;
+  private vineCd = 0;
+  private swingShown = false;
+  /** px afundados na areia movediça */
+  sink = 0;
+  private sinkShown = false;
   runPhase = 0;
   stepAcc = 0;
   animT = 0;
@@ -224,6 +238,9 @@ export class Player {
     this.suit = 0;
     this.suitOn = false;
     this.leapT = 0;
+    if (this.vine) this.vine.held = false;
+    this.vine = null;
+    this.sink = 0;
   }
 
   resetInventory() {
@@ -494,7 +511,9 @@ export class Player {
     }
     const c = this.lockInput ? nullControls : ctl;
     if (this.leapT > 0) this.leapT -= dt;
+    if (this.vineCd > 0) this.vineCd -= dt;
     if (this.nomad) this.updateNomad(w, dt, c);
+    else if (this.vine) this.updateSwing(w, dt, c);
     else {
       const lake = w.water.zones.length && this.mode === 'foot' && this.leapT < 0.28 ? w.water.lakeAt(this.x, this.body.y) : null;
       if (lake) this.updateSwim(w, dt, c, lake);
@@ -634,8 +653,11 @@ export class Player {
     // horizontal (no pântano a água segura as pernas)
     const wade = w.water.zones.length ? w.water.wadeDepth(this.x, this.feetY) : 0;
     let tx = 0;
-    if (!hurt) tx = ctl.moveX * (this.crouch ? CROUCH_SPEED : this.glide ? GLIDE_SPEED : RUN) * (wade > 0 ? 0.72 : 1);
-    if (wade > 0) this.wadeFx(w, dt, wade);
+    if (!hurt) tx = ctl.moveX * (this.crouch ? CROUCH_SPEED : this.glide ? GLIDE_SPEED : RUN) * (wade > 0 ? 0.72 : 1) * (1 - this.sink / (SINK_MAX + 8));
+    if (wade > 0) {
+      this.wadeFx(w, dt, wade);
+      this.quicksand(w, dt, wade, ctl);
+    } else if (this.sink > 0) this.sink = Math.max(0, this.sink - 160 * dt);
     const grounded = b.onGround;
     const acc = grounded ? (Math.abs(tx) > 0 ? RUN_ACC : RUN_DEC) : Math.abs(tx) > 0 ? AIR_ACC : AIR_DEC;
     if (this.slideT > 0 && grounded) {
@@ -669,8 +691,8 @@ export class Player {
       this.coyote = 0;
     }
 
-    // pulo
-    if (this.jumpBuf > 0 && this.coyote > 0 && !hurt) {
+    // pulo (preso na areia movediça não decola)
+    if (this.jumpBuf > 0 && this.coyote > 0 && !hurt && this.sink <= SINK_FREE) {
       b.vy = -JUMP_V;
       this.jumping = true;
       this.jumpBuf = 0;
@@ -734,6 +756,7 @@ export class Player {
     if (b.onGround && !wasGround && preVy > 220) this.onLand(w, preVy);
     if (this.slam && (b.onGround || hurt)) this.slamImpact(w, b.onGround);
     if (b.hitCeil) this.jumping = false;
+    if (w.vines.length && !b.onGround && this.vineCd <= 0 && !hurt && !this.slam) this.tryGrab(w);
 
     // ---- mira + armas
     const [sx, sy] = this.shoulder;
@@ -761,6 +784,134 @@ export class Player {
       }
     } else if (grounded) this.runPhase = damp(this.runPhase, Math.round(this.runPhase / Math.PI) * Math.PI, 12, dt);
     this.wasGround = b.onGround;
+  }
+
+  // ------------------------------------------------------------------ cipós e areia movediça
+  /** No ar, encostando a mão num cipó: agarra (a velocidade vira balanço). */
+  private tryGrab(w: World) {
+    const b = this.body;
+    const hx = this.x + this.facing * 3;
+    const hy = this.feetY - 58;
+    for (const v of w.vines) {
+      if (v.held || Math.abs(v.x - this.x) > v.len + 40) continue;
+      const n = v.nearest(hx, hy);
+      if (n.dist > 20 || n.d < 26) continue;
+      this.vine = v;
+      v.held = true;
+      this.vineD = Math.max(30, n.d);
+      const ca = Math.cos(v.a);
+      const sa = Math.sin(v.a);
+      v.av = clamp((b.vx * ca - b.vy * sa) / this.vineD, -3.2, 3.2);
+      this.stopGlide(w);
+      this.slam = false;
+      this.jumping = false;
+      this.glideFuel = GLIDE_FUEL; // agarrar recarrega as orelhas
+      this.glideUsed = false;
+      w.audio('flap', 0.6, this.x);
+      for (let i = 0; i < 5; i++) w.fx.add(PK.Debris, hx + rand.spread(6), hy + rand.spread(6), rand.spread(80), -rand.range(20, 90), 0.6, 2.4, '#4fa64e', { g: 500, rot: rand.range(0, 6), vr: rand.spread(10) });
+      if (!this.swingShown) {
+        this.swingShown = true;
+        w.hooks.onHint?.('swing');
+      }
+      return;
+    }
+  }
+
+  /** Balanço: pêndulo com impulso pelo joystick, sobe/desce no cipó e solta no pulo. */
+  private updateSwing(w: World, dt: number, ctl: ControlState) {
+    const v = this.vine!;
+    const b = this.body;
+    const hurt = this.hurtT > 0;
+    const d = this.vineD;
+    let acc = -((GRAV * 0.9) / d) * Math.sin(v.a);
+    if (!hurt) acc += ctl.moveX * 3.6 * Math.max(0.3, Math.cos(v.a));
+    v.av += acc * dt;
+    v.av *= 1 - Math.min(1, dt * 0.22);
+    v.av = clamp(v.av, -4.4, 4.4);
+    let na = v.a + v.av * dt;
+    if (Math.abs(na) > 1.45) {
+      na = Math.sign(na) * 1.45;
+      v.av *= -0.2;
+    }
+    // subir/descer pelo cipó
+    if (!hurt && ctl.moveY < -0.5) this.vineD = Math.max(28, d - 90 * dt);
+    else if (!hurt && ctl.moveY > 0.5 && !ctl.jump.pressed) this.vineD = Math.min(v.len, d + 90 * dt);
+    const hx = v.x + Math.sin(na) * this.vineD;
+    const hy = v.y + Math.cos(na) * this.vineD;
+    const nx = hx;
+    const ny = hy + 58 - b.h / 2;
+    const L = w.level;
+    const hw = b.w / 2 - 1;
+    const hh = b.h / 2 - 1;
+    const blocked = L.solidAtPx(nx - hw, ny - hh) || L.solidAtPx(nx + hw, ny - hh) || L.solidAtPx(nx - hw, ny + hh) || L.solidAtPx(nx + hw, ny + hh);
+    if (blocked) v.av *= -0.35;
+    else {
+      v.a = na;
+      b.x = nx;
+      b.y = ny;
+    }
+    b.vx = v.av * this.vineD * Math.cos(v.a);
+    b.vy = -v.av * this.vineD * Math.sin(v.a);
+    b.onGround = false;
+    this.coyote = 0;
+    this.airTime = 0;
+    if (Math.abs(ctl.moveX) > 0.3) this.facing = ctl.moveX > 0 ? 1 : -1;
+    else if (Math.abs(b.vx) > 40) this.facing = b.vx > 0 ? 1 : -1;
+    this.runPhase += dt * 3;
+    // solta: pulo (com impulso para cima) ou baixo + pulo (só larga)
+    if ((ctl.jump.pressed && !hurt) || hurt) {
+      const drop = ctl.moveY > 0.6 || hurt;
+      v.held = false;
+      v.av *= 0.55;
+      this.vine = null;
+      this.vineCd = 0.32;
+      b.vx *= drop ? 1 : 1.12;
+      if (!drop) {
+        b.vy = Math.min(b.vy, 0) - 330;
+        this.jumping = true;
+        this.leapT = 0.3;
+        w.audio('jump', 0.7, this.x);
+      }
+      return;
+    }
+    // atira pendurado
+    const [sx, sy] = this.shoulder;
+    this.aim = this.computeAim(w, ctl, sx, sy);
+    this.aimVis = this.aim;
+    if (ctl.next.pressed) this.cycleWeapon(1, w);
+    if (ctl.prev.pressed) this.cycleWeapon(-1, w);
+    if (!hurt) {
+      if (ctl.fire.held) this.shoot(w);
+      if (ctl.grenade.pressed) this.throwGrenade(w);
+    }
+  }
+
+  /** Areia movediça (pântano): afunda devagar; pular várias vezes solta o Karimbo. */
+  private quicksand(w: World, dt: number, depth: number, ctl: ControlState) {
+    const b = this.body;
+    if (!b.onGround) return;
+    const before = this.sink;
+    this.sink = Math.min(SINK_MAX, this.sink + SINK_RATE * dt);
+    if (before < 2 && this.sink >= 2 && !this.sinkShown) {
+      this.sinkShown = true;
+      w.director.banner('AREIA MOVEDIÇA!', 'Aperte PULO várias vezes para sair', 2.6);
+      w.hooks.onHint?.('quicksand');
+    }
+    if (ctl.jump.pressed && this.sink > SINK_FREE && this.hurtT <= 0) {
+      // esforço para sair: não decola, mas sobe um pouco na lama
+      this.sink = Math.max(0, this.sink - SINK_PULL);
+      this.jumpBuf = 0;
+      this.landSquash = 0.6;
+      w.audio('wade', 1, this.x);
+      for (let i = 0; i < 6; i++) w.fx.add(PK.Drop, this.x + rand.spread(12), this.feetY - depth, rand.spread(90), -rand.range(90, 200), 0.45, rand.range(1.6, 2.8), '#6a6a34', { g: 900 });
+      w.water.ripple(this.x, this.feetY - depth, 20, 0.8);
+    }
+    if (Math.random() < dt * (2 + this.sink * 0.08)) w.water.addBubble(this.x + rand.spread(14), this.feetY - 2, rand.range(1, 2.4), this.feetY - depth);
+    // afundou de vez: perde a vida
+    if (this.sink >= SINK_MAX - 0.01 && this.mode === 'foot') {
+      this.hit(w, 9999, 1, { ignoreInvuln: true });
+      if (this.mode === 'foot') this.sink = SINK_MAX * 0.6; // modo invencível (testes): continua preso
+    }
   }
 
   // ------------------------------------------------------------------ água
@@ -1642,7 +1793,8 @@ export class Player {
       return;
     }
     let st: KState = 'idle';
-    if (this.swimming) st = 'swim';
+    if (this.vine) st = 'fall';
+    else if (this.swimming) st = 'swim';
     else if (this.hurtT > 0) st = 'hurt';
     else if (this.slam) st = 'slam';
     else if (this.slideT > 0 && this.crouch) st = 'slide';
@@ -1652,7 +1804,24 @@ export class Player {
     else if (Math.abs(b.vx) > 25) st = 'run';
     // nadando: o corpo inclina para a frente (pivô no quadril), como quem bate as pernas
     const tilt = this.swimming ? clamp(b.vx / 150, -1, 1) * this.facing * 0.42 - clamp(b.vy / 260, -1, 1) * 0.12 : 0;
-    if (tilt) {
+    const sunk = this.sink > 0.5;
+    if (sunk) {
+      // afundando: o corpo desce e some dentro da lama (recorte no nível do fundo)
+      g.save();
+      g.beginPath();
+      g.rect(this.x - 80, this.feetY - 200, 160, 200);
+      g.clip();
+      // (visual mais suave que a profundidade real: a cabeça aparece até o último instante)
+      g.translate(0, this.sink * 0.6);
+    }
+    if (this.vine) {
+      // pendurado: o corpo segue a direção do cipó (pivô na mão)
+      const hy = this.feetY - 58;
+      g.save();
+      g.translate(this.x, hy);
+      g.rotate(-this.vine.a * 0.85);
+      g.translate(-this.x, -hy);
+    } else if (tilt) {
       g.save();
       g.translate(this.x, this.feetY - 30);
       g.rotate(tilt * this.facing);
@@ -1684,7 +1853,8 @@ export class Player {
       melee: this.meleeT > 0 ? 1 - this.meleeT / KNIFE_T : 0,
       meleeUp: this.meleeAlt === 1,
     });
-    if (tilt) g.restore();
+    if (this.vine || tilt) g.restore();
+    if (sunk) g.restore();
     // barra de "combustível" do glide (sutil)
     if (this.glide || (this.glideUsed && !b.onGround && this.glideFuel < GLIDE_FUEL * 0.999 && this.glideFuel > 0)) {
       const f = clamp(this.glideFuel / GLIDE_FUEL, 0, 1);

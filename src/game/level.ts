@@ -186,6 +186,8 @@ export interface DecoSpawn {
   layer: 'back' | 'front';
   flip?: boolean;
   scale?: number;
+  /** paralaxe de primeiro plano (0 = parado no mundo; 0.3 = passa 30% mais rápido, "perto da câmera") */
+  par?: number;
 }
 
 export interface Trigger {
@@ -225,10 +227,40 @@ export interface WaterZone {
   h: number;
 }
 
+/** Cipó de balançar: preso em (x, y) px, com `len` px de comprimento. */
+export interface VineSpawn {
+  id: number;
+  x: number;
+  y: number;
+  len: number;
+}
+
+/** Porta/entrada: apertando ↑ (ou ↓) parado nela, o Karimbo vai para (tx, ty) — pés. */
+export interface DoorSpawn {
+  id: number;
+  x: number;
+  y: number; // pés
+  tx: number;
+  ty: number;
+  /** 'in' = entrada do templo, 'out' = saída */
+  kind: 'in' | 'out';
+}
+
+/** Interior (templo): fundo de pedra, escuridão com luz em volta do Karimbo e das tochas. */
+export interface RoomZone {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
 export interface LevelData {
   /** 1 = cidade (Felipão), 2 = selva */
   stage: number;
   water: WaterZone[];
+  vines: VineSpawn[];
+  doors: DoorSpawn[];
+  rooms: RoomZone[];
   level: Level;
   playerStart: { x: number; y: number };
   nomadSpawn: { x: number; y: number };

@@ -35,7 +35,7 @@ async function boot() {
     if (document.readyState === 'complete') void reg();
     else window.addEventListener('load', () => void reg());
   }
-  if (params.get('autoplay') === '1') game.play();
+  if (params.get('autoplay') === '1') game.autoplay();
 }
 
 void boot();

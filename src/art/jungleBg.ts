@@ -19,6 +19,8 @@ interface Layer {
 }
 
 const DAY = ['#3e9ee0', '#74c0ee', '#b6e2f2', '#e8f6e6'];
+/** profundidade do bando de araras (fração do movimento da câmera) */
+const FLOCK_P = 0.55;
 const DUSK = ['#24304f', '#56506e', '#c9707a', '#f0a25e'];
 
 function vGrad(cols: string[], h = 256) {
@@ -468,10 +470,12 @@ export class JungleBackground {
       if (m.y < -6) m.y = H + 6;
       if (m.y > H + 6) m.y = -6;
       const x = ((m.x - s.camX * 0.6) % (W + 40) + W + 40) % (W + 40) - 20;
+      // a câmera subindo/descendo (pulo) também desloca o pólen: ele fica "no ar", não grudado na tela
+      const my = (((m.y - (s.camY - s.refY) * 0.6) % (H + 12)) + H + 12) % (H + 12) - 6;
       const tw = 0.5 + 0.5 * Math.sin(t * 2 + m.ph * 3);
       g.globalAlpha = (dusk > 0.55 ? 0.8 : 0.45) * tw;
       const r = m.s * (dusk > 0.55 ? 2.4 : 1.8);
-      g.drawImage(dot.c, x - r, m.y - r, r * 2, r * 2);
+      g.drawImage(dot.c, x - r, my - r, r * 2, r * 2);
     }
     g.globalAlpha = 1;
     g.globalCompositeOperation = 'source-over';
@@ -485,7 +489,7 @@ export class JungleBackground {
       }
       const x = ((l.x - s.camX * 0.8 + Math.sin(t * 1.3 + l.ph) * 22) % (W + 60) + W + 60) % (W + 60) - 30;
       g.save();
-      g.translate(x, l.y);
+      g.translate(x, (((l.y - (s.camY - s.refY) * 0.8) % (H + 40)) + H + 40) % (H + 40) - 20);
       g.rotate(Math.sin(l.rot) * 0.9);
       g.scale(l.s, l.s * (0.5 + 0.5 * Math.abs(Math.cos(l.rot * 1.3))));
       g.globalAlpha = 0.85;
@@ -512,7 +516,7 @@ export class JungleBackground {
         const y0 = 30 + Math.random() * 90;
         const col = Math.floor(Math.random() * this.parrots.length);
         for (let i = 0; i < n; i++) {
-          this.flock.push({ x: dir > 0 ? -40 - i * 34 : W + 40 + i * 34, y: y0 + (i % 2) * 16 + Math.random() * 10, vx: dir * (150 + Math.random() * 30), ph: Math.random() * 6, s: 0.8 + Math.random() * 0.35, col: (col + (i % 3 === 2 ? 1 : 0)) % this.parrots.length });
+          this.flock.push({ x: s.camX * FLOCK_P + (dir > 0 ? -40 - i * 34 : W + 40 + i * 34), y: y0 + (i % 2) * 16 + Math.random() * 10, vx: dir * (230 + Math.random() * 40), ph: Math.random() * 6, s: 0.8 + Math.random() * 0.35, col: (col + (i % 3 === 2 ? 1 : 0)) % this.parrots.length });
         }
       }
       return;
@@ -521,11 +525,13 @@ export class JungleBackground {
       const b = this.flock[i];
       b.x += b.vx * dt;
       b.ph += dt * 13;
-      const y = b.y + Math.sin(b.ph * 0.25) * 6;
+      // em profundidade: acompanha a câmera (andar/pular) como o resto do cenário, sem "travar" no ar
+      const sx = b.x - s.camX * FLOCK_P;
+      const y = b.y + Math.sin(b.ph * 0.25) * 6 - (s.camY - s.refY) * 0.4;
       const dir = b.vx > 0 ? 1 : -1;
       const flap = Math.sin(b.ph);
       g.save();
-      g.translate(b.x, y);
+      g.translate(sx, y);
       g.scale(dir * b.s, b.s);
       // asa de trás
       g.fillStyle = '#1d4a9a';
@@ -545,7 +551,7 @@ export class JungleBackground {
       g.closePath();
       g.fill();
       g.restore();
-      if (b.x < -120 || b.x > W + 120) this.flock.splice(i, 1);
+      if (sx < -160 || sx > W + 160) this.flock.splice(i, 1);
     }
   }
 

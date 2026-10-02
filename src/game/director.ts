@@ -135,6 +135,8 @@ export class Director {
   private hordeTo = 0;
   private enemySpawnById = new Map<number, EnemySpawn>();
   private firstSoldier: EnemySpawn | null = null;
+  /** decorações de primeiro plano com paralaxe (poucas: percorridas direto) */
+  private parDecos: number[] = [];
   /** Busca espacial das decorações; a ordenação original é preservada ao desenhar. */
   private decoBuckets = { back: new Map<number, number[]>(), front: new Map<number, number[]>() };
 
@@ -146,6 +148,10 @@ export class Director {
       .filter((e) => !e.arena && e.type === 'rifle' && e.x >= shootX)
       .reduce<EnemySpawn | null>((best, e) => !best || e.x < best.x ? e : best, null);
     w.data.decos.forEach((d, i) => {
+      if (d.par) {
+        this.parDecos.push(i);
+        return;
+      }
       const key = Math.floor(d.x / 512);
       const buckets = this.decoBuckets[d.layer];
       const list = buckets.get(key) ?? [];
@@ -373,6 +379,8 @@ export class Director {
     const w = this.w;
     w.checkpointIdx = idx;
     w.checkpointSnap = w.player.snapshot();
+    w.blockBehind(idx);
+    w.hooks.onCheckpoint?.(idx);
     if (!quiet) {
       w.audio('checkpoint', 1);
       this.banner('CHECKPOINT', w.data.checkpoints[idx].name, 1.8);
@@ -987,7 +995,7 @@ export class Director {
     this.cine = { kind: 'opening', t: 0, stage: 0, fxT: 0, beat: 0 };
     w.player.lockInput = true;
     w.player.body.vx = 0;
-    w.narrator.request(1, 15, undefined, 3);
+    w.narrator.request(1, 22, undefined, 3);
   }
   openingActive() {
     return this.cine?.kind === 'opening';
@@ -1422,6 +1430,23 @@ export class Director {
       if (d.x < cam.x - 200 || d.x > cam.x + cam.w + 200) continue;
       if (smashed.has(i)) continue;
       drawDeco(g, d, t);
+    }
+    if (layer === 'front' && this.parDecos.length) {
+      // primeiro plano "perto da câmera": desloca-se mais rápido que o mundo (profundidade)
+      const cx = cam.x + cam.w / 2;
+      const cy = cam.y + cam.h / 2;
+      for (const i of this.parDecos) {
+        const d = decos[i];
+        const par = d.par!;
+        const ox = (d.x - cx) * par;
+        if (Math.abs(d.x + ox - cx) > cam.w / 2 + 320) continue;
+        // o que pende do alto fica preso na altura; o que nasce do chão também sobe/desce com a câmera
+        const oy = d.kind === 'pPillar' || d.kind === 'pLeaves' ? (d.y - cy) * par * 0.6 : 0;
+        g.save();
+        g.translate(ox, oy);
+        drawDeco(g, d, t);
+        g.restore();
+      }
     }
     if (layer === 'back') {
       for (const d of this.w.smash.extra) {

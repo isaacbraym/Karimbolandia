@@ -6,7 +6,7 @@ import { audio } from './audio';
 import { clamp } from './math';
 
 export type Layer = 'pad' | 'bass' | 'arp' | 'hat' | 'kick' | 'snare' | 'lead' | 'power' | 'choir' | 'tom';
-export type ThemeName = 'menu' | 'stage' | 'boss';
+export type ThemeName = 'menu' | 'stage' | 'boss' | 'jungle';
 
 const LAYERS: Layer[] = ['pad', 'bass', 'arp', 'hat', 'kick', 'snare', 'lead', 'power', 'choir', 'tom'];
 const mtof = (m: number) => 440 * Math.pow(2, (m - 69) / 12);
@@ -27,6 +27,10 @@ interface Theme {
   lead: (number | null)[][]; // por compasso, 16 passos (nota midi ou null)
   tomPat?: string;
   swing?: number;
+  /** selva: tambores, chocalho, marimba, flauta e bordão (em vez de sintetizadores) */
+  tribal?: boolean;
+  /** congas da selva: 'l' grave, 'm' médio, 'h' agudo, 'x' tapa */
+  congaPat?: string;
 }
 
 // -------- Tema da fase: Ré menor, 124 bpm ------------------------------------
@@ -86,7 +90,39 @@ const BOSS: Theme = {
   tomPat: '..x...x...x.xxxx',
 };
 
-const THEMES: Record<ThemeName, Theme> = { menu: MENU, stage: STAGE, boss: BOSS };
+// -------- Tema da selva (fase 2): Lá menor pentatônico, 104 bpm, tribal ------------
+const JUNGLE: Theme = {
+  bpm: 104,
+  tribal: true,
+  chords: [
+    { root: 45, notes: [57, 60, 64, 69] }, // Am
+    { root: 43, notes: [55, 59, 62, 67] }, // G
+    { root: 45, notes: [57, 60, 64, 69] }, // Am
+    { root: 40, notes: [52, 55, 59, 64] }, // Em
+    { root: 41, notes: [53, 57, 60, 65] }, // F
+    { root: 43, notes: [55, 59, 62, 67] }, // G
+    { root: 45, notes: [57, 60, 64, 69] }, // Am
+    { root: 40, notes: [52, 56, 59, 64] }, // E (volta)
+  ],
+  bassPat: 'x.....x.x...o...',
+  kickPat: 'x.....x...x.....',
+  snarePat: '..x....x..x...x.',
+  hatPat: 'x.xxx.xxx.xxx.xx',
+  arpPat: [0, -1, 2, 1, -1, 3, 2, -1, 0, -1, 2, 3, -1, 1, 2, -1],
+  congaPat: 'l..hm.h.l.hhm.h.',
+  lead: [
+    [81, null, null, 79, 76, null, null, null, 74, null, 76, null, null, null, null, null],
+    [79, null, 76, null, 74, null, null, 71, null, null, 74, null, null, null, null, null],
+    [76, null, null, 79, 81, null, 84, null, 81, null, 79, null, 76, null, null, null],
+    [76, null, null, null, 74, null, 71, null, null, null, null, null, null, null, null, null],
+    [77, null, null, 76, 72, null, null, null, 69, null, 72, null, null, null, null, null],
+    [74, null, 76, null, 79, null, null, 81, null, null, 79, null, null, null, null, null],
+    [84, null, null, 81, 79, null, 76, null, 79, null, 81, null, null, null, null, null],
+    [80, null, null, null, 76, null, null, null, 71, null, null, null, null, null, null, null],
+  ],
+};
+
+const THEMES: Record<ThemeName, Theme> = { menu: MENU, stage: STAGE, boss: BOSS, jungle: JUNGLE };
 
 class MusicEngine {
   private layerGain = new Map<Layer, GainNode>();
@@ -194,6 +230,8 @@ class MusicEngine {
     }
     const th = THEMES[this.theme];
     const stepDur = 60 / th.bpm / 4;
+    // aba em segundo plano (timer congelado): não despeja de uma vez as notas atrasadas
+    if (this.nextTime < c.currentTime - 0.25) this.nextTime = c.currentTime + 0.05;
     while (this.nextTime < c.currentTime + 0.14) {
       this.schedule(th, this.step, this.nextTime, stepDur);
       this.step++;
@@ -392,8 +430,160 @@ class MusicEngine {
     lfo.stop(t + dur + 0.05);
   }
 
+  // ------------------------------------------------------------ selva
+  /** Marimba de madeira: seno + harmônico agudo com ataque seco. */
+  private marimba(l: Layer, t: number, midi: number, dur: number, vol: number) {
+    const c = audio.ctx!;
+    const g = c.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + 0.003);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    g.connect(this.dest(l));
+    if (this.send) {
+      const sg = c.createGain();
+      sg.gain.value = 0.35;
+      g.connect(sg);
+      sg.connect(this.send);
+    }
+    for (const [mul, v] of [[1, 1], [4, 0.25], [10, 0.06]] as [number, number][]) {
+      const o = c.createOscillator();
+      o.type = 'sine';
+      o.frequency.value = mtof(midi) * mul;
+      const og = c.createGain();
+      og.gain.setValueAtTime(v, t);
+      og.gain.exponentialRampToValueAtTime(0.0001, t + dur / mul + 0.02);
+      o.connect(og);
+      og.connect(g);
+      o.start(t);
+      o.stop(t + dur + 0.03);
+    }
+  }
+
+  /** Flauta de bambu: seno com sopro (ruído filtrado), vibrato lento e ataque macio. */
+  private flute(l: Layer, t: number, midi: number, dur: number, vol: number) {
+    const c = audio.ctx!;
+    const o = c.createOscillator();
+    o.type = 'sine';
+    o.frequency.value = mtof(midi);
+    const o2 = c.createOscillator();
+    o2.type = 'triangle';
+    o2.frequency.value = mtof(midi) * 2;
+    const lfo = c.createOscillator();
+    lfo.frequency.value = 4.8;
+    const lg = c.createGain();
+    lg.gain.setValueAtTime(0, t);
+    lg.gain.linearRampToValueAtTime(14, t + dur * 0.6);
+    lfo.connect(lg);
+    lg.connect(o.detune);
+    const g = c.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + 0.07);
+    g.gain.setTargetAtTime(vol * 0.75, t + 0.1, 0.2);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    const g2 = c.createGain();
+    g2.gain.value = 0.12;
+    o.connect(g);
+    o2.connect(g2);
+    g2.connect(g);
+    g.connect(this.dest(l));
+    if (this.send) {
+      const sg = c.createGain();
+      sg.gain.value = 0.5;
+      g.connect(sg);
+      sg.connect(this.send);
+    }
+    // sopro
+    this.noiseHit(l, t, Math.min(0.25, dur * 0.4), 'bandpass', mtof(midi) * 2, vol * 0.5, 4);
+    o.start(t);
+    o2.start(t);
+    lfo.start(t);
+    o.stop(t + dur + 0.05);
+    o2.stop(t + dur + 0.05);
+    lfo.stop(t + dur + 0.05);
+  }
+
+  /** Bloco de madeira / claves. */
+  private woodblock(l: Layer, t: number, f: number, vol: number) {
+    const c = audio.ctx!;
+    const o = c.createOscillator();
+    o.type = 'triangle';
+    o.frequency.setValueAtTime(f, t);
+    o.frequency.exponentialRampToValueAtTime(f * 0.8, t + 0.05);
+    const g = c.createGain();
+    g.gain.setValueAtTime(vol, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.07);
+    o.connect(g);
+    g.connect(this.dest(l));
+    o.start(t);
+    o.stop(t + 0.09);
+  }
+
+  /** Conga/djembê: tom com batida de pele (ruído curto) por cima. */
+  private conga(l: Layer, t: number, f: number, vol: number, slap: boolean) {
+    const c = audio.ctx!;
+    const o = c.createOscillator();
+    o.frequency.setValueAtTime(f * 1.5, t);
+    o.frequency.exponentialRampToValueAtTime(f, t + 0.05);
+    const g = c.createGain();
+    g.gain.setValueAtTime(vol, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + (slap ? 0.12 : 0.32));
+    o.connect(g);
+    g.connect(this.dest(l));
+    o.start(t);
+    o.stop(t + 0.35);
+    this.noiseHit(l, t, slap ? 0.06 : 0.03, 'bandpass', slap ? 3000 : 1500, vol * (slap ? 0.6 : 0.3), 1.2);
+  }
+
+  private scheduleTribal(th: Theme, step: number, t: number, stepDur: number) {
+    const bar = Math.floor(step / 16) % th.chords.length;
+    const s = step % 16;
+    const chord = th.chords[bar];
+    // bordão grave (quinta aberta, filtro escuro)
+    if (this.on('pad') && s === 0) this.padChord('pad', t, [chord.root + 12, chord.root + 19, chord.notes[1]], stepDur * 16, 0.045, 900);
+    if (this.on('choir') && s === 0) this.padChord('choir', t, [chord.notes[0] + 12, chord.notes[2] + 12], stepDur * 16, 0.04, 1800);
+    // baixo dedilhado (madeira)
+    if (this.on('bass')) {
+      const ch = th.bassPat[s];
+      if (ch !== '.') this.pluck('bass', t, chord.root + (ch === 'o' ? 12 : 0), stepDur * 3, 0.3, 'triangle', false);
+    }
+    if (this.on('power') && s % 4 === 0) this.bassNote('power', t, chord.root + 12, stepDur * 1.5, true);
+    // tambores: surdo, congas e claves — a percussão aparece já na exploração
+    const drums = this.on('kick');
+    if (drums && th.kickPat[s] === 'x') this.kick(t);
+    if (drums && th.congaPat) {
+      const k = th.congaPat[s];
+      if (k === 'l') this.conga('kick', t, 95, 0.55, false);
+      else if (k === 'm') this.conga('kick', t, 140, 0.45, false);
+      else if (k === 'h') this.conga('kick', t, 205, 0.4, (step >> 4) % 2 === 1 && s > 8);
+    }
+    if (this.on('tom') && s % 8 === 6) this.conga('tom', t, 70, 0.6, false);
+    if ((this.on('snare') || this.on('hat')) && th.snarePat[s] === 'x') this.woodblock(this.on('snare') ? 'snare' : 'hat', t, s % 4 === 2 ? 1250 : 980, 0.22);
+    // chocalho (sementes)
+    if (this.on('hat') && th.hatPat[s] === 'x') this.noiseHit('hat', t, s % 4 === 0 ? 0.07 : 0.04, 'bandpass', 5600, s % 4 === 0 ? 0.2 : 0.11, 1.4);
+    // marimba
+    if (this.on('arp')) {
+      const idx = th.arpPat[s];
+      if (idx >= 0) this.marimba('arp', t, chord.notes[idx] + 12, stepDur * 2.4, 0.13);
+    }
+    // flauta: melodia (na exploração ela vem mais baixinha, pela camada da marimba)
+    const lay: Layer | null = this.on('lead') ? 'lead' : this.on('arp') ? 'arp' : null;
+    if (lay) {
+      const n = th.lead[bar % th.lead.length][s];
+      if (n !== null && n !== undefined) {
+        let len = 1;
+        const seq = th.lead[bar % th.lead.length];
+        while (s + len < 16 && seq[s + len] === null && len < 6) len++;
+        this.flute(lay, t, n, stepDur * (len + 1.2), lay === 'lead' ? 0.12 : 0.08);
+      }
+    }
+  }
+
   // ------------------------------------------------------------ sequenciador
   private schedule(th: Theme, step: number, t: number, stepDur: number) {
+    if (th.tribal) {
+      this.scheduleTribal(th, step, t, stepDur);
+      return;
+    }
     const bar = Math.floor(step / 16) % th.chords.length;
     const s = step % 16;
     const chord = th.chords[bar];
