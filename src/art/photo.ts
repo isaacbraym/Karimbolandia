@@ -155,8 +155,14 @@ export function bakeKarimboHeads(p: Photos, scale = 3): KarimboHeads {
     },
     { scale, ox: logicalW / 2 + 0.6, oy: headH * 0.94 }
   );
-  // contorno escuro em volta do rosto (como o traço do corpo); some na base do pescoço
-  const rightOutlined = outlineSprite(right, 1.15, headH * 0.9);
+  // Traço fino só na silhueta externa. Na altura das orelhas, as bochechas
+  // ficam sem contorno para a foto do rosto se unir às orelhas desenhadas atrás.
+  const earTop = Math.min(p.meta.earL.y, p.meta.earR.y) * k * sc;
+  const earBottom = Math.max(p.meta.earL.y + p.meta.earL.h, p.meta.earR.y + p.meta.earR.h) * k * sc;
+  const joinPad = Math.max(p.meta.earL.h, p.meta.earR.h) * k * sc * 0.18;
+  const rightOutlined = outlineSprite(right, 0.55, headH * 0.9, '#170f2e', [
+    { x: -2, y: earTop - joinPad, w: logicalW + 4, h: earBottom - earTop + joinPad * 2 },
+  ]);
 
   // frontal com orelhas (foto original)
   const fw = (p.head.width / p.head.height) * headH;
@@ -220,8 +226,8 @@ export function bakeKarimboHeads(p: Photos, scale = 3): KarimboHeads {
       { scale, ox: ew * m.rootX, oy: eh * EAR_ROOT }
     );
   };
-  const earNear = outlineSprite(mkEar(p.earL, p.meta.earL), 1);
-  const earFar = outlineSprite(mkEar(p.earR, p.meta.earR), 1);
+  const earNear = outlineSprite(mkEar(p.earL, p.meta.earL), 0.45);
+  const earFar = outlineSprite(mkEar(p.earR, p.meta.earR), 0.45);
   const rootY = (p.meta.earL.y * k + p.meta.earL.h * k * EAR_ROOT) * sc - right.oy;
   const rootYr = (p.meta.earR.y * k + p.meta.earR.h * k * EAR_ROOT) * sc - right.oy;
   const nearSrcX = PAD + (p.meta.earL.x + p.meta.earL.w * p.meta.earL.rootX) * k;
@@ -297,7 +303,7 @@ function shapeJawAndNeck(g: CanvasRenderingContext2D, w: number, h: number, pad:
  * Copia do sprite com um contorno escuro em volta (silhueta engordada em 12 direções, por baixo).
  * `cutY` (lógico, a partir do topo): abaixo disso o contorno some (a base do pescoço entra na roupa).
  */
-function outlineSprite(spr: Sprite, width = 1.1, cutY = Infinity, color = '#170f2e'): Sprite {
+function outlineSprite(spr: Sprite, width = 1.1, cutY = Infinity, color = '#170f2e', openings: { x: number; y: number; w: number; h: number }[] = []): Sprite {
   const s = spr.s;
   const padL = Math.ceil(width + 1);
   const c = makeCanvas(spr.c.width + padL * 2 * s, spr.c.height + padL * 2 * s);
@@ -318,6 +324,8 @@ function outlineSprite(spr: Sprite, width = 1.1, cutY = Infinity, color = '#170f
     // sem traço na base do pescoço
     g.clearRect(0, o + cutY * s, c.width, c.height);
   }
+  // Recorta somente o traço extra; a foto original volta intacta por cima.
+  for (const r of openings) g.clearRect(o + r.x * s, o + r.y * s, r.w * s, r.h * s);
   g.drawImage(spr.c, o, o);
   return { c, w: spr.w + padL * 2, h: spr.h + padL * 2, s, ox: spr.ox + padL, oy: spr.oy + padL };
 }
