@@ -1,4 +1,4 @@
-import { progress, saveProgress, snapshotProgress, withLegacyCoins, type Progress } from './storage';
+import { progress, saveProgress, snapshotProgress, withLegacyCoins, hasStoredWallet, type Progress } from './storage';
 import { loadSave } from '../game/save';
 import { isSkinId, skinPrice, type SkinId } from './skinCatalog';
 
@@ -13,7 +13,7 @@ export function ensureWallet() {
   if (!progress.coinsMigrated) {
     Object.assign(progress, withLegacyCoins(progress, loadSave()?.tokens ?? 0));
     saveProgress();
-  }
+  } else if (!hasStoredWallet()) saveProgress();
 }
 /** Só muda contadores em memória; checkpoint, pausa e autosave fazem a gravação. */
 export function collectCoin() {

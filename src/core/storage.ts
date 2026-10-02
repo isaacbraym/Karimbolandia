@@ -38,6 +38,8 @@ export interface Progress {
 
 const KEY_S = 'karimbolandia.settings.v1';
 const KEY_P = 'karimbolandia.progress.v1';
+// Clientes anteriores à loja ainda gravam KEY_P; não podem apagar compras novas.
+const KEY_W = 'karimbolandia.wallet.v1';
 
 export const defaultSettings = (): Settings => ({
   music: 0.7,
@@ -106,8 +108,23 @@ export function validateProgress(v: unknown): Progress | null {
     ownedSkins: [...p.ownedSkins], equippedSkin: p.equippedSkin,
   };
 }
-export const progress: Progress = readStored(profileKey(KEY_P), validateProgress) ?? defaultProgress();
-export function reloadProgress() { Object.assign(progress, readStored(profileKey(KEY_P), validateProgress) ?? defaultProgress()); }
+type Wallet = Pick<Progress, 'coinsEarned' | 'coinsMigrated' | 'ownedSkins' | 'equippedSkin'>;
+function validateWallet(v: unknown): Wallet | null {
+  if (!record(v)) return null;
+  for (const key of ['coinsEarned', 'coinsMigrated', 'ownedSkins', 'equippedSkin']) if (!(key in v)) return null;
+  const p = validateProgress({ ...defaultProgress(), ...v });
+  return p ? { coinsEarned: p.coinsEarned, coinsMigrated: p.coinsMigrated, ownedSkins: p.ownedSkins, equippedSkin: p.equippedSkin } : null;
+}
+function readProfileProgress(): Progress | null {
+  const p = readStored(profileKey(KEY_P), validateProgress);
+  const wallet = readStored(profileKey(KEY_W), validateWallet);
+  if (!wallet) return p;
+  const records = p ?? defaultProgress();
+  return mergeProgress(records, { ...records, ...wallet });
+}
+export const hasStoredWallet = () => readStored(profileKey(KEY_W), validateWallet) !== null;
+export const progress: Progress = readProfileProgress() ?? defaultProgress();
+export function reloadProgress() { Object.assign(progress, readProfileProgress() ?? defaultProgress()); }
 export function mergeProgress(a: Progress, b: Progress): Progress {
   const times = [a.bestTime, b.bestTime].filter(n => n > 0);
   const union = (x: number[], y: number[]) => [...new Set([...x, ...y])].sort((x, y) => x - y);
@@ -127,14 +144,16 @@ export function withLegacyCoins(p: Progress, tokens: number): Progress {
   return p.coinsMigrated ? p : { ...p, coinsMigrated: true, coinsEarned: Math.max(p.coinsEarned, tokens) };
 }
 export function snapshotProgress(): Progress {
-  const stored = readStored(profileKey(KEY_P), validateProgress);
+  const stored = readProfileProgress();
   return stored ? mergeProgress(stored, progress) : validateProgress(progress) ?? defaultProgress();
 }
 
 export const saveSettings = () => save(KEY_S, settings);
 export const saveProgress = () => {
   // Outra aba pode ter batido um recorde desde que este módulo foi carregado.
-  const previous = readStored(profileKey(KEY_P), validateProgress);
+  const previous = readProfileProgress();
   if (previous) Object.assign(progress, mergeProgress(previous, progress));
-  return writeStored(profileKey(KEY_P), progress, validateProgress);
+  const wallet = writeStored(profileKey(KEY_W), validateWallet(progress)!, validateWallet);
+  const records = writeStored(profileKey(KEY_P), progress, validateProgress);
+  return wallet && records;
 };

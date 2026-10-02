@@ -149,6 +149,24 @@ describe('Moedas e trajes persistentes', () => {
     expect(progress.ownedSkins).toEqual(['neon']);
   });
 
+  it('uma aba de versão antiga não apaga a carteira nem as skins compradas', async () => {
+    const { collectCoin, chooseSkin } = await import('../src/core/skins');
+    for (let i = 0; i < 380; i++) collectCoin();
+    chooseSkin('explorer'); chooseSkin('neon');
+    // Mesmo que a versão antiga sobrescreva o registro principal e sua cópia anterior.
+    const legacy = { bestScore: 19000, bestTime: 0, bestEmblems: 0, bestSecrets: 0, completed: 0, dashDiscovered: false, emblemsFound: [], secretsFound: [], stagesDone: [] };
+    disk.set('karimbolandia.progress.v1', JSON.stringify(legacy));
+    disk.set('karimbolandia.progress.v1.backup', JSON.stringify(legacy));
+    vi.resetModules();
+    const { ensureWallet, coinBalance } = await import('../src/core/skins');
+    const { progress } = await import('../src/core/storage');
+    ensureWallet();
+    expect(coinBalance()).toBe(30);
+    expect(progress.ownedSkins).toEqual(['explorer', 'neon']);
+    expect(progress.equippedSkin).toBe('neon');
+    expect(progress.bestScore).toBe(19000);
+  });
+
   it('rejeita compras duplicadas e skins bloqueadas em backups danificados', async () => {
     const { defaultProgress, validateProgress } = await import('../src/core/storage');
     expect(validateProgress({ ...defaultProgress(), ownedSkins: ['explorer', 'explorer'] })).toBeNull();
