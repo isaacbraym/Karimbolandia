@@ -3,7 +3,8 @@ import { Game } from './game/game';
 import { startUpdateWatch, checkStartupVersion, wasUpdateAttempted, applyUpdate } from './core/update';
 import { cloudSaves } from './core/cloud';
 
-const base = import.meta.env.BASE_URL;
+// Versioned entry pages share the root assets through their document base.
+const base = new URL(import.meta.env.BASE_URL, document.baseURI).href;
 const params = new URLSearchParams(location.search);
 
 async function verifyBeforeStart(ui: HTMLElement): Promise<'current' | 'unavailable' | 'updating'> {

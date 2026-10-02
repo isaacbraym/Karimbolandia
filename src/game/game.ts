@@ -571,7 +571,7 @@ export class Game {
     this.input.enabled = false;
     this.touch.show(false);
     this.menus.hideAll();
-    this.menus.showMain(first ? 'v4 • toque em JOGAR' : 'v4');
+    this.menus.showMain(first ? 'v5 • toque em JOGAR' : 'v5');
     this.refreshContinue();
     this.menus.fade(false);
     this.updateRotate();

@@ -1,6 +1,6 @@
 import { type Plugin } from 'vite';
 import { defineConfig } from 'vitest/config';
-import { readdirSync, statSync, writeFileSync, readFileSync } from 'node:fs';
+import { readdirSync, statSync, writeFileSync, readFileSync, mkdirSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 import { createHash } from 'node:crypto';
 
@@ -20,6 +20,20 @@ function pwaPlugin(): Plugin {
       outDir = cfg.build.outDir;
     },
     closeBundle() {
+      // A fresh URL, sharing root assets and same-origin saves with the original entry.
+      const entryDir = join(outDir, 'v5');
+      mkdirSync(entryDir, { recursive: true });
+      const html = readFileSync(join(outDir, 'index.html'), 'utf8')
+        .replace('<head>', '<head>\n    <base href="../" />')
+        .replace('href="./manifest.webmanifest"', 'href="./v5/manifest.webmanifest"')
+        .replace('<title>Karimbolândia</title>', '<title>Karimbolândia v5</title>');
+      writeFileSync(join(entryDir, 'index.html'), html);
+      const manifest = JSON.parse(readFileSync(join(outDir, 'manifest.webmanifest'), 'utf8'));
+      manifest.id = '../';
+      manifest.start_url = './';
+      manifest.scope = '../';
+      for (const icon of manifest.icons) icon.src = `../${icon.src}`;
+      writeFileSync(join(entryDir, 'manifest.webmanifest'), JSON.stringify(manifest));
       const files: string[] = [];
       const walk = (dir: string) => {
         for (const name of readdirSync(dir)) {
@@ -36,7 +50,7 @@ function pwaPlugin(): Plugin {
       const version = hash.digest('hex').slice(0, 10) + '-' + BUILD_ID;
       const sw = `/* gerado no build — Karimbolândia */
 const VERSION = 'karimbolandia-${version}';
-const PRECACHE = ${JSON.stringify(['./', ...list])};
+const PRECACHE = ${JSON.stringify(['./', './v5/', ...list])};
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(VERSION).then((c) => c.addAll(PRECACHE)).then(() => self.skipWaiting()));
 });
@@ -82,12 +96,15 @@ self.addEventListener('fetch', (e) => {
   }
   // página (navegação): rede primeiro → quem abre o jogo recebe a versão nova; offline usa o cache
   if (req.mode === 'navigate' || url.pathname.endsWith('/index.html')) {
+    const pageKey = url.origin + url.pathname;
     e.respondWith(
       fetch(req, { cache: 'no-store' }).then((res) => {
-        const copy = res.clone();
-        caches.open(VERSION).then((c) => c.put('./', copy));
+        if (res.ok) {
+          const copy = res.clone();
+          caches.open(VERSION).then((c) => c.put(pageKey, copy));
+        }
         return res;
-      }).catch(() => caches.match('./').then((hit) => hit || caches.match(req, { ignoreSearch: true })))
+      }).catch(() => caches.open(VERSION).then((c) => c.match(pageKey)))
     );
     return;
   }
