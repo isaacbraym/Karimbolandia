@@ -88,10 +88,90 @@ function textures(): Tex {
 }
 
 // ------------------------------------------------------------------ cipós
+interface Bough {
+  x0: number; // tronco
+  x1: number; // ponta (último cipó)
+  y: number;
+  vines: number[];
+}
+const boughCache = new WeakMap<object, Bough[]>();
+
+/** Liga os cipós de fora (não os da masmorra) a galhões que saem da árvore mais próxima. */
+function boughs(w: World): Bough[] {
+  const hit = boughCache.get(w.data);
+  if (hit) return hit;
+  const trees = w.data.decos.filter((d) => d.kind === 'jTree').map((d) => d.x);
+  const out: Bough[] = [];
+  const inRoom = (x: number, y: number) => w.data.rooms.some((r) => x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h);
+  for (const v of w.vines) {
+    if (inRoom(v.x, v.y)) continue;
+    let best = Infinity;
+    for (const tx of trees) if (Math.abs(tx - v.x) < Math.abs(best - v.x)) best = tx;
+    if (!Number.isFinite(best) || Math.abs(best - v.x) > 600) continue;
+    let b = out.find((o) => o.x0 === best && Math.abs(o.y - v.y) < 40);
+    if (!b) {
+      b = { x0: best, x1: v.x, y: v.y, vines: [] };
+      out.push(b);
+    }
+    if (Math.abs(v.x - best) > Math.abs(b.x1 - best)) b.x1 = v.x;
+    b.vines.push(v.spawn.id);
+  }
+  boughCache.set(w.data, out);
+  return out;
+}
+
+function drawBough(g: CanvasRenderingContext2D, b: Bough, t: number) {
+  const dir = Math.sign(b.x1 - b.x0) || 1;
+  const x1 = b.x1 + dir * 26;
+  const len = Math.abs(x1 - b.x0);
+  const mid = (b.x0 + x1) / 2;
+  // galho grosso saindo do tronco, afinando até a ponta e arqueando um pouco
+  g.fillStyle = '#3a281c';
+  g.beginPath();
+  g.moveTo(b.x0, b.y - 22);
+  g.quadraticCurveTo(mid, b.y - 34, x1, b.y - 6);
+  g.lineTo(x1, b.y + 2);
+  g.quadraticCurveTo(mid, b.y - 6, b.x0, b.y + 16);
+  g.closePath();
+  g.fill();
+  g.strokeStyle = '#170f2e';
+  g.lineWidth = 1.4;
+  g.stroke();
+  g.fillStyle = '#5a4030';
+  g.beginPath();
+  g.moveTo(b.x0, b.y - 18);
+  g.quadraticCurveTo(mid, b.y - 30, x1, b.y - 5);
+  g.lineTo(x1, b.y - 3);
+  g.quadraticCurveTo(mid, b.y - 22, b.x0, b.y - 10);
+  g.closePath();
+  g.fill();
+  // musgo e tufos de folhas ao longo do galho
+  const n = Math.max(3, Math.floor(len / 70));
+  for (let i = 0; i <= n; i++) {
+    const k = i / n;
+    const x = b.x0 + (x1 - b.x0) * k;
+    const y = b.y - 20 + 16 * k * k - Math.sin(k * Math.PI) * 8;
+    g.fillStyle = i % 2 ? '#2f7a3a' : '#3f9446';
+    g.beginPath();
+    g.ellipse(x, y - 8, 26 - k * 10, 11 - k * 3, Math.sin(t * 0.8 + i) * 0.05, 0, Math.PI * 2);
+    g.fill();
+    g.fillStyle = '#5c9a38';
+    g.beginPath();
+    g.ellipse(x - 6, y - 12, 12 - k * 4, 5, 0, 0, Math.PI * 2);
+    g.fill();
+  }
+}
+
 export function drawVines(g: CanvasRenderingContext2D, w: World) {
   const T = textures();
   const cam = w.camera;
   const p = w.player;
+  for (const b of boughs(w)) {
+    const lo = Math.min(b.x0, b.x1) - 60;
+    const hi = Math.max(b.x0, b.x1) + 60;
+    if (hi < cam.x || lo > cam.x + cam.w || b.y < cam.y - 80 || b.y > cam.y + cam.h + 40) continue;
+    drawBough(g, b, w.time);
+  }
   for (const v of w.vines) {
     if (!cam.visible(v.x, v.y + v.len / 2, v.len + 40)) continue;
     const [ex, ey] = v.point();

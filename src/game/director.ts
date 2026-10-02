@@ -10,7 +10,7 @@ import { getArt } from '../art';
 import { drawNomadIdle } from '../art/nomad';
 import { newNomad } from './player';
 import { NOMAD_W, NOMAD_H, FOOT_H } from './movement';
-import { BASE_ZOOM, EXPLORE_ZOOM, MIN_THREAT_ZOOM } from './camera';
+import { BASE_ZOOM, EXPLORE_ZOOM, MIN_THREAT_ZOOM, SWING_ZOOM } from './camera';
 import { glowSprite } from '../art/kit';
 import { drawDeco, resetDecoBudget } from '../art/decor';
 import { drawSpr } from '../art/kit';
@@ -135,6 +135,8 @@ export class Director {
   private hordeTo = 0;
   private enemySpawnById = new Map<number, EnemySpawn>();
   private firstSoldier: EnemySpawn | null = null;
+  /** câmera aberta do balanço nos cipós (1 = aberta; cai ao pisar no chão) */
+  private swingCamT = 0;
   /** decorações de primeiro plano com paralaxe (poucas: percorridas direto) */
   private parDecos: number[] = [];
   /** Busca espacial das decorações; a ordenação original é preservada ao desenhar. */
@@ -1390,6 +1392,11 @@ export class Director {
     const explore = this.combatHold <= 0 && !this.activeArenaRect();
     let zoom = explore ? EXPLORE_ZOOM : BASE_ZOOM;
     if (p.mounted) zoom -= 0.1;
+    // balançando nos cipós: câmera bem mais aberta (mostra o próximo cipó e o abismo); segura
+    // aberta no voo entre um cipó e outro e só fecha quando ele pisa no chão de novo
+    if (p.vine) this.swingCamT = 1;
+    else if (p.body.onGround) this.swingCamT = Math.max(0, this.swingCamT - 1 / 50);
+    if (this.swingCamT > 0) zoom = Math.min(zoom, SWING_ZOOM);
     for (let i = w.threats.length - 1; i >= 0; i--) if (w.time - w.threats[i].t >= 2.6) w.threats.splice(i, 1);
     cam.threat = null;
     if (w.threats.length && p.mode !== 'dead') {

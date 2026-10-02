@@ -141,9 +141,8 @@ function templeInterior(b: LevelBuilder) {
   b.crate(30, 14, 'ammo');
   // cipós sobre espinhos (A)
   b.spikes(33, 13, 15);
-  b.vine(36, 4, 5);
-  b.vine(41, 4, 5);
-  b.vine(46, 4, 5);
+  b.vine(37, 4, 5);
+  b.vine(44, 4, 5);
   b.tokenArc(34, 10, 47, 10, 7);
   torch(49, 14);
   // nicho alto do tesouro
@@ -166,8 +165,7 @@ function templeInterior(b: LevelBuilder) {
   b.deco('jTotem', 97, 14, 'back');
   // cipós sobre espinhos (B)
   b.spikes(102, 13, 18);
-  b.vine(105, 4, 5);
-  b.vine(110, 4, 5);
+  b.vine(106, 4, 5);
   b.vine(115, 4, 5);
   b.tokenArc(103, 10, 119, 10, 8);
   // sala do ídolo
@@ -190,10 +188,8 @@ function templeInterior(b: LevelBuilder) {
   b.enemy('rifle', 128, 28, { facing: 1, patrol: 40 });
   // grande poço de cipós (C)
   b.spikes(97, 27, 21);
-  b.vine(114, 16, 6);
-  b.vine(109, 16, 6);
+  b.vine(113, 16, 6);
   b.vine(104, 16, 6);
-  b.vine(99, 16, 6);
   b.tokenArc(117, 23, 97, 23, 9);
   // dois caminhos: passarela de pedra em cima, chão com estacas embaixo
   b.plat(92, 25, 3);
@@ -222,9 +218,8 @@ function templeInterior(b: LevelBuilder) {
   b.tokens(42, 27, 6);
   // cipós sobre espinhos (D)
   b.spikes(20, 27, 18);
-  b.vine(34, 16, 6);
-  b.vine(29, 16, 6);
-  b.vine(24, 16, 6);
+  b.vine(33, 16, 6);
+  b.vine(25, 16, 6);
   b.tokenArc(37, 23, 20, 23, 7);
   torch(14, 28);
 
@@ -249,9 +244,8 @@ function templeInterior(b: LevelBuilder) {
   b.crate(31, 45, 'health');
   // salão alto: corrente de cipós
   b.spikes(44, 44, 27);
-  b.vine(48, 30, 10);
-  b.vine(54, 30, 10);
-  b.vine(60, 30, 10);
+  b.vine(49, 30, 10);
+  b.vine(58, 30, 10);
   b.vine(66, 30, 10);
   b.tokenArc(45, 40, 70, 40, 10);
   torch(72, 45);
@@ -352,10 +346,8 @@ export function buildJungle(): LevelData {
   b.deco('jTotem', 354, G - 1, 'back');
   b.tokens(352, G - 2, 4);
   // cipós presos nos galhos de árvores gigantes (balance, solte no alto e agarre o próximo)
-  for (const [x, len] of [[184, 8], [190, 8], [196, 8], [211, 8], [217, 8], [223, 8]].map(([x, l]) => [x + SHIFT, l]) as [number, number][]) {
-    b.vine(x, G - 12, len);
-    b.deco('jBranch', x, G - 12, 'back', { flip: x > 203 + SHIFT });
-  }
+  // (mais espaçados: as orelhas ajudam entre um e outro; todos pendem dos galhões das árvores da borda)
+  for (const [x, len] of [[185, 8], [194, 8], [213, 8], [222, 8]].map(([x, l]) => [x + SHIFT, l]) as [number, number][]) b.vine(x, G - 12, len);
   b.tokenArc(331, G - 4, 339, G - 6, 5);
   b.tokenArc(341, G - 5, 351, G - 3, 5);
   b.tokenArc(357, G - 3, 366, G - 6, 5);

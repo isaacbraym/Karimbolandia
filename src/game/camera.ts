@@ -7,6 +7,8 @@ export const BASE_ZOOM = 1.14;
 export const EXPLORE_ZOOM = 1.27;
 /** Zoom mínimo ao abrir para mostrar atiradores fora da tela. */
 export const MIN_THREAT_ZOOM = 0.74;
+/** balançando nos cipós: câmera aberta para ver o ambiente em volta */
+export const SWING_ZOOM = 0.8;
 
 /** Câmera com suavização, look-ahead, zoom, travas de arena e shake. */
 export class Camera {

@@ -215,7 +215,7 @@ describe('Fase 2 (selva): templo', () => {
     const inn = data.doors.find((d) => d.kind === 'in')!;
     const out = data.doors.find((d) => d.kind === 'out')!;
     expect(data.rooms[0].h).toBeGreaterThan(30 * TILE);
-    expect(data.vines.filter((v) => v.x < TEMPLE_X1 * TILE).length).toBeGreaterThanOrEqual(12);
+    expect(data.vines.filter((v) => v.x < TEMPLE_X1 * TILE).length).toBeGreaterThanOrEqual(9);
     // os poços de cipós não entram no validador (ele só pula): parte de depois de cada um
     const after = [[49, 14], [121, 14], [95, 28], [17, 28], [72, 45]].map(([x, r]) => ({ x: x * TILE + 16, y: r * TILE }));
     const res = analyzeReach(data, [{ x: inn.tx, y: inn.ty }, ...after]);

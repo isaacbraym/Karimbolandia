@@ -1249,11 +1249,15 @@ function paintAnimated(g: CanvasRenderingContext2D, kind: string, seed: number, 
       // cipó pendurado balançando (pivô no alto)
       const v = Math.abs(seed) % 3;
       const len = 120 + v * 40;
-      const s = piece('vine' + v, 40, len + 10, 20, 0, (c) => {
+      const UP = 440; // corda subindo até a copa (sempre acima da tela): nada de cipó "flutuando"
+      const s = piece('vine' + v, 40, len + 10 + UP, 20, 0, (c) => {
         const r = new Rng(v * 17 + 5);
+        c.translate(0, UP);
         c.strokeStyle = '#2f5a24';
         c.lineWidth = 2.2;
         c.beginPath();
+        c.moveTo(0, -UP);
+        c.lineTo(0, 0);
         c.moveTo(0, 0);
         c.bezierCurveTo(8, len * 0.3, -8, len * 0.7, 2, len);
         c.stroke();
@@ -1269,8 +1273,8 @@ function paintAnimated(g: CanvasRenderingContext2D, kind: string, seed: number, 
         c.fill();
       });
       // cipós ficam "presos" no alto da tela: a base do deco é o topo do cipó
-      g.translate(0, -len);
-      drawPiece(g, s, Math.sin(t * 0.9 + seed) * 0.05 + Math.sin(t * 2.1 + seed * 0.3) * 0.015);
+      g.translate(0, -len - UP);
+      drawPiece(g, s, Math.sin(t * 0.9 + seed) * 0.02 + Math.sin(t * 2.1 + seed * 0.3) * 0.006);
       return true;
     }
     case 'jFireflies': {
@@ -1316,15 +1320,18 @@ function paintAnimated(g: CanvasRenderingContext2D, kind: string, seed: number, 
       return true;
     }
     case 'jFgVines': {
-      const s = piece('fgv' + (Math.abs(seed) % 2), 120, 260, 60, 0, (c) => {
+      const UPF = 320;
+      const s = piece('fgv' + (Math.abs(seed) % 2), 120, 260 + UPF, 60, 0, (c) => {
         const r = new Rng(Math.abs(seed) % 2 + 9);
+        c.translate(0, UPF);
         for (let k = 0; k < 3; k++) {
           const x0 = (k - 1) * 34;
           const len = r.range(160, 250);
           c.strokeStyle = '#0f2412';
           c.lineWidth = 4;
           c.beginPath();
-          c.moveTo(x0, 0);
+          c.moveTo(x0, -UPF);
+          c.lineTo(x0, 0);
           c.bezierCurveTo(x0 + 14, len * 0.4, x0 - 14, len * 0.7, x0 + 4, len);
           c.stroke();
           for (let i = 1; i < 9; i++) {
@@ -1333,7 +1340,8 @@ function paintAnimated(g: CanvasRenderingContext2D, kind: string, seed: number, 
           }
         }
       });
-      drawPiece(g, s, Math.sin(t * 0.6 + seed) * 0.03);
+      g.translate(0, -UPF);
+      drawPiece(g, s, Math.sin(t * 0.6 + seed) * 0.012);
       return true;
     }
     case 'jMist': {
