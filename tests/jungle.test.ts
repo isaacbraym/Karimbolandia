@@ -230,7 +230,7 @@ describe('Fase 2 (selva): areia movediça', () => {
     const swamp = data.water.find((z) => z.kind === 'swamp')!;
     w.player.reset(swamp.x + 5 * TILE, 33 * TILE);
     for (let f = 0; f < 120; f++) w.update(1 / 60, ctl);
-    expect(w.player.sink).toBeGreaterThan(20);
+    expect(w.player.sink).toBeGreaterThan(8);
     expect(w.player.sink).toBeLessThan(SINK_MAX);
     // insiste nos pulos até sair do poço
     let out = false;
@@ -243,6 +243,62 @@ describe('Fase 2 (selva): areia movediça', () => {
       if (w.player.feetY <= 32 * TILE + 1 && w.player.body.onGround) out = true;
     }
     expect(out).toBe(true);
+  });
+
+  it.each([30, 60])('escapa quase totalmente enterrado com um toque curto por segundo a %i Hz, sem invencibilidade', (fps) => {
+    const w = jungleWorld();
+    w.invulnerable = false;
+    w.enemies = [];
+    const ctl = newCtl();
+    const swamp = data.water.find((z) => z.kind === 'swamp')!;
+    w.player.reset(swamp.x + swamp.w - 3 * TILE, 33 * TILE);
+    w.update(1 / fps, ctl);
+    w.player.sink = SINK_MAX - 1;
+    let out = false;
+    for (let f = 0; f < fps * 8 && !out; f++) {
+      ctl.moveX = 1;
+      ctl.jump.pressed = f % fps === 0;
+      ctl.jump.held = ctl.jump.pressed;
+      w.update(1 / fps, ctl);
+      out = w.player.x >= swamp.x + swamp.w && w.player.body.onGround;
+    }
+    expect(out).toBe(true);
+    expect(w.player.hp).toBeGreaterThan(0);
+    expect(w.stats.deaths).toBe(0);
+    expect(w.player.sink).toBe(0);
+  });
+
+  it('dá tempo de reagir, mas ficar parado continua perigoso', () => {
+    const w = jungleWorld();
+    w.invulnerable = false;
+    w.enemies = [];
+    const ctl = newCtl();
+    const swamp = data.water.find((z) => z.kind === 'swamp')!;
+    w.player.reset(swamp.x + 5 * TILE, 33 * TILE);
+    for (let f = 0; f < 60 * 5; f++) w.update(1 / 60, ctl);
+    expect(w.player.hp).toBeGreaterThan(0);
+    expect(w.stats.deaths).toBe(0);
+    expect(w.player.sink).toBeGreaterThan(30);
+    for (let f = 0; f < 60 * 4 && w.player.mode !== 'dead'; f++) w.update(1 / 60, ctl);
+    expect(w.player.mode).toBe('dead');
+    expect(w.stats.deaths).toBe(1);
+  });
+
+  it('aceita o esforço para se desenterrar mesmo durante a reação a dano', () => {
+    const w = jungleWorld();
+    w.invulnerable = false;
+    w.enemies = [];
+    const ctl = newCtl();
+    const swamp = data.water.find((z) => z.kind === 'swamp')!;
+    w.player.reset(swamp.x + 5 * TILE, 33 * TILE);
+    w.update(1 / 60, ctl);
+    w.player.sink = SINK_MAX - 1;
+    w.player.hurtT = 0.2;
+    ctl.jump.pressed = true;
+    w.update(1 / 60, ctl);
+    expect(w.player.sink).toBeLessThan(40);
+    expect(w.player.hp).toBeGreaterThan(0);
+    expect(w.stats.deaths).toBe(0);
   });
 });
 

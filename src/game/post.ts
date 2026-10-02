@@ -64,9 +64,9 @@ export class PostFX {
     const p = w.player;
     // ao ar livre? (nada sólido acima do jogador por ~11 tiles)
     const L = w.level;
-    let covered = false;
+    let covered = this.stage === 2;
     for (let k = 3; k < 14 && !covered; k++) if (L.solidAtPx(p.x, p.y - k * 32)) covered = true;
-    const target = covered || this.stage === 2 ? 0 : 1;
+    const target = covered ? 0 : 1;
     this.rain += (target - this.rain) * Math.min(1, dt * 1.2);
 
     const n = q === 'high' ? 170 : q === 'medium' ? 110 : 60;
@@ -84,7 +84,7 @@ export class PostFX {
       }
     }
     if (this.flashSeq.length) {
-      this.flashSeq = this.flashSeq.map((t) => t - dt);
+      for (let i = 0; i < this.flashSeq.length; i++) this.flashSeq[i] -= dt;
       while (this.flashSeq.length && this.flashSeq[0] <= 0) {
         this.flashSeq.shift();
         this.flash = 0.75 + Math.random() * 0.25;
@@ -106,8 +106,12 @@ export class PostFX {
         k -= 1;
       }
     }
-    for (const s of this.splashes) s.t += dt;
-    this.splashes = this.splashes.filter((s) => s.t < 0.3);
+    let live = 0;
+    for (const s of this.splashes) {
+      s.t += dt;
+      if (s.t < 0.3) this.splashes[live++] = s;
+    }
+    this.splashes.length = live;
   }
 
   /** Relâmpago iluminando o céu (chamar DEPOIS do fundo e ANTES do mundo). */

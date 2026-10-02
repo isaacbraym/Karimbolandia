@@ -1,6 +1,7 @@
 import './style.css';
 import { Game } from './game/game';
 import { startUpdateWatch } from './core/update';
+import { cloudSaves } from './core/cloud';
 
 const base = import.meta.env.BASE_URL;
 const params = new URLSearchParams(location.search);
@@ -30,6 +31,8 @@ async function boot() {
   }
   void import('./core/audio').then((a) => import('./core/music').then((m) => ((window as unknown as Record<string, unknown>).__snd = { audio: a.audio, music: m.music, MIX: m.MIX })));
   await game.boot(base);
+  // Não atrasa a arte nem a partida; o SDK de nuvem vem em um chunk separado.
+  void cloudSaves.initialize(base);
   if ('serviceWorker' in navigator && import.meta.env.PROD) {
     const reg = () => navigator.serviceWorker.register(`${base}sw.js`, { updateViaCache: 'none' }).catch(() => undefined);
     if (document.readyState === 'complete') void reg();

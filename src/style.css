@@ -16,6 +16,8 @@
   --sal: env(safe-area-inset-left, 0px);
   --sar: env(safe-area-inset-right, 0px);
   --display: 'Lilita One', 'Arial Black', Impact, sans-serif;
+  --game-width: 100dvw;
+  --game-height: 100dvh;
   --ui: Rajdhani, 'Segoe UI', system-ui, Arial, sans-serif;
 }
 
@@ -85,6 +87,18 @@ html.rot #app {
 .hidden {
   display: none !important;
 }
+
+.panel.save-panel { width: min(620px, calc(var(--game-width) - 28px)); }
+.save-panel .btns { margin-top: 12px; }
+.save-panel p { line-height: 1.4; }
+.save-status { color: #baf6d5; margin: 8px 0; }
+.save-status.warning { color: var(--amber); }
+.save-account { color: var(--cyan); overflow-wrap: anywhere; }
+.save-details, .save-note { color: #cfc6ee; font-size: 15px; }
+.save-conflicts:not(:empty), .save-preview:not(:empty) { border: 1px solid var(--amber); border-radius: 12px; padding: 12px; margin: 12px 0; }
+.save-conflicts .btn, .save-preview .btn { width: 100%; margin-top: 8px; }
+.save-file { display: none; }
+button[hidden] { display: none !important; }
 
 /* ------------------------------------------------------------------ overlays */
 .overlay {
@@ -251,8 +265,8 @@ html.rot #app {
   backdrop-filter: blur(3px);
 }
 .panel {
-  width: min(680px, 96vw);
-  max-height: calc(100dvh - 20px - var(--sat) - var(--sab));
+  width: min(680px, calc(var(--game-width) - 20px));
+  max-height: calc(var(--game-height) - 54px - var(--sat) - var(--sab));
   overflow: auto;
   background: linear-gradient(180deg, #2b1a66, #180f3f);
   border: 3px solid var(--ink);

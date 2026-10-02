@@ -14,7 +14,7 @@ import { clamp } from '../core/math';
 import { buildArt, getArt, artReady, setArtStage, stageBg, type Quality } from '../art';
 import { loadJungle, getJungle } from '../art/jungle';
 import { buildJungle } from './level/jungle';
-import { loadSave, writeSave, clearSave, captureSave, applySave, freshSave, type SaveState } from './save';
+import { loadSave, writeSave, clearSave, captureSave, applySave, nextStageSave, type SaveState } from './save';
 import { World, type MusicState } from './world';
 import { buildLevel } from './level/index';
 import { Hud, setHudTextScale } from './hud';
@@ -23,6 +23,10 @@ import { Menus, computeRank } from '../ui/menus';
 import { TouchUI } from '../ui/touch';
 import { hintText } from './hints';
 import { VIEW_H } from './level';
+import { cloudSaves } from '../core/cloud';
+import { persistenceStatus, onPersist } from '../core/persistence';
+import { FrameMetrics } from '../debug/performance';
+import { preserveProfile } from '../core/profile';
 
 type State = 'loading' | 'menu' | 'playing' | 'paused' | 'complete' | 'continue' | 'gameover' | 'comic';
 
@@ -95,6 +99,9 @@ export class Game {
   stage = new URLSearchParams(location.search).get('fase') === '2' ? 2 : 1;
   private base = './';
   private ambT = 3;
+  private saveQueued = false;
+  private storageWarningShown = false;
+  private metrics: FrameMetrics | null = null;
 
   constructor(canvas: HTMLCanvasElement, ui: HTMLElement) {
     this.canvas = canvas;
@@ -110,8 +117,8 @@ export class Game {
     this.input.attach(app);
     this.touch = new TouchUI(this.ui, this.input);
     this.menus = new Menus(this.ui, {
-      onPlay: () => this.play(false, this.stage === 2 && new URLSearchParams(location.search).get('fase') === '2' ? 2 : 1),
-      onPlayJungle: () => this.play(false, 2),
+      onPlay: () => this.startNewGame(this.stage === 2 && new URLSearchParams(location.search).get('fase') === '2' ? 2 : 1),
+      onPlayJungle: () => this.startNewGame(2),
       onContinueSave: () => this.continueSave(),
       onDiscardSave: () => {
         clearSave();
@@ -125,6 +132,19 @@ export class Game {
       onContinueYes: () => this.confirmContinue(),
       onContinueNo: () => this.declineContinue(),
       onClick: () => audio.play('uiClick', 0.8),
+      onProfileChanged: () => this.profileChanged(),
+    });
+    if (new URLSearchParams(location.search).get('perf') === '1') this.metrics = new FrameMetrics(this.ui);
+    cloudSaves.configureHooks({
+      beforeSwitch: () => this.prepareProfileChange(),
+      changed: () => this.profileChanged(),
+      safeToApply: () => this.state === 'menu' || this.state === 'paused' || this.state === 'complete',
+    });
+    onPersist(() => {
+      if (persistenceStatus() === 'volatile' && !this.storageWarningShown) {
+        this.storageWarningShown = true;
+        this.menus.toast('Não foi possível salvar no aparelho. Abra SAVE E CONTA e baixe um backup.');
+      }
     });
     this.input.onGesture = () => {
       audio.init();
@@ -144,7 +164,12 @@ export class Game {
     const noPause = new URLSearchParams(location.search).get('nopause') === '1'; // QA
     document.addEventListener('visibilitychange', () => {
       if (document.hidden && this.state === 'playing' && !noPause) this.pause();
-      if (!document.hidden) audio.wake();
+      if (!document.hidden) {
+        this.last = performance.now();
+        this.frames = 0;
+        this.lastFpsUpdate = this.last;
+        audio.wake();
+      }
     });
     // voltando de outro app (celular): o áudio pode ter sido suspenso pelo sistema
     window.addEventListener('focus', () => audio.wake());
@@ -152,6 +177,9 @@ export class Game {
     window.addEventListener('blur', () => {
       if (this.state === 'playing' && !noPause) this.pause();
     });
+    window.addEventListener('pagehide', () => this.saveGame());
+    // Nenhuma serialização/escrita/nuvem por quadro. O save periódico usa uma janela ociosa.
+    window.setInterval(() => { if (this.state === 'playing') this.queueSave(); }, 20000);
     for (const ev of ['gesturestart', 'gesturechange']) document.addEventListener(ev, (e) => e.preventDefault());
     document.addEventListener('dblclick', (e) => e.preventDefault());
     // fontes antes de desenhar HUD
@@ -240,6 +268,8 @@ export class Game {
     const cssH = rot ? window.innerWidth : window.innerHeight;
     // aba em segundo plano / janela minimizada pode reportar 0×0: mantém o tamanho anterior
     if (!(cssW > 0 && cssH > 0)) return;
+    document.documentElement.style.setProperty('--game-width', `${cssW}px`);
+    document.documentElement.style.setProperty('--game-height', `${cssH}px`);
     const aspect = cssW / cssH;
     this.viewH = VIEW_H;
     this.viewW = clamp(Math.round(aspect * VIEW_H), 520, 820);
@@ -312,8 +342,32 @@ export class Game {
   /** Checkpoint alcançado: grava a partida no navegador. */
   private saveGame() {
     const w = this.world;
-    if (!w || w.finished) return;
+    if (!w || w.finished || w.player.hp <= 0) return;
     writeSave(captureSave(w));
+  }
+  private queueSave() {
+    if (this.saveQueued) return;
+    this.saveQueued = true;
+    const save = () => { this.saveQueued = false; if (this.state === 'playing') this.saveGame(); };
+    if (typeof window.requestIdleCallback === 'function') window.requestIdleCallback(save, { timeout: 1500 });
+    else window.setTimeout(save, 0);
+  }
+  prepareProfileChange() {
+    if (this.state === 'playing' || this.state === 'paused') this.saveGame();
+  }
+  private startNewGame(stage: number) {
+    const start = () => {
+      preserveProfile();
+      this.play(true, stage);
+    };
+    const saved = loadSave();
+    if (saved) this.menus.askNewGame(this.saveLabel(saved), start);
+    else this.play(true, stage);
+  }
+  profileChanged() {
+    this.world = null;
+    this.menus.closeResume();
+    this.toMenu();
   }
   /** Volta ao último checkpoint salvo. */
   continueSave() {
@@ -380,6 +434,7 @@ export class Game {
     // abertura narrada (câmera pelas ruínas até o herói)
     if (settings.narrator && !this.noOpening && stage === 1 && !(save && save.checkpointIdx >= 0)) w.director.startOpening();
     this.last = performance.now();
+    this.queueSave();
   }
 
   // ------------------------------------------------------------------ narrador
@@ -420,7 +475,7 @@ export class Game {
       narrReady: (id) => audio.narrReady(id),
       narrPlaying: (id) => this.narrId === id && !!this.narrClip?.playing,
       onNarrPrepare: (id) => audio.prepareNarr(id),
-      onCheckpoint: () => this.saveGame(),
+      onCheckpoint: () => this.queueSave(),
       onBanner: (t, s, d) => this.hud.banner(t, s, d),
       onComplete: () => this.onComplete(),
       onMusic: (s) => this.setMusic(s),
@@ -439,6 +494,7 @@ export class Game {
 
   pause() {
     if (this.state !== 'playing') return;
+    this.saveGame();
     this.state = 'paused';
     this.input.enabled = false;
     this.touch.show(false);
@@ -484,9 +540,11 @@ export class Game {
     this.setMusic('explore');
     this.last = performance.now();
     this.updateRotate();
+    this.queueSave();
   }
 
   toMenu(first = false) {
+    if (this.state === 'playing' || this.state === 'paused') this.saveGame();
     this.stopIntroAudio();
     audio.setUnderwater(0);
     this.stopNarr(0.2);
@@ -670,14 +728,17 @@ export class Game {
     if (!progress.bestTime || w.time < progress.bestTime) progress.bestTime = w.time;
     progress.bestEmblems = Math.max(progress.bestEmblems, w.emblems.size);
     progress.bestSecrets = Math.max(progress.bestSecrets, w.secrets.size);
+    progress.emblemsFound = [...new Set([...progress.emblemsFound, ...w.emblems])];
+    progress.secretsFound = [...new Set([...progress.secretsFound, ...w.secrets])];
     progress.completed++;
     if (!progress.stagesDone.includes(w.data.stage)) progress.stagesDone.push(w.data.stage);
     saveProgress();
     // fase concluída: o save passa a apontar para o começo da próxima (a selva ainda é prévia)
-    if (w.data.stage === 1) writeSave(freshSave(2));
+    if (w.data.stage === 1) writeSave(nextStageSave(w, 2));
     else clearSave();
     window.setTimeout(() => {
       this.menus.showResults({
+        nextStage: w.data.stage === 1 ? 2 : undefined,
         time: w.time, score: w.score, tokens: w.tokens, emblems: w.emblems.size, secrets: w.secrets.size, kills: w.stats.kills, deaths: w.stats.deaths, rank, newBest, bestCombo: w.bestCombo,
       });
       this.input.onMenuKey = (code) => {
@@ -745,8 +806,11 @@ export class Game {
   // ------------------------------------------------------------------ loop
   private frame(now: number) {
     requestAnimationFrame((t) => this.frame(t));
-    let dt = (now - this.last) / 1000;
+    const frameMs = now - this.last;
+    let dt = frameMs / 1000;
     this.last = now;
+    // Aba oculta não desenha nem altera a qualidade; também não contamina o diagnóstico.
+    if (document.hidden) return;
     if (dt > 0.1) dt = 0.1;
     if (dt < 0) dt = 0;
     this.frames++;
@@ -755,7 +819,9 @@ export class Game {
       this.frames = 0;
       this.lastFpsUpdate = now;
     }
-    this.autoQuality(dt, now);
+    const focused = document.hasFocus();
+    if (focused) this.autoQuality(dt, now);
+    else { this.drsAcc = this.drsN = 0; this.frameTimes.length = 0; this.metrics?.inactive(); }
     this.input.poll();
     const w = this.world;
 
@@ -806,6 +872,9 @@ export class Game {
     const t2 = performance.now();
     this.prof.update += (t1 - t0 - this.prof.update) * 0.05;
     this.prof.render += (t2 - t1 - this.prof.render) * 0.05;
+    if (focused && this.state === 'playing' && w && !this.orientationBlocked) {
+      this.metrics?.sample(frameMs, t1 - t0, t2 - t1, now, `Fase ${w.data.stage} • ${this.quality} • resolução ${(this.renderScale * 100).toFixed(0)}%`);
+    }
   }
 
   private step(w: World, dt: number) {

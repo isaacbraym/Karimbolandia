@@ -85,6 +85,12 @@ python tools/make_icons.py
 
 ## Desenvolvimento
 
+### Progresso e backup
+
+Use **SAVE E CONTA** no menu ou na pausa para baixar/restaurar um backup e conferir se o progresso foi gravado. O save local guarda a partida no último checkpoint, fichas, equipamentos e itens, com validação e uma cópia anterior. A partida também é salva periodicamente e ao pausar ou sair. Se o navegador impedir a gravação, o jogo avisa para baixar um backup antes de fechar.
+
+O login Google e o save privado por conta são opcionais e dependem de um projeto Firebase configurado. As instruções e regras de acesso estão em [firebase/README.md](firebase/README.md). A interface distingue progresso local de envio confirmado para a nuvem.
+
 ```bash
 npm install
 npm run dev        # servidor de desenvolvimento

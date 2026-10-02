@@ -6,6 +6,8 @@
  */
 import type { World } from './world';
 import type { WeaponId } from './weapons';
+import { profileKey, readStored, writeStored } from '../core/persistence';
+import { validateSave } from '../core/saveValidation';
 
 const KEY = 'karimbolandia.save.v1';
 
@@ -38,36 +40,22 @@ export interface SaveState {
 }
 
 export function loadSave(): SaveState | null {
-  try {
-    const raw = localStorage.getItem(KEY);
-    if (!raw) return null;
-    const s = JSON.parse(raw) as SaveState;
-    if (!s || s.v !== 1 || typeof s.stage !== 'number') return null;
-    return s;
-  } catch {
-    return null;
-  }
+  return readStored(profileKey(KEY), validateSave);
 }
 
 export function writeSave(s: SaveState) {
-  try {
-    localStorage.setItem(KEY, JSON.stringify(s));
-  } catch {
-    /* modo privado / sem espaço: segue sem salvar */
-  }
+  const valid = validateSave(s);
+  if (!valid) return false;
+  return writeStored(profileKey(KEY), valid, validateSave);
 }
 
 export function clearSave() {
-  try {
-    localStorage.removeItem(KEY);
-  } catch {
-    /* ignora */
-  }
+  return writeStored(profileKey(KEY), null, validateSave);
 }
 
 /** Fotografa a partida no checkpoint atual. */
 export function captureSave(w: World): SaveState {
-  const snap = w.checkpointSnap ?? w.player.snapshot();
+  const snap = w.player.snapshot();
   const cp = w.checkpointIdx >= 0 ? w.data.checkpoints[w.checkpointIdx] : null;
   return {
     v: 1,
@@ -107,6 +95,11 @@ export function freshSave(stage: number, score = 0): SaveState {
     stats: { kills: 0, deaths: 0, damageTaken: 0, dashes: 0, shots: 0, pitFalls: 0 },
     savedAt: Date.now(),
   };
+}
+
+/** Continua a campanha sem levar IDs e checkpoints de um mapa para o outro. */
+export function nextStageSave(w: World, stage: number): SaveState {
+  return { ...freshSave(stage, w.score), tokens: w.tokens };
 }
 
 /** Restaura o save num mundo recém-criado e põe o Karimbo no checkpoint. */

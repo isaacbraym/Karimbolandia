@@ -1,6 +1,9 @@
 /** Menus em DOM: carregamento, principal, configurações, controles, créditos, pausa, resultados, girar celular. */
 import { settings, saveSettings, progress, type QualityPref } from '../core/storage';
 import { formatTime } from '../core/math';
+import { cloudSaves } from '../core/cloud';
+import { applyProfile, captureProfile, exportBackup, parseBackup, validateProfile, preserveProfile, MAX_BACKUP_BYTES, type ProfileData } from '../core/profile';
+import { persistenceStatus, onPersist, profileKey, readStored } from '../core/persistence';
 
 export interface MenuCallbacks {
   onPlay(): void;
@@ -18,9 +21,11 @@ export interface MenuCallbacks {
   onContinueYes(): void;
   onContinueNo(): void;
   onClick(): void;
+  onProfileChanged(): void;
 }
 
 export interface ResultData {
+  nextStage?: number;
   time: number;
   score: number;
   tokens: number;
@@ -71,6 +76,7 @@ export class Menus {
   private toastT = 0;
   private focusable: HTMLElement[] = [];
   private focusIdx = -1;
+  private saveUnsubscribe: (() => void) | null = null;
 
   constructor(root: HTMLElement, private cb: MenuCallbacks) {
     this.root = root;
@@ -122,6 +128,7 @@ export class Menus {
       this.contBtn,
       this.btn('JOGAR', 'primary', () => this.cb.onPlay()),
       this.btn('FASE 2 • SELVA', 'primary', () => this.cb.onPlayJungle()),
+      this.btn('SAVE E CONTA', 'alt', () => this.showSaves('main')),
       this.btn('CONFIGURAÇÕES', 'alt', () => this.showSettings('main')),
       this.btn('CONTROLES', 'alt', () => this.showControls('main')),
       this.btn('CRÉDITOS', 'alt', () => this.showCredits('main'))
@@ -138,11 +145,12 @@ export class Menus {
     const o = el('div', 'overlay panel-back hidden');
     o.style.zIndex = '32';
     const p = el('div', 'panel');
-    p.style.width = 'min(360px, 92vw)';
+    p.style.width = 'min(360px, calc(var(--game-width) - 28px))';
     p.append(el('h2', '', 'PAUSADO'));
     const btns = el('div', 'btns');
     btns.append(
       this.btn('CONTINUAR', 'primary', () => this.cb.onResume()),
+      this.btn('SAVE E CONTA', 'alt', () => this.showSaves('pause')),
       this.btn('CONFIGURAÇÕES', 'alt', () => this.showSettings('pause')),
       this.btn('REINICIAR FASE', 'alt', () => this.cb.onRestart()),
       this.btn('MENU PRINCIPAL', 'alt', () => this.cb.onQuitToMenu())
@@ -207,6 +215,8 @@ export class Menus {
   }
 
   closePanel() {
+    this.saveUnsubscribe?.();
+    this.saveUnsubscribe = null;
     this.panel.classList.add('hidden');
     if (this.panelReturn === 'main') this.main.classList.remove('hidden');
     else this.pause.classList.remove('hidden');
@@ -352,6 +362,112 @@ export class Menus {
   }
 
   // ------------------------------------------------------------------ estados
+  /** Save portátil funciona mesmo sem serviço de contas e sem internet. */
+  showSaves(from: 'main' | 'pause' = 'main') {
+    this.saveUnsubscribe?.();
+    const panel = el('div', 'panel save-panel');
+    panel.append(el('h2', '', 'SEU PROGRESSO'));
+    const local = el('p', 'save-status');
+    local.setAttribute('role', 'status');
+    const account = el('p', 'save-account');
+    const remote = el('p', 'save-status');
+    remote.setAttribute('role', 'status');
+    const details = el('p', 'save-details');
+    const buttons = el('div', 'btns');
+    const login = this.btn('ENTRAR COM GOOGLE', 'primary', () => { void cloudSaves.login(); });
+    const sync = this.btn('SINCRONIZAR AGORA', 'alt', () => { void cloudSaves.sync(); });
+    const logout = this.btn('SAIR DA CONTA', 'alt small', () => { void cloudSaves.logout(); });
+    const conflicts = el('div', 'save-conflicts');
+    const download = this.btn('BAIXAR BACKUP', 'primary', () => {
+      const url = URL.createObjectURL(new Blob([exportBackup()], { type: 'application/json' }));
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `karimbolandia-${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      window.setTimeout(() => URL.revokeObjectURL(url), 10000);
+      this.toast('Backup pronto. Guarde o arquivo para recuperar seu progresso.');
+    });
+    const file = el('input', 'save-file');
+    file.type = 'file';
+    file.accept = '.json,application/json';
+    file.setAttribute('aria-label', 'Escolher backup do Karimbolândia');
+    const preview = el('div', 'save-preview');
+    const describe = (data: ProfileData) => data.save
+      ? `Fase ${data.save.stage} • ${data.save.cpName} • ${data.save.tokens} fichas • ${data.save.score} pontos`
+      : `Sem partida em andamento • recorde ${data.progress.bestScore} • ${data.progress.completed} fases concluídas`;
+    const confirmRestore = (data: ProfileData) => {
+      preview.replaceChildren();
+      const text = el('p');
+      text.textContent = `${describe(data)}. Restaurar substitui a partida deste perfil e guarda uma cópia da atual.`;
+      preview.append(text, this.btn('RESTAURAR ESTE BACKUP', 'primary', () => {
+        const durable = applyProfile(data);
+        this.cb.onProfileChanged();
+        this.showSaves('main');
+        this.toast(durable ? 'Backup restaurado. Use CONTINUAR para jogar.' : 'Restaurado em memória. Baixe um backup: este navegador não conseguiu gravar.');
+      }), this.btn('CANCELAR', 'alt small', () => { preview.replaceChildren(); this.collectFocus(panel); }));
+      this.collectFocus(panel);
+    };
+    file.addEventListener('change', async () => {
+      const selected = file.files?.[0];
+      if (!selected) return;
+      try {
+        if (selected.size > MAX_BACKUP_BYTES) throw new Error('Arquivo grande demais. Escolha um backup do jogo.');
+        const text = await selected.text();
+        if (!panel.isConnected) return;
+        confirmRestore(parseBackup(text));
+      } catch (error) {
+        preview.replaceChildren();
+        const text = el('p');
+        text.textContent = error instanceof Error ? error.message : 'Não foi possível ler o backup.';
+        preview.append(text);
+      } finally { file.value = ''; }
+    });
+    const restore = this.btn('RESTAURAR BACKUP', 'alt', () => file.click());
+    const undo = this.btn('RECUPERAR SAVE ANTERIOR', 'alt small', () => {
+      const data = readStored(profileKey('karimbolandia.before-restore.v1'), validateProfile);
+      if (data) confirmRestore(data);
+      else this.toast('Ainda não há uma restauração anterior neste perfil.');
+    });
+    buttons.append(login, sync, logout, download, restore, undo);
+    panel.append(local, details, account, remote, conflicts, buttons, file, preview);
+    const note = el('p', 'save-note');
+    note.textContent = 'A partida volta ao último checkpoint, com fichas, equipamentos e itens salvos. Baixar um backup também protege seu progresso se você limpar os dados do navegador.';
+    panel.append(note);
+    this.openPanel(panel, from);
+    const update = () => {
+      const data = captureProfile();
+      const previous = readStored(profileKey('karimbolandia.before-restore.v1'), validateProfile);
+      const status = persistenceStatus();
+      local.textContent = status === 'volatile'
+        ? 'Não foi possível gravar no aparelho. Baixe um backup antes de fechar o jogo.'
+        : status === 'recovered' ? 'Uma cópia anterior foi recuperada. Baixe um backup por segurança.' : 'Seu progresso está salvo neste aparelho.';
+      local.classList.toggle('warning', status !== 'saved');
+      details.textContent = describe(data);
+      account.textContent = cloudSaves.user ? `Conta: ${cloudSaves.user.email ?? 'Google'}` : 'Jogando neste aparelho';
+      remote.textContent = cloudSaves.state === 'unconfigured'
+        ? 'O login ainda não está disponível nesta versão. Você já pode baixar e restaurar backups.' : cloudSaves.message;
+      login.hidden = !!cloudSaves.user || !cloudSaves.available;
+      sync.hidden = logout.hidden = !cloudSaves.user;
+      sync.disabled = cloudSaves.state === 'syncing' || cloudSaves.state === 'conflict';
+      login.disabled = cloudSaves.state === 'loading' || cloudSaves.state === 'syncing';
+      undo.hidden = !previous;
+      conflicts.replaceChildren();
+      if (cloudSaves.conflict && cloudSaves.state === 'conflict') {
+        const { remote: saved } = cloudSaves.conflict;
+        const here = el('p'), there = el('p');
+        here.textContent = `Neste aparelho: ${describe(captureProfile())}`;
+        there.textContent = `Na conta: ${describe(saved.data)}`;
+        conflicts.append(here, there,
+          this.btn('CONTINUAR PARTIDA DO APARELHO', 'primary', () => { void cloudSaves.resolveConflict('local'); }),
+          this.btn('CONTINUAR PARTIDA DA CONTA', 'alt', () => { void cloudSaves.resolveConflict('remote'); }));
+      }
+      this.collectFocus(panel);
+    };
+    const unsubscribeCloud = cloudSaves.subscribe(update);
+    const unsubscribeLocal = onPersist(update);
+    this.saveUnsubscribe = () => { unsubscribeCloud(); unsubscribeLocal(); };
+  }
+
   setLoading(p: number, label: string) {
     this.bar.style.width = `${Math.round(p * 100)}%`;
     this.lbl.textContent = label;
@@ -366,6 +482,8 @@ export class Menus {
     this.collectFocus(this.main);
   }
   hideAll() {
+    this.saveUnsubscribe?.();
+    this.saveUnsubscribe = null;
     this.main.classList.add('hidden');
     this.panel.classList.add('hidden');
     this.pause.classList.add('hidden');
@@ -422,15 +540,36 @@ export class Menus {
     this.resumeEl = null;
   }
 
+  askNewGame(label: string, start: () => void) {
+    this.closeResume();
+    const overlay = el('div', 'overlay panel-back');
+    overlay.id = 'resume';
+    const panel = el('div', 'panel');
+    panel.style.width = 'min(460px, calc(var(--game-width) - 28px))';
+    const text = el('p');
+    text.textContent = `Já existe uma partida: ${label}. Ao começar outra, seus recordes continuam e a partida atual fica em RECUPERAR SAVE ANTERIOR.`;
+    panel.append(el('h2', '', 'COMEÇAR OUTRA PARTIDA?'), text);
+    const buttons = el('div', 'btns');
+    buttons.append(
+      this.btn('CONTINUAR PARTIDA SALVA', 'primary', () => { this.closeResume(); this.cb.onContinueSave(); }),
+      this.btn('COMEÇAR NOVA PARTIDA', 'alt', () => { this.closeResume(); start(); }),
+      this.btn('VOLTAR', 'alt small', () => { this.closeResume(); this.collectFocus(this.main); })
+    );
+    panel.append(buttons); overlay.append(panel); this.root.append(overlay);
+    this.resumeEl = overlay; this.collectFocus(overlay);
+  }
+
   /** Ao abrir o jogo com um save: pergunta se quer voltar ao último checkpoint. */
   askResume(label: string) {
     if (this.resumeEl) return;
     const o = el('div', 'overlay panel-back');
     o.id = 'resume';
     const p = el('div', 'panel');
-    p.style.width = 'min(420px, 92vw)';
+    p.style.width = 'min(420px, calc(var(--game-width) - 28px))';
     p.style.textAlign = 'center';
-    p.append(el('h2', '', 'CONTINUAR?'), el('p', '', `Você tem um jogo salvo: ${label}. Quer voltar ao último checkpoint?`));
+    const description = el('p');
+    description.textContent = `Você tem um jogo salvo: ${label}. Quer voltar ao último checkpoint?`;
+    p.append(el('h2', '', 'CONTINUAR?'), description);
     const btns = el('div', 'btns');
     const close = () => {
       o.remove();
@@ -444,8 +583,10 @@ export class Menus {
       }),
       this.btn('NOVO JOGO', 'alt small', () => {
         close();
+        preserveProfile();
         this.cb.onDiscardSave();
-      })
+      }),
+      this.btn('IR AO MENU', 'alt small', close)
     );
     p.append(btns);
     o.append(p);
@@ -461,7 +602,7 @@ export class Menus {
     const o = el('div', 'overlay panel-back');
     o.id = 'update';
     const p = el('div', 'panel');
-    p.style.width = 'min(400px, 92vw)';
+    p.style.width = 'min(400px, calc(var(--game-width) - 28px))';
     p.style.textAlign = 'center';
     p.append(el('h2', '', 'NOVA VERSÃO!'), el('p', '', 'Saiu uma atualização do Karimbolândia. Atualize para jogar a versão mais nova.'));
     const btns = el('div', 'btns');
@@ -520,9 +661,10 @@ export class Menus {
     const rec = el('div', '', d.newBest ? '<b style="color:#ffe27a">★ NOVO RECORDE! ★</b>' : `Recorde: ${String(progress.bestScore).padStart(7, '0')}`);
     rec.style.fontWeight = '700';
     const btns = el('div', 'btns');
-    btns.style.width = 'min(360px, 80vw)';
-    btns.style.flexDirection = 'row';
-    btns.append(this.btn('JOGAR DE NOVO', 'primary small', () => this.cb.onPlayAgain()), this.btn('MENU', 'alt small', () => this.cb.onQuitToMenu()));
+    btns.style.width = 'min(360px, calc(var(--game-width) - 28px))';
+    btns.style.flexDirection = d.nextStage ? 'column' : 'row';
+    if (d.nextStage === 2) btns.append(this.btn('CONTINUAR NA SELVA', 'primary small', () => this.cb.onContinueSave()));
+    btns.append(this.btn('JOGAR DE NOVO', d.nextStage ? 'alt small' : 'primary small', () => this.cb.onPlayAgain()), this.btn('MENU', 'alt small', () => this.cb.onQuitToMenu()));
     this.results.append(t, rk, st, rec, btns);
     this.results.classList.remove('hidden');
     this.collectFocus(btns);
@@ -545,7 +687,7 @@ export class Menus {
 
   // ------------------------------------------------------------------ teclado/gamepad nos menus
   private collectFocus(scope: HTMLElement) {
-    this.focusable = [...scope.querySelectorAll<HTMLElement>('.btn')];
+    this.focusable = [...scope.querySelectorAll<HTMLElement>('.btn')].filter(b => !b.hidden && !(b as HTMLButtonElement).disabled && b.style.display !== 'none');
     this.focusIdx = this.focusable.length ? 0 : -1;
     this.applyFocus();
   }
@@ -554,6 +696,11 @@ export class Menus {
   }
   /** Chamado com códigos de tecla enquanto um menu está aberto. Retorna true se consumiu. */
   handleKey(code: string): boolean {
+    if (code === 'Escape' && this.resumeEl) {
+      this.closeResume();
+      this.collectFocus(this.main);
+      return true;
+    }
     if (!this.focusable.length) return false;
     if (code === 'ArrowDown' || code === 'KeyS') {
       this.focusIdx = (this.focusIdx + 1) % this.focusable.length;

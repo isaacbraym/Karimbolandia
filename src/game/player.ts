@@ -30,10 +30,11 @@ const SHOTGUN_HOP = 400; // pulinho do coice (~45 px)
 const SHOTGUN_POGO = 600; // tiro para baixo: impulso para cima (~100 px)
 const SLIDE_V = 430; // px/s no início do deslize
 /** areia movediça: velocidade de afundar (px/s), profundidade fatal, quanto cada pulo puxa para fora */
-export const SINK_RATE = 15;
+export const SINK_RATE = 8;
 export const SINK_MAX = 60;
-const SINK_PULL = 13;
-const SINK_FREE = 7;
+const SINK_PULL = 24;
+const SINK_FREE = 12;
+const SINK_RECOVERY = 0.5;
 
 export { FOOT_W, FOOT_H, CROUCH_H, NOMAD_W, NOMAD_H };
 export interface NomadState {
@@ -144,6 +145,7 @@ export class Player {
   /** px afundados na areia movediça */
   sink = 0;
   private sinkShown = false;
+  private sinkRecoveryT = 0;
   runPhase = 0;
   stepAcc = 0;
   animT = 0;
@@ -241,6 +243,7 @@ export class Player {
     if (this.vine) this.vine.held = false;
     this.vine = null;
     this.sink = 0;
+    this.sinkRecoveryT = 0;
   }
 
   resetInventory() {
@@ -495,6 +498,7 @@ export class Player {
     this.suspV += (-240 * this.susp - 12 * this.suspV) * Math.min(dt, 1 / 30);
     this.susp = clamp(this.susp + this.suspV * Math.min(dt, 1 / 30), -1.2, 1.6);
     if (this.hurtT > 0) this.hurtT -= dt;
+    if (this.sinkRecoveryT > 0) this.sinkRecoveryT = Math.max(0, this.sinkRecoveryT - dt);
     if (this.fireCd > 0) this.fireCd -= dt;
     if (this.nadeCd > 0) this.nadeCd -= dt;
     this.kick = approach(this.kick, 0, dt * 9);
@@ -694,6 +698,8 @@ export class Player {
     // pulo (preso na areia movediça não decola)
     if (this.jumpBuf > 0 && this.coyote > 0 && !hurt && this.sink <= SINK_FREE) {
       b.vy = -JUMP_V;
+      // Um toque curto também precisa dar altura para vencer a borda da lama.
+      if (wade > 0) this.leapT = Math.max(this.leapT, 0.14);
       this.jumping = true;
       this.jumpBuf = 0;
       this.coyote = 0;
@@ -906,15 +912,16 @@ export class Player {
     const b = this.body;
     if (!b.onGround) return;
     const before = this.sink;
-    this.sink = Math.min(SINK_MAX, this.sink + SINK_RATE * dt);
+    if (this.sinkRecoveryT <= 0) this.sink = Math.min(SINK_MAX, this.sink + SINK_RATE * dt);
     if (before < 2 && this.sink >= 2 && !this.sinkShown) {
       this.sinkShown = true;
       w.director.banner('AREIA MOVEDIÇA!', 'Aperte PULO várias vezes para sair', 2.6);
       w.hooks.onHint?.('quicksand');
     }
-    if (ctl.jump.pressed && this.sink > SINK_FREE && this.hurtT <= 0) {
+    if (ctl.jump.pressed && this.sink > SINK_FREE) {
       // esforço para sair: não decola, mas sobe um pouco na lama
       this.sink = Math.max(0, this.sink - SINK_PULL);
+      this.sinkRecoveryT = SINK_RECOVERY;
       this.jumpBuf = 0;
       this.landSquash = 0.6;
       w.audio('wade', 1, this.x);

@@ -56,7 +56,7 @@ function refreshOldPages() {
 }
 self.addEventListener('activate', (e) => {
   e.waitUntil(
-    caches.keys().then((keys) => Promise.all(keys.filter((k) => k !== VERSION).map((k) => caches.delete(k))))
+    caches.keys().then((keys) => Promise.all(keys.filter((k) => k.startsWith('karimbolandia-') && k !== VERSION).map((k) => caches.delete(k))))
       .then(() => self.clients.claim())
       .then(() => refreshOldPages())
   );
@@ -71,6 +71,14 @@ self.addEventListener('fetch', (e) => {
   if (req.method !== 'GET' || url.origin !== self.location.origin) return;
   // versão: sempre da rede (nunca do cache)
   if (url.pathname.endsWith('/version.json')) return;
+  // Configuração de contas pode mudar sem trocar os assets; rede primeiro com fallback offline.
+  if (url.pathname.endsWith('/cloud-config.json')) {
+    e.respondWith(fetch(req, { cache: 'no-store' }).then((res) => {
+      if (res.ok) { const copy = res.clone(); caches.open(VERSION).then((c) => c.put(req, copy)); }
+      return res;
+    }).catch(() => caches.match(req).then((hit) => hit || new Response('{"enabled":false}', { headers: { 'Content-Type': 'application/json' } }))));
+    return;
+  }
   // página (navegação): rede primeiro → quem abre o jogo recebe a versão nova; offline usa o cache
   if (req.mode === 'navigate' || url.pathname.endsWith('/index.html')) {
     e.respondWith(
