@@ -143,6 +143,8 @@ export class Input {
     target.addEventListener(
       'wheel',
       (e) => {
+        // Menus share the app root: leave their native scrolling untouched.
+        if (!this.enabled || (e.target instanceof Element && e.target.closest('#ui'))) return;
         if (e.deltaY > 0) this.wheelNext = true;
         else if (e.deltaY < 0) this.wheelPrev = true;
         e.preventDefault();

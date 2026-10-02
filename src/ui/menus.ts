@@ -152,8 +152,7 @@ export class Menus {
   private buildPause() {
     const o = el('div', 'overlay panel-back hidden');
     o.style.zIndex = '32';
-    const p = el('div', 'panel');
-    p.style.width = 'min(360px, calc(var(--game-width) - 28px))';
+    const p = el('div', 'panel pause-panel');
     p.append(el('h2', '', 'PAUSADO'));
     const btns = el('div', 'btns');
     btns.append(
@@ -271,11 +270,34 @@ export class Menus {
   }
 
   showSettings(from: 'main' | 'pause') {
-    const c = el('div', 'panel');
+    const c = el('div', 'panel settings-panel');
     c.append(el('h2', '', 'CONFIGURAÇÕES'));
-    c.append(
+    const audio = el('div', 'settings-group active');
+    const game = el('div', 'settings-group');
+    const touch = el('div', 'settings-group');
+    const tabs = el('div', 'settings-tabs');
+    tabs.setAttribute('role', 'tablist');
+    tabs.setAttribute('aria-label', 'Categorias de configurações');
+    const groups = [audio, game, touch];
+    ['SOM', 'JOGO', 'TOQUE'].forEach((label, index) => {
+      const tab = this.btn(label, 'alt small', () => {
+        groups.forEach((group, i) => group.classList.toggle('active', i === index));
+        [...tabs.children].forEach((button, i) => button.setAttribute('aria-selected', String(i === index)));
+      });
+      tab.id = `settings-tab-${index}`;
+      tab.setAttribute('role', 'tab');
+      tab.setAttribute('aria-selected', String(index === 0));
+      tab.setAttribute('aria-controls', `settings-group-${index}`);
+      groups[index].id = `settings-group-${index}`;
+      groups[index].setAttribute('role', 'tabpanel');
+      groups[index].setAttribute('aria-labelledby', tab.id);
+      tabs.append(tab);
+    });
+    c.append(tabs, ...groups);
+    audio.append(
       this.slider('Música', () => settings.music, (v) => (settings.music = v)),
-      this.slider('Efeitos sonoros', () => settings.sfx, (v) => (settings.sfx = v))
+      this.slider('Efeitos sonoros', () => settings.sfx, (v) => (settings.sfx = v)),
+      this.toggle('Narrador da história', () => settings.narrator, (v) => (settings.narrator = v))
     );
     const qrow = el('div', 'row');
     qrow.append(el('label', '', 'Qualidade gráfica'));
@@ -300,20 +322,18 @@ export class Menus {
       this.toast(settings.quality === 'auto' ? 'Qualidade automática' : 'Qualidade atualizada');
     });
     qrow.append(sel);
-    c.append(qrow);
-    c.append(
+    game.append(qrow);
+    touch.append(
       this.slider('Tamanho dos botões (toque)', () => settings.touchScale, (v) => (settings.touchScale = v), 0.7, 1.4, 0.05),
       this.slider('Opacidade dos botões (toque)', () => settings.touchOpacity, (v) => (settings.touchOpacity = v), 0.2, 0.9, 0.05),
-      this.toggle('Modo canhoto (inverte os botões)', () => settings.leftHanded, (v) => (settings.leftHanded = v)),
+      this.toggle('Modo canhoto (inverte os botões)', () => settings.leftHanded, (v) => (settings.leftHanded = v))
+    );
+    game.append(
       this.toggle('Assistência de mira (toque/teclado)', () => settings.aimAssist, (v) => (settings.aimAssist = v)),
-      this.toggle('Narrador da história', () => settings.narrator, (v) => (settings.narrator = v)),
       this.toggle('Vibração (celular / controle)', () => settings.haptics, (v) => (settings.haptics = v)),
       this.toggle('Tremor de tela', () => settings.screenShake, (v) => (settings.screenShake = v)),
       this.toggle('Mostrar FPS', () => settings.showFps, (v) => (settings.showFps = v))
     );
-    const act = el('div', 'actions');
-
-    c.append(act);
     this.openPanel(c, from);
   }
 
@@ -497,7 +517,7 @@ export class Menus {
       else this.toast('Ainda não há uma restauração anterior neste perfil.');
     });
     buttons.append(login, sync, logout, download, restore, undo);
-    panel.append(local, details, account, remote, conflicts, buttons, copies, file, preview);
+    panel.append(local, buttons, details, account, remote, conflicts, copies, file, preview);
     const note = el('p', 'save-note');
     note.textContent = 'A partida volta ao último checkpoint, com fichas, equipamentos e itens salvos. Baixar um backup também protege seu progresso se você limpar os dados do navegador.';
     panel.append(note);
@@ -565,7 +585,9 @@ export class Menus {
   showMain(footer = '') {
     this.hideAll();
     ensureWallet();
-    this.shopBtn.textContent = `LOJA DE SKINS • ${coinBalance()} MOEDAS`;
+    const balance = `${coinBalance()} MOEDAS`;
+    this.shopBtn.setAttribute('aria-label', `LOJA DE SKINS • ${balance}`);
+    this.shopBtn.replaceChildren(el('span', '', 'LOJA DE SKINS'), el('span', 'menu-detail', balance));
     this.main.classList.remove('hidden');
     const copies = listSaveCopies().length;
     (document.getElementById('menu-foot') as HTMLElement).textContent = copies
@@ -624,7 +646,13 @@ export class Menus {
   setContinue(label: string | null) {
     if (!this.contBtn) return;
     this.contBtn.style.display = label ? '' : 'none';
-    this.contBtn.textContent = label ? `CONTINUAR • ${label}` : 'CONTINUAR';
+    this.contBtn.setAttribute('aria-label', label ? `CONTINUAR • ${label}` : 'CONTINUAR');
+    this.contBtn.replaceChildren(el('span', '', 'CONTINUAR'));
+    if (label) {
+      const detail = el('span', 'menu-detail');
+      detail.textContent = label;
+      this.contBtn.append(detail);
+    }
   }
 
   closeResume() {
@@ -753,8 +781,7 @@ export class Menus {
     const rec = el('div', '', d.newBest ? '<b style="color:#ffe27a">★ NOVO RECORDE! ★</b>' : `Recorde: ${String(progress.bestScore).padStart(7, '0')}`);
     rec.style.fontWeight = '700';
     const btns = el('div', 'btns');
-    btns.style.width = 'min(360px, calc(var(--game-width) - 28px))';
-    btns.style.flexDirection = d.nextStage ? 'column' : 'row';
+    btns.classList.add('result-actions');
     if (d.nextStage === 2) btns.append(this.btn('CONTINUAR NA SELVA', 'primary small', () => this.cb.onContinueSave()));
     btns.append(this.btn('JOGAR DE NOVO', d.nextStage ? 'alt small' : 'primary small', () => this.cb.onPlayAgain()), this.btn('MENU', 'alt small', () => this.cb.onQuitToMenu()));
     this.results.append(t, rk, st, rec, btns);

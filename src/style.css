@@ -38,7 +38,7 @@ body {
   background: var(--bg);
   overflow: hidden;
   overscroll-behavior: none;
-  touch-action: none;
+  touch-action: manipulation;
   font-family: var(--ui);
   color: #fff;
 }
@@ -64,6 +64,12 @@ html.rot #app {
   transform-origin: 0 0;
   transform: rotate(90deg) translateY(-100%);
 }
+html.rot {
+  --sat: env(safe-area-inset-right, 0px);
+  --sab: env(safe-area-inset-left, 0px);
+  --sal: env(safe-area-inset-top, 0px);
+  --sar: env(safe-area-inset-bottom, 0px);
+}
 
 #game {
   display: block;
@@ -79,6 +85,7 @@ html.rot #app {
   position: fixed;
   inset: 0;
   pointer-events: none;
+  container: game-ui / size;
 }
 #ui > * {
   pointer-events: auto;
@@ -204,16 +211,15 @@ button[hidden] { display: none !important; }
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: clamp(6px, 2vh, 16px);
+  gap: clamp(6px, calc(var(--game-height) * 0.02), 16px);
   width: min(470px, calc(var(--game-width) * 0.58));
   margin-left: max(2vw, 8px);
-  max-height: calc(var(--game-height) - 36px);
-  overflow-y: auto;
-  overflow-x: hidden;
+  max-height: calc(var(--game-height) - 40px - var(--sat) - var(--sab));
+  overflow: visible;
   container-type: inline-size;
   scrollbar-width: thin;
   padding: 8px 8px 16px;
-  touch-action: pan-y;
+  flex-shrink: 0;
 }
 
 .panel.skin-shop { width: min(900px, calc(var(--game-width) - 28px)); }
@@ -299,6 +305,21 @@ button[hidden] { display: none !important; }
   text-shadow: 0 1px 0 rgba(255, 255, 255, 0.5);
   font-size: clamp(19px, 5.4vh, 31px);
 }
+.pause-panel { width: min(420px, calc(var(--game-width) - 28px)); }
+#menu .menu-detail {
+  display: block;
+  font: 700 13px/1.1 var(--ui);
+  letter-spacing: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.settings-tabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-bottom: 12px; }
+.settings-tabs .btn[aria-selected='true'] { background: linear-gradient(#ffe66a, #ffb01f); color: #3a1d00; }
+.settings-group:not(.active) { display: none; }
+.result-actions { width: min(600px, calc(var(--game-width) - 28px)); flex-direction: row; }
+.result-actions .btn { flex: 1; min-width: 0; }
+
 .btn.alt {
   background: linear-gradient(180deg, #5ab8ff 0%, #2a78d8 55%, #1a4aa0 100%);
 }
@@ -331,7 +352,8 @@ button[hidden] { display: none !important; }
   border-radius: 18px;
   box-shadow: 0 6px 0 var(--ink), 0 0 0 2px rgba(255, 255, 255, 0.12) inset, 0 20px 50px rgba(0, 0, 0, 0.5);
   padding: clamp(10px, 2.4vh, 18px) clamp(12px, 3vw, 24px);
-  touch-action: pan-y;
+  touch-action: pan-x pan-y;
+  overscroll-behavior: contain;
 }
 .panel h2 {
   font-family: var(--display);
@@ -986,4 +1008,106 @@ kbd {
 }
 #update {
   z-index: 60;
+}
+
+/* Measure the game area, including its portrait rotation, rather than physical vh. */
+@container game-ui (max-height: 720px) or (max-width: 600px) {
+  #menu .wrap {
+    width: min(620px, calc(var(--game-width) - 48px));
+    margin-left: 0;
+    padding: 6px;
+    gap: 6px;
+  }
+  #menu .btns, .pause-panel .btns, .save-panel > .btns {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    margin-top: 0;
+  }
+  #menu .btn {
+    min-width: 0;
+    min-height: 44px;
+    padding: 5px 8px;
+    font-size: 17px;
+    line-height: 1.05;
+    letter-spacing: 0.3px;
+  }
+  #menu .sub { font-size: 12px; letter-spacing: 2px; margin: 0; }
+  #menu .title { font-size: clamp(24px, 8cqw, 44px); }
+  #menu .footer { max-width: calc(var(--game-width) - 28px); font-size: 11px; }
+  .btn, .btn.primary, .btn.small {
+    font-size: 16px;
+    line-height: 1.1;
+    min-height: 40px;
+    padding: 6px 10px;
+    letter-spacing: 0.3px;
+  }
+  .panel { padding: 10px 14px; }
+  .panel h2 { font-size: 24px; }
+  .panel p, .panel .row, .kbd-grid { font-size: 14px; }
+  .panel .row { padding: 4px; gap: 8px; min-width: 0; }
+  .panel input[type='range'] { width: min(150px, 35cqw); }
+  .panel select { max-width: 55%; font-size: 14px; padding: 4px; }
+  .back-fab { font-size: 15px; min-height: 36px; padding: 5px 10px; }
+  .pause-panel { width: min(620px, calc(var(--game-width) - 28px)); }
+  .pause-panel .btns > :first-child { grid-column: 1 / -1; }
+  .save-copy { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+  .save-copy p { grid-column: 1 / -1; }
+  .save-copy .btn { margin-top: 0; overflow-wrap: anywhere; }
+  .save-copies:not(:empty) { padding: 8px; margin: 10px 0; }
+  .save-panel .btns { gap: 8px; margin-top: 8px; }
+}
+
+@container game-ui (max-height: 500px) {
+  .settings-group.active {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 16px;
+  }
+  .settings-panel .row { font-size: 13px; }
+  .settings-panel input[type='range'] { width: 100px; flex-shrink: 0; }
+  .skin-cards { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  .skin-card { padding: 6px; border-radius: 12px; }
+  .skin-tag { font-size: 12px; letter-spacing: 0.5px; }
+  .skin-preview { width: 78px; height: 80px; }
+  .skin-card h3 { font-size: 19px; margin: 2px 0 4px; }
+  .skin-shop .shop-note, .skin-shop .skin-description { display: none; }
+  .skin-shop .shop-balance { font-size: 18px; margin-bottom: 6px; }
+  .skin-card .btn { font-size: 14px; min-height: 40px; padding: 4px; }
+  .skin-shortfall { font-size: 12px; margin-top: 4px; }
+  #continue .wrap, #gameover .wrap { width: min(560px, calc(var(--game-width) - 40px)); gap: 8px; }
+  #continue .title, #gameover .title { font-size: 30px; }
+  #continue .btns, #gameover .btns { flex-direction: row; margin-top: 0; }
+  #continue .btn, #gameover .btn { flex: 1; min-width: 0; }
+  .cring { width: 72px; height: 72px; }
+  .cring b { font-size: 34px; }
+  #results { display: grid; grid-template-columns: auto auto; align-content: center; gap: 5px 12px; }
+  #results .title { font-size: 28px; }
+  #results .rank { font-size: 44px; }
+  #results .stats, #results .stats + div, #results .btns { grid-column: 1 / -1; }
+  #results .stats { width: min(600px, calc(var(--game-width) - 40px)); gap: 5px; margin: 0; }
+  #results .stat { padding: 3px 6px; }
+  #results .stat b { font-size: 20px; }
+  #results .stat span { font-size: 11px; letter-spacing: 0; }
+  #results .btns { margin-top: 0; gap: 8px; }
+}
+
+@container game-ui (max-height: 340px) {
+  #menu .title { font-size: clamp(24px, 6.5cqw, 32px); }
+  #menu .sub { display: none; }
+  #menu .btn { min-height: 38px; font-size: 15px; }
+  #menu .btns { gap: 6px; }
+  .panel { padding: 8px 12px; }
+  .panel h2 { font-size: 22px; margin-bottom: 4px; }
+  .skin-preview { width: 50px; height: 52px; }
+  .skin-card h3 { font-size: 17px; }
+  .skin-tag { font-size: 11px; }
+  #results .rank { font-size: 32px; }
+  #results .title { font-size: 24px; }
+}
+
+@container game-ui (max-width: 500px) {
+  #menu .wrap { width: calc(var(--game-width) - 28px); }
+  #menu .btn { font-size: 15px; }
+  .kbd-grid { grid-template-columns: 1fr; }
 }
