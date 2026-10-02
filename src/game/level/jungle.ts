@@ -96,6 +96,7 @@ function swamps(b: LevelBuilder) {
     b.deco('jDragonfly', x0 + 3, G - 1, 'front');
     b.deco('jDragonfly', x1 - 4, G - 2, 'front');
     b.deco('jButterfly', x0 - 3, G - 1, 'back');
+    b.deco('pReeds', x1 - 2, G + 3, 'front', { par: 0.4, flip: r.chance(0.5) });
   }
 }
 
@@ -259,6 +260,24 @@ function templeInterior(b: LevelBuilder) {
   b.enemy('shield', 97, 45, { facing: -1, patrol: 30 });
   b.crate(85, 45, 'health');
   b.crate(93, 45, 'random');
+  // ---- SALA DO RITMO (secreta): no alto do grande salão, atrás de uma parede rachada
+  b.fill(106, 29, 26, 11, 1, THEME.TEMPLE);
+  b.clear(107, 30, 24, 9); // linhas 30..38, chão na 39
+  b.clear(106, 36, 1, 3);
+  b.prop('wall', 106, 39, { h: 96, secret: true, loot: 'none', hp: 55 });
+  b.secretRoom('ritmo', 107, 30, 24, 9);
+  // a câmera enquadra a sala inteira (tambores + notas) enquanto se está nela
+  b.camZones.unshift({ rect: { x: 106 * TILE, y: 29 * TILE, w: 26 * TILE, h: 11 * TILE } });
+  b.plat(100, 42, 2);
+  b.block(103, 39, 3, 1);
+  b.deco('jSkull', 104, 39, 'back');
+  for (const [x, w] of [[109, 2], [114, 2], [119, 2], [124, 2], [128, 2]] as [number, number][]) b.drum(x, 37, w);
+  // as notas: arcos que os quiques naturalmente atravessam
+  const notes: [number, number][] = [[110, 33], [111, 31], [113, 32], [115, 33], [116, 31], [118, 32], [120, 33], [121, 31], [123, 32], [125, 33], [126, 31], [127, 32], [129, 33], [129, 31]];
+  for (const [x, row] of notes) b.pickup('note', x, row);
+  torch(108, 39);
+  torch(130, 39);
+
   // grande salão do ídolo
   b.deco('jPillar', 106, 45, 'back');
   b.deco('jPillar', 126, 45, 'back');
@@ -432,6 +451,8 @@ export function buildJungle(): LevelData {
     while (top > LAKE_TOP && b.level.isSolid(x, top - 1)) top--;
     b.deco(r.pick(['uKelp', 'uKelp', 'uKelp', 'uGrass', 'uRock', 'uGrass', 'uKelp']), x, top, 'back', { flip: r.chance(0.5) });
   }
+  // algas gigantes desfocadas passando na frente da câmera
+  for (const x of [LAKE_X0 + 8, LAKE_X0 + 30, LAKE_X0 + 52, LAKE_X0 + 70]) b.deco('puKelp', x, LAKE_FLOOR + 3, 'front', { par: 0.42, flip: x % 2 === 0 });
   b.deco('uArch', 503, LAKE_FLOOR, 'back');
   b.deco('uChest', 515, LAKE_FLOOR, 'back');
   b.deco('uBones', 493, LAKE_FLOOR, 'back');

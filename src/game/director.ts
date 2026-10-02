@@ -1448,7 +1448,8 @@ export class Director {
         const ox = (d.x - cx) * par;
         if (Math.abs(d.x + ox - cx) > cam.w / 2 + 320) continue;
         // o que pende do alto fica preso na altura; o que nasce do chão também sobe/desce com a câmera
-        const oy = d.kind === 'pPillar' || d.kind === 'pLeaves' ? (d.y - cy) * par * 0.6 : 0;
+        const ground = d.kind === 'pPillar' || d.kind === 'pLeaves' || d.kind === 'pcPole' || d.kind === 'pcDebris' || d.kind === 'pReeds' || d.kind === 'puKelp';
+        const oy = ground ? (d.y - cy) * par * 0.6 : 0;
         g.save();
         g.translate(ox, oy);
         drawDeco(g, d, t);

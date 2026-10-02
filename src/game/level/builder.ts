@@ -3,7 +3,7 @@ import {
   Level, T, TILE, THEME,
   type EnemySpawn, type EnemyType, type PropSpawn, type PropKind, type LootKind, type PickupSpawn, type PickupKind,
   type Checkpoint, type Arena, type CamZone, type DecoSpawn, type Trigger, type SecretRoom, type LevelData, type Wave,
-  type CivilianSpawn, type CivMood, type WaterZone, type VineSpawn, type DoorSpawn, type RoomZone,
+  type CivilianSpawn, type CivMood, type WaterZone, type VineSpawn, type DoorSpawn, type RoomZone, type DrumSpawn,
 } from '../level';
 
 export const G = 32; // linha do chão principal
@@ -28,6 +28,7 @@ export class LevelBuilder {
   vines: VineSpawn[] = [];
   doors: DoorSpawn[] = [];
   rooms: RoomZone[] = [];
+  drums: DrumSpawn[] = [];
   stage = 1;
   sections: { name: string; x: number; y: number }[] = [];
   atmosphere: { x: number; sky: number; ruin: number }[] = [];
@@ -171,6 +172,11 @@ export class LevelBuilder {
   door(x: number, row: number, tx: number, trow: number, kind: 'in' | 'out') {
     this.doors.push({ id: this.doors.length, x: this.px(x), y: this.py(row), tx: this.px(tx), ty: this.py(trow), kind });
   }
+  /** Tambor-trampolim com o topo na linha `row` (w tiles); o couro é uma plataforma one-way. */
+  drum(x: number, row: number, w = 2) {
+    this.plat(x, row, w, 5);
+    this.drums.push({ id: this.drums.length, x: x * TILE + (w * TILE) / 2, y: row * TILE, w: w * TILE });
+  }
   /** Interior coberto (templo) em tiles. */
   room(x: number, y: number, w: number, h: number) {
     this.rooms.push({ x: x * TILE, y: y * TILE, w: w * TILE, h: h * TILE });
@@ -268,6 +274,7 @@ export class LevelBuilder {
       vines: this.vines,
       doors: this.doors,
       rooms: this.rooms,
+      drums: this.drums,
       level: this.level,
       playerStart: this.playerStart,
       nomadSpawn: this.nomadSpawn,

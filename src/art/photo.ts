@@ -124,6 +124,7 @@ export function bakeKarimboHeads(p: Photos, scale = 3): KarimboHeads {
   const cg = comp.getContext('2d')!;
   cg.imageSmoothingQuality = 'high';
   cg.drawImage(src, PAD, 0);
+  shapeJawAndNeck(cg, comp.width, H, PAD);
 
   // projeção cilíndrica (cabeça virada ~20° para a direita)
   const yaw = 0.34;
@@ -154,6 +155,8 @@ export function bakeKarimboHeads(p: Photos, scale = 3): KarimboHeads {
     },
     { scale, ox: logicalW / 2 + 0.6, oy: headH * 0.94 }
   );
+  // contorno escuro em volta do rosto (como o traço do corpo); some na base do pescoço
+  const rightOutlined = outlineSprite(right, 1.15, headH * 0.9);
 
   // frontal com orelhas (foto original)
   const fw = (p.head.width / p.head.height) * headH;
@@ -217,8 +220,8 @@ export function bakeKarimboHeads(p: Photos, scale = 3): KarimboHeads {
       { scale, ox: ew * m.rootX, oy: eh * EAR_ROOT }
     );
   };
-  const earNear = mkEar(p.earL, p.meta.earL);
-  const earFar = mkEar(p.earR, p.meta.earR);
+  const earNear = outlineSprite(mkEar(p.earL, p.meta.earL), 1);
+  const earFar = outlineSprite(mkEar(p.earR, p.meta.earR), 1);
   const rootY = (p.meta.earL.y * k + p.meta.earL.h * k * EAR_ROOT) * sc - right.oy;
   const rootYr = (p.meta.earR.y * k + p.meta.earR.h * k * EAR_ROOT) * sc - right.oy;
   const nearSrcX = PAD + (p.meta.earL.x + p.meta.earL.w * p.meta.earL.rootX) * k;
@@ -226,7 +229,7 @@ export function bakeKarimboHeads(p: Photos, scale = 3): KarimboHeads {
   const toLog = (x: number) => f(x) * (logicalW / comp.width) - right.ox;
 
   return {
-    right,
+    right: rightOutlined,
     front,
     portrait,
     earNear,
@@ -235,4 +238,86 @@ export function bakeKarimboHeads(p: Photos, scale = 3): KarimboHeads {
     earRootFar: [toLog(farSrcX), rootYr],
     earH: earNear.h,
   };
+}
+
+/**
+ * A foto acabava num retângulo largo de pele abaixo do queixo (parecia "colado" no corpo).
+ * Aqui o queixo vira uma curva e sobra só um pescoço mais estreito, com sombra embaixo do queixo.
+ */
+function shapeJawAndNeck(g: CanvasRenderingContext2D, w: number, h: number, pad: number) {
+  const W = w - pad * 2;
+  const L = pad;
+  const jawTop = h * 0.74;
+  const chin = h * 0.905;
+  const neckL = L + W * 0.31;
+  const neckR = L + W * 0.69;
+  g.save();
+  g.globalCompositeOperation = 'destination-in';
+  g.beginPath();
+  g.moveTo(0, 0);
+  g.lineTo(w, 0);
+  g.lineTo(w, jawTop);
+  // lado direito do maxilar descendo até o queixo
+  g.bezierCurveTo(L + W * 0.86, h * 0.84, L + W * 0.7, chin, L + W * 0.5, chin);
+  g.bezierCurveTo(L + W * 0.3, chin, L + W * 0.14, h * 0.84, 0, jawTop);
+  g.closePath();
+  g.fill();
+  g.restore();
+  // pescoço (atrás do queixo): mesma pele da foto, mais estreito e arredondado nas laterais
+  g.save();
+  g.globalCompositeOperation = 'destination-over';
+  // amostra a cor da pele logo abaixo da boca
+  const s = g.getImageData(Math.round(L + W * 0.5), Math.round(h * 0.84), 1, 1).data;
+  const skin = `rgb(${s[0]},${s[1]},${s[2]})`;
+  const gr = g.createLinearGradient(0, h * 0.8, 0, h);
+  gr.addColorStop(0, `rgb(${Math.round(s[0] * 0.62)},${Math.round(s[1] * 0.58)},${Math.round(s[2] * 0.58)})`);
+  gr.addColorStop(0.45, skin);
+  gr.addColorStop(1, skin);
+  g.fillStyle = gr;
+  g.beginPath();
+  g.moveTo(neckL, h * 0.8);
+  g.quadraticCurveTo(neckL - W * 0.02, h * 0.93, neckL - W * 0.06, h);
+  g.lineTo(neckR + W * 0.06, h);
+  g.quadraticCurveTo(neckR + W * 0.02, h * 0.93, neckR, h * 0.8);
+  g.closePath();
+  g.fill();
+  g.restore();
+  // sombra do queixo sobre o pescoço
+  g.save();
+  g.globalCompositeOperation = 'source-atop';
+  const sh = g.createLinearGradient(0, chin - h * 0.01, 0, chin + h * 0.05);
+  sh.addColorStop(0, 'rgba(40,20,10,0.35)');
+  sh.addColorStop(1, 'rgba(40,20,10,0)');
+  g.fillStyle = sh;
+  g.fillRect(neckL - W * 0.08, chin - h * 0.01, neckR - neckL + W * 0.16, h * 0.06);
+  g.restore();
+}
+
+/**
+ * Copia do sprite com um contorno escuro em volta (silhueta engordada em 12 direções, por baixo).
+ * `cutY` (lógico, a partir do topo): abaixo disso o contorno some (a base do pescoço entra na roupa).
+ */
+function outlineSprite(spr: Sprite, width = 1.1, cutY = Infinity, color = '#170f2e'): Sprite {
+  const s = spr.s;
+  const padL = Math.ceil(width + 1);
+  const c = makeCanvas(spr.c.width + padL * 2 * s, spr.c.height + padL * 2 * s);
+  const g = c.getContext('2d')!;
+  // silhueta colorida
+  const sil = makeCanvas(spr.c.width, spr.c.height);
+  const sg = sil.getContext('2d')!;
+  sg.drawImage(spr.c, 0, 0);
+  sg.globalCompositeOperation = 'source-in';
+  sg.fillStyle = color;
+  sg.fillRect(0, 0, sil.width, sil.height);
+  const o = padL * s;
+  for (let i = 0; i < 12; i++) {
+    const a = (i / 12) * Math.PI * 2;
+    g.drawImage(sil, o + Math.cos(a) * width * s, o + Math.sin(a) * width * s);
+  }
+  if (Number.isFinite(cutY)) {
+    // sem traço na base do pescoço
+    g.clearRect(0, o + cutY * s, c.width, c.height);
+  }
+  g.drawImage(spr.c, o, o);
+  return { c, w: spr.w + padL * 2, h: spr.h + padL * 2, s, ox: spr.ox + padL, oy: spr.oy + padL };
 }

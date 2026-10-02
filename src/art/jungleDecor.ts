@@ -1180,13 +1180,41 @@ export function paintJungle(g: CanvasRenderingContext2D, kind: string, seed: num
 
 // ------------------------------------------------------------------ animadas
 const sprCache = new Map<string, Sprite>();
-function piece(key: string, w: number, h: number, ox: number, oy: number, fn: (g: CanvasRenderingContext2D) => void): Sprite {
+/**
+ * Peça pronta (assada uma vez). `blur` > 0: desfoque de lente para o que passa "colado na câmera"
+ * (estilo Rayman Legends) — a peça é reduzida em passos (filtro de caixa, funciona em qualquer
+ * navegador) e ampliada na hora de desenhar; fica macia e ainda custa menos que a nítida.
+ */
+function piece(key: string, w: number, h: number, ox: number, oy: number, fn: (g: CanvasRenderingContext2D) => void, blur = 0): Sprite {
   let s = sprCache.get(key);
   if (!s) {
     s = bake(w, h, (g) => {
       g.translate(ox, oy);
       fn(g);
-    }, { scale: 2.5, ox, oy });
+    }, { scale: blur > 0 ? 1.5 : 2.5, ox, oy });
+    if (blur > 0) {
+      let src: HTMLCanvasElement = s.c;
+      let cw = src.width;
+      let ch = src.height;
+      const target = Math.max(1, 1.5 / blur);
+      let sc = 1.5;
+      while (sc > target * 1.01) {
+        const nsc = Math.max(target, sc / 2);
+        const nw = Math.max(2, Math.round((cw * nsc) / sc));
+        const nh = Math.max(2, Math.round((ch * nsc) / sc));
+        const c = document.createElement('canvas');
+        c.width = nw;
+        c.height = nh;
+        const g = c.getContext('2d')!;
+        g.imageSmoothingQuality = 'high';
+        g.drawImage(src, 0, 0, nw, nh);
+        src = c;
+        cw = nw;
+        ch = nh;
+        sc = nsc;
+      }
+      s = { c: src, w: s.w, h: s.h, s: sc, ox: s.ox, oy: s.oy };
+    }
     sprCache.set(key, s);
   }
   return s;
@@ -1777,7 +1805,7 @@ function paintAnimated(g: CanvasRenderingContext2D, kind: string, seed: number, 
         }
         c.fillStyle = '#0d0a08';
         c.fillRect(-110, -10, 220, 14);
-      });
+      }, 6);
       drawPiece(g, s, Math.sin(t * 0.5 + seed) * 0.02, 0.92);
       return true;
     }
@@ -1804,7 +1832,7 @@ function paintAnimated(g: CanvasRenderingContext2D, kind: string, seed: number, 
           c.ellipse(-20 + (i % 3) * 18, -480 + i * 80, 14, 5, 0, 0, Math.PI * 2);
           c.fill();
         }
-      });
+      }, 7);
       drawPiece(g, s, 0, 0.95);
       return true;
     }
@@ -1838,7 +1866,7 @@ function paintAnimated(g: CanvasRenderingContext2D, kind: string, seed: number, 
           c.fill();
           c.restore();
         }
-      });
+      }, 6);
       drawPiece(g, s, Math.sin(t * 0.7 + seed) * 0.025, 0.95);
       return true;
     }
@@ -1861,8 +1889,152 @@ function paintAnimated(g: CanvasRenderingContext2D, kind: string, seed: number, 
           c.fill();
           c.restore();
         }
-      });
+      }, 7);
       drawPiece(g, s, Math.sin(t * 0.9 + seed) * 0.03, 0.96);
+      return true;
+    }
+    // ----------------------------------------------------- primeiro plano desfocado (estilo Rayman)
+    case 'pcPole': {
+      // poste de luz da rua bem perto da câmera (silhueta desfocada com a lâmpada acesa)
+      const s = piece('pcpole', 150, 400, 60, 400, (c) => {
+        c.fillStyle = '#0a0818';
+        c.fillRect(-17, -370, 34, 370);
+        c.fillRect(-30, -40, 60, 40);
+        c.beginPath();
+        c.moveTo(0, -350);
+        c.quadraticCurveTo(40, -400, 80, -360);
+        c.lineTo(80, -344);
+        c.quadraticCurveTo(40, -380, 6, -330);
+        c.closePath();
+        c.fill();
+        c.fillRect(56, -362, 34, 14);
+      }, 9);
+      drawPiece(g, s, 0, 0.9);
+      const glow = glowSprite('#ffd27a', 32);
+      g.globalCompositeOperation = 'lighter';
+      g.globalAlpha = 0.55 + 0.08 * Math.sin(t * 3 + seed);
+      g.drawImage(glow.c, 73 - 80, -348 - 60, 160, 160);
+      g.globalAlpha = 1;
+      g.globalCompositeOperation = 'source-over';
+      return true;
+    }
+    case 'pcCables': {
+      // fiação pendurada no alto da tela, cruzando de um lado ao outro
+      const s = piece('pccables', 700, 160, 350, 0, (c) => {
+        c.strokeStyle = '#08061a';
+        c.lineCap = 'round';
+        for (let i = 0; i < 4; i++) {
+          c.lineWidth = 5 - i;
+          c.beginPath();
+          c.moveTo(-350, 10 + i * 14);
+          c.quadraticCurveTo(0, 110 + i * 18, 350, 6 + i * 10);
+          c.stroke();
+        }
+        // tênis pendurado no fio
+        c.lineWidth = 2;
+        c.beginPath();
+        c.moveTo(60, 95);
+        c.lineTo(60, 130);
+        c.stroke();
+        c.fillStyle = '#08061a';
+        c.fillRect(48, 128, 26, 12);
+      }, 6);
+      drawPiece(g, s, Math.sin(t * 0.6 + seed) * 0.01, 0.9);
+      return true;
+    }
+    case 'pcDebris': {
+      // entulho, vergalhões e uma placa caída no pé da tela
+      const s = piece('pcdebris', 420, 210, 210, 210, (c) => {
+        c.fillStyle = '#07061a';
+        c.beginPath();
+        c.moveTo(-210, 0);
+        c.lineTo(-170, -80);
+        c.lineTo(-90, -110);
+        c.lineTo(-40, -150);
+        c.lineTo(30, -120);
+        c.lineTo(110, -140);
+        c.lineTo(170, -70);
+        c.lineTo(210, 0);
+        c.closePath();
+        c.fill();
+        c.strokeStyle = '#07061a';
+        c.lineWidth = 5;
+        for (const [x, a] of [[-60, -1.2], [20, -1.9], [90, -1.4], [140, -2.1]] as [number, number][]) {
+          c.beginPath();
+          c.moveTo(x, -100);
+          c.lineTo(x + Math.cos(a) * 90, -100 + Math.sin(a) * 90);
+          c.stroke();
+        }
+      }, 7);
+      drawPiece(g, s, 0, 0.94);
+      return true;
+    }
+    case 'pcBokeh': {
+      // luzes de neon desfocadas bem perto da câmera (bolinhas coloridas)
+      const dot = glowSprite(['#ff3fb4', '#39f0ff', '#ffd23a', '#9a7aff'][Math.abs(seed) % 4], 32);
+      const dot2 = glowSprite(['#39f0ff', '#ff6ad0', '#ffb347', '#7affc8'][Math.abs(seed) % 4], 32);
+      g.globalCompositeOperation = 'lighter';
+      for (let i = 0; i < 7; i++) {
+        const ph = seed * 0.3 + i * 1.9;
+        const x = Math.sin(ph * 3.1) * 140 + Math.sin(t * 0.3 + ph) * 10;
+        const y = -Math.abs(Math.cos(ph * 2.3)) * 160 + Math.cos(t * 0.4 + ph) * 8;
+        const r = 26 + (i % 3) * 14;
+        g.globalAlpha = 0.18 + 0.08 * Math.sin(t * 1.3 + ph);
+        g.drawImage((i % 2 ? dot : dot2).c, x - r, y - r, r * 2, r * 2);
+      }
+      g.globalAlpha = 1;
+      g.globalCompositeOperation = 'source-over';
+      return true;
+    }
+    case 'pReeds': {
+      // juncos e taboas enormes, desfocados, na beira do pântano
+      const s = piece('preeds' + (Math.abs(seed) % 2), 300, 260, 150, 260, (c) => {
+        const r = new Rng(Math.abs(seed) % 2 + 31);
+        c.lineCap = 'round';
+        for (let i = 0; i < 14; i++) {
+          const x = r.range(-130, 130);
+          const h = r.range(150, 250);
+          const lean = r.range(-30, 30);
+          c.strokeStyle = i % 2 ? '#0a1a0c' : '#0d2010';
+          c.lineWidth = r.range(5, 9);
+          c.beginPath();
+          c.moveTo(x, 0);
+          c.quadraticCurveTo(x + lean * 0.3, -h * 0.5, x + lean, -h);
+          c.stroke();
+          if (i % 3 === 0) {
+            c.fillStyle = '#140c06';
+            c.beginPath();
+            c.ellipse(x + lean * 0.9, -h + 18, 7, 22, lean * 0.01, 0, Math.PI * 2);
+            c.fill();
+          }
+        }
+      }, 6);
+      drawPiece(g, s, Math.sin(t * 0.8 + seed) * 0.03, 0.94);
+      return true;
+    }
+    case 'puKelp': {
+      // algas gigantes desfocadas na frente da câmera (debaixo d'água)
+      const s = piece('pukelp' + (Math.abs(seed) % 2), 260, 360, 130, 360, (c) => {
+        const r = new Rng(Math.abs(seed) % 2 + 41);
+        c.lineCap = 'round';
+        for (let i = 0; i < 6; i++) {
+          const x = r.range(-100, 100);
+          const h = r.range(220, 350);
+          c.strokeStyle = i % 2 ? '#0a2a2a' : '#0c3330';
+          c.lineWidth = r.range(10, 16);
+          c.beginPath();
+          c.moveTo(x, 0);
+          c.bezierCurveTo(x + 30, -h * 0.35, x - 30, -h * 0.7, x + r.range(-20, 20), -h);
+          c.stroke();
+          for (let k = 1; k < 6; k++) {
+            c.fillStyle = '#0b2e2c';
+            c.beginPath();
+            c.ellipse(x + (k % 2 ? 16 : -16), -h * (k / 6), 18, 6, k % 2 ? 0.6 : -0.6, 0, Math.PI * 2);
+            c.fill();
+          }
+        }
+      }, 6);
+      drawPiece(g, s, Math.sin(t * 0.9 + seed) * 0.04, 0.9);
       return true;
     }
     case 'jChasm': {

@@ -131,6 +131,8 @@ class MusicEngine {
   private send: GainNode | null = null;
   private timer: number | null = null;
   private theme: ThemeName | null = null;
+  /** instante (relógio do áudio) em que o tema atual começou: base do compasso */
+  private t0 = 0;
   private step = 0;
   private nextTime = 0;
   private built = false;
@@ -176,11 +178,29 @@ class MusicEngine {
       this.theme = theme;
       this.step = 0;
       this.nextTime = audio.ctx.currentTime + 0.08;
+      this.t0 = this.nextTime;
       const bpm = THEMES[theme].bpm;
       if (this.delay) this.delay.delayTime.setTargetAtTime((60 / bpm) * 0.75, audio.ctx.currentTime, 0.05);
     }
     this.setMix(mix);
     if (this.timer === null) this.timer = window.setInterval(() => this.tick(), 25);
+  }
+
+  /** 0..1 dentro do tempo (batida) atual — para coisas que pulsam no ritmo. */
+  beat(): number {
+    const c = audio.ctx;
+    if (!c || !this.theme) return 0;
+    const bps = THEMES[this.theme].bpm / 60;
+    const b = (c.currentTime - this.t0) * bps;
+    return b - Math.floor(b);
+  }
+  /** Próximo instante do relógio do áudio que cai na grade (div = subdivisões por tempo). */
+  quantize(div = 2): number {
+    const c = audio.ctx;
+    if (!c || !this.theme) return 0;
+    const step = 60 / THEMES[this.theme].bpm / div;
+    const n = Math.ceil((c.currentTime + 0.02 - this.t0) / step);
+    return this.t0 + n * step;
   }
 
   setMix(mix: Partial<Record<Layer, number>>, rate = 0.25) {
@@ -634,5 +654,10 @@ export const MIX = {
   boss2: { pad: 0.7, bass: 1, arp: 0.7, hat: 0.9, kick: 1, snare: 1, tom: 0.9, lead: 0.7, power: 0.5 } as Partial<Record<Layer, number>>,
   boss3: { pad: 0.7, bass: 1, arp: 0.8, hat: 1, kick: 1, snare: 1, tom: 1, lead: 1, power: 0.85, choir: 0.9 } as Partial<Record<Layer, number>>,
   calm: { pad: 0.8, arp: 0.5, bass: 0.4 } as Partial<Record<Layer, number>>,
+  /** sala do ritmo: só percussão e baixo — a melodia é o jogador quem toca */
+  rhythm: { pad: 0.45, bass: 0.75, kick: 1, hat: 0.9, tom: 0.9, snare: 0.6 } as Partial<Record<Layer, number>>,
   victory: { pad: 1, lead: 0.8, arp: 0.7, bass: 0.6 } as Partial<Record<Layer, number>>,
 };
+
+/** Melodia da flauta da selva (o que as notas da sala do ritmo tocam, em ordem). */
+export const JUNGLE_MELODY: number[] = JUNGLE.lead.flat().filter((n): n is number => n !== null);

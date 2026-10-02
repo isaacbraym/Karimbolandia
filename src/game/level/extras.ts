@@ -203,3 +203,29 @@ export function addCranes(b: LevelBuilder) {
     }
   }
 }
+
+/**
+ * Primeiro plano desfocado "colado na câmera" (estilo Rayman Legends): postes, fiação, entulho e
+ * luzes de neon passando bem perto e mais rápido que o cenário. Com moderação: espaçados, fora das
+ * arenas (o combate fica limpo) e alternando entre o alto e o pé da tela.
+ */
+export function addForeground(b: LevelBuilder) {
+  const L = b.level;
+  const inArena = (tx: number) => b.arenas.some((a) => tx * TILE > a.rect.x - 6 * TILE && tx * TILE < a.rect.x + a.rect.w + 6 * TILE);
+  const surface = (tx: number) => {
+    for (let ty = 6; ty < L.h - 1; ty++) if (L.get(tx, ty) === T.SOLID && L.get(tx, ty - 1) !== T.SOLID) return ty;
+    return G;
+  };
+  let i = 0;
+  for (let tx = 14; tx < L.w - 14; tx += 17 + ((tx * 7) % 11)) {
+    if (inArena(tx)) continue;
+    const row = surface(tx);
+    const k = i++ % 6;
+    if (k === 0) b.deco('pcPole', tx, row + 3, 'front', { par: 0.45 });
+    else if (k === 1) b.deco('pcCables', tx, row - 12, 'front', { par: 0.3 });
+    else if (k === 2) b.deco('pcDebris', tx, row + 3, 'front', { par: 0.4, flip: tx % 2 === 0 });
+    else if (k === 3) b.deco('pcBokeh', tx, row - 7, 'front', { par: 0.5 });
+    else if (k === 4) b.deco('pcPole', tx, row + 3, 'front', { par: 0.45, flip: true });
+    else b.deco('pcDebris', tx, row + 3, 'front', { par: 0.4 });
+  }
+}

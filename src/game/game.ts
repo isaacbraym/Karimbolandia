@@ -700,6 +700,7 @@ export class Game {
       case 'nomad': m('stage', MIX.nomad); break;
       case 'nomadCombat': m('stage', MIX.nomad); break;
       case 'calm': m('stage', MIX.calm); break;
+      case 'rhythm': m('stage', MIX.rhythm); break;
       case 'boss1': m('boss', MIX.boss1); break;
       case 'boss2': m('boss', MIX.boss2); break;
       case 'boss3': m('boss', MIX.boss3); break;

@@ -20,12 +20,13 @@ import { softDot, drawSpr } from '../art/kit';
 import { Corpse } from './corpse';
 import { Crowd } from './civilians';
 import { Narrator } from './narrator';
+import { music, JUNGLE_MELODY } from '../core/music';
 import { Waters } from './water';
 import { Vine } from './vines';
 import type { DoorSpawn } from './level';
 import { drawWaterBack, drawWaterFront } from '../art/waterDraw';
 import { drawBlockade, COLLAPSE_SHAKE, COLLAPSE_FALL } from '../art/blockade';
-import { drawVines, drawRoomBack, drawRoomDark, drawDoorPrompt } from '../art/jungleWorld';
+import { drawVines, drawRoomBack, drawRoomDark, drawDoorPrompt, drawDrums } from '../art/jungleWorld';
 
 export interface Stats {
   kills: number;
@@ -37,7 +38,7 @@ export interface Stats {
   time: number;
 }
 
-export type MusicState = 'explore' | 'combat' | 'nomad' | 'nomadCombat' | 'boss1' | 'boss2' | 'boss3' | 'silence' | 'calm' | 'victory';
+export type MusicState = 'explore' | 'combat' | 'nomad' | 'nomadCombat' | 'boss1' | 'boss2' | 'boss3' | 'silence' | 'calm' | 'victory' | 'rhythm';
 
 export const MAX_LIVES = 3;
 export const COMBO_WINDOW = 3;
@@ -123,6 +124,10 @@ export class World {
   /** animação do desmoronamento (s desde o início; -1 = parado) */
   blockAnimT = -1;
   private blockImpact = false;
+  /** tambores-trampolim (estado da animação do couro) */
+  drumHit = new Map<number, number>();
+  /** sala do ritmo: notas pegas (cada uma toca a próxima nota da melodia), total e concluída */
+  rhythm = { active: false, got: 0, total: 0, done: false, room: null as { x: number; y: number; w: number; h: number } | null };
   /** cipós de balançar (fase 2) */
   vines: Vine[] = [];
   /** porta do templo em que o Karimbo está parado (mostra "↑ ENTRAR") */
@@ -238,6 +243,9 @@ export class World {
     this.doorT = -1;
     this.blackout = 0;
     this.doorGo = null;
+    this.drumHit.clear();
+    const rr = this.data.secretRooms.find((s) => s.id === 'ritmo');
+    this.rhythm = { active: false, got: 0, total: this.data.pickups.filter((p) => p.kind === 'note').length, done: false, room: rr ? rr.rect : null };
     this.finished = false;
     this.player.resetInventory();
     this.director.reset();
@@ -280,6 +288,67 @@ export class World {
     this.crowd.reset(this.data.civilians);
     this.solidsDirty = true;
     this.applyBlock();
+  }
+
+  /** Tambor sob os pés (para o pulo do trampolim). */
+  drumAt(x: number, feetY: number) {
+    for (const d of this.data.drums ?? []) if (Math.abs(x - d.x) <= d.w / 2 + 6 && Math.abs(feetY - d.y) < 4) return d;
+    return null;
+  }
+  /** Batida no tambor: som (grave → agudo conforme o tambor), couro afundando e anel de som. */
+  hitDrum(id: number) {
+    const d = this.data.drums[id];
+    const n = this.data.drums.length;
+    audioEngine.drum(n > 1 ? id / (n - 1) : 0.5, 1, 0);
+    this.drumHit.set(id, 1);
+    this.fx.add(PK.Ring, d.x, d.y + 2, 0, 0, 0.35, 8, '#ffe27a', { size1: d.w * 1.4, a0: 0.7, front: true });
+  }
+
+  /** Sala do ritmo: ao entrar, a música vira só percussão e as notas tocam a melodia. */
+  private updateRhythm(dt: number) {
+    void dt;
+    const r = this.rhythm;
+    const room = r.room!;
+    const p = this.player;
+    const inside = p.x >= room.x && p.x <= room.x + room.w && p.y >= room.y - 20 && p.y <= room.y + room.h + 20;
+    if (inside && !r.active && !r.done) {
+      r.active = true;
+      this.setMusic('rhythm');
+      this.hooks.onBanner?.('SALA DO RITMO', 'Pule nos tambores e pegue as notas: você toca a música!', 3.2);
+    } else if (!inside && r.active) {
+      r.active = false;
+      this.setMusic('explore');
+    }
+  }
+
+  /** Nota musical pega: toca a próxima nota da melodia, encaixada no compasso. */
+  private onNote(pk: Pickup) {
+    const r = this.rhythm;
+    const idx = r.got++;
+    const midi = JUNGLE_MELODY[idx % JUNGLE_MELODY.length];
+    audioEngine.flute(midi, music.quantize(2));
+    this.score += 100;
+    this.fx.popup(pk.x, pk.y - 18, `♪ ${r.got}/${r.total}`, '#ffe27a', 10);
+    this.fx.sparks(pk.x, pk.y, 10, '#ffe27a', 200);
+    if (r.got >= r.total && !r.done) {
+      r.done = true;
+      // final: o resto da frase toca sozinho, no ritmo, e o tesouro cai do teto
+      let t = music.quantize(1);
+      const step = 60 / 104 / 2;
+      for (const m of [...JUNGLE_MELODY.slice(idx + 1, idx + 6), 76, 74, 71, 69]) {
+        audioEngine.flute(m, t, 0.9);
+        t += step;
+      }
+      this.after(0.4, () => audioEngine.play('secret', 1));
+      this.score += 3000;
+      this.hooks.onBanner?.('SINFONIA DA SELVA!', 'Você tocou a música do templo', 3.5);
+      this.fx.addFlash(0.35, '#ffe27a');
+      const cx = r.room!.x + r.room!.w / 2;
+      const cy = r.room!.y + 30;
+      for (let i = 0; i < 30; i++) this.spawnDrop('token', cx + rand.spread(r.room!.w * 0.4), cy);
+      this.spawnDrop('healthBig', cx, cy);
+      for (let i = 0; i < 4; i++) this.after(0.3 + i * 0.25, () => this.fx.sparks(cx + rand.spread(200), cy + rand.range(0, 120), 24, i % 2 ? '#ff5ab4' : '#ffe27a', 360));
+    }
   }
 
   /** O Karimbo está dentro de um interior (templo)? */
@@ -639,7 +708,10 @@ export class World {
     this.bullets.push(new Bullet(x, y, Math.cos(ang) * speed, Math.sin(ang) * speed, o));
   }
   spawnDrop(kind: PickupKind, x: number, y: number) {
-    if (this.pickups.length > 120) return;
+    // limite só para o que cai (antes contava as moedas fixas da fase: na selva nada caía)
+    let drops = 0;
+    for (const p of this.pickups) if (p.id < 0) drops++;
+    if (drops > 120) return;
     this.pickups.push(new Pickup(kind, x, y, -1, 0, true));
   }
   spawnEnemy(s: EnemySpawn): Enemy {
@@ -797,6 +869,10 @@ export class World {
     const pl = this.player;
     const a = (n: SfxName) => this.audio(n, 0.9, pk.x);
     switch (pk.kind) {
+      case 'note':
+        if (pk.id >= 0) this.collectedPickups.add(pk.id);
+        this.onNote(pk);
+        break;
       case 'token':
         this.tokens++;
         this.score += 10;
@@ -914,6 +990,12 @@ export class World {
     for (const v of this.vines) if (Math.abs(v.x - p.x) < 1400) v.update(dt, this.time);
     if (this.blockAnimT >= 0) this.updateCollapse(dt);
     if (this.data.doors?.length) this.updateDoors(dt, ctl);
+    if (this.rhythm.room) this.updateRhythm(dt);
+    for (const [id, k] of this.drumHit) {
+      const n = k - dt * 4;
+      if (n <= 0) this.drumHit.delete(id);
+      else this.drumHit.set(id, n);
+    }
     // BZZZ do pernilongo enquanto plana (tom varia com velocidade e subida/descida)
     if (p.glide && p.mode === 'foot') audioEngine.loop('glide', true, clamp(Math.abs(p.body.vx) / 218, 0, 1), clamp(-p.body.vy / 220, -1, 1));
     else audioEngine.loop('glide', false);
@@ -1052,6 +1134,8 @@ export class World {
     if (this.water.zones.length) drawWaterFront(g, this);
     this.fx.draw(g, true);
     if (this.data.rooms?.length) drawRoomDark(g, this);
+    // tambores por cima da escuridão: a sala do ritmo "acende" com a batida
+    if (this.data.drums?.length) drawDrums(g, this);
     this.director.drawDecos(g, 'front');
     this.crowd.drawBalloon(g, this);
     this.fx.drawPopups(g);

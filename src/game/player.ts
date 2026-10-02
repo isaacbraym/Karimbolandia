@@ -757,6 +757,21 @@ export class Player {
     if (this.slam && (b.onGround || hurt)) this.slamImpact(w, b.onGround);
     if (b.hitCeil) this.jumping = false;
     if (w.vines.length && !b.onGround && this.vineCd <= 0 && !hurt && !this.slam) this.tryGrab(w);
+    // tambor-trampolim: pisou, quica alto (segurando o pulo, mais alto ainda) e o tambor toca
+    if (b.onGround && w.data.drums?.length) {
+      const d = w.drumAt(this.x, this.feetY);
+      if (d) {
+        b.vy = -(ctl.jump.held ? 900 : 760);
+        b.onGround = false;
+        this.jumping = false;
+        this.leapT = 0.45;
+        this.coyote = 0;
+        this.slam = false;
+        this.landSquash = 0.8;
+        this.glideFuel = GLIDE_FUEL;
+        w.hitDrum(d.id);
+      }
+    }
 
     // ---- mira + armas
     const [sx, sy] = this.shoulder;

@@ -12,7 +12,7 @@ import cv2
 import numpy as np
 
 
-def cutout(path, out, preview=None, core=(0.42, 0.52, 0.22, 0.22), poly=None, polyW=1.0):
+def cutout(path, out, preview=None, core=(0.42, 0.52, 0.22, 0.22), poly=None, polyW=1.0, fg=None):
     img = cv2.imread(path, cv2.IMREAD_COLOR)
     H, W = img.shape[:2]
     s = 760 / W
@@ -27,8 +27,9 @@ def cutout(path, out, preview=None, core=(0.42, 0.52, 0.22, 0.22), poly=None, po
     mask[~water] = cv2.GC_PR_FGD
     # água forte = fundo certo
     mask[(Hh >= 84) & (Hh <= 114) & (S > 90) & (V > 50)] = cv2.GC_BGD
-    # algas verdes saturadas = fundo
-    mask[(Hh >= 35) & (Hh < 80) & (S > 110)] = cv2.GC_BGD
+    # algas verdes saturadas = fundo (só fora do contorno do peixe: as escamas do alto da cabeça são
+    # verde-douradas e eram apagadas junto — era o "pedaço da cabeça" que faltava)
+    algae = (Hh >= 35) & (Hh < 80) & (S > 110)
     # contorno aproximado do peixe (inclui nadadeiras): fora dele é fundo certo
     if poly is not None:
         pts = np.array([[x * w / polyW, y * w / polyW] for x, y in poly], np.int32)
@@ -36,6 +37,9 @@ def cutout(path, out, preview=None, core=(0.42, 0.52, 0.22, 0.22), poly=None, po
         cv2.fillPoly(inside, [pts], 255)
         inside = cv2.dilate(inside, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (9, 9))) > 0
         mask[~inside] = cv2.GC_BGD
+        mask[algae & ~inside] = cv2.GC_BGD
+    else:
+        mask[algae] = cv2.GC_BGD
         # nadadeiras (laranja/dourado translúcido): dentro do contorno são peixe
         fin = (Hh >= 6) & (Hh <= 34) & (S > 35) & (V > 70)
         mask[fin & inside & (mask != cv2.GC_BGD)] = cv2.GC_FGD
@@ -45,6 +49,12 @@ def cutout(path, out, preview=None, core=(0.42, 0.52, 0.22, 0.22), poly=None, po
     mask[-b:, :] = cv2.GC_BGD
     mask[:, :b] = cv2.GC_BGD
     mask[:, -b:] = cv2.GC_BGD
+    # regiões que com certeza são peixe (dorso escamado que o GrabCut confundia com a água)
+    for fp in fg or []:
+        pts = np.array([[x * w / polyW, y * w / polyW] for x, y in fp], np.int32)
+        fm = np.zeros((h, w), np.uint8)
+        cv2.fillPoly(fm, [pts], 255)
+        mask[fm > 0] = cv2.GC_FGD
     # núcleo do corpo = frente certa
     cx, cy, rx, ry = core
     yy, xx = np.ogrid[:h, :w]
@@ -105,8 +115,8 @@ def cutout(path, out, preview=None, core=(0.42, 0.52, 0.22, 0.22), poly=None, po
 
 # contornos generosos (coordenadas das prévias redimensionadas) — o GrabCut refina a borda
 SHAPES = {
-    'a': dict(polyW=685, core=(0.40, 0.55, 0.20, 0.22), poly=[(0,318),(40,300),(105,290),(118,232),(160,150),(230,92),(290,62),(300,40),(318,2),(345,2),(380,40),(420,100),(470,128),(520,140),(560,110),(640,80),(668,85),(672,200),(675,372),(650,380),(620,350),(648,350),(650,395),(590,430),(520,440),(535,525),(500,530),(440,480),(380,495),(300,508),(200,495),(130,450),(110,410),(60,415),(2,345)]),
-    'b': dict(polyW=724, core=(0.36, 0.52, 0.18, 0.2), poly=[(38,330),(45,295),(110,288),(110,220),(150,140),(240,70),(320,40),(340,12),(385,8),(470,60),(530,130),(545,200),(575,215),(640,120),(700,100),(706,200),(698,330),(690,395),(640,385),(585,330),(555,330),(540,365),(545,420),(470,440),(470,500),(420,495),(360,450),(300,455),(275,445),(270,485),(240,480),(210,430),(150,400),(120,375),(80,375)]),
+    'a': dict(polyW=685, core=(0.40, 0.55, 0.20, 0.22), fg=[[(331,98),(390,100),(442,128),(494,160),(540,180),(515,200),(429,190),(351,150)], [(306,70),(320,22),(342,14),(378,52),(404,92),(372,90),(334,84)]], poly=[(0,318),(40,300),(105,290),(118,232),(160,150),(230,92),(290,62),(300,40),(318,2),(345,2),(380,40),(420,100),(470,128),(520,140),(560,110),(640,80),(668,85),(672,200),(675,372),(650,380),(620,350),(648,350),(650,395),(590,430),(520,440),(535,525),(500,530),(440,480),(380,495),(300,508),(200,495),(130,450),(110,410),(60,415),(2,345)]),
+    'b': dict(polyW=724, core=(0.36, 0.52, 0.18, 0.2), poly=[(38,330),(45,295),(96,286),(92,215),(118,150),(165,100),(230,62),(320,36),(340,12),(385,8),(470,60),(530,130),(545,200),(575,215),(640,120),(700,100),(706,200),(698,330),(690,395),(640,385),(585,330),(555,330),(540,365),(545,420),(470,440),(470,500),(420,495),(360,450),(300,455),(275,445),(270,485),(240,480),(210,430),(150,400),(120,375),(80,375)]),
 }
 
 if __name__ == '__main__':

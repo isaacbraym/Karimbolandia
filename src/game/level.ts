@@ -138,7 +138,7 @@ export interface PropSpawn {
 
 export type PickupKind =
   | 'token' | 'emblem' | 'secret' | 'health' | 'healthBig' | 'ammo' | 'nade' | 'rifle' | 'shotgun' | 'launcher'
-  | 'energy' | 'repair';
+  | 'energy' | 'repair' | 'note';
 
 export interface PickupSpawn {
   id: number;
@@ -246,6 +246,14 @@ export interface DoorSpawn {
   kind: 'in' | 'out';
 }
 
+/** Tambor tribal (trampolim musical): topo em (x, y) px, largura w px. */
+export interface DrumSpawn {
+  id: number;
+  x: number;
+  y: number;
+  w: number;
+}
+
 /** Interior (templo): fundo de pedra, escuridão com luz em volta do Karimbo e das tochas. */
 export interface RoomZone {
   x: number;
@@ -261,6 +269,7 @@ export interface LevelData {
   vines: VineSpawn[];
   doors: DoorSpawn[];
   rooms: RoomZone[];
+  drums: DrumSpawn[];
   level: Level;
   playerStart: { x: number; y: number };
   nomadSpawn: { x: number; y: number };

@@ -6,6 +6,8 @@ import type { World } from '../game/world';
 import type { DoorSpawn, RoomZone } from '../game/level';
 import { makeCanvas, glowSprite } from './kit';
 import { Rng } from '../core/math';
+import { music } from '../core/music';
+const musicBeat = () => music.beat();
 
 interface Tex {
   leaf: HTMLCanvasElement;
@@ -331,4 +333,75 @@ export function drawDoorPrompt(g: CanvasRenderingContext2D, w: World, d: DoorSpa
   g.lineTo(d.x - 7, y + 1);
   g.closePath();
   g.fill();
+}
+
+// ------------------------------------------------------------------ tambores-trampolim
+/** Tambor tribal: corpo de madeira pintado, cordas e couro que afunda quando o Karimbo quica. */
+export function drawDrums(g: CanvasRenderingContext2D, w: World) {
+  const cam = w.camera;
+  const beat = w.rhythm.active ? musicBeat() : 1;
+  const warm = glowSprite('#ffb060', 32);
+  for (const d of w.data.drums) {
+    if (!cam.visible(d.x, d.y + 30, d.w + 40)) continue;
+    const hit = w.drumHit.get(d.id) ?? 0;
+    // luz quente em volta de cada tambor (mais forte na batida e no quique)
+    g.globalCompositeOperation = 'lighter';
+    g.globalAlpha = 0.22 + (1 - beat) * 0.18 + hit * 0.3;
+    g.drawImage(warm.c, d.x - 120, d.y - 150, 240, 240);
+    g.globalAlpha = 1;
+    g.globalCompositeOperation = 'source-over';
+    const hw = d.w / 2;
+    const H = 60;
+    const top = d.y + 2 + hit * 7;
+    // corpo
+    g.fillStyle = '#6a3f20';
+    g.beginPath();
+    g.moveTo(d.x - hw, top);
+    g.lineTo(d.x + hw, top);
+    g.lineTo(d.x + hw * 0.82, d.y + H);
+    g.lineTo(d.x - hw * 0.82, d.y + H);
+    g.closePath();
+    g.fill();
+    g.strokeStyle = '#170f2e';
+    g.lineWidth = 1.6;
+    g.stroke();
+    // faixa pintada em zigue-zague
+    g.strokeStyle = d.id % 2 ? '#e2384a' : '#ffd23a';
+    g.lineWidth = 2.4;
+    g.beginPath();
+    for (let i = 0; i <= 8; i++) {
+      const x = d.x - hw * 0.9 + (i / 8) * hw * 1.8;
+      const y = d.y + 26 + (i % 2 ? 7 : -7);
+      if (i === 0) g.moveTo(x, y);
+      else g.lineTo(x, y);
+    }
+    g.stroke();
+    // cordas de amarração
+    g.strokeStyle = '#d8b878';
+    g.lineWidth = 1.2;
+    for (let i = 0; i < 5; i++) {
+      const x = d.x - hw * 0.8 + (i / 4) * hw * 1.6;
+      g.beginPath();
+      g.moveTo(x, top + 3);
+      g.lineTo(x + (i % 2 ? 6 : -6), d.y + 16);
+      g.stroke();
+    }
+    // couro (afunda no quique) + brilho na batida
+    g.fillStyle = '#e8d2a0';
+    g.beginPath();
+    g.ellipse(d.x, top, hw, 6 - hit * 2, 0, 0, Math.PI * 2);
+    g.fill();
+    g.strokeStyle = '#170f2e';
+    g.lineWidth = 1.4;
+    g.stroke();
+    const glow = (1 - beat) * (w.rhythm.active ? 0.5 : 0) + hit * 0.8;
+    if (glow > 0.03) {
+      const spr = glowSprite('#ffe27a', 32);
+      g.globalCompositeOperation = 'lighter';
+      g.globalAlpha = Math.min(1, glow);
+      g.drawImage(spr.c, d.x - hw * 1.4, top - 18, hw * 2.8, 36);
+      g.globalAlpha = 1;
+      g.globalCompositeOperation = 'source-over';
+    }
+  }
 }

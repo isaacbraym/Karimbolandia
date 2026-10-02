@@ -4,6 +4,7 @@ import { getArt } from '../art';
 import { drawSpr, glowSprite } from '../art/kit';
 import { PK } from './fx';
 import { moveBody, newBody, type Body } from './physics';
+import { music } from '../core/music';
 
 export class Pickup {
   kind: PickupKind;
@@ -37,7 +38,7 @@ export class Pickup {
   }
 
   get radius() {
-    return this.kind === 'token' ? 13 : this.kind === 'emblem' || this.kind === 'secret' ? 18 : this.kind === 'healthBig' ? 22 : 18;
+    return this.kind === 'token' ? 13 : this.kind === 'note' ? 18 : this.kind === 'emblem' || this.kind === 'secret' ? 18 : this.kind === 'healthBig' ? 22 : 18;
   }
 
   update(w: World, dt: number) {
@@ -81,6 +82,39 @@ export class Pickup {
     const x = this.x;
     const y = this.y + bob;
     if (this.life < 4 && this.life !== Infinity && Math.floor(this.life * 8) % 2 === 0) return;
+    if (this.kind === 'note') {
+      // nota musical dourada pulsando na batida da música
+      const b = music.beat();
+      const pulse = 1 + 0.22 * Math.max(0, 1 - b * 4);
+      const glow = glowSprite('#ffe27a', 32);
+      g.globalCompositeOperation = 'lighter';
+      g.globalAlpha = 0.45 + 0.35 * Math.max(0, 1 - b * 3);
+      g.drawImage(glow.c, x - 22 * pulse, y - 22 * pulse, 44 * pulse, 44 * pulse);
+      g.globalAlpha = 1;
+      g.globalCompositeOperation = 'source-over';
+      g.save();
+      g.translate(x, y);
+      g.scale(pulse, pulse);
+      g.rotate(Math.sin(this.t * 2) * 0.15);
+      g.fillStyle = '#ffd23a';
+      g.strokeStyle = '#170f2e';
+      g.lineWidth = 1.6;
+      g.beginPath();
+      g.ellipse(-3, 6, 6, 4.4, -0.4, 0, Math.PI * 2);
+      g.fill();
+      g.stroke();
+      g.fillRect(1.6, -10, 2.6, 16);
+      g.strokeRect(1.6, -10, 2.6, 16);
+      g.beginPath();
+      g.moveTo(4.2, -10);
+      g.quadraticCurveTo(12, -6, 9, 2);
+      g.quadraticCurveTo(10, -4, 4.2, -5);
+      g.closePath();
+      g.fill();
+      g.stroke();
+      g.restore();
+      return;
+    }
     if (this.kind === 'token') {
       const sx = Math.cos(this.t * 5);
       drawSpr(g, art.token, x, y, { sx: Math.abs(sx) < 0.12 ? 0.12 : sx });

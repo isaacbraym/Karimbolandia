@@ -333,7 +333,7 @@ describe('Agachar desvia de tiros retos', () => {
       for (const layer of ['back', 'front'] as const) {
         const lo = camX - 200;
         const hi = camX + 1200;
-        const expected = w.data.decos.flatMap((d, i) => d.layer === layer && d.x >= lo && d.x <= hi ? [i] : []);
+        const expected = w.data.decos.flatMap((d, i) => d.layer === layer && !d.par && d.x >= lo && d.x <= hi ? [i] : []);
         const actual: number[] = [];
         for (let key = Math.floor(lo / 512); key <= Math.floor(hi / 512); key++) actual.push(...(buckets[layer].get(key) ?? []));
         actual.sort((a, b) => a - b);

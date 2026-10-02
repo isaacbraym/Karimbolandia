@@ -267,3 +267,38 @@ describe('Save-state', () => {
     expect(w2.player.weapons.get('pistol')).toBe(Infinity);
   });
 });
+
+describe('Fase 2 (selva): sala do ritmo', () => {
+  it('tambor é trampolim: pisou, quica bem mais alto que o pulo e o tambor toca', () => {
+    const w = jungleWorld();
+    const ctl = newCtl();
+    const d = data.drums[0];
+    w.player.reset(d.x, d.y - 40);
+    let minVy = 0;
+    for (let f = 0; f < 40; f++) {
+      w.update(1 / 60, ctl);
+      minVy = Math.min(minVy, w.player.body.vy);
+    }
+    expect(minVy).toBeLessThan(-700);
+    expect(data.drums.length).toBeGreaterThanOrEqual(4);
+  });
+
+  it('pegar todas as notas toca a música inteira e solta o tesouro', () => {
+    const w = jungleWorld();
+    const ctl = newCtl();
+    const room = data.secretRooms.find((s) => s.id === 'ritmo')!.rect;
+    w.player.reset(room.x + 64, room.y + room.h);
+    for (let f = 0; f < 5; f++) w.update(1 / 60, ctl);
+    expect(w.rhythm.active).toBe(true);
+    const notes = w.pickups.filter((p) => p.kind === 'note');
+    expect(notes.length).toBe(w.rhythm.total);
+    expect(notes.length).toBeGreaterThanOrEqual(10);
+    const before = w.pickups.length;
+    for (const n of notes) {
+      w.collect(n);
+      n.alive = false;
+    }
+    expect(w.rhythm.done).toBe(true);
+    expect(w.pickups.length).toBeGreaterThan(before);
+  });
+});

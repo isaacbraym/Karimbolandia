@@ -127,6 +127,23 @@ export class AudioEngine {
     for (const n of this.clipData.keys()) this.decodeClip(n);
   }
 
+  /** Nota de flauta (sala do ritmo). `when` = instante do relógio do áudio (0 = agora). */
+  flute(midi: number, when = 0, vol = 1) {
+    if (!this.ctx || this.ctx.state !== 'running' || this.muted) return;
+    const f = 440 * Math.pow(2, (midi - 69) / 12);
+    const delay = Math.max(0, when - this.ctx.currentTime);
+    this.tone({ type: 'sine', f0: f, dur: 0.42, vol: 0.2 * vol, att: 0.03, delay, vib: 9, vibHz: 5 });
+    this.tone({ type: 'triangle', f0: f * 2, dur: 0.3, vol: 0.05 * vol, att: 0.03, delay });
+    this.noise({ dur: 0.08, vol: 0.05 * vol, type: 'bandpass', f0: f * 2, q: 4, delay });
+  }
+  /** Batida de tambor (tambores-trampolim): `pitch` 0..1 do grave ao agudo. */
+  drum(pitch: number, vol = 1, pan = 0) {
+    if (!this.ctx || this.ctx.state !== 'running' || this.muted) return;
+    const f = 70 + pitch * 150;
+    this.tone({ type: 'sine', f0: f * 1.7, f1: f, dur: 0.32, vol: 0.5 * vol, pan });
+    this.noise({ dur: 0.07, vol: 0.25 * vol, type: 'bandpass', f0: 900 + pitch * 1600, f1: 400, q: 1.2, pan });
+  }
+
   /** 0 = normal, 1 = submerso (tudo abafado). */
   setUnderwater(k: number) {
     if (!this.ctx || !this.uw || Math.abs(k - this.uwK) < 0.01) return;

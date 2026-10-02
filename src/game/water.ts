@@ -110,7 +110,9 @@ export class Waters {
 
   // ------------------------------------------------------------------ peixes
   private freeAt(z: WaterZone, x: number, y: number, pad: number) {
-    if (x < z.x + pad || x > z.x + z.w - pad || y < z.y + pad * 0.6 || y > z.y + z.h - pad * 0.5) return false;
+    // margem vertical ~ meia altura do peixe: antes os grandes subiam até a superfície e o recorte do
+    // lago cortava o alto da cabeça
+    if (x < z.x + pad || x > z.x + z.w - pad || y < z.y + pad * 1.3 + 6 || y > z.y + z.h - pad * 1.1) return false;
     return !this.level.solidAtPx(x, y) && !this.level.solidAtPx(x - pad * 0.6, y) && !this.level.solidAtPx(x + pad * 0.6, y) && !this.level.solidAtPx(x, y + pad * 0.4);
   }
 
