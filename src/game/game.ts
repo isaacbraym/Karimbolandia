@@ -14,7 +14,8 @@ import { clamp } from '../core/math';
 import { buildArt, getArt, artReady, setArtStage, stageBg, type Quality } from '../art';
 import { loadJungle, getJungle } from '../art/jungle';
 import { buildJungle } from './level/jungle';
-import { loadSave, writeSave, clearSave, captureSave, applySave, nextStageSave, type SaveState } from './save';
+import { loadSave, clearSave, captureSave, applySave, nextStageSave, type SaveState } from './save';
+import { SaveSession } from './saveSession';
 import { World, type MusicState } from './world';
 import { buildLevel } from './level/index';
 import { Hud, setHudTextScale } from './hud';
@@ -101,6 +102,8 @@ export class Game {
   private ambT = 3;
   private saveQueued = false;
   private storageWarningShown = false;
+  private saveSession: SaveSession | null = null;
+  private saveConflictShown = false;
   private metrics: FrameMetrics | null = null;
 
   constructor(canvas: HTMLCanvasElement, ui: HTMLElement) {
@@ -346,7 +349,17 @@ export class Game {
     saveProgress();
     const w = this.world;
     if (!w || w.finished || w.player.hp <= 0) return;
-    writeSave(captureSave(w));
+    this.persistRun(captureSave(w));
+  }
+  private persistRun(save: SaveState | null) {
+    this.saveSession ??= new SaveSession();
+    const result = this.saveSession.write(save);
+    if (result.conflict && !this.saveConflictShown) {
+      this.saveConflictShown = true;
+      this.menus.toast(result.durable
+        ? 'Outra aba alterou o save. Sua partida foi preservada em SAVE E CONTA → PARTIDAS GUARDADAS.'
+        : 'Outra aba alterou o save. Sua cópia está só em memória: baixe-a em SAVE E CONTA → PARTIDAS GUARDADAS antes de fechar.');
+    }
   }
   private queueSave() {
     if (this.saveQueued) return;
@@ -390,15 +403,17 @@ export class Game {
     else this.play();
   }
 
-  play(again = false, stage = this.world?.data.stage ?? this.stage, save?: SaveState) {
+  play(again = false, stage = this.world?.data.stage ?? this.stage, save?: SaveState, session = new SaveSession(save ?? loadSave())) {
     if (stage === 2 && !getJungle()) {
       // ainda preparando a selva: espera e entra sozinho
       audio.init();
       this.menus.toast('Entrando na selva...');
-      void loadJungle(this.base, this.quality).then(() => this.play(again, 2, save)).catch(() => this.menus.toast('Não foi possível carregar a selva'));
+      void loadJungle(this.base, this.quality).then(() => this.play(again, 2, save, session)).catch(() => this.menus.toast('Não foi possível carregar a selva'));
       return;
     }
     this.stage = stage;
+    this.saveSession = session;
+    this.saveConflictShown = false;
     setArtStage(stage);
     this.post.stage = stage;
     audio.init();
@@ -740,8 +755,8 @@ export class Game {
     if (!progress.stagesDone.includes(w.data.stage)) progress.stagesDone.push(w.data.stage);
     saveProgress();
     // fase concluída: o save passa a apontar para o começo da próxima (a selva ainda é prévia)
-    if (w.data.stage === 1) writeSave(nextStageSave(w, 2));
-    else clearSave();
+    if (w.data.stage === 1) this.persistRun(nextStageSave(w, 2));
+    else this.persistRun(null);
     window.setTimeout(() => {
       this.menus.showResults({
         nextStage: w.data.stage === 1 ? 2 : undefined,

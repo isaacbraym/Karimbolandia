@@ -127,6 +127,10 @@ html.rot #app {
 .save-conflicts:not(:empty), .save-preview:not(:empty) { border: 1px solid var(--amber); border-radius: 12px; padding: 12px; margin: 12px 0; }
 .save-conflicts .btn, .save-preview .btn { width: 100%; margin-top: 8px; }
 .save-file { display: none; }
+.save-copies:not(:empty) { border: 1px solid #725aaf; border-radius: 12px; padding: 12px; margin: 14px 0; }
+.save-copies h3 { margin: 0 0 8px; color: var(--amber); }
+.save-copy + .save-copy { border-top: 1px solid #725aaf; margin-top: 12px; padding-top: 12px; }
+.save-copy .btn { width: 100%; margin-top: 6px; }
 button[hidden] { display: none !important; }
 
 /* ------------------------------------------------------------------ overlays */

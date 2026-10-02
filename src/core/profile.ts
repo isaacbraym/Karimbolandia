@@ -26,8 +26,10 @@ export function parseBackup(text: string): ProfileData {
   if (!data) throw new Error('O backup está incompleto ou danificado. Seu progresso atual foi mantido.');
   return data;
 }
-export function exportBackup(): string {
-  const backup: Backup = { game: 'karimbolandia', version: 1, exportedAt: new Date().toISOString(), data: captureProfile() };
+export function exportBackup(data = captureProfile()): string {
+  const valid = validateProfile(data);
+  if (!valid) throw new Error('Progresso inválido.');
+  const backup: Backup = { game: 'karimbolandia', version: 1, exportedAt: new Date().toISOString(), data: valid };
   return JSON.stringify(backup, null, 2);
 }
 export function applyProfile(data: ProfileData): boolean {

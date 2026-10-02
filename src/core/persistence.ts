@@ -23,6 +23,17 @@ export function onPersist(fn: (key: string) => void) {
   listeners.add(fn);
   return () => { listeners.delete(fn); };
 }
+/** Enumeração apenas em menus de recuperação, nunca no loop de jogo. */
+export function storedKeys(prefix: string): string[] {
+  const keys = new Set([...memory.keys()].filter(key => key.startsWith(prefix) && !key.endsWith('.backup')));
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key?.startsWith(prefix) && !key.endsWith('.backup')) keys.add(key);
+    }
+  } catch { /* cópias desta sessão continuam disponíveis em memória */ }
+  return [...keys];
+}
 function emit(key: string) { for (const fn of listeners) fn(key); }
 
 export function readStored<T>(key: string, validate: (raw: unknown) => T | null): T | null {

@@ -8,6 +8,7 @@ import { SKINS } from '../core/skinCatalog';
 import { chooseSkin, coinBalance, ensureWallet } from '../core/skins';
 import { getArt } from '../art';
 import { drawKarimbo } from '../art/karimbo';
+import { listSaveCopies } from '../game/saveSession';
 
 export interface MenuCallbacks {
   onPlay(): void;
@@ -442,15 +443,17 @@ export class Menus {
     const sync = this.btn('SINCRONIZAR AGORA', 'alt', () => { void cloudSaves.sync(); });
     const logout = this.btn('SAIR DA CONTA', 'alt small', () => { void cloudSaves.logout(); });
     const conflicts = el('div', 'save-conflicts');
-    const download = this.btn('BAIXAR BACKUP', 'primary', () => {
-      const url = URL.createObjectURL(new Blob([exportBackup()], { type: 'application/json' }));
+    const copies = el('div', 'save-copies');
+    const downloadData = (data?: ProfileData) => {
+      const url = URL.createObjectURL(new Blob([exportBackup(data)], { type: 'application/json' }));
       const a = document.createElement('a');
       a.href = url;
       a.download = `karimbolandia-${new Date().toISOString().slice(0, 10)}.json`;
       a.click();
       window.setTimeout(() => URL.revokeObjectURL(url), 10000);
       this.toast('Backup pronto. Guarde o arquivo para recuperar seu progresso.');
-    });
+    };
+    const download = this.btn('BAIXAR BACKUP', 'primary', () => downloadData());
     const file = el('input', 'save-file');
     file.type = 'file';
     file.accept = '.json,application/json';
@@ -459,17 +462,18 @@ export class Menus {
     const describe = (data: ProfileData) => data.save
       ? `Fase ${data.save.stage} • ${data.save.cpName} • ${data.save.tokens} fichas • ${data.save.score} pontos`
       : `Sem partida em andamento • recorde ${data.progress.bestScore} • ${data.progress.completed} fases concluídas`;
-    const confirmRestore = (data: ProfileData) => {
+    const confirmRestore = (data: ProfileData, label = 'RESTAURAR ESTE BACKUP') => {
       preview.replaceChildren();
       const text = el('p');
       text.textContent = `${describe(data)}. Restaurar substitui a partida deste perfil e guarda uma cópia da atual.`;
-      preview.append(text, this.btn('RESTAURAR ESTE BACKUP', 'primary', () => {
+      preview.append(text, this.btn(label, 'primary', () => {
         const durable = applyProfile(data);
         this.cb.onProfileChanged();
         this.showSaves('main');
         this.toast(durable ? 'Backup restaurado. Use CONTINUAR para jogar.' : 'Restaurado em memória. Baixe um backup: este navegador não conseguiu gravar.');
       }), this.btn('CANCELAR', 'alt small', () => { preview.replaceChildren(); this.collectFocus(panel); }));
       this.collectFocus(panel);
+      preview.scrollIntoView({ block: 'nearest' });
     };
     file.addEventListener('change', async () => {
       const selected = file.files?.[0];
@@ -493,7 +497,7 @@ export class Menus {
       else this.toast('Ainda não há uma restauração anterior neste perfil.');
     });
     buttons.append(login, sync, logout, download, restore, undo);
-    panel.append(local, details, account, remote, conflicts, buttons, file, preview);
+    panel.append(local, details, account, remote, conflicts, buttons, copies, file, preview);
     const note = el('p', 'save-note');
     note.textContent = 'A partida volta ao último checkpoint, com fichas, equipamentos e itens salvos. Baixar um backup também protege seu progresso se você limpar os dados do navegador.';
     panel.append(note);
@@ -516,6 +520,23 @@ export class Menus {
       login.disabled = cloudSaves.state === 'loading' || cloudSaves.state === 'syncing';
       undo.hidden = !previous;
       conflicts.replaceChildren();
+      copies.replaceChildren();
+      const savedCopies = listSaveCopies();
+      if (savedCopies.length) {
+        copies.append(el('h3', '', 'PARTIDAS GUARDADAS'), el('p', 'save-note', 'Estas cópias preservam partidas de outras abas e sessões. Escolher uma não apaga seus recordes, moedas ou trajes.'));
+        for (const copy of savedCopies) {
+          const row = el('div', 'save-copy');
+          const date = new Date(copy.save.savedAt);
+          const when = Number.isNaN(date.getTime()) ? '' : ` • ${date.toLocaleString('pt-BR')}`;
+          row.append(el('p', 'save-details', `${describe({ ...data, save: copy.save })}${when}`),
+            this.btn(`RECUPERAR • FASE ${copy.save.stage} • ${copy.save.cpName}`, 'alt small', () => {
+              confirmRestore({ ...captureProfile(), save: copy.save }, 'RECUPERAR ESTA PARTIDA');
+            }), this.btn(`BAIXAR BACKUP • FASE ${copy.save.stage} • ${copy.save.cpName}`, 'alt small', () => {
+              downloadData({ ...captureProfile(), save: copy.save });
+            }));
+          copies.append(row);
+        }
+      }
       if (cloudSaves.conflict && cloudSaves.state === 'conflict') {
         const { remote: saved } = cloudSaves.conflict;
         const here = el('p'), there = el('p');
@@ -529,7 +550,9 @@ export class Menus {
     };
     const unsubscribeCloud = cloudSaves.subscribe(update);
     const unsubscribeLocal = onPersist(update);
-    this.saveUnsubscribe = () => { unsubscribeCloud(); unsubscribeLocal(); };
+    const changed = () => update();
+    window.addEventListener('storage', changed);
+    this.saveUnsubscribe = () => { unsubscribeCloud(); unsubscribeLocal(); window.removeEventListener('storage', changed); };
   }
 
   setLoading(p: number, label: string) {
@@ -544,7 +567,10 @@ export class Menus {
     ensureWallet();
     this.shopBtn.textContent = `LOJA DE SKINS • ${coinBalance()} MOEDAS`;
     this.main.classList.remove('hidden');
-    (document.getElementById('menu-foot') as HTMLElement).textContent = footer;
+    const copies = listSaveCopies().length;
+    (document.getElementById('menu-foot') as HTMLElement).textContent = copies
+      ? `${copies} partida${copies === 1 ? '' : 's'} guardada${copies === 1 ? '' : 's'} em SAVE E CONTA`
+      : footer;
     this.collectFocus(this.main);
   }
   hideAll() {

@@ -58,4 +58,24 @@ describe('Saída preserva o save mais recente', () => {
     expect(loadSave()?.tokens).toBe(21);
     expect(loadSave()?.score).toBe(5678);
   });
+
+  it.each(['playing', 'paused', 'comic'] as const)('preserva o checkpoint da outra aba na saída em %s', async state => {
+    const game = await makeGame();
+    const { writeSave, freshSave, loadSave } = await import('../src/game/save');
+    const { listSaveCopies } = await import('../src/game/saveSession');
+    const toast = vi.fn();
+    game.menus = { toast } as unknown as typeof game.menus;
+    game.world = makeWorld();
+    game.state = state;
+    saveOnExit(game);
+    const other = { ...freshSave(2), score: 22000, tokens: 47 };
+    writeSave(other);
+    game.world.score = 5900;
+    saveOnExit(game);
+    expect(loadSave()).toEqual(other);
+    expect(listSaveCopies()[0].save.score).toBe(5900);
+    expect(toast).toHaveBeenCalledOnce();
+    saveOnExit(game);
+    expect(toast).toHaveBeenCalledOnce();
+  });
 });
