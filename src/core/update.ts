@@ -20,6 +20,31 @@ export interface UpdateUI {
 const CHECK_EVERY = 60_000; // ms
 const TRIED_KEY = 'karimbolandia.update.tried';
 
+export type VersionCheck = { status: 'current' } | { status: 'unavailable' } | { status: 'outdated'; id: string };
+
+/** A abertura aguarda esta consulta. Falhas de rede nunca apagam nem bloqueiam o save offline. */
+export async function checkStartupVersion(base: string, installedId = __BUILD_ID__): Promise<VersionCheck> {
+  if (!navigator.onLine) return { status: 'unavailable' };
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 6000);
+  try {
+    const res = await fetch(`${base}version.json?t=${Date.now()}`, { cache: 'no-store', signal: controller.signal });
+    if (!res.ok) return { status: 'unavailable' };
+    const v = await res.json() as { id?: unknown };
+    if (typeof v.id !== 'string' || !/^[a-zA-Z0-9_-]{1,100}$/.test(v.id)) return { status: 'unavailable' };
+    return v.id === installedId ? { status: 'current' } : { status: 'outdated', id: v.id };
+  } catch {
+    return { status: 'unavailable' };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+export function wasUpdateAttempted(id: string) {
+  // O parâmetro também protege contra loops quando sessionStorage está indisponível.
+  return triedId() === id || new URL(location.href).searchParams.get('v') === id;
+}
+
 function triedId(): string | null {
   try {
     return sessionStorage.getItem(TRIED_KEY);
@@ -42,24 +67,22 @@ export function startUpdateWatch(base: string, ui: UpdateUI) {
   let busy = false;
 
   const handle = (id: string) => {
-    if (triedId() === id) {
+    if (wasUpdateAttempted(id)) {
       // já recarregamos uma vez para esta versão e ela ainda não veio (CDN atrasada): só avisa
       if (!notified) {
         notified = true;
-        ui.onUpdate(() => void applyUpdate(id));
+        ui.onUpdate(() => void applyUpdate(id, base));
       }
       return;
     }
     if (ui.isSafe()) {
-      markTried(id);
-      void applyUpdate(id);
+      void applyUpdate(id, base);
     } else {
       pending = id;
       if (!notified) {
         notified = true;
         ui.onUpdate(() => {
-          markTried(id);
-          void applyUpdate(id);
+          void applyUpdate(id, base);
         });
       }
     }
@@ -69,13 +92,8 @@ export function startUpdateWatch(base: string, ui: UpdateUI) {
     if (busy || !navigator.onLine) return;
     busy = true;
     try {
-      const res = await fetch(`${base}version.json?t=${Date.now()}`, { cache: 'no-store' });
-      if (res.ok) {
-        const v = (await res.json()) as { id?: string };
-        if (v.id && v.id !== __BUILD_ID__) handle(v.id);
-      }
-    } catch {
-      /* offline / sem version.json: ignora */
+      const v = await checkStartupVersion(base);
+      if (v.status === 'outdated') handle(v.id);
     } finally {
       busy = false;
     }
@@ -89,8 +107,7 @@ export function startUpdateWatch(base: string, ui: UpdateUI) {
     if (pending && ui.isSafe()) {
       const id = pending;
       pending = null;
-      markTried(id);
-      void applyUpdate(id);
+      void applyUpdate(id, base);
     }
   }, 1000);
   document.addEventListener('visibilitychange', () => {
@@ -118,15 +135,17 @@ export function startUpdateWatch(base: string, ui: UpdateUI) {
 }
 
 /** Limpa caches + service worker e recarrega com um parâmetro novo (fura qualquer cache HTTP). */
-export async function applyUpdate(id: string) {
+export async function applyUpdate(id: string, base = './') {
+  markTried(id);
   try {
     if ('caches' in window) {
       const keys = await caches.keys();
-      await Promise.all(keys.map((k) => caches.delete(k)));
+      await Promise.all(keys.filter(k => k.startsWith('karimbolandia-')).map((k) => caches.delete(k)));
     }
     if ('serviceWorker' in navigator) {
       const regs = await navigator.serviceWorker.getRegistrations();
-      await Promise.all(regs.map((r) => r.unregister()));
+      const scope = new URL(base, location.href).href;
+      await Promise.all(regs.filter(r => r.scope === scope).map((r) => r.unregister()));
     }
   } catch {
     /* segue para o recarregamento mesmo assim */

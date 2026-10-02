@@ -46,6 +46,7 @@ const acked = new Set();
 // (ex.: a v1 guardada no cache do celular) e são recarregadas — saem direto na versão nova.
 function refreshOldPages() {
   return self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
+    list = list.filter((c) => c.url.startsWith(self.registration.scope));
     for (const c of list) {
       try { c.postMessage('kg-sw-updated'); } catch (err) { /* ignora */ }
     }

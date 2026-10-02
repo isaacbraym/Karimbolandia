@@ -302,6 +302,59 @@ describe('Fase 2 (selva): areia movediça', () => {
   });
 });
 
+describe('Queda perto dos cipós', () => {
+  it('recupera um ponto antigo e restaura o save do lado livre do checkpoint', () => {
+    const w = jungleWorld();
+    const ctl = newCtl();
+    const idx = w.data.checkpoints.findIndex(c => c.name === 'Desfiladeiro');
+    const cp = w.data.checkpoints[idx];
+    w.checkpointIdx = idx;
+    w.blockBehind(idx, false);
+    const old = { x: cp.x - 8 * TILE, y: cp.y };
+    expect(w.isSafeSpot(old.x, old.y)).toBe(false);
+    const recovered = w.findSafeSpot(old.x, old.y)!;
+    expect(recovered).not.toBeNull();
+    expect(recovered.x - w.player.body.w / 2).toBeGreaterThan(w.blockX + 30);
+    w.player.lastSafe = old;
+    w.player.body.y = w.deathY() + 100;
+    w.player.update(w, 1 / 60, ctl);
+    expect(w.player.x).toBe(cp.x);
+    const loaded = jungleWorld();
+    applySave(loaded, JSON.parse(JSON.stringify(captureSave(w))));
+    expect(loaded.checkpointIdx).toBe(idx);
+    expect(loaded.player.x - loaded.player.body.w / 2).toBeGreaterThan(loaded.blockX + 30);
+    const blockBefore = loaded.blockX;
+    loaded.blockBehind(idx + 1, false);
+    expect(loaded.blockX).toBe(blockBefore);
+    loaded.respawn();
+    expect(loaded.player.x - loaded.player.body.w / 2).toBeGreaterThan(loaded.blockX + 30);
+  });
+
+  it('não devolve o jogador para trás da barreira quando atravessou o checkpoint no ar', () => {
+    const w = jungleWorld();
+    const ctl = newCtl();
+    const idx = w.data.checkpoints.findIndex(c => c.name === 'Desfiladeiro');
+    const cp = w.data.checkpoints[idx];
+    w.checkpointIdx = idx - 1;
+    w.player.reset(cp.x - 6 * TILE, cp.y);
+    const previousSafe = { ...w.player.lastSafe };
+    w.player.body.x = cp.x + 16;
+    w.player.body.y = cp.y - 100;
+    w.director.update(1 / 60, ctl);
+    expect(w.checkpointIdx).toBe(idx);
+    expect(w.blockX).toBeGreaterThan(previousSafe.x);
+    w.player.body.x = (GORGE_X0 + 4) * TILE;
+    w.player.body.y = w.deathY() + 100;
+    w.player.update(w, 1 / 60, ctl);
+    expect(w.stats.pitFalls).toBe(1);
+    expect(w.player.x).toBeGreaterThanOrEqual(cp.x);
+    expect(w.player.x - w.player.body.w / 2).toBeGreaterThan(w.blockX + 30);
+    ctl.moveX = 1;
+    for (let f = 0; f < 15; f++) w.player.update(w, 1 / 60, ctl);
+    expect(w.player.x).toBeGreaterThan(cp.x + 20);
+  });
+});
+
 describe('Save-state', () => {
   it('captura o checkpoint e restaura tudo num jogo novo', () => {
     const w = jungleWorld();

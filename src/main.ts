@@ -1,10 +1,40 @@
 import './style.css';
 import { Game } from './game/game';
-import { startUpdateWatch } from './core/update';
+import { startUpdateWatch, checkStartupVersion, wasUpdateAttempted, applyUpdate } from './core/update';
 import { cloudSaves } from './core/cloud';
 
 const base = import.meta.env.BASE_URL;
 const params = new URLSearchParams(location.search);
+
+async function verifyBeforeStart(ui: HTMLElement): Promise<'current' | 'unavailable' | 'updating'> {
+  const panel = document.createElement('section');
+  panel.className = 'version-gate';
+  const title = document.createElement('h1');
+  title.textContent = 'KARIMBOLÂNDIA';
+  const status = document.createElement('p');
+  status.setAttribute('role', 'status');
+  status.setAttribute('aria-live', 'polite');
+  status.textContent = 'Verificando a versão mais recente...';
+  panel.append(title, status);
+  ui.append(panel);
+  const result = await checkStartupVersion(base);
+  if (result.status !== 'outdated') {
+    panel.remove();
+    return result.status;
+  }
+  if (!wasUpdateAttempted(result.id)) {
+    status.textContent = 'Atualizando o jogo. Seu progresso será mantido.';
+    await applyUpdate(result.id, base);
+  } else {
+    status.textContent = 'A nova versão ainda está chegando. Tente atualizar novamente em alguns instantes.';
+    const retry = document.createElement('button');
+    retry.type = 'button';
+    retry.textContent = 'TENTAR ATUALIZAR';
+    retry.onclick = () => { retry.disabled = true; void applyUpdate(result.id, base); };
+    panel.append(retry);
+  }
+  return 'updating';
+}
 
 async function boot() {
   if (params.get('debug') === 'sprites') {
@@ -19,6 +49,8 @@ async function boot() {
   }
   const canvas = document.getElementById('game') as HTMLCanvasElement;
   const ui = document.getElementById('ui') as HTMLElement;
+  const version = import.meta.env.PROD ? await verifyBeforeStart(ui) : 'current';
+  if (version === 'updating') return;
   const game = new Game(canvas, ui);
   (window as unknown as { __karim: Game }).__karim = game;
   // versão mais nova sempre: confere já na tela de carregamento e recarrega sozinho se houver
@@ -31,6 +63,7 @@ async function boot() {
   }
   void import('./core/audio').then((a) => import('./core/music').then((m) => ((window as unknown as Record<string, unknown>).__snd = { audio: a.audio, music: m.music, MIX: m.MIX })));
   await game.boot(base);
+  if (version === 'unavailable') game.menus.toast('Não foi possível conferir a versão. Usando a versão disponível neste aparelho.');
   // Não atrasa a arte nem a partida; o SDK de nuvem vem em um chunk separado.
   void cloudSaves.initialize(base);
   if ('serviceWorker' in navigator && import.meta.env.PROD) {

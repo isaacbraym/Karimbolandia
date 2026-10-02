@@ -1698,6 +1698,10 @@ export class Player {
     const n = this.nomad;
     // o ponto seguro memorizado pode ter virado buraco (chão do chefe desabou): revalida
     let s = this.lastSafe;
+    if (!w.canReturnTo(s.x, s.y)) {
+      s = w.checkpointPos();
+      this.lastSafe = { ...s };
+    }
     if (!w.standableAt(Math.floor(s.x / TILE), Math.floor(s.y / TILE))) {
       s = w.findSafeSpot(s.x, s.y) ?? w.checkpointPos();
       this.lastSafe = { x: s.x, y: s.y };

@@ -381,6 +381,9 @@ export class Director {
     const w = this.w;
     w.checkpointIdx = idx;
     w.checkpointSnap = w.player.snapshot();
+    const cp = w.data.checkpoints[idx];
+    // O ponto anterior pode ficar do outro lado dos escombros se cruzou o marco no ar.
+    w.player.lastSafe = { x: cp.x, y: cp.y };
     w.blockBehind(idx);
     w.hooks.onCheckpoint?.(idx);
     if (!quiet) {

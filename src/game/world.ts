@@ -462,7 +462,7 @@ export class World {
   /** Passou o checkpoint `idx`: fecha o caminho de volta (num trecho de chão firme, fora de arenas). */
   blockBehind(idx: number, fx = true) {
     const cps = this.data.checkpoints;
-    if (idx < 1 || idx >= cps.length) return;
+    if (idx < 1 || idx >= cps.length || idx > this.checkpointIdx) return;
     const cp = cps[idx];
     const L = this.level;
     // perto do checkpoint (o desmoronamento acontece à vista), procurando para trás um chão firme
@@ -470,7 +470,7 @@ export class World {
     const inArena = (x: number) => this.data.arenas.some((a) => x > a.rect.x - 3 * TILE && x < a.rect.x + a.rect.w + 3 * TILE);
     const inWater = (x: number) => this.data.water.some((z) => x > z.x - 2 * TILE && x < z.x + z.w + 2 * TILE);
     for (let k = 0; k < 12; k++) {
-      const x = Math.floor((cp.x - (3 + k) * TILE) / TILE) * TILE + TILE / 2;
+      const x = Math.floor((cp.x - (5 + k) * TILE) / TILE) * TILE + TILE / 2;
       if (x < xMin || x <= this.blockX + TILE) return;
       if (inArena(x) || inWater(x)) continue;
       const gy = L.groundBelow(x, cp.y - 260, 640);
@@ -696,6 +696,7 @@ export class World {
         if (a && (px < a.x + 40 || px > a.x + a.w - 40)) continue;
         for (const dy of [0, -1, 1, -2, 2, -3, 3, -4, 4, -5, 5, -6, 6, 7, 8]) {
           const ty = ty0 + dy;
+          if (!this.canReturnTo(px, ty * TILE)) continue;
           if (this.standableAt(tx, ty)) return { x: px, y: ty * TILE };
         }
       }
@@ -703,7 +704,14 @@ export class World {
     return null;
   }
 
+  /** Salas são mapas separados; na trilha, o retorno deve ficar depois da barreira. */
+  canReturnTo(x: number, feetY: number) {
+    return !Number.isFinite(this.blockX) || x - this.player.body.w / 2 > this.blockX + 30 ||
+      this.data.rooms.some(r => x >= r.x && x <= r.x + r.w && feetY >= r.y && feetY <= r.y + r.h);
+  }
+
   isSafeSpot(x: number, feetY: number) {
+    if (!this.canReturnTo(x, feetY)) return false;
     const L = this.level;
     const tx = Math.floor(x / TILE);
     const ty = Math.floor(feetY / TILE);
