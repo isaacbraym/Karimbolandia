@@ -4,6 +4,7 @@ import { WEAPONS } from './weapons';
 import { clamp, easeOutBack, formatTime } from '../core/math';
 import { drawSpr } from '../art/kit';
 import type { Felipao } from './enemies/felipao';
+import { coinBalance } from '../core/skins';
 
 export interface Banner {
   title: string;
@@ -448,7 +449,7 @@ export class Hud {
     const cw = 158;
     pill(g, cx - cw / 2, T, cw, 26, 8, 'rgba(23,15,46,0.72)', 'rgba(255,255,255,0.16)');
     drawSpr(g, art.pickups.token, cx - cw / 2 + 14, T + 13, { sx: 0.85, sy: 0.85 });
-    numText(g, 'tokens', w.tokens, fmtInt, cx - cw / 2 + 26, T + 19, 15, '#ffe27a');
+    numText(g, 'tokens', coinBalance(), fmtInt, cx - cw / 2 + 26, T + 19, 15, '#ffe27a');
     drawSpr(g, art.pickups.emblem, cx + 2, T + 13, { sx: 0.55, sy: 0.55 });
     numText(g, 'emblems', w.emblems.size, fmtEmblems, cx + 14, T + 19, 15, '#ffffff');
     for (let i = 0; i < 3; i++) {

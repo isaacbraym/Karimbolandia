@@ -1,6 +1,7 @@
 /** Configurações do aparelho; progresso separado por conta, com recuperação local. */
 import { profileKey, readStored, writeStored } from './persistence';
 import { record, number, integer, ids } from './saveValidation';
+import { isSkinId, type SkinId } from './skinCatalog';
 
 export type QualityPref = 'auto' | 'low' | 'medium' | 'high';
 
@@ -29,6 +30,10 @@ export interface Progress {
   secretsFound: number[];
   /** fases já concluídas (1, 2...) */
   stagesDone: number[];
+  coinsEarned: number;
+  coinsMigrated: boolean;
+  ownedSkins: SkinId[];
+  equippedSkin: SkinId;
 }
 
 const KEY_S = 'karimbolandia.settings.v1';
@@ -58,6 +63,10 @@ export const defaultProgress = (): Progress => ({
   emblemsFound: [],
   secretsFound: [],
   stagesDone: [],
+  coinsEarned: 0,
+  coinsMigrated: false,
+  ownedSkins: [],
+  equippedSkin: 'classic',
 });
 
 function load<T extends object>(key: string, def: () => T): T {
@@ -86,10 +95,15 @@ export function validateProgress(v: unknown): Progress | null {
   if (typeof p.dashDiscovered !== 'boolean') return null;
   for (const k of ['emblemsFound', 'secretsFound', 'stagesDone'] as const) if (!ids(p[k])) return null;
   if (!p.stagesDone.every(s => s === 1 || s === 2)) return null;
+  if (!integer(p.coinsEarned) || typeof p.coinsMigrated !== 'boolean' || !isSkinId(p.equippedSkin)) return null;
+  if (!Array.isArray(p.ownedSkins) || p.ownedSkins.length > 2 || !p.ownedSkins.every(s => isSkinId(s) && s !== 'classic') || new Set(p.ownedSkins).size !== p.ownedSkins.length) return null;
+  if (p.equippedSkin !== 'classic' && !p.ownedSkins.includes(p.equippedSkin)) return null;
   return {
     bestScore: p.bestScore, bestTime: p.bestTime, bestEmblems: p.bestEmblems,
     bestSecrets: p.bestSecrets, completed: p.completed, dashDiscovered: p.dashDiscovered,
     emblemsFound: [...p.emblemsFound], secretsFound: [...p.secretsFound], stagesDone: [...p.stagesDone],
+    coinsEarned: p.coinsEarned, coinsMigrated: p.coinsMigrated,
+    ownedSkins: [...p.ownedSkins], equippedSkin: p.equippedSkin,
   };
 }
 export const progress: Progress = readStored(profileKey(KEY_P), validateProgress) ?? defaultProgress();
@@ -103,7 +117,14 @@ export function mergeProgress(a: Progress, b: Progress): Progress {
     completed: Math.max(a.completed, b.completed), dashDiscovered: a.dashDiscovered || b.dashDiscovered,
     emblemsFound: union(a.emblemsFound, b.emblemsFound), secretsFound: union(a.secretsFound, b.secretsFound),
     stagesDone: union(a.stagesDone, b.stagesDone),
+    coinsEarned: Math.max(a.coinsEarned, b.coinsEarned), coinsMigrated: a.coinsMigrated || b.coinsMigrated,
+    ownedSkins: [...new Set([...a.ownedSkins, ...b.ownedSkins])], equippedSkin: b.equippedSkin,
   };
+}
+
+/** Saves anteriores à loja recebem as fichas da campanha uma única vez. */
+export function withLegacyCoins(p: Progress, tokens: number): Progress {
+  return p.coinsMigrated ? p : { ...p, coinsMigrated: true, coinsEarned: Math.max(p.coinsEarned, tokens) };
 }
 export function snapshotProgress(): Progress {
   const stored = readStored(profileKey(KEY_P), validateProgress);

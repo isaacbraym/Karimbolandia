@@ -343,6 +343,7 @@ export class Game {
   private saveGame() {
     // Fora da partida, outra aba pode ter restaurado, excluído ou avançado o save.
     if (this.state !== 'playing' && this.state !== 'paused' && this.state !== 'comic') return;
+    saveProgress();
     const w = this.world;
     if (!w || w.finished || w.player.hp <= 0) return;
     writeSave(captureSave(w));
@@ -573,6 +574,7 @@ export class Game {
   /** Metal Slug: morreu com vidas sobrando → contagem regressiva para gastar uma vida e continuar. */
   private askContinue(lives: number) {
     if (this.state !== 'playing') return;
+    saveProgress();
     this.state = 'continue';
     this.input.enabled = false;
     this.touch.show(false);
@@ -691,6 +693,7 @@ export class Game {
 
   private gameOver() {
     if (this.state !== 'playing') return;
+    saveProgress();
     this.stopIntroAudio();
     this.state = 'gameover';
     this.input.enabled = false;

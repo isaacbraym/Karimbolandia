@@ -1,4 +1,4 @@
-import { progress, saveProgress, validateProgress, mergeProgress, snapshotProgress, type Progress } from './storage';
+import { progress, saveProgress, validateProgress, mergeProgress, snapshotProgress, withLegacyCoins, type Progress } from './storage';
 import { loadSave, writeSave, clearSave, type SaveState } from '../game/save';
 import { validateSave, record } from './saveValidation';
 import { profileKey, writeStored } from './persistence';
@@ -7,14 +7,15 @@ export const MAX_BACKUP_BYTES = 512_000;
 export interface ProfileData { v: 1; progress: Progress; save: SaveState | null }
 export interface Backup { game: 'karimbolandia'; version: 1; exportedAt: string; data: ProfileData }
 export function captureProfile(): ProfileData {
-  return { v: 1, progress: snapshotProgress(), save: loadSave() };
+  const save = loadSave();
+  return { v: 1, progress: withLegacyCoins(snapshotProgress(), save?.tokens ?? 0), save };
 }
 export function validateProfile(value: unknown): ProfileData | null {
   if (!record(value) || value.v !== 1) return null;
   const p = validateProgress(value.progress);
   const s = value.save === null ? null : validateSave(value.save);
   if (!p || (value.save !== null && !s)) return null;
-  return { v: 1, progress: p, save: s };
+  return { v: 1, progress: withLegacyCoins(p, s?.tokens ?? 0), save: s };
 }
 export function parseBackup(text: string): ProfileData {
   if (new TextEncoder().encode(text).length > MAX_BACKUP_BYTES) throw new Error('O arquivo é grande demais para ser um save.');
@@ -43,7 +44,7 @@ export function preserveProfile() {
   return writeStored(profileKey('karimbolandia.before-restore.v1'), captureProfile(), validateProfile);
 }
 export function hasProgress(data: ProfileData) {
-  return !!data.save || data.progress.bestScore > 0 || data.progress.completed > 0 || data.progress.dashDiscovered || data.progress.stagesDone.length > 0;
+  return !!data.save || data.progress.coinsEarned > 0 || data.progress.ownedSkins.length > 0 || data.progress.bestScore > 0 || data.progress.completed > 0 || data.progress.dashDiscovered || data.progress.stagesDone.length > 0;
 }
 /** Recordes são monotônicos; fichas/inventário da partida vêm inteiros do save escolhido. */
 export function mergeRecords(a: Progress, b: Progress): Progress {

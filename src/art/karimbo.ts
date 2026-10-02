@@ -8,6 +8,8 @@ import { PAL } from './palette';
 import { shade } from '../core/math';
 import type { KarimboHeads } from './photo';
 import { WEAPONS, type WeaponId } from '../game/weapons';
+import { progress } from '../core/storage';
+import type { SkinId } from '../core/skinCatalog';
 
 export interface KarimboArt {
   torso: Sprite;
@@ -20,12 +22,11 @@ export interface KarimboArt {
   /** faquinha de cortar manteiga (golpe corpo a corpo) */
   knife: Sprite;
   heads: KarimboHeads;
+  variants?: Partial<Record<SkinId, KarimboArt>>;
 }
 
 const S = 3;
-const SHIRT = '#d2b892'; // camiseta bege da foto
 const SKIN = '#c98a66';
-const SHORTS = '#3b4763';
 
 /** Faquinha de cortar manteiga: lâmina larga de ponta redonda, cabo de madeira com rebites. */
 function bakeKnife(): Sprite {
@@ -80,7 +81,9 @@ function bakeKnife(): Sprite {
   );
 }
 
-export function bakeKarimbo(heads: KarimboHeads): KarimboArt {
+export function bakeKarimbo(heads: KarimboHeads, skin: SkinId = 'classic', equipment?: Pick<KarimboArt, 'weapons' | 'knife'>): KarimboArt {
+  const SHIRT = skin === 'explorer' ? '#728848' : skin === 'neon' ? '#25243f' : '#d2b892';
+  const SHORTS = skin === 'explorer' ? '#685137' : skin === 'neon' ? '#252d46' : '#3b4763';
   // ---------------------------------------------------------------- tronco (camiseta + barriguinha)
   const torso = bake(
     28,
@@ -123,6 +126,27 @@ export function bakeKarimbo(heads: KarimboHeads): KarimboArt {
       g.moveTo(9, 6);
       g.quadraticCurveTo(11, 9, 8.6, 12);
       g.stroke();
+      if (skin === 'explorer') {
+        // Colete aberto, bolsos e fivela; o rosto continua descoberto.
+        shadedRR(g, 4.2, 6, 7.2, 8.8, 1.4, '#9da76a', { lw: 0.7 });
+        shadedRR(g, 16.6, 6, 7.2, 8.8, 1.4, '#9da76a', { lw: 0.7 });
+        g.fillStyle = '#51452d';
+        g.fillRect(4.8, 9, 6, 1);
+        g.fillRect(17.2, 9, 6, 1);
+        g.fillRect(4.8, 16.4, 18.4, 1.6);
+        shadedRR(g, 12, 16, 4, 2.6, 0.4, '#d6bf72', { lw: 0.6 });
+      } else if (skin === 'neon') {
+        g.strokeStyle = '#39f0ff';
+        g.lineWidth = 1.5;
+        g.beginPath();
+        g.moveTo(5.5, 6); g.lineTo(10, 9); g.lineTo(10, 15.5);
+        g.moveTo(22.5, 6); g.lineTo(18, 9); g.lineTo(18, 15.5);
+        g.stroke();
+        g.fillStyle = '#bd65ff';
+        g.fillRect(6.5, 17, 15, 1.5);
+        g.fillStyle = '#d4faff';
+        g.fillRect(13.6, 7, 0.8, 11);
+      }
       g.restore();
       path();
       g.lineWidth = 1.2;
@@ -192,6 +216,13 @@ export function bakeKarimbo(heads: KarimboHeads): KarimboArt {
         g.lineWidth = 1;
         g.strokeStyle = OUT;
         g.stroke();
+        if (skin !== 'classic') {
+          shadedRR(g, 1.5, 0, 7.5, 13.8, 2, dark ? shade(SHORTS, -0.2) : SHORTS, { lw: 0.8 });
+          shadedRR(g, 0.5, 12.2, 10, 5.3, 1.3, skin === 'explorer' ? '#493628' : '#373152', { lw: 0.8 });
+          g.fillStyle = skin === 'explorer' ? '#c2a675' : '#39f0ff';
+          g.fillRect(2.5, skin === 'explorer' ? 13.4 : 16, 6.2, 1);
+          if (skin === 'neon') g.fillRect(6.8, 1, 1, 10);
+        }
       },
       { scale: S, ox: 5.5, oy: 1 }
     );
@@ -217,11 +248,15 @@ export function bakeKarimbo(heads: KarimboHeads): KarimboArt {
         g.strokeStyle = OUT;
         g.lineWidth = 0.9;
         g.stroke();
+        if (skin !== 'classic') {
+          g.fillStyle = skin === 'explorer' ? '#d6bf72' : '#39f0ff';
+          g.fillRect(1.8, 2, 2, 3.6);
+        }
       },
       { scale: S, ox: 3, oy: 4 }
     );
 
-  return { torso, shorts, legFront, legBack, armFront: mkArm(false), armBack: mkArm(true), weapons: bakeWeapons(), knife: bakeKnife(), heads };
+  return { torso, shorts, legFront, legBack, armFront: mkArm(false), armBack: mkArm(true), weapons: equipment?.weapons ?? bakeWeapons(), knife: equipment?.knife ?? bakeKnife(), heads };
 }
 
 export function bakeWeapons(): Record<WeaponId, Sprite> {
@@ -392,7 +427,8 @@ export const KARIMBO_SHOULDER_Y = SHOULDER_STAND[1];
 /** Escala visual do herói (sprites maiores; hitbox acompanha em movement.ts). */
 export const KSCALE = 1.2;
 
-export function drawKarimbo(g: CanvasRenderingContext2D, art: KarimboArt, x: number, y: number, p: KPose) {
+export function drawKarimbo(g: CanvasRenderingContext2D, art: KarimboArt, x: number, y: number, p: KPose, skin: SkinId = progress.equippedSkin) {
+  art = art.variants?.[skin] ?? art;
   if (p.alpha <= 0.01) return;
   const prevA = g.globalAlpha;
   g.globalAlpha = prevA * p.alpha;

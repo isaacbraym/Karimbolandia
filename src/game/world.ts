@@ -14,6 +14,7 @@ import { clamp, rand, type Rect } from '../core/math';
 import type { ControlState } from '../core/input';
 import { WEAPON_ORDER, type WeaponId } from './weapons';
 import { progress, saveProgress, settings } from '../core/storage';
+import { collectCoin } from '../core/skins';
 import { getArt } from '../art';
 import { drawNomadIdle } from '../art/nomad';
 import { softDot, drawSpr } from '../art/kit';
@@ -932,7 +933,9 @@ export class World {
         this.onNote(pk);
         break;
       case 'token':
+        if (pk.id >= 0) this.collectedPickups.add(pk.id);
         this.tokens++;
+        collectCoin();
         this.score += 10;
         a('coin');
         break;

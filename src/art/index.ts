@@ -75,6 +75,13 @@ export async function buildArt(base: string, quality: Quality, onProgress: (p: n
     const heads = bakeKarimboHeads(photos, quality === 'low' ? 2 : 3);
     out.karimbo = bakeKarimbo(heads);
   }]);
+  steps.push(['Preparando os trajes...', () => {
+    const classic = out.karimbo!;
+    classic.variants = { classic, explorer: bakeKarimbo(classic.heads, 'explorer', classic), neon: bakeKarimbo(classic.heads, 'neon', classic) };
+    for (const variant of Object.values(classic.variants)) warmWhites(variant);
+    warmWhites(classic.heads);
+    warmWhites(classic.weapons);
+  }]);
   steps.push(['Ligando o Nômad...', () => { out.nomad = bakeNomad(photos); }]);
   steps.push(['Equipando o Felipão...', () => { out.felipao = bakeFelipao(photos); }]);
   steps.push(['Convocando a Legião...', () => {

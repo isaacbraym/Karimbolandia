@@ -4,6 +4,10 @@ import { formatTime } from '../core/math';
 import { cloudSaves } from '../core/cloud';
 import { applyProfile, captureProfile, exportBackup, parseBackup, validateProfile, preserveProfile, MAX_BACKUP_BYTES, type ProfileData } from '../core/profile';
 import { persistenceStatus, onPersist, profileKey, readStored } from '../core/persistence';
+import { SKINS } from '../core/skinCatalog';
+import { chooseSkin, coinBalance, ensureWallet } from '../core/skins';
+import { getArt } from '../art';
+import { drawKarimbo } from '../art/karimbo';
 
 export interface MenuCallbacks {
   onPlay(): void;
@@ -77,6 +81,7 @@ export class Menus {
   private focusable: HTMLElement[] = [];
   private focusIdx = -1;
   private saveUnsubscribe: (() => void) | null = null;
+  private shopBtn!: HTMLButtonElement;
 
   constructor(root: HTMLElement, private cb: MenuCallbacks) {
     this.root = root;
@@ -124,10 +129,12 @@ export class Menus {
     const btns = el('div', 'btns');
     this.contBtn = this.btn('CONTINUAR', 'primary', () => this.cb.onContinueSave());
     this.contBtn.style.display = 'none';
+    this.shopBtn = this.btn('LOJA DE SKINS', 'alt', () => this.showShop());
     btns.append(
       this.contBtn,
       this.btn('JOGAR', 'primary', () => this.cb.onPlay()),
       this.btn('FASE 2 • SELVA', 'primary', () => this.cb.onPlayJungle()),
+      this.shopBtn,
       this.btn('SAVE E CONTA', 'alt', () => this.showSaves('main')),
       this.btn('CONFIGURAÇÕES', 'alt', () => this.showSettings('main')),
       this.btn('CONTROLES', 'alt', () => this.showControls('main')),
@@ -362,6 +369,63 @@ export class Menus {
   }
 
   // ------------------------------------------------------------------ estados
+  showShop() {
+    ensureWallet();
+    const panel = el('div', 'panel skin-shop');
+    panel.append(el('h2', '', 'TRAJES DO KARIMBO'));
+    const balance = el('p', 'shop-balance');
+    balance.setAttribute('role', 'status');
+    const note = el('p', 'shop-note', 'Junte moedas na cidade e na selva. Seu saldo e seus trajes ficam guardados entre partidas. Os trajes são apenas visuais.');
+    const cards = el('div', 'skin-cards');
+    panel.append(balance, note, cards);
+    const update = () => {
+      ensureWallet();
+      balance.textContent = `${coinBalance()} MOEDAS • ${progress.ownedSkins.length + 1}/3 TRAJES`;
+      cards.replaceChildren();
+      for (const skin of SKINS) {
+        const owned = skin.id === 'classic' || progress.ownedSkins.includes(skin.id);
+        const equipped = progress.equippedSkin === skin.id;
+        const card = el('article', 'skin-card' + (equipped ? ' equipped' : ''));
+        card.style.setProperty('--skin-color', skin.color);
+        card.append(el('span', 'skin-tag', equipped ? 'EQUIPADO' : owned ? 'SEU TRAJE' : `${skin.price} MOEDAS`));
+        const canvas = el('canvas', 'skin-preview');
+        canvas.width = 320; canvas.height = 330;
+        canvas.setAttribute('role', 'img');
+        canvas.setAttribute('aria-label', `Karimbo ${skin.name}`);
+        const g = canvas.getContext('2d')!;
+        g.scale(3.2, 3.2);
+        drawKarimbo(g, getArt().karimbo, 50, 97, {
+          facing: 1, state: 'idle', t: 0, runPhase: 0, speed01: 0, aim: 0,
+          weapon: 'pistol', kick: 0, flash: false, earGlide: 0, vy: 0, alpha: 1, hasGun: false,
+        }, skin.id);
+        card.append(canvas, el('h3', '', skin.name));
+        const description = el('p', 'skin-description');
+        description.textContent = skin.description;
+        const affordable = coinBalance() >= skin.price;
+        const action = this.btn(equipped ? 'EQUIPADO' : owned ? `USAR ${skin.name.toUpperCase()}` : `COMPRAR • ${skin.price}`, owned ? 'alt small' : 'primary small', () => {
+          const result = chooseSkin(skin.id);
+          if (result === 'insufficient') this.toast('Ainda faltam moedas para este traje.');
+          else if (result === 'volatile') this.toast('Traje disponível nesta sessão. Baixe um backup: não foi possível gravar no aparelho.');
+          else this.toast(result === 'bought' ? `${skin.name} comprado e equipado!` : `${skin.name} equipado!`);
+          update();
+        });
+        action.disabled = equipped || (!owned && !affordable);
+        action.setAttribute('aria-label', equipped ? `${skin.name} equipado` : owned ? `Usar ${skin.name}` : `Comprar ${skin.name} por ${skin.price} moedas`);
+        card.append(description, action);
+        if (!owned && !affordable) card.append(el('small', 'skin-shortfall', `Faltam ${skin.price - coinBalance()} moedas`));
+        cards.append(card);
+      }
+      this.shopBtn.textContent = `LOJA DE SKINS • ${coinBalance()} MOEDAS`;
+      this.collectFocus(panel);
+    };
+    this.openPanel(panel, 'main');
+    update();
+    const persisted = onPersist(() => update());
+    const changed = () => update();
+    window.addEventListener('storage', changed);
+    this.saveUnsubscribe = () => { persisted(); window.removeEventListener('storage', changed); };
+  }
+
   /** Save portátil funciona mesmo sem serviço de contas e sem internet. */
   showSaves(from: 'main' | 'pause' = 'main') {
     this.saveUnsubscribe?.();
@@ -477,6 +541,8 @@ export class Menus {
   }
   showMain(footer = '') {
     this.hideAll();
+    ensureWallet();
+    this.shopBtn.textContent = `LOJA DE SKINS • ${coinBalance()} MOEDAS`;
     this.main.classList.remove('hidden');
     (document.getElementById('menu-foot') as HTMLElement).textContent = footer;
     this.collectFocus(this.main);
