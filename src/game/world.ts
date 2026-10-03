@@ -6,6 +6,7 @@ import { Player } from './player';
 import { Bullet, Grenade, type BulletOpts, type BulletKind } from './bullets';
 import { Prop, pickLoot } from './props';
 import { Pickup } from './pickups';
+import { updateWreckEffects } from './wreckEffects';
 import type { Enemy, HurtInfo } from './enemies/enemy';
 import { createEnemy } from './enemies';
 import { Smasher } from './smash';
@@ -1167,7 +1168,7 @@ export class World {
     for (let i = this.pickups.length - 1; i >= 0; i--) if (!this.pickups[i].alive) this.pickups.splice(i, 1);
     for (const pr of this.props) pr.update(dt);
     for (let i = this.props.length - 1; i >= 0; i--) if (!this.props[i].alive) this.props.splice(i, 1);
-    for (const w of this.wrecks) w.t += dt;
+    updateWreckEffects(this.wrecks, this.fx, this.camera, dt);
     this.crowd.update(this, dt);
     for (const c of this.corpses) c.update(dt);
     for (let i = this.corpses.length - 1; i >= 0; i--) if (this.corpses[i].dead) this.corpses.splice(i, 1);
@@ -1456,9 +1457,6 @@ export class World {
     const art = getArt();
     // carcaça escurecida do Nômad, tombada, soltando fumaça e faíscas
     drawSpr(g, art.nomad.wreck, w.x, w.y, {});
-    if (Math.random() < 0.15) this.fx.smoke(w.x + rand.spread(14), w.y - 40, 1, '#2a2438', 9, 40, 1.1);
-    if (Math.random() < 0.05) this.fx.sparks(w.x + rand.spread(14), w.y - 40, 3, '#ffb347', 120);
-    if (Math.random() < 0.07) this.fx.add(PK.Fire, w.x + rand.spread(12), w.y - 44, 0, -30, 0.5, 8, '#ff7a1a', { size1: 2 });
   }
 }
 
