@@ -512,6 +512,7 @@ export class Game {
       narrPlaying: (id) => this.narrId === id && !!this.narrClip?.playing,
       onNarrPrepare: (id) => audio.prepareNarr(id),
       onCheckpoint: () => this.queueSave(),
+      onProgress: () => this.queueSave(),
       onBanner: (t, s, d) => this.hud.banner(t, s, d),
       onComplete: () => this.onComplete(),
       onMusic: (s) => this.setMusic(s),

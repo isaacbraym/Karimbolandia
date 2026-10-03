@@ -24,6 +24,7 @@ export interface SaveState {
   emblems: number[];
   secrets: number[];
   secretRooms: string[];
+  encounters?: string[];
   killed: number[];
   collected: number[];
   destroyed: number[];
@@ -71,6 +72,7 @@ export function captureSave(w: World): SaveState {
     emblems: [...w.emblems],
     secrets: [...w.secrets],
     secretRooms: [...w.secretRooms],
+    encounters: [...w.encounters.completed],
     killed: [...w.killedEnemies],
     collected: [...w.collectedPickups],
     destroyed: [...w.destroyedProps],
@@ -91,7 +93,7 @@ export function captureSave(w: World): SaveState {
 export function freshSave(stage: number, score = 0): SaveState {
   return {
     v: 1, stage, checkpointIdx: -1, cpName: 'Início', time: 0, score, tokens: 0, lives: 3, bestCombo: 0,
-    emblems: [], secrets: [], secretRooms: [], killed: [], collected: [], destroyed: [],
+    emblems: [], secrets: [], secretRooms: [], encounters: [], killed: [], collected: [], destroyed: [],
     nomadUsed: false, nomadLost: stage === 2, bossLivesGiven: false,
     weapons: [], cur: '', grenades: -1, nomad: -1,
     stats: { kills: 0, deaths: 0, damageTaken: 0, dashes: 0, shots: 0, pitFalls: 0 },
@@ -115,6 +117,7 @@ export function applySave(w: World, s: SaveState) {
   for (const e of s.emblems) w.emblems.add(e);
   for (const e of s.secrets) w.secrets.add(e);
   for (const e of s.secretRooms) w.secretRooms.add(e);
+  for (const e of s.encounters ?? []) w.encounters.completed.add(e);
   for (const e of s.killed) w.killedEnemies.add(e);
   for (const e of s.collected) w.collectedPickups.add(e);
   for (const e of s.destroyed) w.destroyedProps.add(e);

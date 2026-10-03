@@ -443,6 +443,15 @@ export class Hud {
     if (wz) {
       this.drawWarZone(g, w, W, H, wz, T);
     }
+    const trail = w.encounters.active;
+    if (trail && !wz && !w.director.bossActive) {
+      const width = Math.min(236, W - 28), x = (W - width) / 2, y = T + 39;
+      const color = trail.def.theme === 'delivery' ? '#90eeff' : '#ceff91';
+      pill(g, x, y, width, 35, 7, 'rgba(23,15,46,.85)', color);
+      text(g, trail.def.title, W / 2, y + 13, 9, color, 'center');
+      numText(g, `trail-count:${trail.def.id}:${trail.def.points.length}`, trail.next, n => `AROS ${n}/${trail.def.points.length}`, x + 10, y + 28, 11, '#ffffff');
+      numText(g, 'trail-clock', Math.ceil(trail.left), n => `${n}s`, x + width - 10, y + 28, 12, trail.left < 4 ? '#ff8c90' : '#ffe27a', 'right');
+    }
 
     // ------------------------------------------------ topo central: coletáveis
     const cx = W / 2;

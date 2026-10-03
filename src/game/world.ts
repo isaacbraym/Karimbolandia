@@ -26,6 +26,7 @@ import { Waters } from './water';
 import { JungleWildlife } from './wildlife';
 import { Village } from './village';
 import { Merchant } from './merchant';
+import { Encounters } from './encounters';
 import { Vine } from './vines';
 import type { DoorSpawn } from './level';
 import { drawWaterBack, drawWaterFront } from '../art/waterDraw';
@@ -77,6 +78,8 @@ export interface Hooks {
   onNarrPrepare?: (id: number) => void;
   /** checkpoint alcançado (o jogo salva o progresso no navegador) */
   onCheckpoint?: (idx: number) => void;
+  /** Optional event reward: persist at the current checkpoint without moving it. */
+  onProgress?: () => void;
 }
 
 export interface Wreck {
@@ -120,6 +123,7 @@ export class World {
   wildlife!: JungleWildlife;
   village!: Village;
   merchant!: Merchant;
+  encounters!: Encounters;
   /** 0..1 cabeça do Karimbo debaixo d'água (som abafado, tom da tela) */
   underwater = 0;
   /**
@@ -204,6 +208,7 @@ export class World {
     this.wildlife = new JungleWildlife(data);
     this.village = new Village(data);
     this.merchant = new Merchant(data);
+    this.encounters = new Encounters(data);
     this.vines = (data.vines ?? []).map((v) => new Vine(v));
     this.director = new Director(this);
     this.narrator = new Narrator(this);
@@ -251,6 +256,7 @@ export class World {
     this.water?.reset();
     this.wildlife?.reset();
     this.village?.reset();
+    this.encounters?.reset(true);
     for (const v of this.vines) {
       v.held = false;
       v.a = 0;
@@ -566,6 +572,7 @@ export class World {
     const sx = cp ? cp.x : this.data.playerStart.x;
     const sy = cp ? cp.y : this.data.playerStart.y;
     this.director.onRespawn();
+    this.encounters.reset();
     this.narrator.onRespawn();
     this.restoreTiles();
     this.populate(false);
@@ -1058,6 +1065,7 @@ export class World {
     this.director.update(dt, ctl);
     this.narrator.update(dt);
     p.update(this, dt, ctl);
+    this.encounters.update(this, dt);
     this.wildlife.update(this, dt);
     if (this.water.zones.length) this.water.update(dt, p.x, p.y, p.swimming, this.camera.x, this.camera.x + this.camera.w);
     for (const v of this.vines) if (Math.abs(v.x - p.x) < 1400) v.update(dt, this.time);
@@ -1192,6 +1200,7 @@ export class World {
     this.crowd.draw(g, this);
     this.village.draw(g, this);
     this.merchant.draw(g,this);
+    this.encounters.draw(g,this);
     this.fx.draw(g, false);
     for (const c of this.corpses) if (cam.visible(c.x, c.y, 140)) c.render(g);
     for (const e of this.enemies) {

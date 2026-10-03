@@ -15,6 +15,7 @@ export function validateSave(v: unknown): SaveState | null {
   for (const k of ['tokens', 'lives', 'bestCombo']) if (!integer(v[k])) return null;
   for (const k of ['emblems', 'secrets', 'killed', 'collected', 'destroyed']) if (!ids(v[k])) return null;
   if (!Array.isArray(v.secretRooms) || v.secretRooms.length > 1000 || !v.secretRooms.every(x => typeof x === 'string' && x.length <= 100)) return null;
+  if (v.encounters !== undefined && (!Array.isArray(v.encounters) || v.encounters.length > 64 || !v.encounters.every(x => typeof x === 'string' && /^[a-z0-9:-]{1,80}$/.test(x)))) return null;
   for (const k of ['nomadUsed', 'nomadLost', 'bossLivesGiven']) if (typeof v[k] !== 'boolean') return null;
   if (!Array.isArray(v.weapons) || v.weapons.length > WEAPON_ORDER.length) return null;
   const seen = new Set<string>();
@@ -38,6 +39,7 @@ export function validateSave(v: unknown): SaveState | null {
     v: 1, stage: s.stage, checkpointIdx: s.checkpointIdx, cpName: s.cpName,
     time: s.time, score: s.score, tokens: s.tokens, lives: s.lives, bestCombo: s.bestCombo,
     emblems: [...s.emblems], secrets: [...s.secrets], secretRooms: [...s.secretRooms],
+    encounters: [...new Set(s.encounters ?? [])],
     killed: [...s.killed], collected: [...s.collected], destroyed: [...s.destroyed],
     nomadUsed: s.nomadUsed, nomadLost: s.nomadLost, bossLivesGiven: s.bossLivesGiven,
     weapons: s.weapons.map(([id, n]) => [id, n]), cur: s.cur, grenades: s.grenades, nomad: s.nomad,
