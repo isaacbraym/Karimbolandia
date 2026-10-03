@@ -56,6 +56,7 @@ export interface ControlState {
 
 const newBtn = (): Btn => ({ held: false, pressed: false, released: false });
 
+const MOVE_KEYS = new Set(['KeyA', 'KeyD', 'KeyW', 'KeyS', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown']);
 export class Input {
   readonly state: ControlState & {reload:Btn;interact:Btn} = {
     moveX: 0,
@@ -78,6 +79,8 @@ export class Input {
   readonly touch: TouchState = newTouchState();
 
   private keys = new Set<string>();
+  /** Teclas fisicamente seguradas (sempre atualizado, mesmo com o jogo desligado ou depois de um reset). */
+  private down = new Set<string>();
   // A press/release can fit entirely between two rendered frames, especially after pacing.
   private keyTaps=new Set<string>();
   private prevRaw: Record<ActionName, boolean> = { jump: false, fire: false, grenade: false, special: false, next: false, prev: false, pause: false, reload:false, interact:false };
@@ -97,19 +100,33 @@ export class Input {
   onGesture: (() => void) | null = null;
   /** Tecla de menu (Enter/Espaço/Esc) usada pelos overlays DOM — o jogo usa `state`. */
   onMenuKey: ((code: string) => void) | null = null;
-  enabled = true;
+  private active = true;
+  get enabled() { return this.active; }
+  set enabled(v: boolean) {
+    // Voltar ao jogo com A/D/setas ainda seguradas: a direção continua valendo sem soltar e apertar de novo.
+    if (v && !this.active) this.restoreHeldMovement();
+    this.active = v;
+  }
   private suppressed = new Set<ActionName>();
   /** Fechar uma apresentação não reaproveita o mesmo botão para atirar/pular. */
   suppressHeldActions() {
-    this.releaseAll();
+    // Só descarta apertos pendentes: A/D/setas seguradas continuam andando (ações presas são
+    // contidas pela lista `suppressed` abaixo até o botão ser solto).
+    this.keyTaps.clear();
+    this.mouseTap = this.mouseRightTap = false;
     for (const action of ACTIONS) {
       if (this.state[action].held) this.suppressed.add(action);
       this.state[action].held = this.state[action].pressed = this.state[action].released = false;
     }
   }
 
+  private restoreHeldMovement() {
+    for (const code of MOVE_KEYS) if (this.down.has(code)) this.keys.add(code);
+  }
+
   attach(target: HTMLElement) {
     window.addEventListener('keydown', (e) => {
+      this.down.add(e.code);
       if (!this.enabled) {
         // Let native controls handle typing, arrows, Tab and activation once.
         const target = e.target instanceof Element ? e.target : null;
@@ -120,6 +137,8 @@ export class Input {
         return;
       }
       if (e.repeat) {
+        // A repetição do sistema reata uma tecla que perdemos de vista (blur, apresentação, menu).
+        if (MOVE_KEYS.has(e.code)) this.keys.add(e.code);
         if (this.isGameKey(e.code)) e.preventDefault();
         return;
       }
@@ -132,11 +151,12 @@ export class Input {
       if (this.isGameKey(e.code)) e.preventDefault();
     });
     window.addEventListener('keyup', (e) => {
+      this.down.delete(e.code);
       this.keys.delete(e.code);
     });
-    window.addEventListener('blur', () => this.releaseAll());
+    window.addEventListener('blur', () => { this.down.clear(); this.releaseAll(); });
     document.addEventListener('visibilitychange', () => {
-      if (document.hidden) this.releaseAll();
+      if (document.hidden) { this.down.clear(); this.releaseAll(); }
     });
 
     target.addEventListener('pointermove', (e) => {

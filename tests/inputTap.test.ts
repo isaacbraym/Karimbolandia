@@ -39,4 +39,26 @@ describe('Comandos rápidos entre quadros',()=>{
     key('Space');key('Space',false);input.suppressHeldActions();input.poll();expect(input.state.jump.pressed).toBe(false);
     input.enabled=false;key('KeyF');key('KeyF',false);input.enabled=true;input.poll();expect(input.state.interact.pressed).toBe(false);
   });
+  it('D segurado continua andando depois de apresentação, cena ou troca de aba',()=>{
+    const {input,key,win}=setup();
+    key('KeyD');input.poll();expect(input.state.moveX).toBe(1);
+    // fecha uma apresentação: ações presas são contidas, a direção não
+    input.suppressHeldActions();input.poll();expect(input.state.moveX).toBe(1);
+    // foco perdido e devolvido com a tecla ainda pressionada: a repetição do sistema reata a direção
+    win.get('blur')!({});input.poll();expect(input.state.moveX).toBe(0);
+    key('KeyD',true,true);input.poll();expect(input.state.moveX).toBe(1);
+    key('KeyD',false);input.poll();expect(input.state.moveX).toBe(0);
+  });
+  it('direção segurada durante um menu vale ao voltar ao jogo; soltar no menu não deixa direção presa',()=>{
+    const {input,key}=setup();
+    input.enabled=false;key('KeyD');input.enabled=true;input.poll();expect(input.state.moveX).toBe(1);
+    key('KeyD',false);input.poll();expect(input.state.moveX).toBe(0);
+    input.enabled=false;key('ArrowRight');key('ArrowRight',false);input.enabled=true;input.poll();expect(input.state.moveX).toBe(0);
+  });
+  it('pulo e tiro presos ao fechar uma apresentação só voltam depois de soltar',()=>{
+    const {input,key}=setup();
+    key('KeyD');key('Space');input.poll();input.suppressHeldActions();
+    input.poll();expect(input.state.jump.held).toBe(false);expect(input.state.moveX).toBe(1);
+    key('Space',false);input.poll();key('Space');input.poll();expect(input.state.jump.pressed).toBe(true);
+  });
 });
