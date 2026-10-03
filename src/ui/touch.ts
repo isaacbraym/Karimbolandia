@@ -23,6 +23,7 @@ export class TouchUI {
   private knob: HTMLElement;
   private ghost: HTMLElement;
   private buttons = new Map<ActionName, HTMLElement>();
+  private releaseTimers = new Map<ActionName, number>();
   private stickId = -1;
   private ox = 0;
   private oy = 0;
@@ -86,9 +87,33 @@ export class TouchUI {
     this.input.state.device = 'touch';
   }
 
+  private clearRelease(act: ActionName) {
+    const timer = this.releaseTimers.get(act);
+    if (timer !== undefined) window.clearTimeout(timer);
+    this.releaseTimers.delete(act);
+  }
+
+  private finishPress(el: HTMLElement, act: ActionName, e: PointerEvent) {
+    e.preventDefault();
+    this.clearRelease(act);
+    delete el.dataset.pid;
+    el.classList.remove('down');
+    if (e.type !== 'pointerup') {
+      this.input.touch.held[act] = false;
+      return;
+    }
+    // Only a completed tap gets the short grace period, never a cancelled gesture.
+    this.releaseTimers.set(act, window.setTimeout(() => {
+      this.releaseTimers.delete(act);
+      if (el.dataset.pid === undefined) this.input.touch.held[act] = false;
+    }, 45));
+  }
+
   private bindButton(el: HTMLElement, act: ActionName) {
     const t = this.input.touch;
     const down = (e: PointerEvent) => {
+      if (el.dataset.pid !== undefined) return;
+      this.clearRelease(act);
       e.preventDefault();
       this.input.haptic(0.2, 8);
       try {
@@ -104,13 +129,7 @@ export class TouchUI {
     };
     const up = (e: PointerEvent) => {
       if (el.dataset.pid !== String(e.pointerId)) return;
-      e.preventDefault();
-      delete el.dataset.pid;
-      el.classList.remove('down');
-      // garante ≥ 1 frame pressionado (toques muito rápidos)
-      window.setTimeout(() => {
-        if (!el.classList.contains('down')) t.held[act] = false;
-      }, 45);
+      this.finishPress(el, act, e);
     };
     el.addEventListener('pointerdown', down);
     el.addEventListener('pointerup', up);
@@ -122,7 +141,6 @@ export class TouchUI {
   private bindFireStick(el: HTMLElement) {
     const t = this.input.touch;
     const knob = el.querySelector('.fire-knob') as HTMLElement;
-    let pid = -1;
     const setAim = (e: PointerEvent) => {
       const r = localRect(el);
       const cx = r.left + r.width / 2;
@@ -142,14 +160,15 @@ export class TouchUI {
       knob.classList.toggle('aiming', m >= 0.3);
     };
     const down = (e: PointerEvent) => {
-      if (pid !== -1) return;
+      if (el.dataset.pid !== undefined) return;
+      this.clearRelease('fire');
       e.preventDefault();
       try {
         el.setPointerCapture(e.pointerId);
       } catch {
         /* ok */
       }
-      pid = e.pointerId;
+      el.dataset.pid = String(e.pointerId);
       this.input.haptic(0.2, 8);
       this.markActive();
       this.input.onGesture?.();
@@ -158,21 +177,16 @@ export class TouchUI {
       setAim(e);
     };
     const move = (e: PointerEvent) => {
-      if (e.pointerId !== pid) return;
+      if (el.dataset.pid !== String(e.pointerId)) return;
       e.preventDefault();
       setAim(e);
     };
     const up = (e: PointerEvent) => {
-      if (e.pointerId !== pid) return;
-      e.preventDefault();
-      pid = -1;
-      el.classList.remove('down');
+      if (el.dataset.pid !== String(e.pointerId)) return;
+      this.finishPress(el, 'fire', e);
       t.aimX = t.aimY = 0;
       knob.style.transform = 'translate(-50%,-50%)';
       knob.classList.remove('aiming');
-      window.setTimeout(() => {
-        if (pid === -1) t.held.fire = false;
-      }, 45);
     };
     el.addEventListener('pointerdown', down);
     el.addEventListener('pointermove', move);
@@ -268,7 +282,7 @@ export class TouchUI {
       reload.classList.toggle('reloading',!!s.reloading);
       reload.style.setProperty('--reload',String(reloadStep/20));
       reload.setAttribute('aria-label',s.reloading?`Recarregando • ${reloadStep*5}%`:reload.disabled?'Recarregar arma • indisponível':'Recarregar arma');
-      if(reload.disabled){this.input.touch.held.reload=false;reload.classList.remove('down');delete reload.dataset.pid;}
+      if(reload.disabled){this.clearRelease('reload');this.input.touch.held.reload=false;reload.classList.remove('down');delete reload.dataset.pid;}
     }
     this.buttons.get('interact')?.classList.toggle('hidden',!s.merchant);
     const swap = this.buttons.get('next');
@@ -295,12 +309,12 @@ export class TouchUI {
 
   releaseAll() {
     const t = this.input.touch;
-    for (const k of Object.keys(t.held) as ActionName[]) t.held[k] = false;
+    for (const k of Object.keys(t.held) as ActionName[]) {this.clearRelease(k);t.held[k] = false;}
     t.stickX = t.stickY = 0;
     t.aimX = t.aimY = 0;
     this.stickId = -1;
     this.base.classList.remove('on');
     this.ghost.classList.remove('off');
-    this.root.querySelectorAll('.tbtn').forEach((b) => b.classList.remove('down'));
+    this.root.querySelectorAll<HTMLElement>('.tbtn').forEach((b) => {b.classList.remove('down');delete b.dataset.pid;});
   }
 }

@@ -30,7 +30,7 @@ describe('Icone da arma nos controles de toque', () => {
     const setProperty=vi.fn(),setAttribute=vi.fn(),remove=vi.fn();
     const button={disabled:false,dataset:{pid:'4'} as Record<string,string>,style:{setProperty},setAttribute,classList:{toggle:vi.fn(),remove}};
     const held={reload:true};
-    const ui=Object.assign(Object.create(TouchUI.prototype),{buttons:new Map([['reload',button]]),input:{touch:{held}},lastSync:'',lastWeaponIcon:''}) as TouchUI;
+    const ui=Object.assign(Object.create(TouchUI.prototype),{buttons:new Map([['reload',button]]),releaseTimers:new Map(),input:{touch:{held}},lastSync:'',lastWeaponIcon:''}) as TouchUI;
     const state={weaponIcon:'',ammo:'↻',lowAmmo:true,grenades:2,dash01:1,canReload:false,reloading:true,reload01:.5};
     ui.sync(state);
     expect(button.disabled).toBe(true);expect(held.reload).toBe(false);expect(button.dataset.pid).toBeUndefined();expect(remove).toHaveBeenCalledWith('down');
