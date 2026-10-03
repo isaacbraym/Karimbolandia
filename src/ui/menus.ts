@@ -5,6 +5,7 @@ import { cloudSaves } from '../core/cloud';
 import { applyProfile, captureProfile, exportBackup, validateProfile, preserveProfile, type ProfileData } from '../core/profile';
 import { exportAllBackups, parseBackupChoices, MAX_ARCHIVE_BYTES } from '../core/backupArchive';
 import { persistenceStatus, onPersist, profileKey, readStored } from '../core/persistence';
+import { storageUsage } from '../core/storageUsage';
 import { SKINS } from '../core/skinCatalog';
 import { chooseSkin, coinBalance, ensureWallet } from '../core/skins';
 import { getArt } from '../art';
@@ -689,6 +690,11 @@ export class Menus {
     const note = el('p', 'save-note');
     note.textContent = 'A partida volta ao último checkpoint, com fichas, equipamentos e itens salvos. Baixar um backup também protege seu progresso se você limpar os dados do navegador.';
     panel.append(note);
+    const usageInfo = el('details', 'save-note');
+    const usageTitle = el('summary', '', 'ESPAÇO DOS SAVES');
+    const usageText = el('p', '');
+    usageInfo.append(usageTitle, usageText);
+    panel.append(usageInfo);
     this.openPanel(panel, from);
     const addPages = (target: HTMLElement, page: number, total: number, go: (page: number) => void) => {
       if (total <= 1) return;
@@ -714,6 +720,11 @@ export class Menus {
         : status === 'recovered' ? 'Uma cópia anterior foi recuperada. Baixe um backup por segurança.' : 'Seu progresso está salvo neste aparelho.';
       local.classList.toggle('warning', status !== 'saved');
       details.textContent = describe(data);
+      const usage = storageUsage();
+      const size = (bytes: number) => `${(bytes / 1024).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} KiB`;
+      usageText.textContent = usage.available
+        ? `Saves deste perfil: ${size(usage.profileBytes)}. Total do jogo neste navegador: ${size(usage.totalBytes)}. Estimativa UTF-16, incluindo cópias; não indica espaço livre. Nenhuma partida é apagada aqui.`
+        : 'O navegador não permitiu consultar o tamanho dos saves. Baixe um backup para proteger seu progresso.';
       account.textContent = cloudSaves.user ? `Conta: ${cloudSaves.user.email ?? 'Google'}` : 'Jogando neste aparelho';
       remote.textContent = cloudSaves.state === 'unconfigured'
         ? 'O login ainda não está disponível nesta versão. Você já pode baixar e restaurar backups.' : cloudSaves.message;
