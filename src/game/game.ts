@@ -517,6 +517,10 @@ export class Game {
       onComplete: () => this.onComplete(),
       onMusic: (s) => this.setMusic(s),
       onHint: (key) => {
+        if (key === 'interceptGrenade') {
+          if (this.hintsShown.has(key)) return;
+          this.hintsShown.add(key);
+        }
         const t = hintText(key, this.input.state.device);
         if (t) this.hud.setHint(t, 6);
       },

@@ -99,6 +99,7 @@ export class World {
   narrator!: Narrator;
   enemies: Enemy[] = [];
   bullets: Bullet[] = [];
+  readonly interceptableBullets = new Set<Bullet>();
   grenades: Grenade[] = [];
   pickups: Pickup[] = [];
   props: Prop[] = [];
@@ -283,6 +284,7 @@ export class World {
   populate(fresh: boolean) {
     this.enemies = [];
     this.bullets = [];
+    this.interceptableBullets.clear();
     this.grenades = [];
     this.pickups = [];
     this.props = [];
@@ -628,6 +630,8 @@ export class World {
     p.grenades = Math.max(p.grenades, 3);
     // limpa tiros inimigos ao redor
     this.bullets = this.bullets.filter((b) => b.team === 0 || Math.hypot(b.x - p.x, b.y - p.y) > 220);
+    this.interceptableBullets.clear();
+    for (const b of this.bullets) if (b.interceptable && !b.dead) this.interceptableBullets.add(b);
     this.grenades = this.grenades.filter((g) => g.team === 0 || Math.hypot(g.x - p.x, g.y - p.y) > 160);
     this.cameraSnap();
     this.fx.addFlash(0.6, '#ffffff');
@@ -758,6 +762,10 @@ export class World {
   spawnPlayerBullet(x: number, y: number, vx: number, vy: number, o: BulletOpts) {
     this.bullets.push(new Bullet(x, y, vx, vy, o));
   }
+  clearEnemyBullets() {
+    this.bullets = this.bullets.filter(b => b.team === 0);
+    this.interceptableBullets.clear();
+  }
   spawnEnemyBullet(x: number, y: number, ang: number, speed: number, dmg: number, kind: BulletKind, extra: Partial<BulletOpts> = {}) {
     this.noteThreat(x, y);
     const o: BulletOpts = { kind, team: 1, dmg, life: extra.life ?? 3, r: extra.r ?? (kind === 'bossShell' ? 5 : 3), ...extra };
@@ -782,7 +790,12 @@ export class World {
       o.color = extra.color ?? '#ffe7a8';
       o.trail = extra.trail ?? '#ff5a4a';
     }
-    this.bullets.push(new Bullet(x, y, Math.cos(ang) * speed, Math.sin(ang) * speed, o));
+    const bullet = new Bullet(x, y, Math.cos(ang) * speed, Math.sin(ang) * speed, o);
+    this.bullets.push(bullet);
+    if (bullet.interceptable) {
+      this.interceptableBullets.add(bullet);
+      this.hooks.onHint?.('interceptGrenade');
+    }
   }
   spawnDrop(kind: PickupKind, x: number, y: number) {
     // limite só para o que cai (antes contava as moedas fixas da fase: na selva nada caía)
@@ -1125,7 +1138,10 @@ export class World {
     }
 
     for (const b of this.bullets) b.update(this, dt);
-    for (let i = this.bullets.length - 1; i >= 0; i--) if (this.bullets[i].dead) this.bullets.splice(i, 1);
+    for (let i = this.bullets.length - 1; i >= 0; i--) if (this.bullets[i].dead) {
+      this.interceptableBullets.delete(this.bullets[i]);
+      this.bullets.splice(i, 1);
+    }
     for (const g of this.grenades) g.update(this, dt);
     for (let i = this.grenades.length - 1; i >= 0; i--) if (this.grenades[i].dead) this.grenades.splice(i, 1);
     for (const pk of this.pickups) if (pk.body || Math.abs(pk.x - cx) < 900) pk.update(this, dt);
@@ -1201,6 +1217,7 @@ export class World {
     this.village.draw(g, this);
     this.merchant.draw(g,this);
     this.encounters.draw(g,this);
+    for (const e of this.enemies) if (e.alive) e.drawWarnings(g, this);
     this.fx.draw(g, false);
     for (const c of this.corpses) if (cam.visible(c.x, c.y, 140)) c.render(g);
     for (const e of this.enemies) {
@@ -1223,7 +1240,7 @@ export class World {
     }
     this.player.draw(g, this);
     for (const gr of this.grenades) gr.draw(g);
-    for (const b of this.bullets) b.draw(g);
+    for (const b of this.bullets) if (cam.visible(b.x, b.y, b.interceptable ? 24 : 60)) b.draw(g);
     this.director.drawWorldOverlays(g);
     if (this.water.zones.length) drawWaterFront(g, this);
     this.fx.draw(g, true);

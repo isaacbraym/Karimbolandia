@@ -7,6 +7,7 @@ import { drawSoldier, soldierMuzzle, GUN_LEN, type SoldierStyle, type SState } f
 import { PK } from '../fx';
 import { moveBody } from '../physics';
 import { Corpse } from '../corpse';
+import { drawLobTarget } from '../../art/hazards';
 
 /** Base de soldados humanoides. */
 abstract class Soldier extends Enemy {
@@ -205,7 +206,7 @@ abstract class JungleSpecialist extends Soldier {
             const vx = (this.targetX-mx)/flight;
             const vy = (this.targetY-my-310*flight*flight)/flight;
             this.fireBullet(w,mx,my,Math.atan2(vy,vx),Math.hypot(vx,vy),12,'bossShell',
-              { gravity:620, life:2.6, r:5, color:'#efb963', trail:'#b78b56', explode:{radius:48,dmg:18} });
+              { gravity:620, life:2.6, r:5, color:'#efb963', trail:'#b78b56', explode:{radius:48,dmg:18}, interceptable:true });
             w.audio('grenadeThrow',0.65,this.x);
           } else {
             this.fireAt(w,540,10,0.015);
@@ -237,12 +238,11 @@ abstract class JungleSpecialist extends Soldier {
     if (this.lob) for (let i = 0; i < 3; i++) {
       g.fillStyle = '#e5b655'; g.fillRect(this.x-12+i*5,this.feetY-31,3,7);
     }
-    if (!this.lob || this.mode !== 'charge' || this.charge <= 0) return;
-    g.save(); g.globalAlpha = 0.3 + this.charge*0.5;
-    g.strokeStyle = '#ffd58a'; g.lineWidth = 1.5;
-    g.beginPath(); g.ellipse(this.targetX,this.targetY+5,35,6,0,0,TAU); g.stroke();
-    g.restore();
     void w;
+  }
+  drawWarnings(g: CanvasRenderingContext2D, w: World) {
+    if (this.lob && this.alive && this.mode === 'charge' && this.charge > 0 && w.camera.visible(this.targetX, this.targetY, 120))
+      drawLobTarget(g, this.targetX, this.targetY + 5, this.charge, 48);
   }
 }
 export class Grenadier extends JungleSpecialist {

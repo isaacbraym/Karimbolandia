@@ -3,10 +3,13 @@ import type { World } from './world';
 import { PK } from './fx';
 import { glowSprite } from '../art/kit';
 import type { Enemy } from './enemies/enemy';
+import { circleEntry } from './interception';
+import { drawInterceptableGrenade } from '../art/hazards';
 
 export type BulletKind = 'std' | 'shell' | 'rocket' | 'plasma' | 'enemy' | 'orb' | 'sniper' | 'missile' | 'nomadShell' | 'bossShell' | 'bossOrb' | 'mine';
 
 export interface BulletOpts {
+  interceptable?: boolean;
   kind?: BulletKind;
   team: 0 | 1; // 0 = jogador, 1 = inimigo
   dmg: number;
@@ -28,6 +31,7 @@ export interface BulletOpts {
 }
 
 export class Bullet {
+  readonly interceptable: boolean;
   x: number;
   y: number;
   px: number;
@@ -56,6 +60,7 @@ export class Bullet {
   dmgProps: number;
 
   constructor(x: number, y: number, vx: number, vy: number, o: BulletOpts) {
+    this.interceptable = o.interceptable === true && o.team === 1 && !!o.explode;
     this.x = this.px = x;
     this.y = this.py = y;
     this.vx = vx;
@@ -81,6 +86,7 @@ export class Bullet {
   }
 
   update(w: World, dt: number) {
+    if (this.dead) return;
     this.age += dt;
     this.life -= dt;
     if (this.life <= 0) {
@@ -106,6 +112,9 @@ export class Bullet {
     this.py = this.y;
     this.x += this.vx * dt;
     this.y += this.vy * dt;
+    // Primeiro alvo no caminho: colisões posteriores não podem esconder uma interceptação.
+    const interception = this.team === 0 && !this.explode ? this.firstInterception(w) : null;
+    if (interception) { this.x = interception.x; this.y = interception.y; }
 
     // trilha de partículas leve
     if (this.kind === 'rocket' || this.kind === 'missile') {
@@ -179,8 +188,30 @@ export class Bullet {
     } else {
       w.player.tryHitByBullet(w, this);
     }
+    if (interception && !this.dead) {
+      const target = interception.target;
+      target.dead = true;
+      w.interceptableBullets.delete(target);
+      w.audio('hitMetal', .65, target.x);
+      w.fx.sparks(target.x, target.y, 7, '#ffe19e', 130);
+      w.fx.popup(target.x, target.y - 15, 'INTERCEPTADA!', '#ffe19e', 9);
+      // Até munição perfurante é consumida ao neutralizar a granada.
+      this.dead = true;
+      return;
+    }
     // fora do mundo
     if (this.y > w.level.pxH + 200 || this.x < -100 || this.x > w.level.pxW + 100) this.dead = true;
+  }
+
+  private firstInterception(w: World): { target: Bullet; x: number; y: number } | null {
+    // Registro pequeno só de granadas: tiros comuns não percorrem todos os projéteis do mundo.
+    let target: Bullet | null = null, first = Infinity;
+    for (const b of w.interceptableBullets) {
+      if (b.dead) continue;
+      const t = circleEntry(this.px, this.py, this.x, this.y, b.x, b.y, this.r + b.r);
+      if (t !== null && t < first) { target = b; first = t; }
+    }
+    return target ? { target, x: this.px + (this.x - this.px) * first, y: this.py + (this.y - this.py) * first } : null;
   }
 
   private hitEnemy(w: World, e: Enemy) {
@@ -225,6 +256,11 @@ export class Bullet {
   }
 
   draw(g: CanvasRenderingContext2D) {
+    if (this.dead) return;
+    if (this.interceptable) {
+      drawInterceptableGrenade(g, this.x, this.y, this.age, Math.atan2(this.vy, this.vx));
+      return;
+    }
     const sp = Math.hypot(this.vx, this.vy) || 1;
     const nx = this.vx / sp;
     const ny = this.vy / sp;

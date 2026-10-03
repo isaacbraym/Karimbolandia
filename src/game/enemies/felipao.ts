@@ -196,7 +196,7 @@ export class Felipao extends Enemy {
     this.rackOpen = 0;
     this.charge = 0;
     // limpa projéteis inimigos e minions
-    w.bullets = w.bullets.filter((b) => b.team === 0);
+    w.clearEnemyBullets();
     for (const e of w.enemies) if (e.alive && !e.isBoss) e.kill(w);
     w.audio('bossPhase', 1);
     w.fx.addShake(9, 0.9);

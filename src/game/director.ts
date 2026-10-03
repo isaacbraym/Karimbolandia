@@ -945,7 +945,7 @@ export class Director {
       this.cine = { kind: 'bossIntro', t: 0, stage: wait ? -1 : 0, long: true, fxT: 0, beat: 0 };
       this.introLives = livesNow;
       // nada de tiros inimigos voando durante a entrada
-      w.bullets = w.bullets.filter((b) => b.team === 0);
+      w.clearEnemyBullets();
       w.grenades = w.grenades.filter((g) => g.team === 0);
       w.camera.zoomTarget = 0.95;
       if (!wait) {

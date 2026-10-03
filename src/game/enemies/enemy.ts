@@ -85,6 +85,8 @@ export abstract class Enemy {
 
   abstract update(w: World, dt: number): void;
   abstract draw(g: CanvasRenderingContext2D, w: World): void;
+  /** Avisos podem atingir a câmera mesmo quando o atirador está fora dela. */
+  drawWarnings(_g: CanvasRenderingContext2D, _w: World): void {}
 
   /** Aplica dano. Retorna dano efetivo (0..), ou -1 se bloqueado (escudo). */
   hurt(w: World, dmg: number, info: HurtInfo): number {
@@ -208,7 +210,7 @@ export abstract class Enemy {
     else if (rand.chance(0.07)) w.spawnDrop('nade', this.x, this.y - 8);
   }
 
-  fireBullet(w: World, x: number, y: number, ang: number, speed: number, dmg: number, kind: 'enemy' | 'orb' | 'sniper' | 'missile' | 'bossShell' | 'bossOrb' = 'enemy', extra: Partial<{ life: number; homing: number; gravity: number; explode: { radius: number; dmg: number } | null; turnDelay: number; r: number; color: string; trail: string }> = {}) {
+  fireBullet(w: World, x: number, y: number, ang: number, speed: number, dmg: number, kind: 'enemy' | 'orb' | 'sniper' | 'missile' | 'bossShell' | 'bossOrb' = 'enemy', extra: Partial<{ life: number; homing: number; gravity: number; explode: { radius: number; dmg: number } | null; turnDelay: number; r: number; color: string; trail: string; interceptable: boolean }> = {}) {
     w.spawnEnemyBullet(x, y, ang, speed, dmg, kind, extra);
   }
 

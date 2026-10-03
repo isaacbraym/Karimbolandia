@@ -2,6 +2,7 @@
 export type Device = 'kb' | 'touch' | 'pad';
 
 const H: Record<string, Record<Device, string>> = {
+  interceptGrenade: { kb: 'Granada laranja no ar? Atire nela para neutralizar!', touch: 'Mire FOGO na granada laranja para neutralizar!', pad: 'Mire e atire na granada laranja para neutralizar!' },
   move: { kb: 'Mova-se com A/D ou ← →', touch: 'Arraste o joystick à esquerda para andar', pad: 'Analógico esquerdo para andar' },
   shoot: { kb: 'Clique (ou J) para atirar — mire com o mouse', touch: 'Segure FOGO para atirar • ARRASTE o botão FOGO para mirar em qualquer direção', pad: 'X ou RT para atirar' },
   jump: { kb: 'ESPAÇO para pular — solte para pular mais baixo', touch: 'Toque em PULO • segure para pular mais alto', pad: 'A para pular' },
