@@ -253,18 +253,20 @@ export class TouchUI {
   }
 
   private lastSync = '';
+  private lastWeaponIcon = '';
   /** Atualiza os botões com o estado do jogo (ícone/munição da arma, granadas, recarga do avanço). */
   sync(s: { weaponIcon: string; ammo: string; lowAmmo: boolean; grenades: number; dash01: number; merchant?:boolean }) {
     const key = `${s.weaponIcon.length}|${s.ammo}|${s.lowAmmo}|${s.grenades}|${Math.round(s.dash01 * 20)}|${s.merchant}`;
-    if (key === this.lastSync) return;
+    const iconChanged = s.weaponIcon !== this.lastWeaponIcon;
+    if (key === this.lastSync && !iconChanged) return;
     this.lastSync = key;
+    this.lastWeaponIcon = s.weaponIcon;
     this.buttons.get('interact')?.classList.toggle('hidden',!s.merchant);
     const swap = this.buttons.get('next');
     if (swap) {
       const img = swap.querySelector('.wicon') as HTMLImageElement;
-      if (img.dataset.src !== String(s.weaponIcon.length)) {
+      if (iconChanged) {
         img.src = s.weaponIcon;
-        img.dataset.src = String(s.weaponIcon.length);
       }
       const b = swap.querySelector('.ammo-n') as HTMLElement;
       b.textContent = s.ammo;
