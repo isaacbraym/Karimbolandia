@@ -23,6 +23,7 @@ import { Crowd } from './civilians';
 import { Narrator } from './narrator';
 import { music, JUNGLE_MELODY, STAGE_MELODY } from '../core/music';
 import { Waters } from './water';
+import { JungleWildlife } from './wildlife';
 import { Vine } from './vines';
 import type { DoorSpawn } from './level';
 import { drawWaterBack, drawWaterFront } from '../art/waterDraw';
@@ -114,6 +115,7 @@ export class World {
   crowd = new Crowd();
   /** pântanos e lagos (fase 2): nado, peixes, bolhas */
   water!: Waters;
+  wildlife!: JungleWildlife;
   /** 0..1 cabeça do Karimbo debaixo d'água (som abafado, tom da tela) */
   underwater = 0;
   /**
@@ -195,6 +197,7 @@ export class World {
     this.baseTiles = data.level.tiles.slice();
     this.baseTheme = data.level.theme.slice();
     this.water = new Waters(data.water ?? [], this.level, data.decos);
+    this.wildlife = new JungleWildlife(data);
     this.vines = (data.vines ?? []).map((v) => new Vine(v));
     this.director = new Director(this);
     this.narrator = new Narrator(this);
@@ -240,6 +243,7 @@ export class World {
     this.smash?.reset();
     this.narrator?.reset();
     this.water?.reset();
+    this.wildlife?.reset();
     for (const v of this.vines) {
       v.held = false;
       v.a = 0;
@@ -1047,6 +1051,7 @@ export class World {
     this.director.update(dt, ctl);
     this.narrator.update(dt);
     p.update(this, dt, ctl);
+    this.wildlife.update(this, dt);
     if (this.water.zones.length) this.water.update(dt, p.x, p.y, p.swimming, this.camera.x, this.camera.x + this.camera.w);
     for (const v of this.vines) if (Math.abs(v.x - p.x) < 1400) v.update(dt, this.time);
     if (this.blockAnimT >= 0) this.updateCollapse(dt);
@@ -1153,6 +1158,8 @@ export class World {
     art.tiles.render(g, L, cam.x, cam.y, cam.w, cam.h, this.time);
     this.drawWet(g);
     this.drawPits(g);
+    this.wildlife.drawTrees(g, this);
+    this.wildlife.drawCroc(g, this);
     // destroços do Nômad
     for (const w of this.wrecks) if (cam.visible(w.x, w.y, 160)) this.drawWreck(g, w);
     // escombros fechando o caminho de volta

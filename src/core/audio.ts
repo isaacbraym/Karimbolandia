@@ -15,7 +15,7 @@ export type SfxName =
   | 'uiClick' | 'uiBack' | 'uiStart' | 'alarm' | 'warning' | 'lock' | 'unlock' | 'missile' | 'laserCharge' | 'laserFire'
   | 'enemyShot' | 'sniperShot' | 'turretShot' | 'stomp' | 'bossRoar' | 'bossHit' | 'bossPhase' | 'bossDie' | 'thruster'
   | 'victory' | 'servo' | 'spark' | 'slam' | 'burp' | 'burpBig' | 'crush' | 'extraLife' | 'thunder' | 'knife'
-  | 'splash' | 'bigSplash' | 'wade' | 'swim' | 'bubble' | 'suitOn' | 'bird' | 'bird2' | 'insect' | 'frog' | 'creak' | 'rumble';
+  | 'splash' | 'bigSplash' | 'wade' | 'swim' | 'bubble' | 'suitOn' | 'bird' | 'bird2' | 'insect' | 'frog' | 'creak' | 'rumble' | 'crocBite';
 
 type LoopName = 'glide' | 'roll' | 'alarm' | 'laser' | 'thrusterLoop';
 
@@ -715,6 +715,11 @@ export class AudioEngine {
         this.noise({ dur: 0.35, vol: 0.32 * v, type: 'bandpass', f0: 1600 * r, f1: 300, q: 0.8, pan });
         this.noise({ dur: 0.5, vol: 0.12 * v, type: 'highpass', f0: 4200, f1: 2000, delay: 0.05, pan });
         this.tone({ type: 'sine', f0: 180, f1: 60, dur: 0.2, vol: 0.15 * v, pan });
+        break;
+      case 'crocBite':
+        this.noise({ dur: 0.11, vol: 0.27 * v, type: 'lowpass', f0: 1800, f1: 180, pan });
+        this.tone({ type: 'triangle', f0: 105, f1: 38, dur: 0.18, vol: 0.2 * v, pan });
+        this.noise({ dur: 0.15, vol: 0.1 * v, type: 'bandpass', f0: 620, f1: 240, delay: 0.04, pan });
         break;
       case 'bigSplash':
         this.noise({ dur: 0.9, vol: 0.5 * v, type: 'lowpass', f0: 3000, f1: 220, q: 0.7, pan });
