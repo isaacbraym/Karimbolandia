@@ -62,4 +62,15 @@ describe('Arsenal e oficina',()=>{
     const pending=withWalletLock(()=>buyGear('pistol.mag.1',w.player.weapons));scope.setProfile('new');s.reloadProgress();
     await expect(pending).rejects.toThrow('profile-changed');expect(s.progress.gear).toEqual([]);
   });
+  it('cancela compra na fila ao fechar oficina sem gastar moedas ou alterar recibos',async()=>{
+    const w=await setup(),{buyGearWhenOpen}=await import('../src/core/forge'),s=await import('../src/core/storage'),{coinBalance}=await import('../src/core/skins');
+    s.progress.coinsEarned=100;s.progress.coinsMigrated=true;s.saveProgress();
+    let run:(()=>unknown)|undefined,open=true;
+    vi.stubGlobal('navigator',{locks:{request:(_name:string,fn:()=>unknown)=>new Promise(resolve=>{run=()=>resolve(fn());})}});
+    const before=new Map(disk),pending=buyGearWhenOpen('pistol.damage.1',w.player.weapons,()=>open);
+    open=false;run!();expect(await pending).toBe('cancelled');
+    expect(coinBalance()).toBe(100);expect(s.progress.gear).toEqual([]);expect(disk).toEqual(before);
+    open=true;const bought=buyGearWhenOpen('pistol.damage.1',w.player.weapons,()=>open);run!();
+    expect(await bought).toBe('bought');expect(coinBalance()).toBe(35);
+  });
 });

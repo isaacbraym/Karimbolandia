@@ -1189,6 +1189,8 @@ kbd {
 .panel.forge-shop h2 {font-size:24px;margin:0;}
 .panel.forge-shop p {margin:0;}
 .panel.forge-shop .forge-card p {font-size:12px;line-height:1.15;}
+.panel.forge-shop .forge-preview {color:#a9eadb;overflow-wrap:anywhere;}
+.forge-shortfall {font-size:10px;line-height:1;color:#ffd29e;}
 .panel.forge-shop .forge-card h3 {font-size:15px;margin:0;}
 .panel.forge-shop .forge-card .btn.small {font-size:12px;min-height:30px;padding:5px;letter-spacing:0;}
 .panel.forge-shop .shop-balance {font-size:17px;line-height:1;}
@@ -1196,10 +1198,11 @@ kbd {
 .forge-nav .forge-selector {flex:1;min-width:0;}
 .panel.forge-shop .forge-nav .btn.small {font-size:19px;min-width:32px;min-height:30px;height:30px;padding:0;}
 @container game-ui (max-height: 370px) {
-  .panel.forge-shop {gap:3px;padding:6px;}
+  .panel.forge-shop {gap:2px;padding:4px;}
+  .panel.forge-shop .forge-cards {gap:3px;}
   .panel.forge-shop h2 {font-size:18px;line-height:1;}
   .panel.forge-shop .shop-balance {font-size:12px;line-height:1;}
-  .panel.forge-shop .forge-card {padding:4px;gap:2px;}
+  .panel.forge-shop .forge-card {padding:3px;gap:1px;}
   .panel.forge-shop .forge-card p {font-size:10px;line-height:1.1;}
   .panel.forge-shop .forge-card h3 {font-size:12px;line-height:1.1;}
   .panel.forge-shop .forge-selector {padding:2px;font-size:12px;height:23px;min-height:23px;}

@@ -13,7 +13,8 @@ import { listSaveCopies } from '../game/saveSession';
 import { loadSave, type SaveState } from '../game/save';
 import { STAGES, stageCheckpoints, type StageId } from '../game/stageSelect';
 import { GEAR, magazineCapacity } from '../core/gearCatalog';
-import { buyGear, withWalletLock } from '../core/forge';
+import { buyGearWhenOpen, withWalletLock } from '../core/forge';
+import { gearPreview } from '../core/gearPreview';
 import { WEAPON_ORDER, WEAPONS, type WeaponId } from '../game/weapons';
 import type { World } from '../game/world';
 
@@ -229,7 +230,7 @@ export class Menus {
   }
 
   closePanel() {
-    if(this.merchantExit){const exit=this.merchantExit;this.merchantExit=null;this.panel.classList.add('hidden');exit();return;}
+    if(this.merchantExit){const exit=this.merchantExit;this.merchantExit=null;this.saveUnsubscribe?.();this.saveUnsubscribe=null;this.panel.classList.add('hidden');exit();return;}
     if (this.panel.querySelector('.stage-picker')) this.cb.onCancelStageStart();
     this.saveUnsubscribe?.();
     this.saveUnsubscribe = null;
@@ -523,6 +524,7 @@ export class Menus {
 
   /** Save portátil funciona mesmo sem serviço de contas e sem internet. */
   showMerchant(w:World,onChange:()=>void) {
+    this.saveUnsubscribe?.();this.saveUnsubscribe=null;
     const player=w.player;
     ensureWallet();
     const panel=el('div','panel forge-shop');
@@ -535,37 +537,56 @@ export class Menus {
     selection.value=player.cur;
     const stats=el('p','forge-stats'),cards=el('div','forge-cards'),status=el('p','forge-message','Armas e melhorias ficam no seu save.');status.setAttribute('role','status');
     panel.append(title,balance,nav,stats,cards,status);
+    const isOpen=()=>panel.isConnected&&!this.panel.classList.contains('hidden');
+    let purchaseFocus:string|undefined;
     const update=()=>{
+      const focused=document.activeElement as HTMLElement|null;
+      const focusedKind=focused?.closest<HTMLElement>('.forge-card')?.dataset.kind??(focused===document.body?purchaseFocus:undefined);
+      purchaseFocus=undefined;
       ensureWallet();
       const id=selection.value as WeaponId,d=player.weaponDef(id),owned=player.weapons.has(id)||progress.gear.includes(`${id}.unlock.1`);
       balance.textContent=`${coinBalance()} MOEDAS`;
-      stats.textContent=`${d.dmg.toFixed(1)} dano • ${magazineCapacity(id,progress.gear)} no carregador • ${(1/d.rate).toFixed(1)} tiros/s`;
+      stats.textContent=`${d.pellets>1?`${d.pellets} × `:''}${d.dmg.toLocaleString('pt-BR',{maximumFractionDigits:2})} dano${d.pellets>1?' por disparo':''} • ${magazineCapacity(id,progress.gear)} no carregador • ${(1/d.rate).toLocaleString('pt-BR',{maximumFractionDigits:1})} tiros/s`;
       cards.replaceChildren();
       for(const kind of ['unlock','mag','rate','damage','scope','pierce']) {
         if(kind==='unlock'&&id==='pistol')continue;
         const options=GEAR.filter(x=>x.weapon===id&&x.kind===kind),item=options.find(x=>!progress.gear.includes(x.id))??options[options.length-1];
         const acquired=progress.gear.includes(item.id),allowed=kind==='unlock'||owned;
-        const card=el('article','forge-card');card.append(el('h3','',item.label),el('p','',item.detail));
+        const card=el('article','forge-card');card.dataset.kind=kind;
+        const description=el('p',acquired?'':'forge-preview');description.textContent=acquired?item.detail:item.kind==='unlock'&&player.weapons.has(id)?'Permanente • munição mantida':gearPreview(item,progress.gear);
+        card.append(el('h3','',item.label),description);
         const button=this.btn(acquired?'ADQUIRIDO':`COMPRAR • ${item.price}`, 'small '+(kind==='unlock'?'primary':'alt'),()=>{
+          purchaseFocus=kind;
           button.disabled=true;
-          void withWalletLock(()=>buyGear(item.id,player.weapons)).then(result=>{
+          void buyGearWhenOpen(item.id,player.weapons,isOpen).then(result=>{
+            if(result==='cancelled'||!isOpen())return;
             if(result==='bought'||result==='volatile') {
               if(item.kind==='unlock'&&!player.weapons.has(id))player.giveWeapon(id,w);
               onChange();
             }
             status.textContent=result==='bought'?'Compra salva! Boa viagem, Karimbo.':result==='volatile'?'Compra nesta sessão. Baixe um backup: o aparelho não conseguiu salvar.':result==='insufficient'?'Faltam moedas.':result==='locked'?'Adquira a arma ou a melhoria anterior primeiro.':'Você já tem esta melhoria.';
             update();
-          }).catch(()=>{status.textContent='A conta mudou. Feche e abra a oficina novamente.';});
+          }).catch(()=>{if(isOpen())status.textContent='A conta mudou. Feche e abra a oficina novamente.';});
         });
         button.disabled=acquired||!allowed||coinBalance()<item.price;
         if(!allowed)button.textContent='ADQUIRA A ARMA';
+        if(allowed&&!acquired&&coinBalance()<item.price){const missing=el('small','forge-shortfall');missing.textContent=`Faltam ${item.price-coinBalance()} moedas`;card.append(missing);}
+        button.setAttribute('aria-label',acquired?`${item.label} adquirido`:`${item.label} • ${button.textContent}`);
         card.append(button);cards.append(card);
       }
       this.collectFocus(panel);
+      const restoreFocus=focusedKind
+        ? cards.querySelector<HTMLButtonElement>(`[data-kind="${focusedKind}"] button:not(:disabled)`)??selection
+        : focused&&panel.contains(focused)?focused:null;
+      if(restoreFocus){this.focusIdx=this.focusable.indexOf(restoreFocus);this.applyFocus();restoreFocus.focus({preventScroll:true});}
     };
     const cycle=(dir:number)=>{selection.value=WEAPON_ORDER[(WEAPON_ORDER.indexOf(selection.value as WeaponId)+dir+WEAPON_ORDER.length)%WEAPON_ORDER.length];update();};
     selection.addEventListener('change',update);
     this.openPanel(panel,'pause');this.merchantExit=()=>this.cb.onResume();update();
+    let pending=false;
+    const changed=()=>{if(pending)return;pending=true;queueMicrotask(()=>{pending=false;if(isOpen())update();});};
+    const unsubscribe=onPersist(changed);window.addEventListener('storage',changed);
+    this.saveUnsubscribe=()=>{unsubscribe();window.removeEventListener('storage',changed);};
   }
 
   showSaves(from: 'main' | 'pause' = 'main') {
