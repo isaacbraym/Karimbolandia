@@ -94,6 +94,15 @@ export class Input {
   /** Tecla de menu (Enter/Espaço/Esc) usada pelos overlays DOM — o jogo usa `state`. */
   onMenuKey: ((code: string) => void) | null = null;
   enabled = true;
+  private suppressed = new Set<ActionName>();
+  /** Fechar uma apresentação não reaproveita o mesmo botão para atirar/pular. */
+  suppressHeldActions() {
+    this.releaseAll();
+    for (const action of ACTIONS) {
+      if (this.state[action].held) this.suppressed.add(action);
+      this.state[action].held = this.state[action].pressed = this.state[action].released = false;
+    }
+  }
 
   attach(target: HTMLElement) {
     window.addEventListener('keydown', (e) => {
@@ -282,6 +291,10 @@ export class Input {
     s.padAim = padAim;
     s.mouseAim = !t.active && this.now() - this.mouseLastMove < 3500 && s.device === 'kb' ? { x: this.mouseX, y: this.mouseY } : null;
 
+    for (const action of this.suppressed) {
+      if (!raw[action]) this.suppressed.delete(action);
+      else raw[action] = false;
+    }
     for (const a of ACTIONS) {
       const b = s[a];
       const prev = this.prevRaw[a];

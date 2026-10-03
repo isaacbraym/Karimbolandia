@@ -124,6 +124,38 @@ html.rot {
   display: none !important;
 }
 
+.weapon-reveal { z-index: 120; background: #09051bcc; backdrop-filter: blur(5px); }
+.weapon-reveal-card { width: min(650px, 100%); max-height: calc(100dvh - 24px); padding: 18px 24px; border: 2px solid #edbf65; border-radius: 22px; background: linear-gradient(145deg, #34235c, #120d28); box-shadow: 0 10px 60px #0009; display: grid; grid-template-columns: 1fr 1.1fr; gap: 12px 20px; color: #f5eddc; animation: weapon-discover .24s ease-out; }
+.weapon-reveal-card header, .weapon-reveal-card footer { grid-column: 1 / -1; text-align: center; }
+.weapon-reveal-card header small { color: #ffe2a0; letter-spacing: 2px; font-weight: 700; }
+.weapon-reveal-card h2 { margin: 2px 0 0; font: 28px var(--display); color: #fff0bf; }
+.weapon-reveal-art { display: grid; place-items: center; border-radius: 14px; background: radial-gradient(ellipse, #b99b5240, transparent 70%); }
+.weapon-reveal-art canvas { width: 100%; height: auto; }
+.weapon-reveal-stats { display: grid; gap: 10px; }
+.weapon-reveal-stat { display: grid; grid-template-columns: 1fr auto; gap: 4px 8px; font-size: 16px; }
+.weapon-reveal-bar { grid-column: 1 / -1; position: relative; height: 9px; background: #080512; border-radius: 5px; overflow: hidden; }
+.weapon-reveal-bar i { position: absolute; inset: 0 auto 0 0; border-radius: inherit; }
+.weapon-reveal-potential { background: repeating-linear-gradient(110deg, #ad905e90 0 3px, #ad905e20 3px 7px); border-right: 1px solid #ffe2a0; }
+.weapon-reveal-filled { background: linear-gradient(90deg, #ed9c3d, #ffeab1); }
+.weapon-reveal-card footer p { margin: 0 0 10px; font-size: 13px; line-height: 1.25; color: #d7cbe5; }
+.weapon-reveal-card footer .btn { min-height: 40px; padding: 8px 28px; }
+@keyframes weapon-discover { from { opacity: 0; transform: translateY(8px) scale(.97); } to { opacity: 1; transform: none; } }
+@media (max-width: 480px) and (min-height: 450px) {
+  .weapon-reveal-card { grid-template-columns: 1fr; padding: 16px 20px; gap: 12px; }
+  .weapon-reveal-art { max-height: 110px; }
+  .weapon-reveal-art canvas { max-width: 250px; }
+}
+@media (max-height: 380px) {
+  .weapon-reveal-card { padding: 10px 18px; gap: 8px 14px; }
+  .weapon-reveal-card h2 { font-size: 23px; }
+  .weapon-reveal-card header small { font-size: 11px; }
+  .weapon-reveal-stats { gap: 6px; }
+  .weapon-reveal-stat { font-size: 14px; gap: 2px 8px; }
+  .weapon-reveal-card footer p { font-size: 11px; margin-bottom: 6px; }
+  .weapon-reveal-card footer .btn { font-size: 17px; min-height: 36px; padding: 5px 24px; }
+}
+@media (prefers-reduced-motion: reduce) { .weapon-reveal-card { animation: none; } }
+
 .panel.save-panel { width: min(620px, calc(var(--game-width) - 28px)); }
 .save-panel .btns { margin-top: 12px; }
 .save-panel p { line-height: 1.4; }

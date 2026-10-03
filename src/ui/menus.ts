@@ -18,6 +18,7 @@ import { buyGearWhenOpen, withWalletLock } from '../core/forge';
 import { gearPreview } from '../core/gearPreview';
 import { WEAPON_ORDER, WEAPONS, type WeaponId } from '../game/weapons';
 import type { World } from '../game/world';
+import { weaponReveal } from './weaponReveal';
 
 export interface MenuCallbacks {
   onSelectStage(stage: StageId, save?: SaveState): void;
@@ -92,6 +93,25 @@ export class Menus {
   private saveUnsubscribe: (() => void) | null = null;
   private shopBtn!: HTMLButtonElement;
   private merchantExit:(()=>void)|null=null;
+  private weaponClose: (() => void) | null = null;
+  private weaponOverlay: HTMLElement | null = null;
+  get weaponOpen() { return this.weaponOverlay !== null; }
+
+  showWeaponAcquired(id: WeaponId, gear: string[], onDone?: () => void) {
+    const previousFocus = document.activeElement as HTMLElement | null;
+    const background = this.panelOpen ? this.panel : this.pause;
+    const close = () => {
+      this.weaponOverlay?.remove(); this.weaponOverlay = null; this.weaponClose = null;
+      background.inert = false;
+      this.collectFocus(background);
+      if (previousFocus?.isConnected) previousFocus.focus({ preventScroll: true });
+      onDone?.();
+    };
+    const view = weaponReveal(id, gear, close);
+    background.inert = true;
+    this.weaponClose = close; this.weaponOverlay = view.overlay;
+    this.root.append(view.overlay); this.collectFocus(view.overlay); view.button.focus();
+  }
 
   constructor(root: HTMLElement, private cb: MenuCallbacks) {
     this.root = root;
@@ -575,6 +595,7 @@ export class Menus {
         button.setAttribute('aria-label',acquired?`${item.label} adquirido`:`${item.label} • ${button.textContent}`);
         card.append(button);cards.append(card);
       }
+      if (this.weaponOpen) return;
       this.collectFocus(panel);
       const restoreFocus=focusedKind
         ? cards.querySelector<HTMLButtonElement>(`[data-kind="${focusedKind}"] button:not(:disabled)`)??selection
@@ -799,6 +820,8 @@ export class Menus {
     this.collectFocus(this.main);
   }
   hideAll() {
+    this.weaponOverlay?.remove(); this.weaponOverlay = null; this.weaponClose = null;
+    this.panel.inert = this.pause.inert = false;
     this.merchantExit=null;
     this.saveUnsubscribe?.();
     this.saveUnsubscribe = null;
@@ -1020,6 +1043,7 @@ export class Menus {
   }
   /** Chamado com códigos de tecla enquanto um menu está aberto. Retorna true se consumiu. */
   handleKey(code: string): boolean {
+    if (code === 'Escape' && this.weaponClose) { this.weaponClose(); return true; }
     if (code === 'Escape' && this.resumeEl) {
       this.closeResume();
       this.collectFocus(this.panelOpen ? this.panel : this.main);

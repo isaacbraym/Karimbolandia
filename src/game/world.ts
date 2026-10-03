@@ -52,6 +52,7 @@ export const COMBO_WINDOW = 3;
 export const comboMult = (n: number) => (n >= 20 ? 5 : n >= 12 ? 4 : n >= 7 ? 3 : n >= 3 ? 2 : 1);
 
 export interface Hooks {
+  onWeaponAcquired?: (id: WeaponId) => void;
   onRespawn?: () => void;
   onBanner?: (title: string, sub?: string, dur?: number) => void;
   onComplete?: () => void;

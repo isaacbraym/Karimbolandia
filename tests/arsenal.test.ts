@@ -5,6 +5,14 @@ beforeEach(()=>{disk=new Map();vi.stubGlobal('localStorage',{get length(){return
 afterEach(()=>vi.unstubAllGlobals());
 async function setup(){const {World}=await import('../src/game/world'),{buildLevel}=await import('../src/game/level/index');const w=new World(buildLevel());w.enemies=[];w.player.lockInput=false;w.player.fireCd=0;return w;}
 describe('Arsenal e oficina',()=>{
+  it('apresenta apenas aquisicao nova; municao e restauracao nao repetem o anuncio',async()=>{
+    const w=await setup(),notify=vi.fn();w.hooks.onWeaponAcquired=notify;
+    w.player.giveWeapon('rifle',w);expect(notify).toHaveBeenCalledExactlyOnceWith('rifle');
+    expect(w.player.cur).toBe('rifle');expect(w.player.loadedAmmo).toBe(18);
+    w.player.giveWeapon('rifle',w);expect(notify).toHaveBeenCalledTimes(1);
+    w.player.restore(w.player.snapshot());expect(notify).toHaveBeenCalledTimes(1);
+    w.player.giveWeapon('shotgun',w);expect(notify).toHaveBeenCalledTimes(2);expect(notify).toHaveBeenLastCalledWith('shotgun');
+  });
   it('a disponibilidade de recarga acompanha reserva, capacidade, golpe e veiculo',async()=>{
     const w=await setup(),p=w.player,{progress}=await import('../src/core/storage');
     expect(p.canReload).toBe(false);expect(p.startReload(w)).toBe(false);

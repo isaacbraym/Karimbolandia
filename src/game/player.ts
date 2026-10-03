@@ -298,6 +298,7 @@ export class Player {
       this.weapons.set(id, d.ammoStart);
       this.magazines.set(id,Math.min(d.ammoStart,magazineCapacity(id,progress.gear)));
       this.cur = id;
+      w.hooks.onWeaponAcquired?.(id);
     } else {
       this.weapons.set(id, Math.min(d.ammoMax, have + d.ammoPickup));
       if (this.cur !== id) this.cur = id;

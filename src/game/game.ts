@@ -28,6 +28,7 @@ import { cloudSaves } from '../core/cloud';
 import { persistenceStatus, onPersist } from '../core/persistence';
 import { FrameMetrics } from '../debug/performance';
 import { preserveProfile } from '../core/profile';
+import type { WeaponId } from './weapons';
 
 type State = 'loading' | 'menu' | 'playing' | 'paused' | 'complete' | 'continue' | 'gameover' | 'comic';
 
@@ -43,6 +44,7 @@ const CAPS: Record<Quality, { parts: number; density: number }> = {
 };
 
 export class Game {
+  private pendingWeapons: WeaponId[] = [];
   canvas: HTMLCanvasElement;
   g: CanvasRenderingContext2D;
   ui: HTMLElement;
@@ -457,6 +459,7 @@ export class Game {
     this.applyFxCaps();
     w.fx.popScale = Math.max(2, this.pxScale * 1.3);
     this.applyDebugParams(w);
+    this.pendingWeapons = [];
     this.state = 'playing';
     this.input.enabled = true;
     this.touch.show(this.isTouch || this.input.touch.active);
@@ -495,7 +498,14 @@ export class Game {
   }
 
   private bindWorld(w: World) {
+    this.pendingWeapons = [];
     w.hooks = {
+      onWeaponAcquired: id => {
+        if (this.state === 'paused') queueMicrotask(() => {
+          if (this.world === w && this.state === 'paused') this.menus.showWeaponAcquired(id, progress.gear);
+        });
+        else if (this.state === 'playing') this.pendingWeapons.push(id);
+      },
       onRespawn: () => this.beginRespawn(),
       onContinue: (lives) => this.askContinue(lives),
       onGameOver: () => this.gameOver(),
@@ -585,6 +595,7 @@ export class Game {
   }
 
   toMenu(first = false) {
+    this.pendingWeapons = [];
     this.cancelStageStart();
     if (this.state === 'playing' || this.state === 'paused') this.saveGame();
     this.world = null;
@@ -742,6 +753,7 @@ export class Game {
   }
 
   private beginRespawn() {
+    this.pendingWeapons = [];
     if (this.respawnPending || !this.world) return;
     this.stopIntroAudio();
     this.respawnPending = true;
@@ -957,6 +969,17 @@ export class Game {
     for (let i = 0; i < n; i++) {
       w.update(h, this.input.state);
       if (i === 0) this.input.clearEdges();
+      if (this.state === 'playing' && this.pendingWeapons.length) {
+        this.pause();
+        this.input.suppressHeldActions();
+        const next = () => {
+          const id = this.pendingWeapons.shift();
+          if (id) this.menus.showWeaponAcquired(id, progress.gear, next);
+          else { this.input.suppressHeldActions(); this.resume(); }
+        };
+        next();
+        return;
+      }
       if (this.state !== 'playing') break; // a HQ congelou o mundo
     }
     this.updateNarrDuck(w);
