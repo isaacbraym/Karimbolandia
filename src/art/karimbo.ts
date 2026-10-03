@@ -553,7 +553,13 @@ export function drawKarimbo(g: CanvasRenderingContext2D, art: KarimboArt, x: num
     if (m > 0) drawSpr(g, art.knife, ARM_LEN - 1, 0.2, { white: w });
     else drawSpr(g, art.weapons[p.weapon], ARM_LEN - 1.5 - p.kick * 3.2, 0.3, { white: w });
     if(m<=0&&p.scope){g.fillStyle='#374653';g.fillRect(ARM_LEN+4,-5,7,3);g.fillStyle='#8de6ea';g.fillRect(ARM_LEN+10,-5,2,3);}
-    if(reload>.2&&reload<.6){g.fillStyle='#7e8b9b';g.fillRect(ARM_LEN-3,4+(1-Math.sin(Math.PI*(reload-.2)/.4))*7,4,7);}
+    if(m<=0&&reload>.2&&reload<.6){
+      const ry=4+(1-Math.sin(Math.PI*(reload-.2)/.4))*7,rx=ARM_LEN-3;
+      if(p.weapon==='shotgun'){g.fillStyle='#ba4f40';g.fillRect(rx,ry,3,7);g.fillStyle='#e3bb65';g.fillRect(rx,ry+5,3,2);}
+      else if(p.weapon==='launcher'){g.fillStyle='#90b568';g.fillRect(rx-1,ry,5,8);g.fillStyle='#e3bb65';g.fillRect(rx-1,ry+6,5,2);}
+      else if(p.weapon==='energy'){g.fillStyle='#384a63';g.fillRect(rx-1,ry,5,7);g.fillStyle='#7ff9ff';g.fillRect(rx,ry+1,3,4);}
+      else {g.fillStyle='#7e8b9b';g.fillRect(rx,ry,p.weapon==='rifle'?5:4,p.weapon==='rifle'?9:7);g.fillStyle='#b8c5cf';g.fillRect(rx,ry,3,1);}
+    }
     g.restore();
   } else {
     drawSpr(g, art.armFront, sh[0], shY, { rot: 0.9 + Math.sin(c + 3) * (running ? 0.5 : 0), white: w });

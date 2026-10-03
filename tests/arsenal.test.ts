@@ -5,6 +5,18 @@ beforeEach(()=>{disk=new Map();vi.stubGlobal('localStorage',{get length(){return
 afterEach(()=>vi.unstubAllGlobals());
 async function setup(){const {World}=await import('../src/game/world'),{buildLevel}=await import('../src/game/level/index');const w=new World(buildLevel());w.enemies=[];w.player.lockInput=false;w.player.fireCd=0;return w;}
 describe('Arsenal e oficina',()=>{
+  it('a disponibilidade de recarga acompanha reserva, capacidade, golpe e veiculo',async()=>{
+    const w=await setup(),p=w.player,{progress}=await import('../src/core/storage');
+    expect(p.canReload).toBe(false);expect(p.startReload(w)).toBe(false);
+    p.giveWeapon('rifle',w);p.weapons.set('rifle',24);p.magazines.set('rifle',18);
+    expect(p.canReload).toBe(false);
+    progress.gear.push('rifle.mag.1');expect(p.canReload).toBe(true);
+    p.meleeT=.2;expect(p.canReload).toBe(false);p.meleeT=0;
+    p.mode='nomad';expect(p.canReload).toBe(false);p.mode='foot';
+    p.weapons.set('rifle',18);expect(p.canReload).toBe(false);
+    p.weapons.set('rifle',24);expect(p.startReload(w)).toBe(true);expect(p.canReload).toBe(false);
+    p.reloadT=0;p.cur='pistol';p.magazines.set('pistol',0);expect(p.canReload).toBe(true);
+  });
   it('começa apenas com pistola e interrompe disparos ao esvaziar o carregador',async()=>{
     const w=await setup(),p=w.player,c=newCtl();
     expect([...p.weapons.keys()]).toEqual(['pistol']);expect(p.grenades).toBe(2);

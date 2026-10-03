@@ -121,10 +121,14 @@ export class Player {
   get loadedAmmo(){return this.magazines.get(this.cur)??Math.min(magazineCapacity(this.cur,progress.gear),this.weapons.get(this.cur)??0);}
   get reload01(){return this.reloadT>0?1-this.reloadT/this.reloadDuration:0;}
   get ammoLabel(){const total=this.weapons.get(this.cur)??0;return this.reloadT>0?'↻':`${this.loadedAmmo}/${total===Infinity?'∞':Math.max(0,total-this.loadedAmmo)}`;}
-  startReload(w:World) {
+  get canReload() {
     if(this.mode!=='foot'||this.reloadT>0||this.meleeT>0)return false;
     const ammo=this.weapons.get(this.cur)??0,cap=magazineCapacity(this.cur,progress.gear);
     if(ammo<=this.loadedAmmo||this.loadedAmmo>=cap)return false;
+    return true;
+  }
+  startReload(w:World) {
+    if(!this.canReload)return false;
     this.reloadT=this.reloadDuration=reloadSeconds(this.cur);
     w.audio('uiClick',.45,this.x);return true;
   }

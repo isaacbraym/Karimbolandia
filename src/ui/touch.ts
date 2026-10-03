@@ -255,12 +255,21 @@ export class TouchUI {
   private lastSync = '';
   private lastWeaponIcon = '';
   /** Atualiza os botões com o estado do jogo (ícone/munição da arma, granadas, recarga do avanço). */
-  sync(s: { weaponIcon: string; ammo: string; lowAmmo: boolean; grenades: number; dash01: number; merchant?:boolean }) {
-    const key = `${s.weaponIcon.length}|${s.ammo}|${s.lowAmmo}|${s.grenades}|${Math.round(s.dash01 * 20)}|${s.merchant}`;
+  sync(s: { weaponIcon: string; ammo: string; lowAmmo: boolean; grenades: number; dash01: number; merchant?:boolean;canReload?:boolean;reloading?:boolean;reload01?:number }) {
+    const reloadStep=Math.round(Math.max(0,Math.min(1,s.reload01??0))*20);
+    const key = `${s.weaponIcon.length}|${s.ammo}|${s.lowAmmo}|${s.grenades}|${Math.round(s.dash01 * 20)}|${s.merchant}|${s.canReload}|${s.reloading}|${reloadStep}`;
     const iconChanged = s.weaponIcon !== this.lastWeaponIcon;
     if (key === this.lastSync && !iconChanged) return;
     this.lastSync = key;
     this.lastWeaponIcon = s.weaponIcon;
+    const reload=this.buttons.get('reload') as HTMLButtonElement|undefined;
+    if(reload){
+      reload.disabled=s.canReload===false||!!s.reloading;
+      reload.classList.toggle('reloading',!!s.reloading);
+      reload.style.setProperty('--reload',String(reloadStep/20));
+      reload.setAttribute('aria-label',s.reloading?`Recarregando • ${reloadStep*5}%`:reload.disabled?'Recarregar arma • indisponível':'Recarregar arma');
+      if(reload.disabled){this.input.touch.held.reload=false;reload.classList.remove('down');delete reload.dataset.pid;}
+    }
     this.buttons.get('interact')?.classList.toggle('hidden',!s.merchant);
     const swap = this.buttons.get('next');
     if (swap) {

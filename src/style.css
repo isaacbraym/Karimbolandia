@@ -818,6 +818,9 @@ kbd {
   height: 56%;
 }
 .t-reload {right:calc(var(--sar) + 58px);top:calc(var(--sat) + 8px);width:38px;height:38px;font-size:28px;}
+.t-reload:disabled {opacity:.5;}
+.t-reload.reloading {opacity:1;color:#a9eadb;}
+.t-reload.reloading::after {content:'';position:absolute;inset:-4px;border-radius:50%;pointer-events:none;background:conic-gradient(#85e1d1 calc(var(--reload,0) * 360deg),rgba(255,255,255,.12) 0);-webkit-mask:radial-gradient(circle,transparent 60%,#000 63%);mask:radial-gradient(circle,transparent 60%,#000 63%);}
 .touch.mounted .t-reload {display:none;}
 .t-merchant {left:50%;bottom:calc(var(--sab) + 8px);transform:translateX(-50%);width:102px;height:40px;border-radius:12px;font-size:12px;}
 .forge-shop {width:min(790px,96vw);padding:12px;display:flex;flex-direction:column;gap:7px;}
