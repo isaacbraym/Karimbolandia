@@ -83,6 +83,8 @@ export interface Hooks {
   onCheckpoint?: (idx: number) => void;
   /** Optional event reward: persist at the current checkpoint without moving it. */
   onProgress?: () => void;
+  /** Require fresh presses when a brief scripted participation releases control. */
+  onControlReturned?: () => void;
 }
 
 export interface Wreck {
@@ -261,7 +263,7 @@ export class World {
     this.narrator?.reset();
     this.water?.reset();
     this.wildlife?.reset();
-    this.village?.reset();
+    this.village?.reset(this);
     this.encounters?.reset(true);
     for (const v of this.vines) {
       v.held = false;
@@ -487,11 +489,13 @@ export class World {
   /** Passou o checkpoint `idx`: fecha o caminho de volta (num trecho de chão firme, fora de arenas). */
   blockBehind(idx: number, fx = true) {
     const cps = this.data.checkpoints;
-    if (idx < 1 || idx >= cps.length || idx > this.checkpointIdx) return;
+    if (idx < 1 || idx >= cps.length || idx !== this.checkpointIdx) return;
     const cp = cps[idx];
     const L = this.level;
     // perto do checkpoint (o desmoronamento acontece à vista), procurando para trás um chão firme
-    const xMin = Math.max(cps[idx - 1].x + 4 * TILE, cp.x - 30 * TILE);
+    const previousX = cps.reduce((x, c) => c.x < cp.x ? Math.max(x, c.x) : x, this.data.playerStart.x);
+    if (previousX >= cp.x) return;
+    const xMin = Math.max(previousX + 4 * TILE, cp.x - 30 * TILE);
     const inArena = (x: number) => this.data.arenas.some((a) => x > a.rect.x - 3 * TILE && x < a.rect.x + a.rect.w + 3 * TILE);
     const inWater = (x: number) => this.data.water.some((z) => x > z.x - 2 * TILE && x < z.x + z.w + 2 * TILE);
     for (let k = 0; k < 12; k++) {
@@ -579,6 +583,7 @@ export class World {
     const sx = cp ? cp.x : this.data.playerStart.x;
     const sy = cp ? cp.y : this.data.playerStart.y;
     this.director.onRespawn();
+    this.village.reset(this);
     this.encounters.reset();
     this.narrator.onRespawn();
     this.restoreTiles();
@@ -1082,6 +1087,7 @@ export class World {
 
     this.director.update(dt, ctl);
     this.narrator.update(dt);
+    this.village.update(this, dt);
     p.update(this, dt, ctl);
     this.encounters.update(this, dt);
     this.wildlife.update(this, dt);
@@ -1155,7 +1161,6 @@ export class World {
     for (let i = this.props.length - 1; i >= 0; i--) if (!this.props[i].alive) this.props.splice(i, 1);
     for (const w of this.wrecks) w.t += dt;
     this.crowd.update(this, dt);
-    this.village.update(this, dt);
     for (const c of this.corpses) c.update(dt);
     for (let i = this.corpses.length - 1; i >= 0; i--) if (this.corpses[i].dead) this.corpses.splice(i, 1);
 
@@ -1165,6 +1170,7 @@ export class World {
     // câmera
     const cam = this.camera;
     this.director.cameraUpdate(dt);
+    this.village.camera(this);
     cam.update(dt, p.x, p.y - (p.mode === 'nomad' ? 6 : 14), p.facing, p.body.vx, p.body.onGround, this.fx.shake, settings.screenShake);
   }
 
@@ -1251,6 +1257,7 @@ export class World {
     if (this.water.zones.length) drawWaterFront(g, this);
     this.fx.draw(g, true);
     this.director.drawDecos(g, 'front');
+    this.encounters.drawPrompts(g, this);
     this.crowd.drawBalloon(g, this);
     this.village.draw(g, this, true);
     this.fx.drawPopups(g);

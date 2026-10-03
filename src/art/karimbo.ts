@@ -413,6 +413,8 @@ export interface KPose {
   swimPhase?: number;
   reload?: number;
   scope?: boolean;
+  clap?: boolean;
+  clapTime?: number;
 }
 
 // ombro abaixo do queixo: o braço/arma nunca cobre o rosto
@@ -532,7 +534,7 @@ export function drawKarimbo(g: CanvasRenderingContext2D, art: KarimboArt, x: num
   // Sequência do Animator_AI: aproximar, buscar carregador, encaixar, retomar mira.
   if(reloadWeight>0)drawSpr(g,art.armBack,sh[0]-3,shY+1,{rot:1.25-Math.sin(Math.PI*Math.min(1,reload*1.6))*.9,white:w});
   // braço de trás (só quando sem arma)
-  if (!p.hasGun) drawSpr(g, art.armBack, sh[0] - 4, shY + 0.5, { rot: 1.1 + Math.sin(c) * (running ? 0.5 : 0), white: w });
+  if (!p.hasGun&&!p.clap) drawSpr(g, art.armBack, sh[0] - 4, shY + 0.5, { rot: 1.1 + Math.sin(c) * (running ? 0.5 : 0), white: w });
   // cilindro de ar nas costas (traje de mergulho)
   const suit = p.suit ?? 0;
   if (suit > 0.02) {
@@ -575,7 +577,15 @@ export function drawKarimbo(g: CanvasRenderingContext2D, art: KarimboArt, x: num
     }
     g.restore();
   } else {
-    drawSpr(g, art.armFront, sh[0], shY, { rot: 0.9 + Math.sin(c + 3) * (running ? 0.5 : 0), white: w });
+    if(!p.clap)drawSpr(g, art.armFront, sh[0], shY, { rot: 0.9 + Math.sin(c + 3) * (running ? 0.5 : 0), white: w });
+    if(p.clap){
+      const open=(1-Math.cos((p.clapTime??p.t)*Math.PI*2/.6))*.5;
+      for(const s of [-1,1]) {
+        const sx=s*5,sy=shY+1,ex=s*(2+open*8),ey=shY+5;
+        g.save();g.translate(sx,sy);g.rotate(Math.atan2(ey-sy,ex-sx));
+        drawSpr(g,s>0?art.armFront:art.armBack,0,0,{sx:Math.hypot(ex-sx,ey-sy)/ARM_LEN,white:w});g.restore();
+      }
+    }
   }
 
   // cabeça (rosto sempre em destaque, por cima de tudo) + orelhas atrás dela

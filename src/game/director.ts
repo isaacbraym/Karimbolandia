@@ -373,8 +373,8 @@ export class Director {
     const cps = this.w.data.checkpoints;
     const p = this.w.player;
     let idx = -1;
-    for (let i = 0; i < cps.length; i++) if (cps[i].x <= p.x + 40) idx = i;
-    if (idx >= 0 && idx > this.w.checkpointIdx) this.activateCheckpoint(idx, true);
+    for (let i = 0; i < cps.length; i++) if (cps[i].x <= p.x + 40 && (idx < 0 || cps[i].x > cps[idx].x)) idx = i;
+    if (idx >= 0 && cps[idx].x > (cps[this.w.checkpointIdx]?.x ?? -Infinity)) this.activateCheckpoint(idx, true);
   }
 
   private activateCheckpoint(idx: number, quiet = false) {
@@ -405,12 +405,11 @@ export class Director {
     const indoors = w.inRoom();
     if ((p.mode === 'foot' || p.mode === 'nomad') && !indoors) {
       const cps = w.data.checkpoints;
-      for (let i = w.checkpointIdx + 1; i < cps.length; i++) {
-        if (p.x >= cps[i].x && !this.insideActiveArena(p.x)) {
-          this.activateCheckpoint(i);
-          break;
-        }
-      }
+      let next = -1;
+      const previousX = cps[w.checkpointIdx]?.x ?? -Infinity;
+      for (let i = 0; i < cps.length; i++) if (cps[i].x > previousX && p.x >= cps[i].x
+        && (next < 0 || cps[i].x > cps[next].x)) next = i;
+      if (next >= 0 && !this.insideActiveArena(p.x)) this.activateCheckpoint(next);
     }
     // gatilhos
     for (const t of w.data.triggers) {

@@ -1,16 +1,16 @@
 /**
- * FASE 2 — SELVA (prévia do cenário): selva densa, pântanos, ruínas de um templo, a cachoeira com o
- * lago (o Karimbo cai nele e veste o traje de mergulho) e o acampamento dos bandidos.
- * As mecânicas de plataforma (estilo Donkey Kong / Mario) entram depois; aqui o foco é o cenário.
+ * FASE 2 — SELVA: brejos, cipós, templo, mergulho, acampamento, comunidade viva e santuário.
+ * A expansão conserva IDs de entidades e índices de checkpoints usados por saves anteriores.
  */
 import { Rng } from '../../core/math';
 import { THEME, TILE, type LevelData } from '../level';
 import { G, LEVEL_H, LevelBuilder } from './builder';
 import { addPatrolStories } from './story';
+import { expandCommunity, COMMUNITY_EXTRA, DANCE_TILE } from './community';
 
 /** a masmorra do templo ocupa as primeiras SHIFT colunas do mapa; a selva vem depois */
 export const SHIFT = 150;
-export const JUNGLE_W = 726 + SHIFT;
+export const JUNGLE_W = 726 + SHIFT + COMMUNITY_EXTRA;
 
 /** Lago: colunas [LAKE_X0, LAKE_X1), superfície na linha LAKE_TOP, fundo na linha LAKE_FLOOR. */
 export const LAKE_X0 = 324 + SHIFT;
@@ -45,6 +45,7 @@ const inGorge = (x: number) => x >= GORGE_X0 - 1 && x < GORGE_X1 + 1;
 function rollingGround(b: LevelBuilder) {
   const L = b.level;
   const free = (x: number) => !inSwamp(x) && !inLake(x) && !inGorge(x)
+    && Math.abs(x - DANCE_TILE) > 10 && !(x >= 922 && x <= 963)
     && L.get(x, G) === 1 && L.get(x, G - 1) === 0
     && !b.checkpoints.some(c => Math.abs(c.x / TILE - x) < 3)
     && !b.props.some(p => Math.abs(p.x / TILE - x) < 2);
@@ -154,7 +155,7 @@ function expandJungle(b: LevelBuilder) {
   b.deco('jGate',866,G,'back');
   b.deco('jTorch',863,G,'back'); b.deco('jTorch',869,G,'back');
   b.tokens(860,G-1,6);
-  dressJungle(b,820,JUNGLE_W-2,{seed:14,temple:true,dense:0.7});
+  dressJungle(b,820,874,{seed:14,temple:true,dense:0.7});
   b.finishX=866*TILE;
 }
 
@@ -396,14 +397,14 @@ function templeInterior(b: LevelBuilder) {
 }
 
 export function buildJungle(): LevelData {
-  const b = new LevelBuilder(JUNGLE_W, LEVEL_H);
+  const b = new LevelBuilder(JUNGLE_W - COMMUNITY_EXTRA, LEVEL_H);
   b.stage = 2;
   b.setTheme(THEME.EARTH);
-  b.ground(0, JUNGLE_W);
+  b.ground(0, b.level.w);
   // o começo do mapa é rocha maciça: lá dentro fica a masmorra do templo (só se chega pelas portas)
   b.fill(0, 0, SHIFT, LEVEL_H, 1, THEME.TEMPLE);
   // a câmera nunca mostra a rocha da masmorra quando se está do lado de fora
-  b.camZone(SHIFT, 0, JUNGLE_W - SHIFT, LEVEL_H);
+  b.camZone(SHIFT, 0, b.level.w - SHIFT, LEVEL_H);
 
   // ================================================================ A — ORLA DA SELVA (0–64)
   b.playerStart = { x: b.px(154), y: b.py(G) };
@@ -629,6 +630,7 @@ export function buildJungle(): LevelData {
   b.finishX = 672 * TILE;
   dressJungle(b, 570, 686, { seed: 6, camp: true, dense: 0.9 });
   expandJungle(b);
+  expandCommunity(b);
 
   b.atmosphere.sort((a, c) => a.x - c.x);
   rollingGround(b);

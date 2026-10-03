@@ -1,10 +1,13 @@
 import { poly, shadedRR, OUT, bake, drawSpr, shadedEllipse, type Sprite } from './kit';
 import { prism, clothFinish } from './volume';
+import { LIFE_BOUNDS, paintVillageLife } from './villageLife';
 export const VILLAGE_BOUNDS: Record<string, [number,number,number,number]> = {
+  ...LIFE_BOUNDS,
   villageHome: [-108,-181,120,11], villageGarden: [-72,-38,80,11], villagePottery: [-50,-44,57,12],
 };
 export function paintVillageProp(g: CanvasRenderingContext2D, kind: string, seed: number) {
   if (!VILLAGE_BOUNDS[kind]) return false;
+  if (paintVillageLife(g,kind,seed)) return true;
   g.fillStyle = 'rgba(12,28,15,.2)';
   g.beginPath(); g.ellipse(4,3,kind==='villageHome'?104:50,6,0,0,Math.PI*2); g.fill();
   if (kind === 'villageHome') {
@@ -46,7 +49,8 @@ export function paintVillageProp(g: CanvasRenderingContext2D, kind: string, seed
   return true;
 }
 
-export interface ResidentPose { x:number; y:number; id:number; facing:number; walk:number; gesture:number }
+export type ResidentRole = 'resident'|'farmer'|'washer'|'weaver'|'carrier'|'carpenter'|'child';
+export interface ResidentPose { x:number; y:number; id:number; facing:number; walk:number; gesture:number; role?:ResidentRole; work?:number }
 const residents = new Map<number, { body: Sprite; head: Sprite; arm: Sprite; leg: Sprite; shoe: Sprite }>();
 function residentArt(id: number, skin: string, shirt: string) {
   const key = id % 4, cached = residents.get(key); if (cached) return cached;
@@ -89,6 +93,9 @@ function residentLimb(g: CanvasRenderingContext2D, art: Sprite, x: number, y: nu
 }
 export function drawResident(g: CanvasRenderingContext2D, p: ResidentPose, t:number) {
   g.save(); g.translate(p.x,p.y); g.scale(p.facing,1);
+  const child=p.role==='child',work=p.work??0,beat=t*Math.PI*2/.6;
+  if(child)g.scale(.64,.64);
+  if(p.role==='farmer'||p.role==='washer')g.rotate(work*.18);
   const skin = ['#ba835b','#a46a48','#cd9468','#8c593d'][p.id%4];
   const shirt = ['#467780','#ac6950','#667b51','#b49461'][p.id%4];
   const art = residentArt(p.id, skin, shirt);
@@ -99,10 +106,29 @@ export function drawResident(g: CanvasRenderingContext2D, p: ResidentPose, t:num
     drawSpr(g, art.shoe, foot + 2, 1);
   }
   drawSpr(g, art.body, 0, -24);
-  residentLimb(g, art.arm, -7, -45, -12, -32); residentLimb(g, art.arm, -12, -32, -8, -26);
-  const wave = p.gesture ? Math.sin(t*7+p.id)*3 : 0;
-  residentLimb(g, art.arm, 9, -45, 17, -38-p.gesture*14);
-  residentLimb(g, art.arm, 17, -38-p.gesture*14, 20+p.gesture*5, -29-p.gesture*27+wave);
+  if(child) {
+    const spread=3+(1-Math.cos(beat))*8;
+    for(const s of [-1,1]){residentLimb(g,art.arm,s*7,-45,s*13,-36);residentLimb(g,art.arm,s*13,-36,s*spread,-43);}
+    if(Math.cos(beat)>.96){g.strokeStyle='#f8df91';g.lineWidth=1;g.beginPath();g.moveTo(-3,-48);g.lineTo(-5,-52);g.moveTo(3,-48);g.lineTo(5,-52);g.stroke();}
+  } else if(p.role && p.role!=='resident') {
+    const handY=-27-work*12;
+    for(const s of [-1,1]){residentLimb(g,art.arm,s*7,-45,10+s*5,-32);residentLimb(g,art.arm,10+s*5,-32,22+s*4,handY);}
+    if(p.role==='farmer'||p.role==='carpenter'){
+      g.save();g.translate(24,handY);g.rotate(work*.4);shadedRR(g,-1,-17,3,p.role==='farmer'?58:32,1,'#806243',{lw:.6});
+      shadedRR(g,-7,p.role==='farmer'?37:-19,15,5,1,'#9bada7',{lw:.7});g.restore();
+    }else if(p.role==='washer'||p.role==='weaver'){
+      poly(g,[[17,handY],[35,handY+2],[32,handY+17],[18,handY+14]],p.role==='washer'?'#7f9fba':'#b77958',{lw:.7});
+      g.strokeStyle='#edc991';g.lineWidth=1;g.beginPath();g.moveTo(19,handY+7);g.lineTo(33,handY+8);g.stroke();
+    }else{
+      shadedEllipse(g,23,-29,11,13,'#ae8655',{lw:.8});g.strokeStyle='#6a4b31';g.lineWidth=.7;
+      for(let y=-39;y<-17;y+=5){g.beginPath();g.moveTo(14,y);g.lineTo(31,y);g.stroke();}
+    }
+  } else {
+    residentLimb(g, art.arm, -7, -45, -12, -32); residentLimb(g, art.arm, -12, -32, -8, -26);
+    const wave = p.gesture ? Math.sin(t*7+p.id)*3 : 0;
+    residentLimb(g, art.arm, 9, -45, 17, -38-p.gesture*14);
+    residentLimb(g, art.arm, 17, -38-p.gesture*14, 20+p.gesture*5, -29-p.gesture*27+wave);
+  }
   drawSpr(g, art.head, 0, -48);
   g.restore();
 }

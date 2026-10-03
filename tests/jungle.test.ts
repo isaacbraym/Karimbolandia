@@ -97,7 +97,7 @@ describe('Fase 2 (selva): caminho alcançável', () => {
     expect(missing).toEqual([]);
     const fx = Math.floor(data.finishX / TILE);
     expect(res.reached.has(res.key(fx, 32))).toBe(true);
-  });
+  }, 20000); // Simulates the full campaign, including the 620-column community.
 });
 
 describe('Fase 2 (selva): água', () => {

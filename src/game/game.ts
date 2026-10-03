@@ -523,6 +523,7 @@ export class Game {
       onNarrPrepare: (id) => audio.prepareNarr(id),
       onCheckpoint: () => this.queueSave(),
       onProgress: () => this.queueSave(),
+      onControlReturned: () => this.input.suppressHeldActions(),
       onBanner: (t, s, d) => this.hud.banner(t, s, d),
       onComplete: () => this.onComplete(),
       onMusic: (s) => this.setMusic(s),

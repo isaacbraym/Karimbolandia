@@ -193,6 +193,7 @@ export class Player {
   deadRot = 0;
   respawnQueued = false;
   lockInput = false;
+  clapping = false;
   justLanded = 0;
   fallCount = 0;
   aimAssistTarget: object | null = null;
@@ -238,6 +239,7 @@ export class Player {
 
   // ------------------------------------------------------------------ ciclo de vida
   reset(x: number, feetY: number) {
+    this.clapping = false;
     this.body = newBody(FOOT_W, FOOT_H);
     this.body.x = x;
     this.body.y = feetY - FOOT_H / 2;
@@ -345,7 +347,7 @@ export class Player {
 
   // ------------------------------------------------------------------ dano
   tryHitByBullet(w: World, b: Bullet) {
-    if (!this.targetable) return;
+    if (!this.targetable || w.village?.active) return;
     const hb = this.hitbox;
     // segmento vs retângulo
     const r = b.r;
@@ -376,7 +378,7 @@ export class Player {
   /** Dano ao jogador (Karimbo ou Nômad). dir = lado de onde veio (empurra no sentido). */
   hit(w: World, dmg: number, dir: number, o: { kx?: number; ky?: number; ignoreInvuln?: boolean; fall?: boolean } = {}) {
     if (!this.targetable) return;
-    if (this.isDashing) return;
+    if (this.isDashing || w.village?.active) return;
     if (this.invuln > 0 && !o.ignoreInvuln) return;
     w.stats.damageTaken += dmg;
     this.lastDamageT = w.time;
@@ -1908,7 +1910,9 @@ export class Player {
       earGlide: this.earGlide,
       vy: b.vy,
       alpha,
-      hasGun: true,
+      hasGun: !this.clapping,
+      clap: this.clapping,
+      clapTime: w.time,
       reload:this.reload01,
       scope:progress.gear.includes(`${this.cur}.scope.1`),
       scarf: this.scarfT,

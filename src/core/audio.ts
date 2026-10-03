@@ -10,7 +10,7 @@ export type SfxName =
   | 'explosion' | 'bigExplosion' | 'grenadeThrow' | 'grenadeBounce'
   | 'hit' | 'hitMetal' | 'shieldPing' | 'enemyHurt' | 'enemyDie' | 'robotDie' | 'crateBreak' | 'debris'
   | 'jump' | 'land' | 'step' | 'flap' | 'hurt' | 'die'
-  | 'coin' | 'emblem' | 'secret' | 'pickup' | 'heal' | 'weapon' | 'checkpoint'
+  | 'coin' | 'emblem' | 'secret' | 'pickup' | 'heal' | 'weapon' | 'checkpoint' | 'clap'
   | 'dash' | 'dash2' | 'dashHit' | 'nomadBoot' | 'nomadHop' | 'nomadHurt' | 'nomadDeath' | 'eject' | 'nomadEnter'
   | 'uiClick' | 'uiBack' | 'uiStart' | 'alarm' | 'warning' | 'lock' | 'unlock' | 'missile' | 'laserCharge' | 'laserFire'
   | 'enemyShot' | 'sniperShot' | 'turretShot' | 'stomp' | 'bossRoar' | 'bossHit' | 'bossPhase' | 'bossDie' | 'thruster'
@@ -781,6 +781,10 @@ export class AudioEngine {
       case 'coin':
         this.tone({ type: 'square', f0: 988, dur: 0.06, vol: 0.09 * v, pan });
         this.tone({ type: 'square', f0: 1319, dur: 0.16, vol: 0.09 * v, delay: 0.06, pan });
+        break;
+      case 'clap':
+        this.noise({dur:.065,vol:.12*v,type:'bandpass',f0:1700,f1:1000,q:.7,pan});
+        this.noise({dur:.04,vol:.045*v,type:'highpass',f0:2500,delay:.015,pan});
         break;
       case 'emblem':
         [523, 659, 784, 1047].forEach((f, i) => this.tone({ type: 'triangle', f0: f, dur: 0.22, vol: 0.2 * v, delay: i * 0.07, pan }));
