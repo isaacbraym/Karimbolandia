@@ -51,7 +51,7 @@ function branch(kind: HabitatKind) {
       oval(g, x, y, 9 + i % 3 * 2, 4, i % 2 ? '#64913e' : '#3e7036', -0.5 + i % 3 * 0.5);
       line(g, [x - 6, y + 1, x + 5, y - 1], '#8fb55a', 0.7);
     }
-    if (kind === 'eggs' || kind === 'bird') { g.save(); g.translate(76, -5); nest(g, kind === 'eggs'); g.restore(); }
+    if (kind === 'eggs' || kind === 'bird') { g.save(); g.translate(76, -5); g.scale(.55, .55); nest(g, kind === 'eggs'); g.restore(); }
     if (kind === 'hive') {
       line(g, [72, 2, 76, 26], '#af874b', 4);
       oval(g, 77, 52, 23, 32, '#d4a44c');
@@ -167,10 +167,12 @@ export function drawHabitat(g: CanvasRenderingContext2D, h: Habitat, t: number) 
   drawSpr(g, branch(h.kind), 0, 0);
   if (h.kind === 'bird') {
     const bob = Math.sin(t * 3) * 0.6;
-    drawSpr(g, a.birdBody, 77, -17 + bob);
+    g.save(); g.translate(77, -7); g.scale(.3, .3);
+    drawSpr(g, a.birdBody, 0, -10 + bob);
     const look = Math.sin(t * 0.7 + Math.sin(t * 0.31));
-    drawSpr(g, a.birdHead, 82, -43 + bob, { flip: look < -0.25, rot: Math.sin(t * 1.1) * 0.1 });
-    if (t % 4.9 > 4.78) line(g, [83, -51 + bob, 89, -51 + bob], '#be7147', 3);
+    drawSpr(g, a.birdHead, 5, -36 + bob, { flip: look < -0.25, rot: Math.sin(t * 1.1) * 0.1 });
+    if (t % 4.9 > 4.78) line(g, [6, -44 + bob, 12, -44 + bob], '#be7147', 3);
+    g.restore();
   } else if (h.kind === 'hive') {
     for (let i = 0; i < 6; i++) {
       const v = t * (0.8 + i * 0.12) + i * 1.7;
