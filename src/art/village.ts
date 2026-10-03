@@ -1,6 +1,7 @@
 import { poly, shadedRR, OUT, bake, drawSpr, shadedEllipse, type Sprite } from './kit';
 import { prism, clothFinish } from './volume';
 import { LIFE_BOUNDS, paintVillageLife } from './villageLife';
+import { clapOpen } from '../core/clapRhythm';
 export const VILLAGE_BOUNDS: Record<string, [number,number,number,number]> = {
   ...LIFE_BOUNDS,
   villageHome: [-108,-181,120,11], villageGarden: [-72,-38,80,11], villagePottery: [-50,-44,57,12],
@@ -93,7 +94,7 @@ function residentLimb(g: CanvasRenderingContext2D, art: Sprite, x: number, y: nu
 }
 export function drawResident(g: CanvasRenderingContext2D, p: ResidentPose, t:number) {
   g.save(); g.translate(p.x,p.y); g.scale(p.facing,1);
-  const child=p.role==='child',work=p.work??0,beat=t*Math.PI*2/.6;
+  const child=p.role==='child',work=p.work??0;
   if(child)g.scale(.64,.64);
   if(p.role==='farmer'||p.role==='washer')g.rotate(work*.18);
   const skin = ['#ba835b','#a46a48','#cd9468','#8c593d'][p.id%4];
@@ -107,9 +108,9 @@ export function drawResident(g: CanvasRenderingContext2D, p: ResidentPose, t:num
   }
   drawSpr(g, art.body, 0, -24);
   if(child) {
-    const spread=3+(1-Math.cos(beat))*8;
+    const open=clapOpen(t),spread=3+open*16;
     for(const s of [-1,1]){residentLimb(g,art.arm,s*7,-45,s*13,-36);residentLimb(g,art.arm,s*13,-36,s*spread,-43);}
-    if(Math.cos(beat)>.96){g.strokeStyle='#f8df91';g.lineWidth=1;g.beginPath();g.moveTo(-3,-48);g.lineTo(-5,-52);g.moveTo(3,-48);g.lineTo(5,-52);g.stroke();}
+    if(open<.08){g.strokeStyle='#f8df91';g.lineWidth=1;g.beginPath();g.moveTo(-3,-48);g.lineTo(-5,-52);g.moveTo(3,-48);g.lineTo(5,-52);g.stroke();}
   } else if(p.role && p.role!=='resident') {
     const handY=-27-work*12;
     for(const s of [-1,1]){residentLimb(g,art.arm,s*7,-45,10+s*5,-32);residentLimb(g,art.arm,10+s*5,-32,22+s*4,handY);}

@@ -4,6 +4,8 @@ import { approach } from '../core/math';
 import { drawResident, type ResidentPose, type ResidentRole } from '../art/village';
 import { drawDancingAlligator } from '../art/dancingAlligator';
 import { DANCE_ID } from './level/community';
+import type { ControlState } from '../core/input';
+import { clapTick, clapTone } from '../core/clapRhythm';
 const ROLES: Record<string,ResidentRole> = { villageResident:'resident',villageFarmer:'farmer',villageWasher:'washer',
   villageWeaver:'weaver',villageCarrier:'carrier',villageCarpenter:'carpenter',villageChild:'child' };
 export const CELEBRATION_SECONDS = 5.4;
@@ -16,6 +18,7 @@ export class Village {
   sceneTime=0;
   private clapBeat=-1;
   private ownsLock=false;
+  private upHeld=false;
   constructor(data:LevelData) {
     this.dance=data.decos.find(d=>d.kind==='villageDance')??null;
     this.streams=data.decos.filter(d=>d.kind==='villageStream');
@@ -27,18 +30,25 @@ export class Village {
       if(!w.director.cine){w.player.lockInput=false;w.camera.focus=null;}
       w.player.clapping=false;
     }
-    this.active=false;this.ownsLock=false;this.sceneTime=0;this.clapBeat=-1;
+    this.active=false;this.ownsLock=false;this.sceneTime=0;
     for (const r of this.residents) { r.x=r.home;r.y=r.baseY;r.walk=r.gesture=r.speech=r.cooldown=0; }
   }
-  update(w:World,dt:number) {
+  canJoin(w:World) {
     const p=w.player,d=this.dance;
+    return !!d&&p.mode==='foot'&&!p.lockInput&&!w.director.cine&&!w.finished&&!w.inRoom()
+      &&p.body.onGround&&!p.crouch&&!p.vine&&Math.abs(p.x-d.x)<220&&Math.abs(p.feetY-d.y)<12&&p.hurtT<=0
+      &&!w.enemies.some(e=>e.alive&&Math.abs(e.x-p.x)<800)
+      &&!w.bullets.some(b=>!b.dead&&b.team!==0&&Math.abs(b.x-p.x)<700);
+  }
+  update(w:World,dt:number,ctl?:ControlState) {
+    const p=w.player,d=this.dance;
+    const up=(ctl?.moveY??0)<-.6, join=(up&&!this.upHeld)||!!ctl?.interact?.pressed;
+    this.upHeld=up;
     if(this.active&&(p.mode!=='foot'||w.director.cine||w.finished))this.reset(w);
-    if(d&&!this.active&&!w.encounters.completed.has(DANCE_ID)&&p.mode==='foot'&&!p.lockInput
-      &&!w.director.cine&&!w.finished&&!w.inRoom()&&p.body.onGround&&!p.crouch&&!p.vine
-      &&p.x>=d.x-114&&p.x<=d.x-65&&Math.abs(p.feetY-d.y)<12&&p.hurtT<=0
-      &&!w.enemies.some(e=>e.alive&&Math.abs(e.x-p.x)<800)&&!w.bullets.some(b=>!b.dead&&b.team!==0&&Math.abs(b.x-p.x)<700)) {
+    const first=!w.encounters.completed.has(DANCE_ID);
+    if(d&&!this.active&&this.canJoin(w)&&(first?p.x>=d.x-114&&p.x<=d.x-65:join)) {
       this.active=true;this.sceneTime=0;this.ownsLock=true;
-      p.lockInput=true;p.body.vx=p.body.vy=0;p.facing=1;p.clapping=true;
+      p.lockInput=true;p.body.vx=p.body.vy=0;p.facing=p.x<=d.x?1:-1;p.clapping=true;
       p.meleeT=0;p.reloadT=0;p.glide=false;
       w.hooks.onBanner?.('A DANÇA DO JACARÉ','Karimbo entrou na roda!',2);
     }
@@ -47,14 +57,13 @@ export class Village {
       if(this.sceneTime>=CELEBRATION_SECONDS) {
         w.encounters.completed.add(DANCE_ID);this.reset(w);
         w.hooks.onControlReturned?.();
-        w.hooks.onBanner?.('BOA VIAGEM, KARIMBO!','Controle liberado • siga pela trilha',1.8);
-        w.hooks.onProgress?.();
+        w.hooks.onBanner?.('BOA VIAGEM, KARIMBO!','↑ perto da roda para bater palmas de novo',1.8);
+        if(first)w.hooks.onProgress?.();
       }
     }
-    if(d&&Math.abs(p.x-d.x)<700) {
-      const beat=Math.floor(w.time/.6);
-      if(beat!==this.clapBeat){this.clapBeat=beat;w.audio('clap',.45,d.x);}
-    }
+    const beat=clapTick(w.time),tone=clapTone(beat);
+    if(beat!==this.clapBeat&&tone&&d&&Math.abs(p.x-d.x)<700)w.audio(tone,.45,d.x);
+    this.clapBeat=beat;
     for (const r of this.residents) {
       if (Math.abs(w.player.x-r.home)>1200) continue;
       const near = Math.abs(w.player.x-r.x)<185 && Math.abs(w.player.feetY-r.y)<170;
@@ -76,6 +85,13 @@ export class Village {
     if(this.active&&this.dance){w.camera.zoomTarget=Math.min(.92,w.camera.viewW/500);w.camera.focus={x:this.dance.x-20,y:this.dance.y-91,rate:5};}
   }
   draw(g:CanvasRenderingContext2D,w:World,balloons=false) {
+    if(balloons&&!this.active&&w.encounters.completed.has(DANCE_ID)&&this.canJoin(w)) {
+      const x=w.player.x,y=w.player.y-93;
+      g.save();g.font='bold 12px sans-serif';g.textAlign='center';
+      g.fillStyle='#253c30ee';g.strokeStyle='#e6ce88';g.lineWidth=1;
+      g.beginPath();g.roundRect(x-69,y-16,138,26,7);g.fill();g.stroke();
+      g.fillStyle='#fff0c6';g.fillText('↑ Bater palmas',x,y+1);g.restore();
+    }
     if(!balloons)for(const s of this.streams)if(w.camera.visible(s.x,s.y,260)) {
       g.save();g.strokeStyle='#d9f3d580';g.lineWidth=1.1;
       for(let i=0;i<10;i++){const x=s.x-215+((i*43+w.time*19)%430),y=s.y-13-i%3*6;

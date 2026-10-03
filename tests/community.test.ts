@@ -7,6 +7,8 @@ import { captureSave,applySave } from '../src/game/save';
 import { validateSave } from '../src/core/saveValidation';
 import { newCtl } from './helpers/bot';
 import { CELEBRATION_SECONDS } from '../src/game/village';
+import { clapOpen } from '../src/core/clapRhythm';
+import { progress as wallet } from '../src/core/storage';
 
 function plaza() {
   const w=new World(buildJungle());w.director.cine=null;w.pickups=[];
@@ -57,6 +59,47 @@ describe('Comunidade viva',()=>{
     const w=plaza();w.player.body.onGround=false;w.village.update(w,.1);expect(w.village.active).toBe(false);
     w.player.body.onGround=true;w.player.lockInput=true;w.village.update(w,.1);expect(w.village.active).toBe(false);
     w.player.lockInput=false;w.enemies[0].body.x=w.player.x+100;w.village.update(w,.1);expect(w.village.active).toBe(false);
+  });
+  it('repete por uma nova pressão de cima, mas não por tecla segurada nem sozinho após restaurar',()=>{
+    const w=plaza(),ctl=newCtl(),progress=vi.fn(),returned=vi.fn();
+    w.hooks.onProgress=progress;w.hooks.onControlReturned=returned;
+    ctl.moveY=-1;for(let i=0;i<660;i++)w.update(1/60,ctl);
+    expect(w.village.active).toBe(false);expect(returned).toHaveBeenCalledTimes(1);
+    const save=captureSave(w),coins=wallet.coinsEarned,ammo=w.player.weapons.get(w.player.cur);
+    ctl.moveY=0;w.update(1/60,ctl);ctl.moveY=-1;w.update(1/60,ctl);
+    expect(w.village.active).toBe(true);expect(w.player.clapping).toBe(true);
+    for(let i=0;i<660;i++)w.update(1/60,ctl);
+    expect(w.village.active).toBe(false);expect(returned).toHaveBeenCalledTimes(2);
+    expect(progress).toHaveBeenCalledTimes(1);expect(wallet.coinsEarned).toBe(coins);
+    expect(w.player.weapons.get(w.player.cur)).toBe(ammo);
+    const restored=plaza();applySave(restored,save);
+    restored.player.reset(w.village.dance!.x-90,w.village.dance!.y);
+    restored.player.body.onGround=true;restored.player.lockInput=false;restored.director.cine=null;
+    const fresh=newCtl();restored.update(1/60,fresh);expect(restored.village.active).toBe(false);
+    fresh.moveY=-1;restored.update(1/60,fresh);expect(restored.village.active).toBe(true);
+  });
+  it('exige proximidade e segurança para a interação manual, inclusive no controle mobile',()=>{
+    const w=plaza(),ctl=newCtl();w.encounters.completed.add(DANCE_ID);ctl.device='touch';
+    ctl.moveY=-1;w.player.body.x=w.village.dance!.x+300;w.update(1/60,ctl);
+    expect(w.village.active).toBe(false);
+    w.player.body.x=w.village.dance!.x-90;w.player.body.onGround=true;w.update(1/60,ctl);
+    expect(w.village.active).toBe(false);
+    ctl.moveY=0;w.update(1/60,ctl);w.player.lockInput=true;ctl.moveY=-1;w.update(1/60,ctl);
+    expect(w.village.active).toBe(false);
+    w.player.lockInput=false;ctl.moveY=0;w.update(1/60,ctl);ctl.moveY=-1;w.update(1/60,ctl);
+    expect(w.village.active).toBe(true);
+  });
+  it.each([30,60,120])('palmas sincronizam tum tum tá e pausa sem duplicar batidas a %i Hz',fps=>{
+    const w=plaza(),ctl=newCtl(),sounds:{name:string;t:number}[]=[];
+    w.audio=(name)=>{if(name==='clap'||name==='clapAccent')sounds.push({name,t:w.time});};
+    for(let i=0;i<fps*2.5;i++)w.update(1/fps,ctl);
+    expect(sounds.map(s=>s.name)).toEqual(['clap','clap','clapAccent','clap','clap','clapAccent','clap']);
+    sounds.forEach((s,i)=>{
+      const hit=Math.floor(i/3)*1.2+(i%3)*.3;
+      expect(Math.abs(s.t-hit)).toBeLessThanOrEqual(1/fps+1e-8);
+      expect(clapOpen(hit)).toBeCloseTo(0);
+    });
+    expect(clapOpen(.9)).toBe(1);expect(clapOpen(2.1)).toBe(1);
   });
   it('mantém índices antigos e progride por checkpoints novos e antigos em ordem espacial',()=>{
     const w=new World(buildJungle());w.enemies=[];

@@ -1,4 +1,5 @@
 import { bake, drawSpr, poly, shadedEllipse, shadedRR, type Sprite } from './kit';
+import { clapOpen } from '../core/clapRhythm';
 
 let art: { torso: Sprite; head: Sprite; tail: Sprite; arm: Sprite; leg: Sprite; foot: Sprite } | null = null;
 function parts() {
@@ -51,7 +52,7 @@ function limb(g:CanvasRenderingContext2D,s:Sprite,x:number,y:number,ex:number,ey
 
 /** Weight shifts before each side step; feet lift alternately, tail follows the hips. */
 export function drawDancingAlligator(g:CanvasRenderingContext2D,x:number,y:number,t:number) {
-  const a=parts(), beat=t*Math.PI*2/.6, side=Math.sin(beat*.5), bob=Math.abs(Math.sin(beat))*5;
+  const a=parts(), beat=t*Math.PI*2/.6, side=Math.sin(beat*.5), bob=clapOpen(t)*5;
   g.save();g.translate(x+side*28,y);
   g.fillStyle='#13281735';g.beginPath();g.ellipse(9,3,52,7,0,0,Math.PI*2);g.fill();
   drawSpr(g,a.tail,10,-37,{rot:side*.15});

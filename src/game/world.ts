@@ -1087,7 +1087,7 @@ export class World {
 
     this.director.update(dt, ctl);
     this.narrator.update(dt);
-    this.village.update(this, dt);
+    this.village.update(this, dt, ctl);
     p.update(this, dt, ctl);
     this.encounters.update(this, dt);
     this.wildlife.update(this, dt);

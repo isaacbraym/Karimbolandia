@@ -6,6 +6,7 @@
 import { bake, drawSpr, glowSprite, OUT, rrPath, shadedRR, type Sprite } from './kit';
 import { PAL } from './palette';
 import { shade } from '../core/math';
+import { clapOpen } from '../core/clapRhythm';
 import type { KarimboHeads } from './photo';
 import { WEAPONS, type WeaponId } from '../game/weapons';
 import { progress } from '../core/storage';
@@ -579,7 +580,7 @@ export function drawKarimbo(g: CanvasRenderingContext2D, art: KarimboArt, x: num
   } else {
     if(!p.clap)drawSpr(g, art.armFront, sh[0], shY, { rot: 0.9 + Math.sin(c + 3) * (running ? 0.5 : 0), white: w });
     if(p.clap){
-      const open=(1-Math.cos((p.clapTime??p.t)*Math.PI*2/.6))*.5;
+      const open=clapOpen(p.clapTime??p.t);
       for(const s of [-1,1]) {
         const sx=s*5,sy=shY+1,ex=s*(2+open*8),ey=shY+5;
         g.save();g.translate(sx,sy);g.rotate(Math.atan2(ey-sy,ex-sx));
