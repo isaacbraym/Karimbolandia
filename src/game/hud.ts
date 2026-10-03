@@ -445,7 +445,7 @@ export class Hud {
     }
     const trail = w.encounters.active;
     if (trail && !wz && !w.director.bossActive) {
-      const width = Math.min(236, W - 28), x = (W - width) / 2, y = T + 39;
+      const width = Math.min(236, W - 28), x = (W - width) / 2, y = H - 48;
       const color = trail.def.theme === 'delivery' ? '#90eeff' : '#ceff91';
       pill(g, x, y, width, 35, 7, 'rgba(23,15,46,.85)', color);
       text(g, trail.def.title, W / 2, y + 13, 9, color, 'center');
@@ -551,7 +551,7 @@ export class Hud {
     }
 
     // ------------------------------------------------ dica de controle
-    if (this.hint) {
+    if (this.hint && !trail) {
       const a = clamp(this.hint.t / 0.5, 0, 1) * clamp((4 - this.hint.t) / 0.3 + 0.2, 0, 1);
       g.globalAlpha = Math.min(1, a);
       const tw = Math.min(W - 60, 30 + this.hint.text.length * 6.6);
