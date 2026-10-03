@@ -4,6 +4,7 @@ import type { ControlState } from '../core/input';
 import { WEAPONS, WEAPON_ORDER, type WeaponId } from './weapons';
 import { Bullet, Grenade } from './bullets';
 import { clamp, approach, rand, TAU, damp, angleDiff } from '../core/math';
+import { segmentRectEntry } from '../core/segment';
 import { PK } from './fx';
 import { T, TILE } from './level';
 import type { Vine } from './vines';
@@ -376,30 +377,20 @@ export class Player {
   tryHitByBullet(w: World, b: Bullet) {
     if (!this.targetable || w.village?.active) return;
     const hb = this.hitbox;
-    // segmento vs retângulo
-    const r = b.r;
-    const len = Math.hypot(b.x - b.px, b.y - b.py);
-    const n = Math.max(1, Math.ceil(len / 6));
-    for (let i = 0; i <= n; i++) {
-      const t = i / n;
-      const x = b.px + (b.x - b.px) * t;
-      const y = b.py + (b.y - b.py) * t;
-      if (x >= hb.x - r && x <= hb.x + hb.w + r && y >= hb.y - r && y <= hb.y + hb.h + r) {
-        if (this.isDashing) {
-          // invulnerável no avanço: a bala é destruída com faísca
-          w.fx.sparks(x, y, 4, '#7ff9ff', 160);
-          b.dead = true;
-          return;
-        }
-        if (this.invuln > 0) return; // atravessa durante i-frames (perdão)
-        b.x = x;
-        b.y = y;
-        this.hit(w, b.dmg, Math.sign(b.vx) || 1, { kx: b.kb * 3 });
-        if (b.explode) b.finish(w, true);
-        else b.dead = true;
-        return;
-      }
+    const t = segmentRectEntry(b.px, b.py, b.x, b.y, hb.x, hb.y, hb.w, hb.h, b.r);
+    if (t === null) return;
+    const x = b.px + (b.x - b.px) * t, y = b.py + (b.y - b.py) * t;
+    if (this.isDashing) {
+      // invulnerável no avanço: a bala é destruída com faísca
+      w.fx.sparks(x, y, 4, '#7ff9ff', 160);
+      b.dead = true;
+      return;
     }
+    if (this.invuln > 0) return; // atravessa durante i-frames (perdão)
+    b.x = x;b.y = y;
+    this.hit(w, b.dmg, Math.sign(b.vx) || 1, { kx: b.kb * 3 });
+    if (b.explode) b.finish(w, true);
+    else b.dead = true;
   }
 
   /** Dano ao jogador (Karimbo ou Nômad). dir = lado de onde veio (empurra no sentido). */

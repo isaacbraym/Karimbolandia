@@ -1,4 +1,5 @@
 import { rand, TAU } from '../core/math';
+import { segmentRectEntry } from '../core/segment';
 import type { World } from './world';
 import { PK } from './fx';
 import { glowSprite } from '../art/kit';
@@ -373,21 +374,7 @@ export class Bullet {
 
 /** Segmento (a→b) engrossado por `r` intersecta o retângulo? */
 export function segHitsRect(ax: number, ay: number, bx: number, by: number, r: number, rx: number, ry: number, rw: number, rh: number) {
-  const minX = Math.min(ax, bx) - r;
-  const maxX = Math.max(ax, bx) + r;
-  const minY = Math.min(ay, by) - r;
-  const maxY = Math.max(ay, by) + r;
-  if (maxX < rx || minX > rx + rw || maxY < ry || minY > ry + rh) return false;
-  // amostragem do segmento (passos ≤ 6px) contra o retângulo expandido
-  const len = Math.hypot(bx - ax, by - ay);
-  const n = Math.max(1, Math.ceil(len / 6));
-  for (let i = 0; i <= n; i++) {
-    const t = i / n;
-    const x = ax + (bx - ax) * t;
-    const y = ay + (by - ay) * t;
-    if (x >= rx - r && x <= rx + rw + r && y >= ry - r && y <= ry + rh + r) return true;
-  }
-  return false;
+  return segmentRectEntry(ax, ay, bx, by, rx, ry, rw, rh, r) !== null;
 }
 
 // ------------------------------------------------------------------------------------------
