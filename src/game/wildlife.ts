@@ -4,10 +4,12 @@ import type { World } from './world';
 import type { Rect } from '../core/math';
 import { drawHabitat, drawCrocodile } from '../art/wildlife';
 import { drawCityAnimal, type CityAnimal } from '../art/cityFauna';
+import { AmbientReaction, wildlifeNoiseRadius } from './ambientReaction';
+import type { SfxName } from '../core/audio';
 
 export const CROCODILE_DAMAGE = 36; // Enemy shotgun volley: 5 × 6.
 export type HabitatKind = 'eggs' | 'bird' | 'hive' | 'snake' | 'marmoset' | 'capuchin';
-export interface Habitat { kind: HabitatKind; x: number; y: number; side: number }
+export interface Habitat { kind: HabitatKind; x: number; y: number; side: number; reaction?:AmbientReaction }
 
 /** SAT: actual rotated upper jaw, rather than a tall damage box above the entire animal. */
 function touchesJaw(h: Rect, c: Crocodile) {
@@ -65,7 +67,8 @@ export class JungleWildlife {
       const kinds: CityAnimal['kind'][] = ['cat', 'owl', 'courier'];
       for (const roof of roofs) {
         if (roof.x < data.playerStart.x + 1200 || roof.x - lastX < 2800 || this.cityAnimals.length >= 9) continue;
-        this.cityAnimals.push({ kind: kinds[this.cityAnimals.length % 3], x: roof.x + 18, y: roof.y - 192 * (roof.scale ?? 1) * 1.35, seed: Math.floor(roof.x) });
+        const kind=kinds[this.cityAnimals.length % 3];
+        this.cityAnimals.push({ kind, x: roof.x + 18, y: roof.y - 192 * (roof.scale ?? 1) * 1.35, seed: Math.floor(roof.x), reaction:kind==='courier'?undefined:new AmbientReaction(kind) });
         lastX = roof.x;
       }
       return;
@@ -88,16 +91,32 @@ export class JungleWildlife {
       if (best < 0) continue;
       used.add(best);
       const tree = trees[best];
-      this.habitats.push({ kind, x: tree.x, y: tree.y - (kind === 'hive' ? 160 : 128), side });
+      this.habitats.push({ kind, x: tree.x, y: tree.y - (kind === 'hive' ? 160 : 128), side, reaction:kind==='bird'?new AmbientReaction('bird'):undefined });
     }
   }
-  reset() { this.crocodile?.reset(); }
+  reset() {
+    this.crocodile?.reset();
+    for(const a of this.cityAnimals)a.reaction?.reset();
+    for(const h of this.habitats)h.reaction?.reset();
+  }
+  hear(name:SfxName,x:number,volume:number) {
+    const radius=wildlifeNoiseRadius(name);
+    if(!radius||!Number.isFinite(x)||!Number.isFinite(volume)||volume<=0)return;
+    const range=radius*Math.min(1,volume);
+    for(const a of this.cityAnimals)if(a.reaction&&Math.abs(a.x-x)<=range)a.reaction.trigger(x,a.x);
+    for(const h of this.habitats)if(h.reaction){
+      const home=h.x+77*h.side;
+      if(Math.abs(home-x)<=range)h.reaction.trigger(x,home);
+    }
+  }
   update(w: World, dt: number) {
+    for(const a of this.cityAnimals)a.reaction?.update(dt);
+    for(const h of this.habitats)h.reaction?.update(dt);
     const c = this.crocodile;
     if (c && Math.abs(w.player.x - c.x) < 1500) c.update(w, dt);
   }
   drawTrees(g: CanvasRenderingContext2D, w: World) {
-    for (const a of this.cityAnimals) if (w.camera.visible(a.x, a.y, 100)) drawCityAnimal(g, a, w.time);
+    for (const a of this.cityAnimals) if (w.camera.visible(a.x+(a.reaction?.dx??0), a.y+(a.reaction?.dy??0), 100)) drawCityAnimal(g, a, w.time);
     for (const h of this.habitats) {
       if (w.camera.visible(h.x, h.y, 280)) drawHabitat(g, h, w.time);
     }

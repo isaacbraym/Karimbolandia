@@ -1,8 +1,11 @@
 import { OUT, poly, shadedRR } from './kit';
+import type { AmbientReaction } from '../game/ambientReaction';
 
-export interface CityAnimal { kind: 'cat' | 'owl' | 'courier'; x: number; y: number; seed: number }
+export interface CityAnimal { kind: 'cat' | 'owl' | 'courier'; x: number; y: number; seed: number; reaction?:AmbientReaction }
 export function drawCityAnimal(g: CanvasRenderingContext2D, a: CityAnimal, t: number) {
-  g.save(); g.translate(a.x, a.y);
+  const r=a.reaction;
+  g.save(); g.translate(a.x+(r?.dx??0), a.y+(r?.dy??0));
+  if(r?.active)g.scale(r.facing,1);
   g.lineCap = 'round'; g.lineJoin = 'round'; g.strokeStyle = OUT; g.lineWidth = 1.1;
   const ellipse = (x: number, y: number, rx: number, ry: number, color: string) => {
     g.fillStyle = color; g.beginPath(); g.ellipse(x,y,rx,ry,0,0,Math.PI*2); g.fill(); g.stroke();
@@ -15,14 +18,28 @@ export function drawCityAnimal(g: CanvasRenderingContext2D, a: CityAnimal, t: nu
     g.beginPath(); g.moveTo(-10,-6); g.bezierCurveTo(-24,-10,-23,-21,-18+Math.sin(t*1.5)*3,-21); g.stroke();
     g.strokeStyle = OUT; g.lineWidth = 1.1;
     ellipse(-2,-9,10,7,color);
+    if(r?.moving){
+      const stride=Math.sin(t*22)*4;
+      g.strokeStyle=color;g.lineWidth=3;
+      g.beginPath();g.moveTo(-7,-6);g.lineTo(-8+stride,1);g.moveTo(3,-6);g.lineTo(5-stride,1);g.stroke();
+      g.strokeStyle=OUT;g.lineWidth=1.1;
+    }
     ellipse(7+look,-17,6.5,6,color);
     poly(g,[[2+look,-20],[2+look,-27],[7+look,-22]],color,{lw:1});
     poly(g,[[8+look,-23],[13+look,-27],[13+look,-18]],color,{lw:1});
     g.fillStyle = '#ecdbac'; g.fillRect(8+look,-15,5,3);
-    g.fillStyle = '#d7e789'; g.fillRect(7+look,-19,2,Math.sin(t*0.8+a.seed)>0.98?0.4:1.7);
+    g.fillStyle = '#d7e789'; g.fillRect(7+look,-19,2,r?.alert?2.5:Math.sin(t*0.8+a.seed)>0.98?0.4:1.7);
     g.strokeStyle = '#ded5c5'; g.lineWidth = 0.6;
     g.beginPath(); g.moveTo(11,-15); g.lineTo(18,-16); g.moveTo(11,-14); g.lineTo(18,-12); g.stroke();
   } else if (a.kind === 'owl') {
+    if(r?.active&&r.alert===0){
+      const wing=Math.sin(t*18)*.65;
+      for(const side of [-1,1]){
+        g.save();g.translate(side*5,-13);g.rotate(side*(.35+wing));
+        poly(g,[[0,0],[side*24,-8],[side*30,1],[side*21,8],[side*5,7]],'#786858',{lw:1});
+        g.strokeStyle='#b8a48a';g.lineWidth=1;g.beginPath();g.moveTo(side*9,2);g.lineTo(side*25,1);g.stroke();g.restore();
+      }
+    }
     ellipse(0,-11,8,12,'#837467');
     ellipse(-4,-11,3,8,'#66564e'); ellipse(4,-11,3,8,'#66564e');
     g.translate(look*2,0);

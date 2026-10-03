@@ -166,11 +166,21 @@ export function drawHabitat(g: CanvasRenderingContext2D, h: Habitat, t: number) 
   g.save(); g.translate(h.x, h.y); g.scale(h.side, 1); g.lineCap = 'round'; g.lineJoin = 'round';
   drawSpr(g, branch(h.kind), 0, 0);
   if (h.kind === 'bird') {
+    const r=h.reaction;
     const bob = Math.sin(t * 3) * 0.6;
-    g.save(); g.translate(77, -7); g.scale(.3, .3);
+    g.save(); g.translate(77+(r?.dx??0)*h.side, -7+(r?.dy??0)); g.scale(.3, .3);
+    if(r?.active)g.scale(r.facing*h.side,1);
+    if(r?.active&&r.alert===0){
+      const wing=Math.sin(t*24)*.9;
+      for(const side of [-1,1]){
+        g.save();g.translate(side*7,-24);g.rotate(side*(.5+wing));
+        poly(g,[0,0,side*28,-14,side*40,-5,side*31,7,side*4,9],'#43848d');
+        line(g,[side*9,1,side*32,-4],'#8fbec0',1.2);g.restore();
+      }
+    }
     drawSpr(g, a.birdBody, 0, -10 + bob);
     const look = Math.sin(t * 0.7 + Math.sin(t * 0.31));
-    drawSpr(g, a.birdHead, 5, -36 + bob, { flip: look < -0.25, rot: Math.sin(t * 1.1) * 0.1 });
+    drawSpr(g, a.birdHead, 5, -36 + bob, { flip: !r?.active&&look < -0.25, rot: Math.sin(t * 1.1) * 0.1 });
     if (t % 4.9 > 4.78) line(g, [6, -44 + bob, 12, -44 + bob], '#be7147', 3);
     g.restore();
   } else if (h.kind === 'hive') {

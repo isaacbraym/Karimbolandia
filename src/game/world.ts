@@ -653,6 +653,8 @@ export class World {
 
   // ------------------------------------------------------------------ helpers de serviço
   audio(name: SfxName, vol = 1, x?: number) {
+    // World reactions do not depend on the speaker volume or camera attenuation.
+    if(x!==undefined)this.wildlife.hear(name,x,vol);
     let v = vol;
     let pan = 0;
     if (x !== undefined && Number.isFinite(x) && Number.isFinite(this.camera.x)) {
