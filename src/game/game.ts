@@ -29,12 +29,13 @@ import { persistenceStatus, onPersist } from '../core/persistence';
 import { FrameMetrics } from '../debug/performance';
 import { preserveProfile } from '../core/profile';
 import type { WeaponId } from './weapons';
+import { FramePacer } from '../core/framePacing';
+import { backingSize, resizeBacking, targetRenderHeight } from '../core/renderBudget';
 
 type State = 'loading' | 'menu' | 'playing' | 'paused' | 'complete' | 'continue' | 'gameover' | 'comic';
 
 const CONTINUE_SECS = 10;
 
-const MAX_H: Record<Quality, number> = { low: 540, medium: 720, high: 960 };
 /** resolução do fundo distante (fração da tela) por qualidade */
 const BG_RES: Record<Quality, number> = { low: 0.55, medium: 0.65, high: 1 };
 const CAPS: Record<Quality, { parts: number; density: number }> = {
@@ -62,6 +63,7 @@ export class Game {
   isTouch = false;
   private playRequest = 0;
   private last = 0;
+  private pacer=new FramePacer();
   private acc = 0;
   private frameTimes: number[] = [];
   private lastQualityCheck = 0;
@@ -179,7 +181,7 @@ export class Game {
     document.addEventListener('visibilitychange', () => {
       if (document.hidden && this.state === 'playing' && !noPause) this.pause();
       if (!document.hidden) {
-        this.last = performance.now();
+        this.pacer.reset(this.last = performance.now());
         this.frames = 0;
         this.lastFpsUpdate = this.last;
         audio.wake();
@@ -297,23 +299,20 @@ export class Game {
     this.canvas.style.width = `${Math.floor(w)}px`;
     this.canvas.style.height = `${Math.floor(h)}px`;
     const dpr = window.devicePixelRatio || 1;
-    const targetH = Math.min(h * dpr, MAX_H[this.quality]);
-    this.pxScale = Math.max(1, (targetH / this.viewH) * this.renderScale);
+    const targetH = targetRenderHeight(h,dpr,this.quality,this.isTouch);
+    const size=backingSize(this.viewW,this.viewH,targetH,this.renderScale);
+    this.pxScale = size.pxScale;
     setDecoDensity((targetH / this.viewH) * 1.25);
     // textos do HUD na escala alvo (sem a resolução dinâmica): cada passo da resolução dinâmica não
     // obriga mais a recriar todas as imagens de texto (isso dava um engasgo a cada ajuste)
     setHudTextScale(Math.max(1, targetH / this.viewH));
     if (this.world) this.world.fx.popScale = Math.max(2, (targetH / this.viewH) * 1.3);
-    this.canvas.width = Math.round(this.viewW * this.pxScale);
-    this.canvas.height = Math.round(this.viewH * this.pxScale);
+    resizeBacking(this.canvas,size.width,size.height);
     if (this.world) {
       this.world.camera.viewW = this.viewW;
       this.world.camera.viewH = this.viewH;
     }
     // safe area (px lógicos)
-    const cs = getComputedStyle(document.documentElement);
-    const px = (v: string) => parseFloat(cs.getPropertyValue(v)) || 0;
-    void px;
     this.hud.safeL = 0;
     this.hud.safeR = 0;
     this.hud.safeT = 0;
@@ -472,7 +471,7 @@ export class Game {
     this.setMusic(w.musicState);
     // abertura narrada (câmera pelas ruínas até o herói)
     if (settings.narrator && !this.noOpening && stage === 1 && !(save && save.checkpointIdx >= 0)) w.director.startOpening();
-    this.last = performance.now();
+    this.pacer.reset(this.last = performance.now());
     this.queueSave();
   }
 
@@ -571,7 +570,7 @@ export class Game {
     this.introClip?.resume();
     this.narrClip?.resume();
     audio.setDuck(1);
-    this.last = performance.now();
+    this.pacer.reset(this.last = performance.now());
     this.updateRotate();
   }
 
@@ -590,7 +589,7 @@ export class Game {
     audio.play('uiStart', 0.8);
     this.wasMusic = null;
     this.setMusic('explore');
-    this.last = performance.now();
+    this.pacer.reset(this.last = performance.now());
     this.updateRotate();
     this.queueSave();
   }
@@ -651,7 +650,7 @@ export class Game {
     this.world.reviveInPlace();
     this.wasMusic = null;
     this.setMusic(this.world.musicState);
-    this.last = performance.now();
+    this.pacer.reset(this.last = performance.now());
   }
 
   /** Sem confirmar (ou tempo esgotado): volta ao último checkpoint, sem gastar vida. */
@@ -664,7 +663,7 @@ export class Game {
     audio.setDuck(1);
     this.world.respawnRequested = true;
     this.beginRespawn();
-    this.last = performance.now();
+    this.pacer.reset(this.last = performance.now());
   }
 
   /** Entrada longa do Felipão: esconde os controles, abafa a música e toca o áudio que guia a cena. */
@@ -730,7 +729,7 @@ export class Game {
     this.input.enabled = true;
     this.touch.show(this.isTouch || this.input.touch.active);
     this.input.clearEdges();
-    this.last = performance.now();
+    this.pacer.reset(this.last = performance.now());
     // a HQ fecha a entrada do chefe: a luta começa
     if (notify) this.world?.director.onComicDone();
   }
@@ -864,11 +863,12 @@ export class Game {
   // ------------------------------------------------------------------ loop
   private frame(now: number) {
     requestAnimationFrame((t) => this.frame(t));
-    const frameMs = now - this.last;
-    let dt = frameMs / 1000;
-    this.last = now;
     // Aba oculta não desenha nem altera a qualidade; também não contamina o diagnóstico.
-    if (document.hidden) return;
+    if (document.hidden) {this.pacer.reset(now);return;}
+    const frameMs=this.pacer.take(now,this.state==='playing'||this.state==='comic'||this.state==='continue'?60:30);
+    if(frameMs===null)return;
+    let dt=frameMs/1000;
+    this.last=now;
     if (dt > 0.1) dt = 0.1;
     if (dt < 0) dt = 0;
     this.frames++;
@@ -931,7 +931,7 @@ export class Game {
     this.prof.update += (t1 - t0 - this.prof.update) * 0.05;
     this.prof.render += (t2 - t1 - this.prof.render) * 0.05;
     if (focused && this.state === 'playing' && w && !this.orientationBlocked) {
-      this.metrics?.sample(frameMs, t1 - t0, t2 - t1, now, `Fase ${w.data.stage} • ${this.quality} • resolução ${(this.renderScale * 100).toFixed(0)}%`);
+      this.metrics?.sample(frameMs, t1 - t0, t2 - t1, now, `Fase ${w.data.stage} • ${this.quality} • ${this.canvas.width}×${this.canvas.height}\nalvo 60 • DPR ${window.devicePixelRatio||1} • resolução ${(this.renderScale * 100).toFixed(0)}%`);
     }
   }
 
@@ -1174,7 +1174,7 @@ export class Game {
     // primeiro plano e HUD
     g.setTransform(k, 0, 0, k, 0, 0);
     bg.drawForeground(g, { camX: cam.x, camY: cam.y, viewW: W, viewH: H, time: w.time, sky: atm.sky, ruin: atm.ruin, canopy: w.forestLight.shadeAt(w.player.x), refY: 0, intensity: 0.6, under: w.underwater || (w.inRoom() ? 1 : 0) }, this.state === 'playing' ? dt : 0);
-    if (this.state === 'playing') this.post.drawRain(g, w, W, H);
+    if (this.state === 'playing') this.post.drawRain(g, w, W, H,dt);
     this.post.bloom(g, this.canvas, this.quality);
     this.post.grade(g, W, H, this.quality);
     bg.drawVignette(g, W, H, 0.9);

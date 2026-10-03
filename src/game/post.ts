@@ -129,7 +129,7 @@ export class PostFX {
   }
 
   /** Chuva + respingos (espaço de tela lógico). */
-  drawRain(g: CanvasRenderingContext2D, w: World, W: number, H: number) {
+  drawRain(g: CanvasRenderingContext2D, w: World, W: number, H: number, dt=1/60) {
     const cam = w.camera;
     const dxCam = (cam.x - this.lastCamX) * cam.zoom;
     const dyCam = (cam.y - this.lastCamY) * cam.zoom;
@@ -138,7 +138,6 @@ export class PostFX {
     if (Math.abs(dxCam) > 200 || Math.abs(dyCam) > 200) return; // teleporte/respawn
     const a = this.rain;
     if (a < 0.02) return;
-    const dt = 1 / 60;
     const wind = 0.22;
     g.save();
     g.lineCap = 'round';
