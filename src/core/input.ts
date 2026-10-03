@@ -78,9 +78,13 @@ export class Input {
   readonly touch: TouchState = newTouchState();
 
   private keys = new Set<string>();
+  // A press/release can fit entirely between two rendered frames, especially after pacing.
+  private keyTaps=new Set<string>();
   private prevRaw: Record<ActionName, boolean> = { jump: false, fire: false, grenade: false, special: false, next: false, prev: false, pause: false, reload:false, interact:false };
   private mouseDown = false;
   private mouseRight = false;
+  private mouseTap=false;
+  private mouseRightTap=false;
   private wheelNext = false;
   private wheelPrev = false;
   private mouseX = 0;
@@ -120,6 +124,7 @@ export class Input {
         return;
       }
       this.keys.add(e.code);
+      this.keyTaps.add(e.code);
       this.state.device = 'kb';
       this.touch.active = false;
       this.onGesture?.();
@@ -149,8 +154,8 @@ export class Input {
       this.mouseX = e.clientX;
       this.mouseY = e.clientY;
       this.mouseLastMove = this.now();
-      if (e.button === 0) this.mouseDown = true;
-      else if (e.button === 2) this.mouseRight = true;
+      if (e.button === 0) {this.mouseDown = true;if(this.enabled)this.mouseTap=true;}
+      else if (e.button === 2) {this.mouseRight = true;if(this.enabled)this.mouseRightTap=true;}
     });
     window.addEventListener('pointerup', (e) => {
       if (e.pointerType !== 'mouse') return;
@@ -184,12 +189,14 @@ export class Input {
 
   private releaseAll() {
     this.keys.clear();
+    this.keyTaps.clear();
+    this.mouseTap=this.mouseRightTap=false;
     this.mouseDown = false;
     this.mouseRight = false;
   }
 
   private k(...codes: string[]) {
-    for (const c of codes) if (this.keys.has(c)) return true;
+    for (const c of codes) if (this.keys.has(c)||this.keyTaps.has(c)) return true;
     return false;
   }
 
@@ -217,13 +224,14 @@ export class Input {
     if (this.k('KeyW', 'ArrowUp')) my -= 1;
     if (this.k('KeyS', 'ArrowDown')) my += 1;
     raw.jump = this.k('Space', 'KeyK', 'KeyZ');
-    raw.fire = this.k('KeyJ', 'KeyX') || this.mouseDown;
-    raw.grenade = this.k('KeyG', 'KeyL', 'KeyC') || this.mouseRight;
+    raw.fire = this.k('KeyJ', 'KeyX') || this.mouseDown||this.mouseTap;
+    raw.grenade = this.k('KeyG', 'KeyL', 'KeyC') || this.mouseRight||this.mouseRightTap;
     raw.special = this.k('ShiftLeft', 'ShiftRight', 'KeyV', 'KeyI');
     raw.next = this.k('KeyE') || this.wheelNext;
     raw.prev = this.k('KeyQ') || this.wheelPrev;
     raw.pause = this.k('Escape', 'KeyP');
     raw.reload=this.k('KeyR');raw.interact=this.k('KeyF');
+    this.keyTaps.clear();this.mouseTap=this.mouseRightTap=false;
     this.wheelNext = this.wheelPrev = false;
 
     // ---- gamepad
