@@ -132,14 +132,14 @@ abstract class Soldier extends Enemy {
     w.fx.sparks(this.x, this.y, 10, '#ffd0a0', 260);
     w.fx.smoke(this.x, this.y, 3, '#6b6480', 9, 26, 0.7);
     w.corpses.push(new Corpse(this.x, this.y, dir * rand.range(120, 240) + (info?.kx ?? 0) * 0.3, -rand.range(280, 420), (g, x, y, rot, alpha) => {
-      const art = soldierSet()[this.style];
+      const art = soldierSet(this.spawn.id)[this.style];
       drawSoldier(g, art, x, y + this.stats.h / 2, { facing: this.facing, state: 'hurt', t: 0, runPhase: 0, aim: this.aim, aiming: false, flash: false, alpha, kick: 0, charge: 0, style: this.style, rot });
     }));
     w.fx.explosion(this.x, this.y - 6, 9);
   }
 
   draw(g: CanvasRenderingContext2D, w: World) {
-    const art = soldierSet()[this.style];
+    const art = soldierSet(this.spawn.id)[this.style];
     const b = this.body;
     this.drawExtra(g, w, false);
     drawSoldier(g, art, this.x, this.feetY, {
@@ -176,6 +176,84 @@ abstract class Soldier extends Enemy {
 }
 
 // ------------------------------------------------------------------------------------------
+/** Especialistas da selva: disparos com preparação e oportunidade de aproximação. */
+abstract class JungleSpecialist extends Soldier {
+  targetX = 0;
+  targetY = 0;
+  protected abstract lob: boolean;
+  update(w: World, dt: number) {
+    this.commonUpdate(w, dt);
+    const p = w.player, b = this.body;
+    const see = this.canSee(w, 560);
+    if (this.stunned > 0) {
+      this.setMode('idle'); this.charge = 0; this.walk(0,0,dt);
+    } else if (!see && this.mode !== 'charge') {
+      this.aiming = false; this.charge = 0; this.patrol(w,dt,43);
+    } else {
+      this.faceToward(p.x);
+      this.aiming = true;
+      const dx = p.x - this.x;
+      this.aim = this.aimAngleTo(w,this.x,this.feetY-42,0);
+      if (this.mode === 'charge') {
+        this.walk(0,0,dt);
+        const preparation = this.lob ? 1.05 : 0.72;
+        this.charge = Math.min(1,this.modeT/preparation);
+        if (this.modeT >= preparation) {
+          const [mx,my] = this.muzzlePos(w);
+          if (this.lob) {
+            const flight = 1.1 + Math.min(0.45,Math.abs(this.targetX-mx)*0.001);
+            const vx = (this.targetX-mx)/flight;
+            const vy = (this.targetY-my-310*flight*flight)/flight;
+            this.fireBullet(w,mx,my,Math.atan2(vy,vx),Math.hypot(vx,vy),12,'bossShell',
+              { gravity:620, life:2.6, r:5, color:'#efb963', trail:'#b78b56', explode:{radius:48,dmg:18} });
+            w.audio('grenadeThrow',0.65,this.x);
+          } else {
+            this.fireAt(w,540,10,0.015);
+            w.audio('rifle',0.6,this.x);
+          }
+          this.kick = 1; this.charge = 0;
+          this.shootCd = this.lob ? 3.6 : 2.2;
+          this.setMode('recover');
+        }
+      } else {
+        const retreat = Math.abs(dx) < (this.lob ? 230 : 260);
+        let dir = retreat ? -this.facing : Math.abs(dx) > 420 ? this.facing : 0;
+        if (dir && !this.ledgeAhead(w,dir*this.facing*18)) dir = 0;
+        this.walk(dir,this.lob ? 48 : 108,dt);
+        this.tryJumpObstacle(w);
+        if (see && this.shootCd <= 0) {
+          this.targetX = p.x; this.targetY = p.feetY-5;
+          this.setMode('charge');
+        }
+      }
+    }
+    this.physics(w,dt); this.animate(dt);
+  }
+  protected drawExtra(g: CanvasRenderingContext2D, w: World, front: boolean) {
+    if (!front) return;
+    // Insígnias e equipamento tornam as funções reconhecíveis à distância.
+    g.fillStyle = this.lob ? '#e5b655' : '#abc59b';
+    g.fillRect(this.x-7,this.feetY-46,5,4);
+    if (this.lob) for (let i = 0; i < 3; i++) {
+      g.fillStyle = '#e5b655'; g.fillRect(this.x-12+i*5,this.feetY-31,3,7);
+    }
+    if (!this.lob || this.mode !== 'charge' || this.charge <= 0) return;
+    g.save(); g.globalAlpha = 0.3 + this.charge*0.5;
+    g.strokeStyle = '#ffd58a'; g.lineWidth = 1.5;
+    g.beginPath(); g.ellipse(this.targetX,this.targetY+5,35,6,0,0,TAU); g.stroke();
+    g.restore();
+    void w;
+  }
+}
+export class Grenadier extends JungleSpecialist {
+  protected lob = true;
+  constructor(s: EnemySpawn) { super(s,'shotgun',{hp:48,w:37,h:78,score:160,wake:640,tokens:[2,3]}); }
+}
+export class Hunter extends JungleSpecialist {
+  protected lob = false;
+  constructor(s: EnemySpawn) { super(s,'sniper',{hp:36,w:37,h:78,score:140,wake:640,tokens:[1,3]}); }
+}
+
 export class RifleSoldier extends Soldier {
   coverT = 0;
   constructor(spawn: EnemySpawn) {

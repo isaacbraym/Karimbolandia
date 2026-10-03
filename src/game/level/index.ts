@@ -6,6 +6,7 @@ import { section10, section11, section12, section13, section14 } from './section
 import { addSupplies, easeClimbs, addRollers, addCivilians, addCranes, addForeground, addClub } from './extras';
 import { assignLooks } from '../civLook';
 import { applyCuts, CUT_TOTAL } from './cut';
+import { addPatrolStories } from './story';
 
 /** largura da fase montada (antes dos cortes) */
 const RAW_W = 1352;
@@ -38,6 +39,7 @@ export function buildLevel(): LevelData {
   applyCuts(b);
   addClub(b);
   addForeground(b);
+  addPatrolStories(b);
   b.atmosphere.sort((a, c) => a.x - c.x);
   // cada morador com uma aparência única (sem repetir combinação)
   assignLooks(b.civilians);

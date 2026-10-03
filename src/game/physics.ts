@@ -34,12 +34,29 @@ export function moveBody(b: Body, dt: number, level: Level, solids: readonly Rec
   b.wallDir = 0;
   b.hitCeil = false;
   const wasGround = b.onGround;
+  const previousFeet = b.y + b.h / 2;
   b.onGround = false;
   b.onOneWay = false;
   if (b.dropTimer > 0) b.dropTimer -= dt;
   for (let i = 0; i < n; i++) {
     stepX(b, dx / n, level, solids);
     stepY(b, dy / n, level, solids, useOneWay);
+  }
+  // Segue o relevo baixo andando, sem exigir saltos sobre cada ondulação.
+  if (b.vy >= 0) {
+    let surface = Infinity;
+    for (const x of [b.x - b.w * 0.4, b.x, b.x + b.w * 0.4]) {
+      const y = level.reliefSurface(x);
+      if (y !== null) surface = Math.min(surface, y);
+    }
+    const feet = b.y + b.h / 2;
+    const follows = wasGround && previousFeet <= level.reliefRow * TILE + 1.5;
+    if (Number.isFinite(surface) && (follows || previousFeet <= surface + 1.5) && feet >= surface - (follows ? TILE : 0)) {
+      b.y = surface - b.h / 2 - EPS;
+      b.vy = 0;
+      b.onGround = true;
+      b.onOneWay = false;
+    }
   }
   // gruda no chão em descidas pequenas (evita perder onGround em frames intermediários)
   if (!b.onGround && wasGround && b.vy >= 0 && b.vy < 40) {

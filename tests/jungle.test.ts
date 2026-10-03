@@ -25,13 +25,13 @@ describe('Fase 2 (selva): dados', () => {
     const swamps = data.water.filter((z) => z.kind === 'swamp');
     const lakes = data.water.filter((z) => z.kind === 'lake');
     expect(swamps.length).toBeGreaterThanOrEqual(3);
-    expect(lakes.length).toBe(1);
+    expect(lakes.length).toBe(2);
     expect(lakes[0].h).toBeGreaterThan(8 * TILE);
     expect(data.finishX).toBeGreaterThan(LAKE_X1 * TILE);
   });
 
   it('inimigos são só humanos (mercenários) — nada de robôs', () => {
-    const human = new Set(['rifle', 'shotgun', 'shield', 'sniper']);
+    const human = new Set(['rifle', 'shotgun', 'shield', 'sniper', 'grenadier', 'hunter']);
     expect(data.enemies.filter((e) => !human.has(e.type))).toEqual([]);
   });
 
@@ -49,7 +49,7 @@ describe('Fase 2 (selva): dados', () => {
     const bad: string[] = [];
     for (const e of data.enemies) {
       const t = L.get(Math.floor(e.x / TILE), Math.round(e.y / TILE));
-      if (t !== T.SOLID && t !== T.ONEWAY) bad.push(`${e.type} @${Math.floor(e.x / TILE)} sem chão`);
+      if (!L.solidAtPx(e.x,e.y+1) && t !== T.SOLID && t !== T.ONEWAY) bad.push(`${e.type} @${Math.floor(e.x / TILE)} sem chão`);
       if (data.water.some((z) => e.x >= z.x && e.x < z.x + z.w && e.y > z.y)) bad.push(`${e.type} @${Math.floor(e.x / TILE)} na água`);
     }
     expect(bad).toEqual([]);

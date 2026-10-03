@@ -6,10 +6,11 @@
 import { Rng } from '../../core/math';
 import { THEME, TILE, type LevelData } from '../level';
 import { G, LEVEL_H, LevelBuilder } from './builder';
+import { addPatrolStories } from './story';
 
 /** a masmorra do templo ocupa as primeiras SHIFT colunas do mapa; a selva vem depois */
 export const SHIFT = 150;
-export const JUNGLE_W = 536 + SHIFT;
+export const JUNGLE_W = 726 + SHIFT;
 
 /** Lago: colunas [LAKE_X0, LAKE_X1), superfície na linha LAKE_TOP, fundo na linha LAKE_FLOOR. */
 export const LAKE_X0 = 324 + SHIFT;
@@ -39,12 +40,33 @@ const inSwamp = (x: number) => SWAMPS.some(([a, b]) => x >= a - 1 && x < b + 1);
 const inLake = (x: number) => x >= LAKE_X0 - 1 && x < LAKE_X1 + 1;
 const inGorge = (x: number) => x >= GORGE_X0 - 1 && x < GORGE_X1 + 1;
 
+/** Relevo caminhável. Mantém acessos, pontes, checkpoints e plataformas existentes. */
+function rollingGround(b: LevelBuilder) {
+  const L = b.level;
+  const free = (x: number) => !inSwamp(x) && !inLake(x) && !inGorge(x)
+    && L.get(x, G) === 1 && L.get(x, G - 1) === 0
+    && !b.checkpoints.some(c => Math.abs(c.x / TILE - x) < 3)
+    && !b.props.some(p => Math.abs(p.x / TILE - x) < 2);
+  for (let x = SHIFT + 7; x < L.w - 12; x++) {
+    const width = 6 + x % 4;
+    if (!Array.from({ length: width + 3 }, (_, i) => x + i - 1).every(free)) continue;
+    const height = 14 + (x % 3) * 5;
+    for (let i = 0; i <= width; i++) L.relief[x + i] = Math.sin(i / width * Math.PI) ** 2 * height;
+    x += width + 4;
+  }
+  // Plantações e pedras são cenário: não entram na lista de colisões.
+  for (const d of b.decos) {
+    if (d.y === G * TILE) d.y = L.reliefSurface(d.x) ?? d.y;
+  }
+  for (const e of b.enemies) if (e.y === G * TILE) e.y = L.reliefSurface(e.x) ?? e.y;
+}
+
 /** Vegetação automática da selva (camadas de trás e da frente), com semente estável. */
 function dressJungle(b: LevelBuilder, x0: number, x1: number, o: { seed: number; row?: number; dense?: number; temple?: boolean; camp?: boolean }) {
   const r = new Rng(o.seed * 7919 + x0);
   const row = o.row ?? G;
   const d = o.dense ?? 1;
-  const free = (x: number) => !inSwamp(x) && !inLake(x) && !inGorge(x);
+  const free = (x: number) => !inSwamp(x) && !inLake(x) && !inGorge(x) && b.level.isSolid(x,row);
   // árvores gigantes ao fundo (troncos com raízes tabulares)
   for (let x = x0 + 3; x < x1 - 2; x += Math.round(r.range(10, 16) / d)) {
     if (!free(x)) continue;
@@ -75,6 +97,66 @@ function dressJungle(b: LevelBuilder, x0: number, x1: number, o: { seed: number;
   for (let x = x0 + 24; x < x1 - 2; x += Math.round(r.range(30, 46) / d)) if (free(x)) b.deco('pLeaves', x, row + 3, 'front', { flip: r.chance(0.5), par: 0.38 });
 }
 
+/** Novos trechos ao fim: não desloca nenhum ID de inimigo, moeda ou checkpoint antigo. */
+function expandJungle(b: LevelBuilder) {
+  b.section('Comunidade da trilha', 692, G);
+  b.checkpoint('Trilha da comunidade', 692, G);
+  b.atmos(692, 0.08, 0.12);
+  for (const [i,x] of [702,719,739].entries()) {
+    b.deco('villageHome',x,G,'back',{scale:1+i*0.05,flip:i===1});
+    b.deco('villageGarden',x-5,G,'back');
+    b.deco('villagePottery',x+4,G,'back',{scale:0.9});
+    b.deco('villageResident',x-2,G,'back');
+    b.deco('villageResident',x+5,G,'back');
+  }
+  // A trilha pública contorna as casas. A copa guarda uma rota opcional de moedas.
+  for (const [x,y,w] of [[696,G-2,5],[703,G-4,4],[710,G-6,8],[722,G-6,8],[735,G-4,4]] as [number,number,number][]) b.plat(x,y,w,THEME.WOOD);
+  b.tokens(710,G-7,7); b.tokens(722,G-7,7);
+  b.tokenArc(693,G-1,704,G-5,7);
+  dressJungle(b,686,752,{seed:12,dense:0.65});
+
+  b.section('Rio das raízes',754,G);
+  b.checkpoint('Rio das raízes',754,G);
+  b.enemy('hunter',761,G,{patrol:90,facing:-1});
+  b.deco('patrolWorkshop',764,G,'back');
+  b.pit(773,789);
+  b.fill(773,G+5,16,LEVEL_H-G-5,1,THEME.MUD);
+  b.waterZone('lake',773,789,G+1,G+5,0);
+  b.plat(772,G,18,THEME.WOOD);
+  b.deco('jPost',772,G,'back'); b.deco('jPost',789,G,'back',{flip:true});
+  b.deco('uArch',781,G+5,'back',{scale:0.75});
+  b.deco('uChest',783,G+5,'back');
+  b.tokens(775,G+4,10); b.pickup('health',784,G+4);
+  b.plat(786,G+3,3,THEME.TEMPLE); b.plat(788,G+1,3,THEME.TEMPLE);
+  b.plat(797,G-2,5,THEME.WOOD); b.plat(805,G-4,6,THEME.WOOD);
+  b.tokens(805,G-5,5);
+  b.enemy('grenadier',800,G,{patrol:75,facing:-1});
+  b.crate(810,G,'ammo');
+  dressJungle(b,752,820,{seed:13,dense:0.8});
+
+  b.section('Santuário das raízes',820,G);
+  b.checkpoint('Santuário das raízes',820,G);
+  b.atmos(821,0.13,0.3);
+  b.ground(819,866,G,THEME.TEMPLE);
+  b.deco('jTempleBack',840,G,'back',{scale:0.85});
+  b.block(829,G-1,4,1,THEME.TEMPLE);
+  b.plat(835,G-3,5,THEME.WOOD);
+  b.plat(842,G-5,5,THEME.WOOD);
+  b.plat(849,G-3,5,THEME.WOOD);
+  b.deco('jIdol',845,G-5,'back');
+  b.tokens(842,G-6,5);
+  b.enemy('hunter',830,G-1,{patrol:45,facing:-1});
+  b.enemy('grenadier',846,G,{patrol:70,facing:-1});
+  b.enemy('shield',854,G,{patrol:55,facing:-1});
+  b.crate(839,G,'health'); b.crate(853,G,'random');
+  b.checkpoint('Saída do santuário',858,G);
+  b.deco('jGate',866,G,'back');
+  b.deco('jTorch',863,G,'back'); b.deco('jTorch',869,G,'back');
+  b.tokens(860,G-1,6);
+  dressJungle(b,820,JUNGLE_W-2,{seed:14,temple:true,dense:0.7});
+  b.finishX=866*TILE;
+}
+
 /** Pântano: poço raso com lama no fundo, água turva, juncos, raízes de mangue e troncos boiando. */
 function swamps(b: LevelBuilder) {
   const r = new Rng(4242);
@@ -97,6 +179,11 @@ function swamps(b: LevelBuilder) {
     b.deco('jDragonfly', x1 - 4, G - 2, 'front');
     b.deco('jButterfly', x0 - 3, G - 1, 'back');
     b.deco('pReeds', x1 - 2, G + 3, 'front', { par: 0.4, flip: r.chance(0.5) });
+    // Touceiras, taboas e folhas flutuantes em planos diferentes da água.
+    for (let x = x0; x < x1; x += 2) {
+      b.deco(x % 4 ? 'jSedge' : 'jCattails', x, G - 0.1, 'back', { scale: r.range(0.5, 0.75), flip: r.chance(0.5) });
+      if (x % 4 === 0) b.deco('jSedge', x + 0.6, G + 1.4, 'front', { scale: 1.05, par: 0.04, flip: r.chance(0.5) });
+    }
   }
 }
 
@@ -527,8 +614,11 @@ export function buildJungle(): LevelData {
   b.deco('jTorch', 676, G, 'back');
   b.tokens(660, G - 1, 8);
   b.finishX = 672 * TILE;
-  dressJungle(b, 570, JUNGLE_W - 2, { seed: 6, camp: true, dense: 0.9 });
+  dressJungle(b, 570, 686, { seed: 6, camp: true, dense: 0.9 });
+  expandJungle(b);
 
   b.atmosphere.sort((a, c) => a.x - c.x);
+  rollingGround(b);
+  addPatrolStories(b);
   return b.build('none');
 }

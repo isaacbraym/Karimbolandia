@@ -23,6 +23,7 @@ export interface JungleArt {
   fish: FishArt[];
   bg: JungleBackground;
   bandits: Record<SoldierStyle, SoldierArt>;
+  banditVariants: Record<SoldierStyle, SoldierArt>[];
 }
 
 let jungle: JungleArt | null = null;
@@ -80,9 +81,18 @@ export function loadJungle(base: string, quality: Quality): Promise<JungleArt> {
       jetpack: bakeBandit('rifle'),
       sniper: bakeBandit('sniper'),
     };
+    const banditVariants = [bandits];
+    for (let v = 1; v < 3; v++) {
+      const set = {} as Record<SoldierStyle, SoldierArt>;
+      for (const style of ['rifle', 'shotgun', 'shield', 'jetpack', 'sniper'] as const) {
+        set[style] = bakeBandit(style, v);
+        await tick();
+      }
+      banditVariants.push(set);
+    }
     await tick();
     prepareWildlifeArt();
-    jungle = { fish, bg, bandits };
+    jungle = { fish, bg, bandits, banditVariants };
     return jungle;
   })();
   pending.catch(() => {

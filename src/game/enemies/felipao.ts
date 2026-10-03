@@ -19,6 +19,13 @@ import { PK } from '../fx';
 type BState =
   | 'enter' | 'idle' | 'cannon' | 'missiles' | 'summon' | 'dash' | 'pound' | 'beam' | 'stun' | 'transition' | 'dying';
 
+// Cada barra apresenta uma estratégia que o jogador consegue aprender.
+const ATTACKS: readonly (readonly BState[])[] = [
+  ['cannon', 'missiles', 'cannon', 'summon'],
+  ['dash', 'cannon', 'pound', 'dash'],
+  ['beam', 'pound', 'dash', 'beam', 'pound'],
+];
+
 /** FELIPÃO — chefe em 3 fases. */
 export class Felipao extends Enemy {
   phase: 1 | 2 | 3 = 1;
@@ -99,6 +106,7 @@ export class Felipao extends Enemy {
     this.homeX = spawn.x;
     this.facing = -1;
     this.body.x = spawn.x;
+    this.prevX = spawn.x;
     this.body.y = -400;
     this.hover = 0;
     this.canBeHit = true;
@@ -155,6 +163,8 @@ export class Felipao extends Enemy {
       w.fx.sparks(info.x, info.y, 6, '#ffb0d0', 220);
     }
     if (this.state === 'stun') d *= 1.3;
+    // Um golpe forte não pula uma barra inteira nem a apresentação seguinte.
+    if (this.phase < 3) d = Math.min(d, Math.max(0, this.hp - this.maxHp * (3 - this.phase) / 3));
     this.hp -= d;
     if (this.flashCd <= 0) {
       this.flash = 0.05;
@@ -166,8 +176,8 @@ export class Felipao extends Enemy {
     if (info.type !== 'explosion') w.fx.addHitStop(0.008);
     // transições de fase
     const pct = this.hp / this.maxHp;
-    if (this.phase === 1 && pct <= 0.66) this.beginTransition(w, 2);
-    else if (this.phase === 2 && pct <= 0.33) this.beginTransition(w, 3);
+    if (this.phase === 1 && pct <= 2 / 3) this.beginTransition(w, 2);
+    else if (this.phase === 2 && pct <= 1 / 3) this.beginTransition(w, 3);
     if (this.hp <= 0) {
       this.hp = 0;
       this.state = 'dying';
@@ -200,7 +210,7 @@ export class Felipao extends Enemy {
     w.spawnDrop('nade', this.rect.x + this.rect.w / 2 + 70, this.floorY - 100);
     w.director.setBossPhase(to);
     this.doBurp(w, true);
-    w.hooks.onBanner?.(to === 2 ? 'FÚRIA!' : 'ÚLTIMA CARTADA!', to === 2 ? 'Felipão está mais agressivo' : 'Equipamento danificado — cuidado!', 2.4);
+    w.hooks.onBanner?.(to === 2 ? 'INVESTIDA!' : 'REATOR INSTÁVEL!', to === 2 ? 'Desvie da corrida e do pisão; ataque na recuperação' : 'Salte a varredura e saia da marca do pisão', 2.4);
   }
 
   // ------------------------------------------------------------------ atualização
@@ -282,9 +292,9 @@ export class Felipao extends Enemy {
     this.rackOpen = damp(this.rackOpen, this.state === 'missiles' || this.introPower > 0.6 ? 1 : 0, 10, dt);
     if (this.introPower > 0) this.taunt = Math.max(this.taunt, this.introPower);
     this.setBody();
-    this.stepCycle(w, dt);
     // estabilidade do corpo dentro do palco
     this.body.x = clamp(this.body.x, this.rect.x + 60, this.rect.x + this.rect.w - 60);
+    this.stepCycle(w, dt);
     // partículas do propulsor
     if (this.thrust > 0.3 && w.fx.opt() && Math.random() < dt * 40) {
       for (const f of [FELI_LAYOUT.footL, FELI_LAYOUT.footR]) {
@@ -382,12 +392,8 @@ export class Felipao extends Enemy {
   }
 
   private pickAttack(w: World) {
-    const opts: string[] = ['cannon', 'missiles'];
-    if (this.phase === 1) opts.push('summon', 'cannon');
-    if (this.phase >= 2) opts.push('dash', 'pound', 'cannon');
-    if (this.phase === 3) opts.push('beam', 'pound', 'missiles');
-    let pick = rand.pick(opts);
-    if (pick === this.lastAtk) pick = rand.pick(opts);
+    const cycle = ATTACKS[this.phase - 1];
+    let pick = cycle[this.atkCount % cycle.length];
     if (pick === 'summon' && w.enemies.filter((e) => e.alive && !e.isBoss).length >= 2) pick = 'cannon';
     this.lastAtk = pick;
     this.atkCount++;
@@ -812,7 +818,10 @@ export class Felipao extends Enemy {
     if (this.st > 2.5) {
       this.roared = false;
       this.phase = this.transitionTo;
-      this.hp = Math.min(this.hp, this.maxHp * (this.phase === 2 ? 0.66 : 0.33));
+      this.hp = Math.min(this.hp, this.maxHp * (4 - this.phase) / 3);
+      this.atkCount = 0;
+      this.lastAtk = '';
+      this.body.vx = 0;
       this.hover = 0;
       this.go('idle');
       this.restT = 1.0;

@@ -24,6 +24,8 @@ export const JUNGLE_BOUNDS: Record<string, [number, number, number, number]> = {
   jBanana: [-56, -128, 56, 2],
   jFlowers: [-30, -30, 30, 2],
   jReeds: [-30, -70, 30, 4],
+  jSedge: [-40, -62, 40, 5],
+  jCattails: [-34, -86, 34, 5],
   jLily: [-34, -12, 34, 4],
   jMangrove: [-80, -210, 80, 10],
   jSign: [-24, -56, 24, 2],
@@ -62,6 +64,8 @@ export function jungleVariants(kind: string): number {
     case 'jRock':
     case 'jBanana':
     case 'jReeds':
+    case 'jSedge':
+    case 'jCattails':
     case 'jFlowers':
     case 'uGrass':
     case 'uRock':
@@ -535,6 +539,29 @@ export function paintJungle(g: CanvasRenderingContext2D, kind: string, seed: num
       }
       return true;
     }
+    case 'jSedge':
+    case 'jCattails': {
+      // Referência: vegetacaopantano.jfif — lâminas abertas e espigas de taboa.
+      g.fillStyle = 'rgba(23,37,18,.22)';
+      g.beginPath(); g.ellipse(0,2,30,3.5,0,0,Math.PI*2); g.fill();
+      for (let i = 0; i < 19; i++) {
+        const x = r.range(-13,13), height = r.range(25,59), lean = r.range(-27,27);
+        g.fillStyle = i % 3 ? '#698541' : '#a4a56a';
+        g.beginPath(); g.moveTo(x,3);
+        g.quadraticCurveTo(x+lean*0.3,-height*0.6,x+lean,-height);
+        g.quadraticCurveTo(x+lean*0.38,-height*0.4,x+2,3); g.fill();
+      }
+      if (kind === 'jCattails') for (let i = 0; i < 4; i++) {
+        const x = (i-1.5)*13, height = r.range(62,78);
+        g.strokeStyle = '#778e4d'; g.lineWidth = 1.7;
+        g.beginPath(); g.moveTo(x,2); g.lineTo(x+4,-height); g.stroke();
+        g.fillStyle = '#705035';
+        g.beginPath(); g.ellipse(x+4,-height+5,2.8,8,0.04,0,Math.PI*2); g.fill();
+        g.strokeStyle = '#b1a270'; g.lineWidth = 0.8;
+        g.beginPath(); g.moveTo(x+3,-height-2); g.lineTo(x+3,-height-7); g.stroke();
+      }
+      return true;
+    }
     case 'jReeds': {
       // taboas (juncos com espiga marrom)
       for (let i = 0; i < 9; i++) {
@@ -638,6 +665,8 @@ export function paintJungle(g: CanvasRenderingContext2D, kind: string, seed: num
       g.lineTo(60, 20);
       g.stroke();
       // paredes
+      poly(g, [[56,-92],[79,-106],[79,-14],[56,0]], '#756438');
+      poly(g, [[-56,0],[56,0],[79,-14],[-33,-14]], '#a68d55');
       for (let x = -56; x < 56; x += 7) {
         g.fillStyle = (x / 7) % 2 ? '#b89a5a' : '#a88a4a';
         g.fillRect(x, -92, 7, 92);

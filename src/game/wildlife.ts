@@ -3,6 +3,7 @@ import type { LevelData } from './level';
 import type { World } from './world';
 import type { Rect } from '../core/math';
 import { drawHabitat, drawCrocodile } from '../art/wildlife';
+import { drawCityAnimal, type CityAnimal } from '../art/cityFauna';
 
 export const CROCODILE_DAMAGE = 36; // Enemy shotgun volley: 5 × 6.
 export type HabitatKind = 'eggs' | 'bird' | 'hive' | 'snake' | 'marmoset' | 'capuchin';
@@ -54,23 +55,35 @@ export class Crocodile {
 
 export class JungleWildlife {
   readonly habitats: Habitat[] = [];
+  readonly cityAnimals: CityAnimal[] = [];
   readonly crocodile: Crocodile | null;
   constructor(data: LevelData) {
-    if (data.stage !== 2) { this.crocodile = null; return; }
+    if (data.stage !== 2) {
+      this.crocodile = null;
+      const roofs = data.decos.filter(d => d.kind === 'facade').sort((a,b) => a.x-b.x);
+      let lastX = -Infinity;
+      const kinds: CityAnimal['kind'][] = ['cat', 'owl', 'courier'];
+      for (const roof of roofs) {
+        if (roof.x < data.playerStart.x + 1200 || roof.x - lastX < 2800 || this.cityAnimals.length >= 9) continue;
+        this.cityAnimals.push({ kind: kinds[this.cityAnimals.length % 3], x: roof.x + 18, y: roof.y - 192 * (roof.scale ?? 1) * 1.35, seed: Math.floor(roof.x) });
+        lastX = roof.x;
+      }
+      return;
+    }
     const swamp = data.water.find(z => z.kind === 'swamp');
     this.crocodile = swamp ? new Crocodile(swamp.x + swamp.w * 0.52, swamp.y - 7) : null;
     const trees = data.decos.filter(d => d.kind === 'jTree' && d.x >= data.playerStart.x);
     // Deliberately placed along the route, rather than stamped on every tree.
     const targets: [HabitatKind, number, number][] = [
-      ['eggs', 350, 1], ['bird', 1370, -1], ['hive', 2810, 1],
-      ['snake', 4240, -1], ['marmoset', 5050, 1], ['capuchin', 8800, -1],
+      ['eggs', 450, 1], ['bird', 2350, -1], ['hive', 4750, 1],
+      ['snake', 7200, -1], ['marmoset', 10400, 1], ['capuchin', 14300, -1],
     ];
     const used = new Set<number>();
     for (const [kind, offset, side] of targets) {
       let best = -1, dist = Infinity;
       for (let i = 0; i < trees.length; i++) {
         const d = Math.abs(trees[i].x - data.playerStart.x - offset);
-        if (!used.has(i) && d < dist) { best = i; dist = d; }
+        if (!used.has(i) && this.habitats.every(h => Math.abs(h.x - trees[i].x) >= 1500) && d < dist) { best = i; dist = d; }
       }
       if (best < 0) continue;
       used.add(best);
@@ -84,6 +97,7 @@ export class JungleWildlife {
     if (c && Math.abs(w.player.x - c.x) < 1500) c.update(w, dt);
   }
   drawTrees(g: CanvasRenderingContext2D, w: World) {
+    for (const a of this.cityAnimals) if (w.camera.visible(a.x, a.y, 100)) drawCityAnimal(g, a, w.time);
     for (const h of this.habitats) {
       if (w.camera.visible(h.x, h.y, 280)) drawHabitat(g, h, w.time);
     }

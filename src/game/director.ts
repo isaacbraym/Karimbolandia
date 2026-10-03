@@ -253,7 +253,7 @@ export class Director {
   remountAtCheckpoint(hp: number) {
     const p = this.w.player;
     const s = newNomad();
-    s.hp = Math.max(hp, s.maxHp * 0.6);
+    s.hp = Math.min(s.maxHp, Math.max(hp, s.maxHp * 0.6));
     p.nomad = s;
     const feet = p.body.y + p.body.h / 2;
     p.body.w = NOMAD_W;
@@ -351,7 +351,7 @@ export class Director {
       const n = this.w.player.nomad;
       if (n) {
         n.timeLeft = n.maxTime = SUPPORT_TIME;
-        n.hp = n.maxHp = 270;
+        n.hp = n.maxHp = 216;
       }
       this.banner('NÔMAD DE APOIO', `Emprestado por ${SUPPORT_TIME}s`, 2.6);
       return;

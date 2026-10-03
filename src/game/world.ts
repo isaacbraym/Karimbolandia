@@ -24,6 +24,7 @@ import { Narrator } from './narrator';
 import { music, JUNGLE_MELODY, STAGE_MELODY } from '../core/music';
 import { Waters } from './water';
 import { JungleWildlife } from './wildlife';
+import { Village } from './village';
 import { Vine } from './vines';
 import type { DoorSpawn } from './level';
 import { drawWaterBack, drawWaterFront } from '../art/waterDraw';
@@ -116,6 +117,7 @@ export class World {
   /** pântanos e lagos (fase 2): nado, peixes, bolhas */
   water!: Waters;
   wildlife!: JungleWildlife;
+  village!: Village;
   /** 0..1 cabeça do Karimbo debaixo d'água (som abafado, tom da tela) */
   underwater = 0;
   /**
@@ -198,6 +200,7 @@ export class World {
     this.baseTheme = data.level.theme.slice();
     this.water = new Waters(data.water ?? [], this.level, data.decos);
     this.wildlife = new JungleWildlife(data);
+    this.village = new Village(data);
     this.vines = (data.vines ?? []).map((v) => new Vine(v));
     this.director = new Director(this);
     this.narrator = new Narrator(this);
@@ -244,6 +247,7 @@ export class World {
     this.narrator?.reset();
     this.water?.reset();
     this.wildlife?.reset();
+    this.village?.reset();
     for (const v of this.vines) {
       v.held = false;
       v.a = 0;
@@ -1119,6 +1123,7 @@ export class World {
     for (let i = this.props.length - 1; i >= 0; i--) if (!this.props[i].alive) this.props.splice(i, 1);
     for (const w of this.wrecks) w.t += dt;
     this.crowd.update(this, dt);
+    this.village.update(this, dt);
     for (const c of this.corpses) c.update(dt);
     for (let i = this.corpses.length - 1; i >= 0; i--) if (this.corpses[i].dead) this.corpses.splice(i, 1);
 
@@ -1182,6 +1187,7 @@ export class World {
     for (const pk of this.pickups) if (cam.visible(pk.x, pk.y, 40)) pk.draw(g, this);
     this.drawShadows(g);
     this.crowd.draw(g, this);
+    this.village.draw(g, this);
     this.fx.draw(g, false);
     for (const c of this.corpses) if (cam.visible(c.x, c.y, 140)) c.render(g);
     for (const e of this.enemies) {
@@ -1210,6 +1216,7 @@ export class World {
     this.fx.draw(g, true);
     this.director.drawDecos(g, 'front');
     this.crowd.drawBalloon(g, this);
+    this.village.draw(g, this, true);
     this.fx.drawPopups(g);
     void art.props;
   }

@@ -4,6 +4,8 @@ import { Rng, clamp } from '../core/math';
 import type { DecoSpawn } from '../game/level';
 import { getArt } from './index';
 import { JUNGLE_BOUNDS, jungleVariants, paintJungle, setDecoAt } from './jungleDecor';
+import { STORY_BOUNDS, paintStoryProp } from './storyProps';
+import { VILLAGE_BOUNDS, paintVillageProp } from './village';
 
 const rngCache = new Map<string, Rng>();
 const seedOf = (d: DecoSpawn) => Math.floor(d.x * 7.13 + d.y * 3.1);
@@ -42,7 +44,7 @@ const DECO_SCALE: Record<string, number> = {
  * As animadas (neon piscando, fogo, plantas balançando...) continuam desenhadas ao vivo.
  */
 const STATIC_BOUNDS: Record<string, [number, number, number, number]> = {
-  facade: [-66, -194, 66, 2],
+  facade: [-66, -206, 84, 2],
   pipes: [-50, -46, 50, 2],
   fgPillar: [-20, -422, 20, 22],
   parkedCar: [-64, -54, 64, 6],
@@ -56,6 +58,8 @@ const STATIC_BOUNDS: Record<string, [number, number, number, number]> = {
   kiosk: [-60, -82, 60, 8],
   crateStack: [-18, -58, 46, 2],
   ...JUNGLE_BOUNDS,
+  ...STORY_BOUNDS,
+  ...VILLAGE_BOUNDS,
 };
 let decoDensity = 2;
 const baked = new Map<string, HTMLCanvasElement>();
@@ -109,6 +113,7 @@ function bakeSeed(kind: string, seed: number) {
     case 'shopFront':
     case 'streetTree':
     case 'crateStack':
+    case 'villageHome':
       return (Math.abs(seed) % 8) * 977 + 13;
     default: {
       const nv = jungleVariants(kind);
@@ -147,6 +152,12 @@ function paintDeco(g: CanvasRenderingContext2D, kind: string, seed: number, t: n
       // painel de fachada atrás do gameplay (profundidade)
       const w = 128;
       const h = 192;
+      g.fillStyle = '#3b326c';
+      g.beginPath(); g.moveTo(-w/2,-h); g.lineTo(w/2,-h);
+      g.lineTo(w/2+18,-h-12); g.lineTo(-w/2+18,-h-12); g.closePath(); g.fill();
+      g.fillStyle = '#100f2c';
+      g.beginPath(); g.moveTo(w/2,-h); g.lineTo(w/2+18,-h-12);
+      g.lineTo(w/2+18,-12); g.lineTo(w/2,0); g.closePath(); g.fill();
       const gr = g.createLinearGradient(0, -h, 0, 0);
       gr.addColorStop(0, '#2b2260');
       gr.addColorStop(1, '#1b1544');
@@ -929,8 +940,7 @@ function paintDeco(g: CanvasRenderingContext2D, kind: string, seed: number, t: n
       break;
     }
     default:
-      paintJungle(g, kind, seed, t);
+      if (!paintStoryProp(g, kind, seed) && !paintVillageProp(g, kind, seed)) paintJungle(g, kind, seed, t);
       break;
   }
 }
-

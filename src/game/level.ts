@@ -17,12 +17,16 @@ export class Level {
   readonly h: number;
   readonly tiles: Uint8Array;
   readonly theme: Uint8Array;
+  /** Altura das bordas de cada coluna; pequenas colinas contínuas, sem paredes. */
+  readonly relief: Float32Array;
+  reliefRow = 32;
 
   constructor(w: number, h: number) {
     this.w = w;
     this.h = h;
     this.tiles = new Uint8Array(w * h);
     this.theme = new Uint8Array(w * h);
+    this.relief = new Float32Array(w + 1);
   }
 
   get(tx: number, ty: number): number {
@@ -51,7 +55,16 @@ export class Level {
   }
   /** Ponto (em px) dentro de tile sólido? */
   solidAtPx(x: number, y: number) {
+    const surface = this.reliefSurface(x);
+    if (surface !== null && y >= surface && y < this.reliefRow * TILE) return true;
     return this.get(Math.floor(x / TILE), Math.floor(y / TILE)) === T.SOLID;
+  }
+  reliefSurface(x: number): number | null {
+    const col = Math.floor(x / TILE);
+    if (col < 0 || col >= this.w || this.get(col, this.reliefRow) !== T.SOLID || this.get(col, this.reliefRow - 1) !== T.EMPTY) return null;
+    const a = this.relief[col], b = this.relief[col + 1];
+    if (a === 0 && b === 0) return null;
+    return this.reliefRow * TILE - (a + (b - a) * (x / TILE - col));
   }
   get pxW() {
     return this.w * TILE;
@@ -84,7 +97,7 @@ export class Level {
     const end = Math.min(this.h - 1, ty + Math.ceil(maxDist / TILE));
     for (; ty <= end; ty++) {
       const t = this.get(tx, ty);
-      if (t === T.SOLID || t === T.ONEWAY) return ty * TILE;
+      if (t === T.SOLID || t === T.ONEWAY) return ty === this.reliefRow ? this.reliefSurface(x) ?? ty * TILE : ty * TILE;
     }
     return null;
   }
@@ -93,7 +106,7 @@ export class Level {
 // ------------------------------------------------------------------ dados de fase
 export type EnemyType =
   | 'rifle' | 'shotgun' | 'shield' | 'jetpack' | 'sniper' | 'drone' | 'turret' | 'heavy' | 'spider' | 'minimech' | 'roller'
-  | 'boss';
+  | 'boss' | 'grenadier' | 'hunter';
 
 export interface EnemySpawn {
   id: number;

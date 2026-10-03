@@ -124,7 +124,7 @@ export function bakeKarimboHeads(p: Photos, scale = 3): KarimboHeads {
   const cg = comp.getContext('2d')!;
   cg.imageSmoothingQuality = 'high';
   cg.drawImage(src, PAD, 0);
-  shapeJawAndNeck(cg, comp.width, H, PAD);
+  shapeJaw(cg, comp.width, H, PAD);
 
   // projeção cilíndrica (cabeça virada ~20° para a direita)
   const yaw = 0.34;
@@ -153,7 +153,7 @@ export function bakeKarimboHeads(p: Photos, scale = 3): KarimboHeads {
       g.imageSmoothingQuality = 'high';
       g.drawImage(yawed, 0, 0, logicalW, headH);
     },
-    { scale, ox: logicalW / 2 + 0.6, oy: headH * 0.94 }
+    { scale, ox: logicalW / 2 + 0.6, oy: headH * 0.905 }
   );
   // Traço fino só na silhueta externa. Na altura das orelhas, as bochechas
   // ficam sem contorno para a foto do rosto se unir às orelhas desenhadas atrás.
@@ -165,15 +165,19 @@ export function bakeKarimboHeads(p: Photos, scale = 3): KarimboHeads {
   ]);
 
   // frontal com orelhas (foto original)
+  const frontal = makeCanvas(p.head.width, p.head.height);
+  const fg = frontal.getContext('2d')!;
+  fg.drawImage(p.head, 0, 0);
+  shapeJaw(fg, frontal.width, frontal.height, 0);
   const fw = (p.head.width / p.head.height) * headH;
   const front = bake(
     fw,
     headH,
     (g) => {
       g.imageSmoothingQuality = 'high';
-      g.drawImage(p.head, 0, 0, fw, headH);
+      g.drawImage(frontal, 0, 0, fw, headH);
     },
-    { scale, ox: fw / 2, oy: headH * 0.94 }
+    { scale, ox: fw / 2, oy: headH * 0.905 }
   );
 
   // retrato circular (HUD): cabeça inteira (com orelhas) centralizada, nada cortado
@@ -195,7 +199,7 @@ export function bakeKarimboHeads(p: Photos, scale = 3): KarimboHeads {
       const ph = PR * 2 - 3; // altura total da cabeça cabe no medalhão
       const pw = ph * (p.head.width / p.head.height);
       g.imageSmoothingQuality = 'high';
-      g.drawImage(p.head, c - pw / 2, c - ph / 2 + 1, pw, ph);
+      g.drawImage(frontal, c - pw / 2, c - ph / 2 + 1, pw, ph);
       g.restore();
       g.beginPath();
       g.arc(c, c, PR, 0, Math.PI * 2);
@@ -248,15 +252,13 @@ export function bakeKarimboHeads(p: Photos, scale = 3): KarimboHeads {
 
 /**
  * A foto acabava num retângulo largo de pele abaixo do queixo (parecia "colado" no corpo).
- * Aqui o queixo vira uma curva e sobra só um pescoço mais estreito, com sombra embaixo do queixo.
+ * Conserva a curva do queixo, sem acrescentar pescoço sobre a roupa do rig.
  */
-function shapeJawAndNeck(g: CanvasRenderingContext2D, w: number, h: number, pad: number) {
+function shapeJaw(g: CanvasRenderingContext2D, w: number, h: number, pad: number) {
   const W = w - pad * 2;
   const L = pad;
   const jawTop = h * 0.74;
   const chin = h * 0.905;
-  const neckL = L + W * 0.31;
-  const neckR = L + W * 0.69;
   g.save();
   g.globalCompositeOperation = 'destination-in';
   g.beginPath();
@@ -268,34 +270,6 @@ function shapeJawAndNeck(g: CanvasRenderingContext2D, w: number, h: number, pad:
   g.bezierCurveTo(L + W * 0.3, chin, L + W * 0.14, h * 0.84, 0, jawTop);
   g.closePath();
   g.fill();
-  g.restore();
-  // pescoço (atrás do queixo): mesma pele da foto, mais estreito e arredondado nas laterais
-  g.save();
-  g.globalCompositeOperation = 'destination-over';
-  // amostra a cor da pele logo abaixo da boca
-  const s = g.getImageData(Math.round(L + W * 0.5), Math.round(h * 0.84), 1, 1).data;
-  const skin = `rgb(${s[0]},${s[1]},${s[2]})`;
-  const gr = g.createLinearGradient(0, h * 0.8, 0, h);
-  gr.addColorStop(0, `rgb(${Math.round(s[0] * 0.62)},${Math.round(s[1] * 0.58)},${Math.round(s[2] * 0.58)})`);
-  gr.addColorStop(0.45, skin);
-  gr.addColorStop(1, skin);
-  g.fillStyle = gr;
-  g.beginPath();
-  g.moveTo(neckL, h * 0.8);
-  g.quadraticCurveTo(neckL - W * 0.02, h * 0.93, neckL - W * 0.06, h);
-  g.lineTo(neckR + W * 0.06, h);
-  g.quadraticCurveTo(neckR + W * 0.02, h * 0.93, neckR, h * 0.8);
-  g.closePath();
-  g.fill();
-  g.restore();
-  // sombra do queixo sobre o pescoço
-  g.save();
-  g.globalCompositeOperation = 'source-atop';
-  const sh = g.createLinearGradient(0, chin - h * 0.01, 0, chin + h * 0.05);
-  sh.addColorStop(0, 'rgba(40,20,10,0.35)');
-  sh.addColorStop(1, 'rgba(40,20,10,0)');
-  g.fillStyle = sh;
-  g.fillRect(neckL - W * 0.08, chin - h * 0.01, neckR - neckL + W * 0.16, h * 0.06);
   g.restore();
 }
 

@@ -85,12 +85,40 @@ export function bakeTiles(): TileArt {
   const drawTile = (g: CanvasRenderingContext2D, level: Level, tx: number, ty: number, ox: number, oy: number, k: number, time: number) => {
     const t = level.tiles[ty * level.w + tx];
     if (t === T.EMPTY) {
+      const below = level.get(tx, ty + 1);
+      if (below === T.SOLID || below === T.ONEWAY) {
+        const th = THEMES[level.themeAt(tx, ty + 1)];
+        const x = (tx * TILE - ox) * k, y = ((ty + 1) * TILE - oy) * k;
+        const rel = ty + 1 === level.reliefRow && below === T.SOLID;
+        const h0 = rel ? level.relief[tx] * k : 0;
+        const h1 = rel ? level.relief[tx + 1] * k : 0;
+        // Face do relevo e topo em perspectiva; linha de contato legível.
+        if (h0 > 0 || h1 > 0) {
+          g.fillStyle = th.base;
+          g.beginPath(); g.moveTo(x, y); g.lineTo(x, y - h0);
+          g.lineTo(x + TILE * k, y - h1); g.lineTo(x + TILE * k, y); g.fill();
+        }
+        const d = 10 * k;
+        g.fillStyle = th.light;
+        g.beginPath(); g.moveTo(x, y - h0); g.lineTo(x + TILE * k, y - h1);
+        g.lineTo(x + TILE * k + d, y - h1 - 8 * k); g.lineTo(x + d, y - h0 - 8 * k); g.closePath(); g.fill();
+        g.strokeStyle = th.edge; g.lineWidth = 1.4 * k;
+        g.beginPath(); g.moveTo(x, y - h0); g.lineTo(x + TILE * k, y - h1); g.stroke();
+        // Juntas diagonais, folhas e pedrinhas pequenas no plano de cima.
+        g.strokeStyle = th.dark; g.lineWidth = 0.65 * k;
+        g.beginPath(); g.moveTo(x, y - h0); g.lineTo(x + d, y - h0 - 8 * k); g.stroke();
+        if (th === THEMES[4] || th === THEMES[7]) {
+          g.fillStyle = tx % 3 ? '#91a24e' : '#a89060';
+          g.beginPath(); g.ellipse(x + 18 * k, y - (h0 + h1) / 2 - 4 * k, 3 * k, 1.2 * k, -0.35, 0, Math.PI * 2); g.fill();
+        }
+      }
       // capim/samambaia crescendo sobre o chão da selva (desenhado no tile vazio de cima)
       if (ty + 1 < level.h && level.tiles[(ty + 1) * level.w + tx] === T.SOLID) {
         const tb = level.theme[(ty + 1) * level.w + tx];
         if (tb >= JUNGLE0 && tb !== 5) {
           const v = (tx * 5 + ty * 3) & 1;
-          g.drawImage(atlas, (37 + v) * CELL, tb * CELL, CELL, CELL, (tx * TILE - ox) * k, (ty * TILE - oy) * k, (TILE + 0.6) * k, TILE * k);
+          const rise = ty + 1 === level.reliefRow ? (level.relief[tx] + level.relief[tx + 1]) / 2 : 0;
+          g.drawImage(atlas, (37 + v) * CELL, tb * CELL, CELL, CELL, (tx * TILE - ox) * k, (ty * TILE - oy - rise) * k, (TILE + 0.6) * k, TILE * k);
         }
       }
       return;
@@ -126,7 +154,7 @@ export function bakeTiles(): TileArt {
         const t = level.tiles[ty * level.w + tx];
         if (t === T.HAZARD) hazards.push(ty * level.w + tx);
         else if (t !== T.EMPTY) any = true;
-        else if (ty + 1 < level.h && level.tiles[(ty + 1) * level.w + tx] === T.SOLID && level.theme[(ty + 1) * level.w + tx] >= JUNGLE0) any = true;
+        else if (ty + 1 < level.h && (level.get(tx, ty + 1) === T.SOLID || level.get(tx, ty + 1) === T.ONEWAY)) any = true;
       }
     }
     if (!any) return { c: null, empty: true, hazards, used: frame };
@@ -135,6 +163,8 @@ export function bakeTiles(): TileArt {
     cg.clearRect(0, 0, c.width, c.height);
     const k = CELL / TILE;
     for (let ty = cy * CH; ty < cy * CH + CH && ty < level.h; ty++) {
+      // Le dessus projeté du voisin de gauche peut entrer dans ce bloc.
+      if (cx > 0 && level.get(cx * CH - 1, ty) === T.EMPTY) drawTile(cg, level, cx * CH - 1, ty, cx * CH * TILE, cy * CH * TILE, k, 0);
       for (let tx = cx * CH; tx < cx * CH + CH && tx < level.w; tx++) {
         if (level.tiles[ty * level.w + tx] === T.HAZARD) continue;
         drawTile(cg, level, tx, ty, cx * CH * TILE, cy * CH * TILE, k, 0);

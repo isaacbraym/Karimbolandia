@@ -49,9 +49,9 @@ let artStage = 1;
 export function setArtStage(s: number) {
   artStage = s;
 }
-export function soldierSet(): Record<SoldierStyle, SoldierArt> {
+export function soldierSet(variant = 0): Record<SoldierStyle, SoldierArt> {
   const j = artStage === 2 ? getJungle() : null;
-  return j ? j.bandits : getArt().soldiers;
+  return j ? j.banditVariants[Math.abs(variant) % j.banditVariants.length] : getArt().soldiers;
 }
 export function stageBg(): Background | JungleBackground {
   const j = artStage === 2 ? getJungle() : null;

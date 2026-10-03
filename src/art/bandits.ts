@@ -54,8 +54,10 @@ const WOOD_D = '#5c3a1c';
 const STEEL = '#4a4c58';
 const STEEL_D = '#2c2d36';
 
-export function bakeBandit(style: SoldierStyle): SoldierArt {
-  const L = LOOKS[style];
+export function bakeBandit(style: SoldierStyle, variant = 0): SoldierArt {
+  const base = LOOKS[style];
+  const L: Look = variant === 1 ? { ...base, skin: '#8e604c', shirt: '#687887', pants: '#756857', cloth: '#ba995e', camo: DESERT }
+    : variant === 2 ? { ...base, skin: '#dfab83', shirt: '#765044', pants: '#3a4944', cloth: '#6f8178', camo: ['#29413a','#637761','#202d29'] } : base;
   const head = bake(
     22,
     22,

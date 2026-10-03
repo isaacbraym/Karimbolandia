@@ -278,10 +278,14 @@ export function drawFelipao(g: CanvasRenderingContext2D, a: FelipaoArt, x: numbe
   const sL = Math.sin(walk);
   const sR = -sL;
   const air = p.hover > 4;
-  const angL = air ? 0.22 : sL * 0.3 * wk;
-  const angR = air ? -0.14 : sR * 0.3 * wk;
-  const liftL = air ? 0 : Math.max(0, Math.cos(walk)) * 6.5 * wk;
-  const liftR = air ? 0 : Math.max(0, -Math.cos(walk)) * 6.5 * wk;
+  // Suspensão também tem vida: recolhe as pernas na subida e estabiliza no ar.
+  const tuck = Math.min(1, p.hover / 100);
+  const airborneStep = Math.sin(p.t * 4.2) * 0.07;
+  const brace = p.charge * (1 - wk) * 0.08;
+  const angL = air ? 0.12 + tuck * 0.27 + airborneStep : sL * 0.43 * wk + brace;
+  const angR = air ? -0.1 - tuck * 0.2 - airborneStep : sR * 0.43 * wk - brace;
+  const liftL = air ? tuck * 4 : Math.max(0, Math.cos(walk)) * 9 * wk;
+  const liftR = air ? tuck * 6 : Math.max(0, -Math.cos(walk)) * 9 * wk;
   const bob = (air ? 0 : -Math.abs(sL) * 4.6 * wk) + Math.sin(p.t * 2.2) * 0.8 * (1 - wk);
   const sway = sL * 0.04 * wk; // peso de um lado para o outro
   // virada de lado: escala horizontal contínua (passa por uma "fatia" fina)

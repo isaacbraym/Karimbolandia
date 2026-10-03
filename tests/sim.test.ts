@@ -294,7 +294,7 @@ describe('Agachar desvia de tiros retos', () => {
     expect(w.director.supportUsed).toBe(false);
   });
 
-  it('Nômad perde 10% de vida máxima e não se cura por abate', async () => {
+  it('Nômad tem 20% menos vida máxima e não se cura por abate', async () => {
     const { newNomad } = await import('../src/game/player');
     const w = makeWorld();
     w.player.mode = 'nomad';
@@ -304,7 +304,9 @@ describe('Agachar desvia de tiros retos', () => {
     w.director.onEnemyKilled(enemy);
     expect(w.player.nomad.hp).toBe(200);
     expect(w.director.streak).toBe(1);
-    expect(w.player.nomad.maxHp).toBe(405);
+    expect(w.player.nomad.maxHp).toBe(324);
+    w.director.remountAtCheckpoint(405); // Save anterior à mudança de balanceamento.
+    expect(w.player.nomad.hp).toBe(324);
   });
 
   it('ondas a pé têm menos inimigos; montado mantém a onda completa', async () => {
@@ -455,10 +457,10 @@ describe('Agachar desvia de tiros retos', () => {
     d.startBoss(a);
     expect(w.lives).toBe(6);
   });
-  it('escudo tem vida e quebra; Nômad 405 de vida; granada maior; contador da zona de guerra', async () => {
+  it('escudo tem vida e quebra; Nômad 324 de vida; granada maior; contador da zona de guerra', async () => {
     const { newNomad } = await import('../src/game/player');
     const { Grenade } = await import('../src/game/bullets');
-    expect(newNomad().maxHp).toBe(405);
+    expect(newNomad().maxHp).toBe(324);
     expect(new Grenade(0, 0, 0, 0).radius).toBeGreaterThanOrEqual(115);
     const w = makeWorld();
     const sp = w.data.enemies.find((e) => e.type === 'shield' && !e.arena)!;
