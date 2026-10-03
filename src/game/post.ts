@@ -51,6 +51,7 @@ export class PostFX {
     this.splashes = [];
     this.flash = 0;
     this.flashSeq = [];
+    this.bloomStage = 0;
   }
 
   /** Clarão no céu pedido por uma cinemática (0..1). */
@@ -196,10 +197,12 @@ export class PostFX {
 
   // ------------------------------------------------------------------ pós
   private bloomFrame = 0;
+  private bloomStage = 0;
+  private bloomQuality: Quality | null = null;
   /**
    * Bloom: reduz o quadro em cascata, eleva ao cubo (só o que brilha sobra), soma as duas escalas
-   * no buffer pequeno e devolve com UMA passada de tela cheia. Em aparelhos modestos o buffer é
-   * recalculado a cada 2 quadros (a soma continua a cada quadro — visual idêntico).
+   * no buffer pequeno e devolve com UMA passada de tela cheia. A qualidade define a frequência
+   * de captura; o halo continua sendo composto em todos os quadros, com a mesma intensidade.
    */
   bloom(g: CanvasRenderingContext2D, canvas: HTMLCanvasElement, q: Quality) {
     const W = canvas.width;
@@ -217,8 +220,15 @@ export class PostFX {
       this.b2 = mk(w2, h2);
       fresh = true;
     }
+    fresh ||= this.bloomStage !== this.stage || this.bloomQuality !== q;
+    if (fresh) this.bloomFrame = 0;
     this.bloomFrame++;
-    if (fresh || this.bloomFrame % 2 === 0) {
+    // A captura da tela pode sincronizar a rasterização do Canvas. O halo suave tolera
+    // menos capturas na média/baixa; sua composição continua em todos os quadros.
+    const every = q === 'high' ? 2 : q === 'medium' ? 3 : 4;
+    if (fresh || this.bloomFrame % every === 0) {
+      this.bloomStage = this.stage;
+      this.bloomQuality = q;
       const c1 = this.b1.getContext('2d')!;
       const c2 = this.b2.getContext('2d')!;
       c1.globalCompositeOperation = 'source-over';
