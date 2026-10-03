@@ -130,7 +130,7 @@ html.rot {
 .save-status { color: #baf6d5; margin: 8px 0; }
 .save-status.warning { color: var(--amber); }
 .save-account { color: var(--cyan); overflow-wrap: anywhere; }
-.save-details, .save-note { color: #cfc6ee; font-size: 15px; }
+.save-details, .save-note { color: #cfc6ee; font-size: 15px; overflow-wrap: anywhere; }
 .save-conflicts:not(:empty), .save-preview:not(:empty) { border: 1px solid var(--amber); border-radius: 12px; padding: 12px; margin: 12px 0; }
 .save-conflicts .btn, .save-preview .btn { width: 100%; margin-top: 8px; }
 .save-file { display: none; }
@@ -138,6 +138,10 @@ html.rot {
 .save-copies h3 { margin: 0 0 8px; color: var(--amber); }
 .save-copy + .save-copy { border-top: 1px solid #725aaf; margin-top: 12px; padding-top: 12px; }
 .save-copy .btn { width: 100%; margin-top: 6px; }
+.save-copy .btn, .save-preview .btn { overflow-wrap: anywhere; }
+.save-pages { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 8px; margin: 12px 0; }
+.save-pages .btn { width: 100%; min-width: 0; }
+.save-pages span { color: #d6dfeb; font-size: 14px; text-align: center; }
 button[hidden] { display: none !important; }
 
 /* ------------------------------------------------------------------ overlays */

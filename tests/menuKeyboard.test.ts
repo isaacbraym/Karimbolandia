@@ -29,4 +29,19 @@ describe('Teclado nos menus', () => {
     menus.handleKey('Enter');
     expect(a.click).not.toHaveBeenCalled(); expect(b.click).toHaveBeenCalledOnce();
   });
+  it('exibe nomes de backups como texto, sem interpretar marcação ou eventos HTML', () => {
+    const handlers = new Map<string, () => void>();
+    const node = { className: '', textContent: '', type: '',
+      set innerHTML(_value: string) { throw new Error('Nome de backup tratado como HTML'); },
+      addEventListener: (event: string, fn: () => void) => handlers.set(event, fn),
+    };
+    vi.stubGlobal('document', { createElement: () => node });
+    const onClick = vi.fn(), action = vi.fn();
+    const menus = Object.assign(Object.create(Menus.prototype), { cb: { onClick } });
+    const label = '<img src=x onerror="alert(1)"> • <b>Checkpoint</b>';
+    const button = menus.btn(label, 'alt small', action);
+    expect(button.textContent).toBe(label);
+    handlers.get('click')!();
+    expect(onClick).toHaveBeenCalledOnce(); expect(action).toHaveBeenCalledOnce();
+  });
 });

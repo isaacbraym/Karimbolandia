@@ -2,7 +2,8 @@
 import { settings, saveSettings, progress, type QualityPref } from '../core/storage';
 import { formatTime } from '../core/math';
 import { cloudSaves } from '../core/cloud';
-import { applyProfile, captureProfile, exportBackup, parseBackup, validateProfile, preserveProfile, MAX_BACKUP_BYTES, type ProfileData } from '../core/profile';
+import { applyProfile, captureProfile, exportBackup, validateProfile, preserveProfile, type ProfileData } from '../core/profile';
+import { exportAllBackups, parseBackupChoices, MAX_ARCHIVE_BYTES } from '../core/backupArchive';
 import { persistenceStatus, onPersist, profileKey, readStored } from '../core/persistence';
 import { SKINS } from '../core/skinCatalog';
 import { chooseSkin, coinBalance, ensureWallet } from '../core/skins';
@@ -110,7 +111,8 @@ export class Menus {
 
   // ------------------------------------------------------------------ construção
   private btn(label: string, cls: string, fn: () => void) {
-    const b = el('button', `btn ${cls}`.trim(), label);
+    const b = el('button', `btn ${cls}`.trim());
+    b.textContent = label;
     b.type = 'button';
     b.addEventListener('click', () => {
       this.cb.onClick();
@@ -582,16 +584,23 @@ export class Menus {
     const logout = this.btn('SAIR DA CONTA', 'alt small', () => { void cloudSaves.logout(); });
     const conflicts = el('div', 'save-conflicts');
     const copies = el('div', 'save-copies');
-    const downloadData = (data?: ProfileData) => {
-      const url = URL.createObjectURL(new Blob([exportBackup(data)], { type: 'application/json' }));
+    let copyPage = 0;
+    const pageSize = 4;
+    const downloadText = (text: string, all = false) => {
+      const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
       const a = document.createElement('a');
       a.href = url;
-      a.download = `karimbolandia-${new Date().toISOString().slice(0, 10)}.json`;
+      a.download = `karimbolandia-${all ? 'partidas-' : ''}${new Date().toISOString().slice(0, 10)}.json`;
       a.click();
       window.setTimeout(() => URL.revokeObjectURL(url), 10000);
       this.toast('Backup pronto. Guarde o arquivo para recuperar seu progresso.');
     };
+    const downloadData = (data?: ProfileData) => downloadText(exportBackup(data));
     const download = this.btn('BAIXAR BACKUP', 'primary', () => downloadData());
+    const downloadAll = this.btn('BAIXAR TODAS AS PARTIDAS', 'alt', () => {
+      try { downloadText(exportAllBackups(), true); }
+      catch (error) { this.toast(error instanceof Error ? error.message : 'Não foi possível preparar o arquivo.'); }
+    });
     const file = el('input', 'save-file');
     file.type = 'file';
     file.accept = '.json,application/json';
@@ -600,7 +609,7 @@ export class Menus {
     const describe = (data: ProfileData) => data.save
       ? `Fase ${data.save.stage} • ${data.save.cpName} • ${data.save.tokens} fichas • ${data.save.score} pontos`
       : `Sem partida em andamento • recorde ${data.progress.bestScore} • ${data.progress.completed} fases concluídas`;
-    const confirmRestore = (data: ProfileData, label = 'RESTAURAR ESTE BACKUP') => {
+    const confirmRestore = (data: ProfileData, label = 'RESTAURAR ESTE BACKUP', onCancel?: () => void) => {
       preview.replaceChildren();
       const text = el('p');
       text.textContent = `${describe(data)}. Restaurar substitui a partida deste perfil e guarda uma cópia da atual.`;
@@ -609,23 +618,43 @@ export class Menus {
         this.cb.onProfileChanged();
         this.showSaves('main');
         this.toast(durable ? 'Backup restaurado. Use CONTINUAR para jogar.' : 'Restaurado em memória. Baixe um backup: este navegador não conseguiu gravar.');
-      }), this.btn('CANCELAR', 'alt small', () => { preview.replaceChildren(); this.collectFocus(panel); }));
+      }), this.btn('CANCELAR', 'alt small', () => { if (onCancel) onCancel(); else { preview.replaceChildren(); this.collectFocus(panel); } }));
       this.collectFocus(panel);
+      preview.querySelector<HTMLButtonElement>('button')?.focus();
       preview.scrollIntoView({ block: 'nearest' });
     };
     file.addEventListener('change', async () => {
       const selected = file.files?.[0];
       if (!selected) return;
       try {
-        if (selected.size > MAX_BACKUP_BYTES) throw new Error('Arquivo grande demais. Escolha um backup do jogo.');
+        if (selected.size > MAX_ARCHIVE_BYTES) throw new Error('Arquivo grande demais. Escolha um backup do jogo.');
         const text = await selected.text();
-        if (!panel.isConnected) return;
-        confirmRestore(parseBackup(text));
+        if (!panel.isConnected || this.panel.classList.contains('hidden')) return;
+        const choices = parseBackupChoices(text);
+        if (choices.length === 1) confirmRestore(choices[0].data);
+        else {
+          let page = 0;
+          const showChoices = () => {
+            preview.replaceChildren(el('h3', '', 'ESCOLHA UMA PARTIDA DO ARQUIVO'),
+              el('p', 'save-note', `${choices.length} partidas disponíveis. Seus dados só mudam depois da confirmação.`));
+            for (const [offset, choice] of choices.slice(page * pageSize, (page + 1) * pageSize).entries()) {
+              const label = choice.kind === 'current' ? 'ATUAL' : choice.kind === 'previous' ? 'ANTES DA RESTAURAÇÃO' : 'GUARDADA';
+              preview.append(this.btn(`${page * pageSize + offset + 1} • ${label} • ${describe(choice.data)}`, 'alt small', () => confirmRestore(choice.data, 'RESTAURAR ESTA PARTIDA', showChoices)));
+            }
+            addPages(preview, page, Math.ceil(choices.length / pageSize), next => { page = next; showChoices(); });
+            preview.append(this.btn('CANCELAR IMPORTAÇÃO', 'alt small', () => { preview.replaceChildren(); this.collectFocus(panel); }));
+            this.collectFocus(panel);
+            preview.querySelector<HTMLButtonElement>('button')?.focus();
+          };
+          showChoices(); preview.scrollIntoView({ block: 'nearest' });
+        }
       } catch (error) {
         preview.replaceChildren();
         const text = el('p');
+        text.setAttribute('role', 'alert');
         text.textContent = error instanceof Error ? error.message : 'Não foi possível ler o backup.';
         preview.append(text);
+        this.collectFocus(panel);
       } finally { file.value = ''; }
     });
     const restore = this.btn('RESTAURAR BACKUP', 'alt', () => file.click());
@@ -634,12 +663,27 @@ export class Menus {
       if (data) confirmRestore(data);
       else this.toast('Ainda não há uma restauração anterior neste perfil.');
     });
-    buttons.append(login, sync, logout, download, restore, undo);
+    buttons.append(login, sync, logout, download, downloadAll, restore, undo);
     panel.append(local, buttons, details, account, remote, conflicts, copies, file, preview);
     const note = el('p', 'save-note');
     note.textContent = 'A partida volta ao último checkpoint, com fichas, equipamentos e itens salvos. Baixar um backup também protege seu progresso se você limpar os dados do navegador.';
     panel.append(note);
     this.openPanel(panel, from);
+    const addPages = (target: HTMLElement, page: number, total: number, go: (page: number) => void) => {
+      if (total <= 1) return;
+      const nav = el('div', 'save-pages');
+      nav.setAttribute('aria-label', 'Páginas das partidas');
+      const move = (nextPage: number, direction: number) => {
+        go(nextPage);
+        const buttons = [...target.querySelectorAll<HTMLButtonElement>('.save-pages button')];
+        const preferred = buttons[direction > 0 ? 1 : 0];
+        (preferred && !preferred.disabled ? preferred : buttons.find(button => !button.disabled))?.focus();
+      };
+      const prev = this.btn('ANTERIORES', 'alt small', () => move(page - 1, -1));
+      const next = this.btn('PRÓXIMAS', 'alt small', () => move(page + 1, 1));
+      prev.disabled = page === 0; next.disabled = page + 1 >= total;
+      nav.append(prev, el('span', '', `${page + 1} / ${total}`), next); target.append(nav);
+    };
     const update = () => {
       const data = captureProfile();
       const previous = readStored(profileKey('karimbolandia.before-restore.v1'), validateProfile);
@@ -660,13 +704,16 @@ export class Menus {
       conflicts.replaceChildren();
       copies.replaceChildren();
       const savedCopies = listSaveCopies();
+      copyPage = Math.min(copyPage, Math.max(0, Math.ceil(savedCopies.length / pageSize) - 1));
       if (savedCopies.length) {
-        copies.append(el('h3', '', 'PARTIDAS GUARDADAS'), el('p', 'save-note', 'Estas cópias preservam partidas de outras abas e sessões. Escolher uma não apaga seus recordes, moedas ou trajes.'));
-        for (const copy of savedCopies) {
+        copies.append(el('h3', '', `PARTIDAS GUARDADAS • ${savedCopies.length}`), el('p', 'save-note', 'Estas cópias preservam partidas de outras abas e sessões. Baixe todas em um único arquivo ou escolha uma abaixo.'));
+        for (const copy of savedCopies.slice(copyPage * pageSize, (copyPage + 1) * pageSize)) {
           const row = el('div', 'save-copy');
           const date = new Date(copy.save.savedAt);
           const when = Number.isNaN(date.getTime()) ? '' : ` • ${date.toLocaleString('pt-BR')}`;
-          row.append(el('p', 'save-details', `${describe({ ...data, save: copy.save })}${when}`),
+          const copyDetails = el('p', 'save-details');
+          copyDetails.textContent = `${describe({ ...data, save: copy.save })}${when}`;
+          row.append(copyDetails,
             this.btn(`RECUPERAR • FASE ${copy.save.stage} • ${copy.save.cpName}`, 'alt small', () => {
               confirmRestore({ ...captureProfile(), save: copy.save }, 'RECUPERAR ESTA PARTIDA');
             }), this.btn(`BAIXAR BACKUP • FASE ${copy.save.stage} • ${copy.save.cpName}`, 'alt small', () => {
@@ -674,6 +721,7 @@ export class Menus {
             }));
           copies.append(row);
         }
+        addPages(copies, copyPage, Math.ceil(savedCopies.length / pageSize), next => { copyPage = next; update(); });
       }
       if (cloudSaves.conflict && cloudSaves.state === 'conflict') {
         const { remote: saved } = cloudSaves.conflict;
@@ -686,9 +734,14 @@ export class Menus {
       }
       this.collectFocus(panel);
     };
-    const unsubscribeCloud = cloudSaves.subscribe(update);
-    const unsubscribeLocal = onPersist(update);
-    const changed = () => update();
+    let pending = false;
+    const changed = () => {
+      if (pending) return;
+      pending = true;
+      queueMicrotask(() => { pending = false; if (panel.isConnected && !this.panel.classList.contains('hidden')) update(); });
+    };
+    const unsubscribeCloud = cloudSaves.subscribe(changed);
+    const unsubscribeLocal = onPersist(changed);
     window.addEventListener('storage', changed);
     this.saveUnsubscribe = () => { unsubscribeCloud(); unsubscribeLocal(); window.removeEventListener('storage', changed); };
   }
