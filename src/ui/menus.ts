@@ -876,6 +876,7 @@ export class Menus {
   }
   private applyFocus() {
     this.focusable.forEach((b, i) => b.classList.toggle('focus', i === this.focusIdx));
+    this.focusable[this.focusIdx]?.focus({ preventScroll: true });
   }
   /** Chamado com códigos de tecla enquanto um menu está aberto. Retorna true se consumiu. */
   handleKey(code: string): boolean {
@@ -889,6 +890,9 @@ export class Menus {
       return true;
     }
     if (!this.focusable.length) return false;
+    // Tab/click may have moved DOM focus independently of the gamepad cursor.
+    const focused = this.focusable.indexOf(document.activeElement as HTMLElement);
+    if (focused >= 0) this.focusIdx = focused;
     if (code === 'ArrowDown' || code === 'KeyS') {
       this.focusIdx = (this.focusIdx + 1) % this.focusable.length;
       this.applyFocus();

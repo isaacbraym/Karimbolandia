@@ -94,6 +94,11 @@ export class Input {
   attach(target: HTMLElement) {
     window.addEventListener('keydown', (e) => {
       if (!this.enabled) {
+        // Let native controls handle typing, arrows, Tab and activation once.
+        const target = e.target instanceof Element ? e.target : null;
+        if (e.code === 'Tab'
+          || (e.code !== 'Escape' && target?.closest('input, select, textarea, [contenteditable="true"]'))
+          || ((e.code === 'Enter' || e.code === 'Space') && target?.closest('button'))) return;
         this.onMenuKey?.(e.code);
         return;
       }
