@@ -2,7 +2,7 @@ export interface TrailPoint { x: number; y: number }
 export interface TrailDefinition {
   id: string;
   title: string;
-  theme: 'delivery' | 'fireflies';
+  theme: 'delivery' | 'fireflies' | 'harvest';
   points: readonly TrailPoint[];
   seconds: number;
   coins: number;
@@ -59,17 +59,19 @@ export class TrailChallenge {
       if (!this.retryT && Math.hypot(x - first.x, y - first.y) > 80) this.reset();
       return 0;
     }
-    let flags = 0, startAt = 0;
+    let flags = 0, startAt = 0, lastContact = 0;
     const wasActive = this.status === 'active';
     while (this.next < this.def.points.length) {
       const t = ringContact(from, to, this.def.points[this.next]);
-      if (t === null || (this.status === 'active' && (wasActive ? t : t - startAt) * dt > this.left)) break;
+      // A single sweep must visit successive rings in chronological order.
+      if (t === null || t < lastContact || (this.status === 'active' && (wasActive ? t : t - startAt) * dt > this.left)) break;
       if (this.status === 'ready') {
         this.status = 'active';
         startAt = t;
         flags |= TRAIL.START;
       }
       this.next++;
+      lastContact = t;
       flags |= TRAIL.HIT;
     }
     if (this.status === 'active') {
