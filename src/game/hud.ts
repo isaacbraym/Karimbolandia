@@ -71,7 +71,7 @@ export function setHudTextScale(s: number) {
 interface Slot {
   c: HTMLCanvasElement;
   g: CanvasRenderingContext2D;
-  val: number;
+  val: number|string;
   color: string;
   w: number;
   h: number;
@@ -79,8 +79,8 @@ interface Slot {
   ay: number;
 }
 const slots = new Map<string, Slot>();
-function numText(
-  g: CanvasRenderingContext2D, slot: string, val: number, fmt: (v: number) => string, x: number, y: number, size: number,
+function numText<V extends number|string>(
+  g: CanvasRenderingContext2D, slot: string, val: V, fmt: (v: V) => string, x: number, y: number, size: number,
   color = '#fff', align: CanvasTextAlign = 'left', font = UI, weight = '700'
 ) {
   if (typeof document === 'undefined') return;
@@ -133,7 +133,6 @@ function numText(
   g.drawImage(e.c, 0, 0, Math.ceil(e.w * textScale), Math.ceil(e.h * textScale), x - e.ax, y - e.ay, e.w, e.h);
 }
 const fmtInt = (v: number) => String(v);
-const fmtAmmo = (v: number) => (v === Infinity ? '∞' : String(v));
 const fmtScore = (v: number) => String(v).padStart(7, '0');
 const fmtEmblems = (v: number) => `${v} / 10`;
 const fmtCombo = (v: number) => `${v} COMBO`;
@@ -366,8 +365,8 @@ export class Hud {
     g.scale(s, s);
     g.drawImage(wp.c, -wp.ox, -wp.oy, wp.w, wp.h);
     g.restore();
-    const ammo = p.weapons.get(p.cur) ?? 0;
-    numText(g, 'ammo', ammo, fmtAmmo, bx + 92, by + 31.5, 14, ammo !== Infinity && ammo < 10 ? '#ff8a8a' : '#ffffff', 'right');
+    numText(g,'ammo',p.ammoLabel,String,bx+92,by+31.5,12,p.loadedAmmo===0?'#ff8a8a':'#ffffff','right');
+    if(p.reloadT>0){g.fillStyle='#85e1d1';g.fillRect(bx+3,by+34,90*p.reload01,2);}
     // granadas
     for (let i = 0; i < p.maxGrenades; i++) {
       const gx = bx + 4 + i * 8;
@@ -382,6 +381,7 @@ export class Hud {
       }
     }
     void def;
+    if(w.merchant.near(w))text(g,'TOMÉ • F / SELECT / OFICINA',W/2,H-68,12,'#ffe6a6','center');
 
     // ------------------------------------------------ Nômad
     if (p.nomad) {

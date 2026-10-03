@@ -918,6 +918,10 @@ export class Game {
   }
 
   private step(w: World, dt: number) {
+    if(this.input.state.interact.pressed&&w.merchant.near(w)) {
+      this.input.clearEdges();this.pause();
+      this.menus.showMerchant(w,()=>{w.checkpointSnap=w.player.snapshot();this.saveGame();});return;
+    }
     // hit-stop / câmera lenta
     let sdt = dt;
     if (w.fx.hitStop > 0) {
@@ -1023,7 +1027,7 @@ export class Game {
     const n = p.nomad;
     let dash01 = 1;
     if (n) dash01 = n.window > 0 ? 1 : n.cooldown > 0 ? clamp(1 - n.cooldown / 3.4, 0, 1) : 1;
-    this.touch.sync({ weaponIcon: icon, ammo: ammo === Infinity ? '∞' : String(ammo), lowAmmo: ammo !== Infinity && ammo < 10, grenades: p.grenades, dash01 });
+    this.touch.sync({ weaponIcon: icon, ammo: p.mounted?(ammo===Infinity?'∞':String(ammo)):p.ammoLabel, lowAmmo: !p.mounted&&p.loadedAmmo===0, grenades: p.grenades, dash01,merchant:w.merchant.near(w) });
   }
 
   /**

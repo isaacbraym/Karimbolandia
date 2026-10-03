@@ -10,7 +10,8 @@ import type { Vine } from './vines';
 import { getArt } from '../art';
 import { drawKarimbo, karimboMuzzle, type KState } from '../art/karimbo';
 import { drawNomad } from '../art/nomad';
-import { settings } from '../core/storage';
+import { settings, progress } from '../core/storage';
+import { magazineCapacity, reloadSeconds, tunedWeapon } from '../core/gearCatalog';
 import {
   FOOT_W, FOOT_H, CROUCH_H, NOMAD_W, NOMAD_H, RUN, RUN_ACC, RUN_DEC, AIR_ACC, AIR_DEC, GRAV, JUMP_V, FALL_MAX, COYOTE, JUMP_BUF,
   GLIDE_FALL, GLIDE_FUEL, GLIDE_SPEED, CROUCH_SPEED, N_RUN, N_ACC, N_DEC, N_GRAV, N_JUMP,
@@ -107,6 +108,26 @@ export class Player {
   aimVis = 0;
   weapons: Map<WeaponId, number> = new Map([['pistol', Infinity]]);
   cur: WeaponId = 'pistol';
+  magazines = new Map<WeaponId,number>([['pistol',8]]);
+  reloadT = 0;
+  reloadDuration = 0;
+  private gearKey = '';
+  private tuned = new Map<WeaponId,ReturnType<typeof tunedWeapon>>();
+  weaponDef(id:WeaponId=this.cur) {
+    const key=progress.gear.join('|');
+    if(key!==this.gearKey){this.gearKey=key;this.tuned.clear();}
+    let d=this.tuned.get(id);if(!d){d=tunedWeapon(id,progress.gear);this.tuned.set(id,d);}return d;
+  }
+  get loadedAmmo(){return this.magazines.get(this.cur)??Math.min(magazineCapacity(this.cur,progress.gear),this.weapons.get(this.cur)??0);}
+  get reload01(){return this.reloadT>0?1-this.reloadT/this.reloadDuration:0;}
+  get ammoLabel(){const total=this.weapons.get(this.cur)??0;return this.reloadT>0?'↻':`${this.loadedAmmo}/${total===Infinity?'∞':Math.max(0,total-this.loadedAmmo)}`;}
+  startReload(w:World) {
+    if(this.mode!=='foot'||this.reloadT>0||this.meleeT>0)return false;
+    const ammo=this.weapons.get(this.cur)??0,cap=magazineCapacity(this.cur,progress.gear);
+    if(ammo<=this.loadedAmmo||this.loadedAmmo>=cap)return false;
+    this.reloadT=this.reloadDuration=reloadSeconds(this.cur);
+    w.audio('uiClick',.45,this.x);return true;
+  }
   grenades = 3;
   maxGrenades = 8;
   fireCd = 0;
@@ -233,6 +254,7 @@ export class Player {
     this.respawnQueued = false;
     this.lockInput = false;
     this.fireCd = 0.2;
+    this.reloadT = 0;
     this.lastSafe = { x, y: feetY };
     this.safeT = 0;
     this.landSquash = 0;
@@ -247,19 +269,22 @@ export class Player {
   }
 
   resetInventory() {
-    // começa com pistola + metralhadora + shotgun (munição LIMITADA: varie as armas!)
-    this.weapons = new Map<WeaponId, number>([['pistol', Infinity], ['rifle', 110], ['shotgun', 16]]);
-    this.cur = 'rifle';
-    this.grenades = 4;
+    this.weapons = new Map<WeaponId, number>([['pistol', Infinity]]);
+    for(const id of WEAPON_ORDER)if(progress.gear.includes(`${id}.unlock.1`))this.weapons.set(id,WEAPONS[id].ammoStart);
+    this.magazines=new Map([...this.weapons].map(([id,n])=>[id,Math.min(n,magazineCapacity(id,progress.gear))]));
+    this.cur = 'pistol';this.reloadT=0;
+    this.grenades = 2;
   }
 
   snapshot() {
-    return { weapons: [...this.weapons.entries()], cur: this.cur, grenades: this.grenades, nomad: this.nomad && this.nomad.timeLeft === Infinity ? this.nomad.hp : -1 };
+    return { weapons: [...this.weapons.entries()], magazines:[...this.magazines.entries()] as [WeaponId,number][]|undefined, cur: this.cur, grenades: this.grenades, nomad: this.nomad && this.nomad.timeLeft === Infinity ? this.nomad.hp : -1 };
   }
   restore(s: ReturnType<Player['snapshot']>) {
     this.weapons = new Map(s.weapons as [WeaponId, number][]);
     this.cur = s.cur;
     this.grenades = s.grenades;
+    this.magazines=new Map([...this.weapons].map(([id,n])=>[id,Math.min(n,magazineCapacity(id,progress.gear),s.magazines?.find(x=>x[0]===id)?.[1]??magazineCapacity(id,progress.gear))]));
+    this.reloadT=0;
   }
 
   giveWeapon(id: WeaponId, w: World) {
@@ -267,12 +292,14 @@ export class Player {
     const have = this.weapons.get(id);
     if (have === undefined) {
       this.weapons.set(id, d.ammoStart);
+      this.magazines.set(id,Math.min(d.ammoStart,magazineCapacity(id,progress.gear)));
       this.cur = id;
     } else {
       this.weapons.set(id, Math.min(d.ammoMax, have + d.ammoPickup));
       if (this.cur !== id) this.cur = id;
     }
     w.audio('weapon', 0.8, this.x);
+    this.reloadT=0;
   }
 
   /** Caixa de munição: reabastece TODAS as armas que você tem (metade da carga de cada). */
@@ -514,6 +541,10 @@ export class Player {
       return;
     }
     const c = this.lockInput ? nullControls : ctl;
+    if(this.mode==='foot'&&!this.lockInput) {
+      if(this.reloadT>0){this.reloadT=Math.max(0,this.reloadT-dt);if(!this.reloadT){this.magazines.set(this.cur,Math.min(this.weapons.get(this.cur)??0,magazineCapacity(this.cur,progress.gear)));w.audio('weapon',.45,this.x);}}
+      if(c.reload?.pressed)this.startReload(w);
+    }
     if (this.leapT > 0) this.leapT -= dt;
     if (this.vineCd > 0) this.vineCd -= dt;
     if (this.nomad) this.updateNomad(w, dt, c);
@@ -1276,6 +1307,7 @@ export class Player {
     if (i < 0) i = 0;
     i = (i + dir + owned.length) % owned.length;
     this.cur = owned[i];
+    this.reloadT=0;
     w.audio('uiClick', 0.6, this.x);
     w.fx.popup(this.x, this.y - 44, WEAPONS[this.cur].name, '#ffffff', 8);
   }
@@ -1289,12 +1321,15 @@ export class Player {
     }
     // inimigo colado: golpe corpo a corpo (como a faca do Metal Slug) — sem gastar munição
     if (this.tryMelee(w)) return;
-    const d = WEAPONS[this.cur];
+    if(this.reloadT>0)return;
+    const d = this.weaponDef();
     const ammo = this.weapons.get(this.cur) ?? 0;
     if (ammo <= 0) {
       this.cur = 'pistol';
       return;
     }
+    if(this.loadedAmmo<=0){this.startReload(w);return;}
+    this.magazines.set(this.cur,this.loadedAmmo-1);
     this.fireCd = d.rate;
     if (ammo !== Infinity) {
       this.weapons.set(this.cur, ammo - 1);
@@ -1869,6 +1904,8 @@ export class Player {
       vy: b.vy,
       alpha,
       hasGun: true,
+      reload:this.reload01,
+      scope:progress.gear.includes(`${this.cur}.scope.1`),
       scarf: this.scarfT,
       squash: b.onGround ? this.landSquash : this.slam ? -0.45 : -clamp(Math.abs(b.vy) / 1700, 0, 0.3),
       lean: this.animLean,

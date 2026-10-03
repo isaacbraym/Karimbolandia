@@ -527,6 +527,7 @@ describe('Agachar desvia de tiros retos', () => {
     for (let i = 0; i < 20; i++) w.update(1 / 60, ctl);
     const p = w.player;
     p.cur = 'shotgun';
+    p.giveWeapon('shotgun',w);
     p.facing = 1;
     ctl.mouseAim = { x: p.x + 300, y: p.y - 10 };
     ctl.fire.held = true;

@@ -5,8 +5,8 @@ const hapticsOn = () => settings.haptics !== false;
  * O jogo lê apenas `input.state` (analógico + botões com borda pressionar/soltar).
  */
 
-export type ActionName = 'jump' | 'fire' | 'grenade' | 'special' | 'next' | 'prev' | 'pause';
-const ACTIONS: ActionName[] = ['jump', 'fire', 'grenade', 'special', 'next', 'prev', 'pause'];
+export type ActionName = 'jump' | 'fire' | 'grenade' | 'special' | 'next' | 'prev' | 'pause' | 'reload' | 'interact';
+const ACTIONS: ActionName[] = ['jump', 'fire', 'grenade', 'special', 'next', 'prev', 'pause', 'reload', 'interact'];
 
 export interface Btn {
   held: boolean;
@@ -30,7 +30,7 @@ export const newTouchState = (): TouchState => ({
   stickY: 0,
   aimX: 0,
   aimY: 0,
-  held: { jump: false, fire: false, grenade: false, special: false, next: false, prev: false, pause: false },
+  held: { jump: false, fire: false, grenade: false, special: false, next: false, prev: false, pause: false, reload:false, interact:false },
 });
 
 export interface ControlState {
@@ -49,13 +49,15 @@ export interface ControlState {
   next: Btn;
   prev: Btn;
   pause: Btn;
+  reload?: Btn;
+  interact?: Btn;
   device: 'kb' | 'touch' | 'pad';
 }
 
 const newBtn = (): Btn => ({ held: false, pressed: false, released: false });
 
 export class Input {
-  readonly state: ControlState = {
+  readonly state: ControlState & {reload:Btn;interact:Btn} = {
     moveX: 0,
     moveY: 0,
     aimVecX: 0,
@@ -69,12 +71,14 @@ export class Input {
     next: newBtn(),
     prev: newBtn(),
     pause: newBtn(),
+    reload:newBtn(),
+    interact:newBtn(),
     device: 'kb',
   };
   readonly touch: TouchState = newTouchState();
 
   private keys = new Set<string>();
-  private prevRaw: Record<ActionName, boolean> = { jump: false, fire: false, grenade: false, special: false, next: false, prev: false, pause: false };
+  private prevRaw: Record<ActionName, boolean> = { jump: false, fire: false, grenade: false, special: false, next: false, prev: false, pause: false, reload:false, interact:false };
   private mouseDown = false;
   private mouseRight = false;
   private wheelNext = false;
@@ -194,7 +198,7 @@ export class Input {
   /** Chamar uma vez por frame de render, ANTES das atualizações da simulação. */
   poll() {
     const s = this.state;
-    const raw: Record<ActionName, boolean> = { jump: false, fire: false, grenade: false, special: false, next: false, prev: false, pause: false };
+    const raw: Record<ActionName, boolean> = { jump: false, fire: false, grenade: false, special: false, next: false, prev: false, pause: false, reload:false, interact:false };
 
     // ---- teclado
     let mx = 0;
@@ -210,6 +214,7 @@ export class Input {
     raw.next = this.k('KeyE') || this.wheelNext;
     raw.prev = this.k('KeyQ') || this.wheelPrev;
     raw.pause = this.k('Escape', 'KeyP');
+    raw.reload=this.k('KeyR');raw.interact=this.k('KeyF');
     this.wheelNext = this.wheelPrev = false;
 
     // ---- gamepad
@@ -232,7 +237,7 @@ export class Input {
       const padFire = b(2) || b(7);
       const padNade = b(1) || b(6);
       const padSpecial = b(3);
-      const any = Math.abs(padX) > 0 || Math.abs(padY) > 0 || padJump || padFire || padNade || padSpecial;
+      const any = Math.abs(padX) > 0 || Math.abs(padY) > 0 || padJump || padFire || padNade || padSpecial || b(11) || b(8);
       if (any) {
         this.padSeen = true;
         s.device = 'pad';
@@ -247,6 +252,7 @@ export class Input {
       raw.prev = raw.prev || b(4);
       raw.next = raw.next || b(5);
       raw.pause = raw.pause || b(9);
+      raw.reload=raw.reload||b(11);raw.interact=raw.interact||b(8);
       const rx = gp.axes[2] ?? 0;
       const ry = gp.axes[3] ?? 0;
       if (Math.hypot(rx, ry) > 0.45) padAim = { x: rx, y: ry };

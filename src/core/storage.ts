@@ -2,6 +2,9 @@
 import { profileKey, readStored, writeStored } from './persistence';
 import { record, number, integer, ids } from './saveValidation';
 import { isSkinId, type SkinId } from './skinCatalog';
+import { validGear } from './gearCatalog';
+import { readGearReceipts, storeGearReceipts } from './gearReceipts';
+import { coinTotal, validateCoinLedger, mergeCoinLedgers, readCoinWriters, flushCoinWriter, type CoinLedger } from './coins';
 
 export type QualityPref = 'auto' | 'low' | 'medium' | 'high';
 
@@ -34,6 +37,8 @@ export interface Progress {
   coinsMigrated: boolean;
   ownedSkins: SkinId[];
   equippedSkin: SkinId;
+  coinsLedger?: CoinLedger;
+  gear: string[];
 }
 
 const KEY_S = 'karimbolandia.settings.v1';
@@ -69,6 +74,8 @@ export const defaultProgress = (): Progress => ({
   coinsMigrated: false,
   ownedSkins: [],
   equippedSkin: 'classic',
+  coinsLedger: undefined,
+  gear: [],
 });
 
 function load<T extends object>(key: string, def: () => T): T {
@@ -100,27 +107,37 @@ export function validateProgress(v: unknown): Progress | null {
   if (!integer(p.coinsEarned) || typeof p.coinsMigrated !== 'boolean' || !isSkinId(p.equippedSkin)) return null;
   if (!Array.isArray(p.ownedSkins) || p.ownedSkins.length > 2 || !p.ownedSkins.every(s => isSkinId(s) && s !== 'classic') || new Set(p.ownedSkins).size !== p.ownedSkins.length) return null;
   if (p.equippedSkin !== 'classic' && !p.ownedSkins.includes(p.equippedSkin)) return null;
+  const ledger=p.coinsLedger===undefined?undefined:validateCoinLedger(p.coinsLedger);
+  if(ledger===null)return null;
+  if(!validGear(p.gear))return null;
   return {
     bestScore: p.bestScore, bestTime: p.bestTime, bestEmblems: p.bestEmblems,
     bestSecrets: p.bestSecrets, completed: p.completed, dashDiscovered: p.dashDiscovered,
     emblemsFound: [...p.emblemsFound], secretsFound: [...p.secretsFound], stagesDone: [...p.stagesDone],
     coinsEarned: p.coinsEarned, coinsMigrated: p.coinsMigrated,
     ownedSkins: [...p.ownedSkins], equippedSkin: p.equippedSkin,
+    coinsLedger: ledger,
+    gear: [...p.gear],
   };
 }
-type Wallet = Pick<Progress, 'coinsEarned' | 'coinsMigrated' | 'ownedSkins' | 'equippedSkin'>;
+type Wallet = Pick<Progress, 'coinsEarned' | 'coinsMigrated' | 'ownedSkins' | 'equippedSkin' | 'coinsLedger' | 'gear'>;
 function validateWallet(v: unknown): Wallet | null {
   if (!record(v)) return null;
   for (const key of ['coinsEarned', 'coinsMigrated', 'ownedSkins', 'equippedSkin']) if (!(key in v)) return null;
   const p = validateProgress({ ...defaultProgress(), ...v });
-  return p ? { coinsEarned: p.coinsEarned, coinsMigrated: p.coinsMigrated, ownedSkins: p.ownedSkins, equippedSkin: p.equippedSkin } : null;
+  return p ? { coinsEarned: p.coinsEarned, coinsMigrated: p.coinsMigrated, ownedSkins: p.ownedSkins, equippedSkin: p.equippedSkin, coinsLedger:p.coinsLedger, gear:p.gear } : null;
 }
 function readProfileProgress(): Progress | null {
   const p = readStored(profileKey(KEY_P), validateProgress);
   const wallet = readStored(profileKey(KEY_W), validateWallet);
-  if (!wallet) return p;
   const records = p ?? defaultProgress();
-  return mergeProgress(records, { ...records, ...wallet });
+  const combined=wallet?mergeProgress(records,{...records,...wallet}):records;
+  const writers=readCoinWriters();
+  const receipts=readGearReceipts();
+  combined.gear=[...new Set([...combined.gear,...receipts])];
+  if(writers)combined.coinsLedger=mergeCoinLedgers(combined.coinsLedger,writers);
+  if(combined.coinsLedger)combined.coinsEarned=Math.max(combined.coinsEarned,coinTotal(combined.coinsLedger));
+  return p||wallet||writers||receipts.length?combined:null;
 }
 export const hasStoredWallet = () => readStored(profileKey(KEY_W), validateWallet) !== null;
 export const progress: Progress = readProfileProgress() ?? defaultProgress();
@@ -128,13 +145,16 @@ export function reloadProgress() { Object.assign(progress, readProfileProgress()
 export function mergeProgress(a: Progress, b: Progress): Progress {
   const times = [a.bestTime, b.bestTime].filter(n => n > 0);
   const union = (x: number[], y: number[]) => [...new Set([...x, ...y])].sort((x, y) => x - y);
+  const ledger=mergeCoinLedgers(a.coinsLedger,b.coinsLedger);
   return {
     bestScore: Math.max(a.bestScore, b.bestScore), bestTime: times.length ? Math.min(...times) : 0,
     bestEmblems: Math.max(a.bestEmblems, b.bestEmblems), bestSecrets: Math.max(a.bestSecrets, b.bestSecrets),
     completed: Math.max(a.completed, b.completed), dashDiscovered: a.dashDiscovered || b.dashDiscovered,
     emblemsFound: union(a.emblemsFound, b.emblemsFound), secretsFound: union(a.secretsFound, b.secretsFound),
     stagesDone: union(a.stagesDone, b.stagesDone),
-    coinsEarned: Math.max(a.coinsEarned, b.coinsEarned), coinsMigrated: a.coinsMigrated || b.coinsMigrated,
+    coinsEarned: Math.max(a.coinsEarned, b.coinsEarned,ledger?coinTotal(ledger):0), coinsMigrated: a.coinsMigrated || b.coinsMigrated,
+    coinsLedger:ledger,
+    gear: [...new Set([...a.gear,...b.gear])],
     ownedSkins: [...new Set([...a.ownedSkins, ...b.ownedSkins])], equippedSkin: b.equippedSkin,
   };
 }
@@ -150,10 +170,12 @@ export function snapshotProgress(): Progress {
 
 export const saveSettings = () => save(KEY_S, settings);
 export const saveProgress = () => {
+  const coins=flushCoinWriter(progress.coinsLedger);
   // Outra aba pode ter batido um recorde desde que este módulo foi carregado.
   const previous = readProfileProgress();
   if (previous) Object.assign(progress, mergeProgress(previous, progress));
+  const gear=storeGearReceipts(progress.gear);
   const wallet = writeStored(profileKey(KEY_W), validateWallet(progress)!, validateWallet);
   const records = writeStored(profileKey(KEY_P), progress, validateProgress);
-  return wallet && records;
+  return coins && gear && wallet && records;
 };

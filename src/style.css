@@ -813,6 +813,20 @@ kbd {
   width: 56%;
   height: 56%;
 }
+.t-reload {right:calc(var(--sar) + 58px);top:calc(var(--sat) + 8px);width:38px;height:38px;font-size:28px;}
+.touch.mounted .t-reload {display:none;}
+.t-merchant {left:50%;bottom:calc(var(--sab) + 8px);transform:translateX(-50%);width:102px;height:40px;border-radius:12px;font-size:12px;}
+.forge-shop {width:min(790px,96vw);padding:12px;display:flex;flex-direction:column;gap:7px;}
+.forge-shop h2,.forge-shop p {margin:0;}
+.forge-selector {width:100%;padding:7px;background:#211b34;color:#fff;border:1px solid #9e8056;border-radius:8px;font:inherit;}
+.forge-cards {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;}
+.forge-card {padding:8px;border:1px solid #756247;background:linear-gradient(135deg,#292239,#352c27);border-radius:10px;display:flex;flex-direction:column;gap:4px;}
+.forge-card h3 {font-size:15px;margin:0;color:#ffe0a1;}
+.forge-card p {font-size:12px;line-height:1.15;flex:1;}
+.forge-card .btn {width:100%;padding:5px;font-size:12px;min-height:30px;}
+.forge-stats,.forge-message {font-size:13px;line-height:1.15;}
+@media(max-width:540px){.forge-cards{grid-template-columns:repeat(2,minmax(0,1fr));}.forge-shop h2{font-size:19px;}.forge-card{padding:6px;}}
+@media(max-height:370px){.forge-shop{gap:4px;padding:8px;}.forge-shop h2{font-size:18px;}.forge-shop .shop-balance{font-size:14px;}.forge-card{padding:5px;}.forge-card p{font-size:11px;}.forge-card h3{font-size:13px;}.forge-selector{padding:3px;}.forge-stats,.forge-message{font-size:11px;}}
 /* canhoto: espelha */
 .touch.lefty .stick-zone {
   left: auto;
@@ -1164,4 +1178,31 @@ kbd {
   #menu .wrap { width: calc(var(--game-width) - 28px); }
   #menu .btn { font-size: 15px; }
   .kbd-grid { grid-template-columns: 1fr; }
+}
+
+/* Oficina: regras após os estilos de painéis; respeita também a tela girada do jogo. */
+.panel.forge-shop {width:min(790px,96cqw);padding:12px;gap:7px;}
+.panel.forge-shop h2 {font-size:24px;margin:0;}
+.panel.forge-shop p {margin:0;}
+.panel.forge-shop .forge-card p {font-size:12px;line-height:1.15;}
+.panel.forge-shop .forge-card h3 {font-size:15px;margin:0;}
+.panel.forge-shop .forge-card .btn.small {font-size:12px;min-height:30px;padding:5px;letter-spacing:0;}
+.panel.forge-shop .shop-balance {font-size:17px;line-height:1;}
+.forge-nav {display:flex;align-items:center;gap:5px;}
+.forge-nav .forge-selector {flex:1;min-width:0;}
+.panel.forge-shop .forge-nav .btn.small {font-size:19px;min-width:32px;min-height:30px;height:30px;padding:0;}
+@container game-ui (max-height: 370px) {
+  .panel.forge-shop {gap:3px;padding:6px;}
+  .panel.forge-shop h2 {font-size:18px;line-height:1;}
+  .panel.forge-shop .shop-balance {font-size:12px;line-height:1;}
+  .panel.forge-shop .forge-card {padding:4px;gap:2px;}
+  .panel.forge-shop .forge-card p {font-size:10px;line-height:1.1;}
+  .panel.forge-shop .forge-card h3 {font-size:12px;line-height:1.1;}
+  .panel.forge-shop .forge-selector {padding:2px;font-size:12px;height:23px;min-height:23px;}
+  .panel.forge-shop .forge-nav .btn.small {height:23px;min-height:23px;font-size:17px;}
+  .panel.forge-shop .forge-stats,.panel.forge-shop .forge-message {font-size:11px;line-height:1.1;}
+}
+@container game-ui (max-width:540px) {
+  .forge-cards {grid-template-columns:repeat(2,minmax(0,1fr));}
+  .panel.forge-shop h2 {font-size:19px;}
 }

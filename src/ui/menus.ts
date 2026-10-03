@@ -11,6 +11,10 @@ import { drawKarimbo } from '../art/karimbo';
 import { listSaveCopies } from '../game/saveSession';
 import { loadSave, type SaveState } from '../game/save';
 import { STAGES, stageCheckpoints, type StageId } from '../game/stageSelect';
+import { GEAR, magazineCapacity } from '../core/gearCatalog';
+import { buyGear, withWalletLock } from '../core/forge';
+import { WEAPON_ORDER, WEAPONS, type WeaponId } from '../game/weapons';
+import type { World } from '../game/world';
 
 export interface MenuCallbacks {
   onSelectStage(stage: StageId, save?: SaveState): void;
@@ -84,6 +88,7 @@ export class Menus {
   private focusIdx = -1;
   private saveUnsubscribe: (() => void) | null = null;
   private shopBtn!: HTMLButtonElement;
+  private merchantExit:(()=>void)|null=null;
 
   constructor(root: HTMLElement, private cb: MenuCallbacks) {
     this.root = root;
@@ -222,6 +227,7 @@ export class Menus {
   }
 
   closePanel() {
+    if(this.merchantExit){const exit=this.merchantExit;this.merchantExit=null;this.panel.classList.add('hidden');exit();return;}
     if (this.panel.querySelector('.stage-picker')) this.cb.onCancelStageStart();
     this.saveUnsubscribe?.();
     this.saveUnsubscribe = null;
@@ -418,6 +424,7 @@ export class Menus {
       <div class="k"><span>Mirar</span><span>mouse</span></div>
       <div class="k"><span>Granada</span><span><kbd>G</kbd> / botão direito</span></div>
       <div class="k"><span>Trocar arma</span><span><kbd>Q</kbd> <kbd>E</kbd> / roda</span></div>
+      <div class="k"><span>Recarregar / mercador</span><span><kbd>R</kbd> / <kbd>F</kbd> • controle: R3 / Select</span></div>
       <div class="k"><span>Especial (Nômad)</span><span><kbd>SHIFT</kbd></span></div>
       <div class="k"><span>Descer da plataforma</span><span><kbd>S</kbd> + <kbd>ESPAÇO</kbd></span></div>
       <div class="k"><span>Pausar</span><span><kbd>ESC</kbd></span></div>`
@@ -488,11 +495,12 @@ export class Menus {
         description.textContent = skin.description;
         const affordable = coinBalance() >= skin.price;
         const action = this.btn(equipped ? 'EQUIPADO' : owned ? `USAR ${skin.name.toUpperCase()}` : `COMPRAR • ${skin.price}`, owned ? 'alt small' : 'primary small', () => {
-          const result = chooseSkin(skin.id);
+          void withWalletLock(()=>chooseSkin(skin.id)).then(result=>{
           if (result === 'insufficient') this.toast('Ainda faltam moedas para este traje.');
           else if (result === 'volatile') this.toast('Traje disponível nesta sessão. Baixe um backup: não foi possível gravar no aparelho.');
           else this.toast(result === 'bought' ? `${skin.name} comprado e equipado!` : `${skin.name} equipado!`);
           update();
+          }).catch(()=>this.toast('A conta mudou. Abra a loja novamente antes de comprar.'));
         });
         action.disabled = equipped || (!owned && !affordable);
         action.setAttribute('aria-label', equipped ? `${skin.name} equipado` : owned ? `Usar ${skin.name}` : `Comprar ${skin.name} por ${skin.price} moedas`);
@@ -512,6 +520,52 @@ export class Menus {
   }
 
   /** Save portátil funciona mesmo sem serviço de contas e sem internet. */
+  showMerchant(w:World,onChange:()=>void) {
+    const player=w.player;
+    ensureWallet();
+    const panel=el('div','panel forge-shop');
+    const title=el('h2','','TOMÉ • OFICINA ITINERANTE'),balance=el('p','shop-balance');balance.setAttribute('role','status');
+    const selection=el('select','forge-selector');selection.setAttribute('aria-label','Arma para personalizar');
+    const nav=el('div','forge-nav');
+    const previous=this.btn('‹','alt small',()=>cycle(-1)),next=this.btn('›','alt small',()=>cycle(1));
+    previous.setAttribute('aria-label','Arma anterior');next.setAttribute('aria-label','Próxima arma');nav.append(previous,selection,next);
+    for(const id of WEAPON_ORDER){const option=el('option');option.value=id;option.textContent=WEAPONS[id].name;selection.append(option);}
+    selection.value=player.cur;
+    const stats=el('p','forge-stats'),cards=el('div','forge-cards'),status=el('p','forge-message','Armas e melhorias ficam no seu save.');status.setAttribute('role','status');
+    panel.append(title,balance,nav,stats,cards,status);
+    const update=()=>{
+      ensureWallet();
+      const id=selection.value as WeaponId,d=player.weaponDef(id),owned=player.weapons.has(id)||progress.gear.includes(`${id}.unlock.1`);
+      balance.textContent=`${coinBalance()} MOEDAS`;
+      stats.textContent=`${d.dmg.toFixed(1)} dano • ${magazineCapacity(id,progress.gear)} no carregador • ${(1/d.rate).toFixed(1)} tiros/s`;
+      cards.replaceChildren();
+      for(const kind of ['unlock','mag','rate','damage','scope','pierce']) {
+        if(kind==='unlock'&&id==='pistol')continue;
+        const options=GEAR.filter(x=>x.weapon===id&&x.kind===kind),item=options.find(x=>!progress.gear.includes(x.id))??options[options.length-1];
+        const acquired=progress.gear.includes(item.id),allowed=kind==='unlock'||owned;
+        const card=el('article','forge-card');card.append(el('h3','',item.label),el('p','',item.detail));
+        const button=this.btn(acquired?'ADQUIRIDO':`COMPRAR • ${item.price}`, 'small '+(kind==='unlock'?'primary':'alt'),()=>{
+          button.disabled=true;
+          void withWalletLock(()=>buyGear(item.id,player.weapons)).then(result=>{
+            if(result==='bought'||result==='volatile') {
+              if(item.kind==='unlock'&&!player.weapons.has(id))player.giveWeapon(id,w);
+              onChange();
+            }
+            status.textContent=result==='bought'?'Compra salva! Boa viagem, Karimbo.':result==='volatile'?'Compra nesta sessão. Baixe um backup: o aparelho não conseguiu salvar.':result==='insufficient'?'Faltam moedas.':result==='locked'?'Adquira a arma ou a melhoria anterior primeiro.':'Você já tem esta melhoria.';
+            update();
+          }).catch(()=>{status.textContent='A conta mudou. Feche e abra a oficina novamente.';});
+        });
+        button.disabled=acquired||!allowed||coinBalance()<item.price;
+        if(!allowed)button.textContent='ADQUIRA A ARMA';
+        card.append(button);cards.append(card);
+      }
+      this.collectFocus(panel);
+    };
+    const cycle=(dir:number)=>{selection.value=WEAPON_ORDER[(WEAPON_ORDER.indexOf(selection.value as WeaponId)+dir+WEAPON_ORDER.length)%WEAPON_ORDER.length];update();};
+    selection.addEventListener('change',update);
+    this.openPanel(panel,'pause');this.merchantExit=()=>this.cb.onResume();update();
+  }
+
   showSaves(from: 'main' | 'pause' = 'main') {
     this.saveUnsubscribe?.();
     const panel = el('div', 'panel save-panel');
@@ -660,6 +714,7 @@ export class Menus {
     this.collectFocus(this.main);
   }
   hideAll() {
+    this.merchantExit=null;
     this.saveUnsubscribe?.();
     this.saveUnsubscribe = null;
     this.main.classList.add('hidden');

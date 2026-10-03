@@ -25,6 +25,7 @@ import { music, JUNGLE_MELODY, STAGE_MELODY } from '../core/music';
 import { Waters } from './water';
 import { JungleWildlife } from './wildlife';
 import { Village } from './village';
+import { Merchant } from './merchant';
 import { Vine } from './vines';
 import type { DoorSpawn } from './level';
 import { drawWaterBack, drawWaterFront } from '../art/waterDraw';
@@ -118,6 +119,7 @@ export class World {
   water!: Waters;
   wildlife!: JungleWildlife;
   village!: Village;
+  merchant!: Merchant;
   /** 0..1 cabeça do Karimbo debaixo d'água (som abafado, tom da tela) */
   underwater = 0;
   /**
@@ -201,6 +203,7 @@ export class World {
     this.water = new Waters(data.water ?? [], this.level, data.decos);
     this.wildlife = new JungleWildlife(data);
     this.village = new Village(data);
+    this.merchant = new Merchant(data);
     this.vines = (data.vines ?? []).map((v) => new Vine(v));
     this.director = new Director(this);
     this.narrator = new Narrator(this);
@@ -1188,6 +1191,7 @@ export class World {
     this.drawShadows(g);
     this.crowd.draw(g, this);
     this.village.draw(g, this);
+    this.merchant.draw(g,this);
     this.fx.draw(g, false);
     for (const c of this.corpses) if (cam.visible(c.x, c.y, 140)) c.render(g);
     for (const e of this.enemies) {
@@ -1442,4 +1446,4 @@ function pitSprites() {
 /** duração das vozes gravadas dos personagens (s) */
 const CLIP_LEN: Record<ClipName, number> = { bossIntro: 15.7, karimboEncara: 3.7, karimboNomad: 1.5 };
 
-const WEAPON_AMMO_FLOOR: Record<WeaponId, number> = { pistol: Infinity, rifle: 60, shotgun: 12, launcher: 5, energy: 25 };
+const WEAPON_AMMO_FLOOR: Record<WeaponId, number> = { pistol: Infinity, rifle: 18, shotgun: 4, launcher: 2, energy: 8 };

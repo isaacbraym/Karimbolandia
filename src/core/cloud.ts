@@ -17,7 +17,8 @@ interface Baseline { revision: number; payload: string }
 function validateBaseline(v: unknown): Baseline | null {
   return record(v) && integer(v.revision) && typeof v.payload === 'string' ? { revision: v.revision as number, payload: v.payload } : null;
 }
-const fingerprint = (p: ProfileData) => JSON.stringify(p);
+// A ordem das propriedades muda ao mesclar migrações e contadores de várias abas.
+const fingerprint = (p: ProfileData) => JSON.stringify(p,(_key,value)=>record(value)?Object.fromEntries(Object.keys(value).sort().map(k=>[k,value[k]])):value);
 export class CloudSaves {
   state: CloudState = 'unconfigured';
   user: CloudUser | null = null;

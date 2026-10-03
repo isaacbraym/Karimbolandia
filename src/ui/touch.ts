@@ -41,6 +41,8 @@ export class TouchUI {
       <button class="tbtn t-special" data-act="special" aria-label="Especial">${ICONS.special}<i class="cd-ring"></i></button>
       <button class="tbtn t-swap" data-act="next" aria-label="Trocar arma"><img class="wicon" alt="" /><b class="badge ammo-n">∞</b></button>
       <button class="tbtn t-pause" data-act="pause" aria-label="Pausar">${ICONS.pause}</button>
+      <button class="tbtn t-reload" data-act="reload" aria-label="Recarregar arma">↻</button>
+      <button class="tbtn t-merchant hidden" data-act="interact" aria-label="Conversar com o mercador">OFICINA</button>
     `;
     parent.appendChild(this.root);
     this.stickZone = this.root.querySelector('.stick-zone') as HTMLElement;
@@ -252,10 +254,11 @@ export class TouchUI {
 
   private lastSync = '';
   /** Atualiza os botões com o estado do jogo (ícone/munição da arma, granadas, recarga do avanço). */
-  sync(s: { weaponIcon: string; ammo: string; lowAmmo: boolean; grenades: number; dash01: number }) {
-    const key = `${s.weaponIcon.length}|${s.ammo}|${s.lowAmmo}|${s.grenades}|${Math.round(s.dash01 * 20)}`;
+  sync(s: { weaponIcon: string; ammo: string; lowAmmo: boolean; grenades: number; dash01: number; merchant?:boolean }) {
+    const key = `${s.weaponIcon.length}|${s.ammo}|${s.lowAmmo}|${s.grenades}|${Math.round(s.dash01 * 20)}|${s.merchant}`;
     if (key === this.lastSync) return;
     this.lastSync = key;
+    this.buttons.get('interact')?.classList.toggle('hidden',!s.merchant);
     const swap = this.buttons.get('next');
     if (swap) {
       const img = swap.querySelector('.wicon') as HTMLImageElement;

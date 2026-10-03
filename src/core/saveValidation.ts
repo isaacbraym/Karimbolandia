@@ -25,6 +25,11 @@ export function validateSave(v: unknown): SaveState | null {
     seen.add(pair[0]);
   }
   if (typeof v.cur !== 'string' || (v.weapons.length ? !seen.has(v.cur) : v.cur !== '')) return null;
+  if(v.magazines!==undefined) {
+    if(!Array.isArray(v.magazines)||v.magazines.length>WEAPON_ORDER.length)return null;
+    const clips=new Set<string>();
+    for(const pair of v.magazines){if(!Array.isArray(pair)||pair.length!==2||!seen.has(pair[0])||clips.has(pair[0])||!integer(pair[1],0,100))return null;clips.add(pair[0]);}
+  }
   if (!integer(v.grenades, -1) || !number(v.nomad, -1) || !record(v.stats)) return null;
   for (const k of ['kills', 'deaths', 'damageTaken', 'dashes', 'shots', 'pitFalls']) if (!number(v.stats[k])) return null;
   // Clone também remove propriedades desconhecidas nos subobjetos usados pelo jogo.
@@ -36,6 +41,7 @@ export function validateSave(v: unknown): SaveState | null {
     killed: [...s.killed], collected: [...s.collected], destroyed: [...s.destroyed],
     nomadUsed: s.nomadUsed, nomadLost: s.nomadLost, bossLivesGiven: s.bossLivesGiven,
     weapons: s.weapons.map(([id, n]) => [id, n]), cur: s.cur, grenades: s.grenades, nomad: s.nomad,
+    magazines:s.magazines?.map(([id,n])=>[id,n]),
     stats: { kills: s.stats.kills, deaths: s.stats.deaths, damageTaken: s.stats.damageTaken, dashes: s.stats.dashes, shots: s.stats.shots, pitFalls: s.stats.pitFalls },
     savedAt: s.savedAt,
   };

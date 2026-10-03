@@ -32,6 +32,7 @@ export interface SaveState {
   bossLivesGiven: boolean;
   /** inventário no checkpoint (munição infinita gravada como -1) */
   weapons: [string, number][];
+  magazines?: [string,number][];
   cur: string;
   grenades: number;
   nomad: number;
@@ -77,6 +78,7 @@ export function captureSave(w: World): SaveState {
     nomadLost: w.nomadLost,
     bossLivesGiven: w.bossLivesGiven,
     weapons: snap.weapons.map(([id, n]) => [id as string, n === Infinity ? -1 : n]),
+    magazines: snap.magazines,
     cur: snap.cur,
     grenades: snap.grenades,
     nomad: snap.nomad,
@@ -99,7 +101,8 @@ export function freshSave(stage: number, score = 0): SaveState {
 
 /** Continua a campanha sem levar IDs e checkpoints de um mapa para o outro. */
 export function nextStageSave(w: World, stage: number): SaveState {
-  return { ...freshSave(stage, w.score), tokens: w.tokens };
+  const snap=captureSave(w);
+  return { ...freshSave(stage, w.score), tokens: w.tokens, weapons:snap.weapons,magazines:snap.magazines,cur:snap.cur,grenades:snap.grenades };
 }
 
 /** Restaura o save num mundo recém-criado e põe o Karimbo no checkpoint. */
@@ -126,6 +129,7 @@ export function applySave(w: World, s: SaveState) {
       weapons: s.weapons.map(([id, n]) => [id as WeaponId, n < 0 ? Infinity : n]),
       cur: s.cur as WeaponId,
       grenades: s.grenades,
+      magazines: s.magazines as [WeaponId,number][]|undefined,
       nomad: s.nomad,
     };
   } else w.checkpointSnap = null;

@@ -398,6 +398,8 @@ export interface KPose {
   suit?: number;
   /** fase da batida de pernas no nado */
   swimPhase?: number;
+  reload?: number;
+  scope?: boolean;
 }
 
 // ombro abaixo do queixo: o braço/arma nunca cobre o rosto
@@ -512,6 +514,10 @@ export function drawKarimbo(g: CanvasRenderingContext2D, art: KarimboArt, x: num
 
   const sh = SHOULDER_STAND;
   const shY = sh[1] + torsoDrop + bob - breath * 10;
+  const reload=p.reload??0;
+  const reloadWeight=reload>0?Math.sin(Math.PI*reload):0;
+  // Sequência do Animator_AI: aproximar, buscar carregador, encaixar, retomar mira.
+  if(reloadWeight>0)drawSpr(g,art.armBack,sh[0]-3,shY+1,{rot:1.25-Math.sin(Math.PI*Math.min(1,reload*1.6))*.9,white:w});
   // braço de trás (só quando sem arma)
   if (!p.hasGun) drawSpr(g, art.armBack, sh[0] - 4, shY + 0.5, { rot: 1.1 + Math.sin(c) * (running ? 0.5 : 0), white: w });
   // cilindro de ar nas costas (traje de mergulho)
@@ -530,6 +536,7 @@ export function drawKarimbo(g: CanvasRenderingContext2D, art: KarimboArt, x: num
   // braço da frente + arma (ANTES da cabeça: nada cobre o rosto)
   if (p.hasGun) {
     let a = localAim(p.aim, p.facing);
+    if(reloadWeight>0)a=a*(1-reloadWeight)+.5*reloadWeight;
     const m = p.melee ?? 0;
     if (m > 0) {
       // golpe de faca: antecipação curta e corte em arco (alternando de cima / de baixo)
@@ -545,6 +552,8 @@ export function drawKarimbo(g: CanvasRenderingContext2D, art: KarimboArt, x: num
     // durante o golpe a arma some e a faquinha aparece na mão (como no Metal Slug)
     if (m > 0) drawSpr(g, art.knife, ARM_LEN - 1, 0.2, { white: w });
     else drawSpr(g, art.weapons[p.weapon], ARM_LEN - 1.5 - p.kick * 3.2, 0.3, { white: w });
+    if(m<=0&&p.scope){g.fillStyle='#374653';g.fillRect(ARM_LEN+4,-5,7,3);g.fillStyle='#8de6ea';g.fillRect(ARM_LEN+10,-5,2,3);}
+    if(reload>.2&&reload<.6){g.fillStyle='#7e8b9b';g.fillRect(ARM_LEN-3,4+(1-Math.sin(Math.PI*(reload-.2)/.4))*7,4,7);}
     g.restore();
   } else {
     drawSpr(g, art.armFront, sh[0], shY, { rot: 0.9 + Math.sin(c + 3) * (running ? 0.5 : 0), white: w });
@@ -555,7 +564,7 @@ export function drawKarimbo(g: CanvasRenderingContext2D, art: KarimboArt, x: num
   const aimLocal = localAim(p.aim, p.facing);
   const lookAround = idle && (p.idleT ?? 0) > 3.5 ? Math.sin(((p.idleT ?? 0) - 3.5) * 1.1) * 0.07 : 0;
   const headRot =
-    hurtRot * 1.4 + (glide ? -0.06 : 0) + Math.sin(p.t * 2.2) * 0.012 + (running ? Math.sin(c - 0.5) * 0.035 : 0) + (p.hasGun ? aimLocal * 0.1 : 0) + lookAround - lagX * 0.02;
+    hurtRot * 1.4 + (glide ? -0.06 : 0) + Math.sin(p.t * 2.2) * 0.012 + (running ? Math.sin(c - 0.5) * 0.035 : 0) + (p.hasGun ? aimLocal * 0.1 : 0) + lookAround - lagX * 0.02 + reloadWeight*.08;
   const hx = 1.0 + lagX - recoil * 0.8;
   const hy = -26.5 + torsoDrop + bob * 1.15 + lagY - breath * 12;
   g.save();
