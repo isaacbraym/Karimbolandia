@@ -1,4 +1,5 @@
-import { Level, T, TILE, type LevelData, type EnemySpawn, type PickupKind } from './level';
+import { Level, T, TILE, type LevelData, type EnemySpawn, type EnemyType, type PickupKind } from './level';
+import { difficulty } from '../core/difficulty';
 import { Fx, PK } from './fx';
 import { Camera } from './camera';
 import { Player } from './player';
@@ -301,13 +302,16 @@ export class World {
     this.timers = [];
     const dismountX = this.data.triggers.find((t) => t.id === 'dismount')?.rect.x ?? Infinity;
     let footGrunts = 0;
+    const diff = difficulty();
     for (const s of this.data.enemies) {
       if (s.arena) continue;
       // Nos trechos percorridos a pé, reduz só tropas comuns; encontros especiais permanecem.
+      // A dificuldade decide quantos ficam de fora (FÁCIL tira mais, DIFÍCIL não tira nenhum).
       if ((s.x < this.data.nomadSpawn.x || s.x >= dismountX) &&
-          (s.type === 'rifle' || s.type === 'shotgun' || s.type === 'drone') && ++footGrunts % 4 === 0) continue;
+          (s.type === 'rifle' || s.type === 'shotgun' || s.type === 'drone') && ++footGrunts % 4 === 0 && diff.thinEvery === 4) continue;
+      if (diff.thinEvery === 3 && (s.type === 'rifle' || s.type === 'shotgun' || s.type === 'drone') && s.id % 3 === 0) continue;
       if (this.killedEnemies.has(s.id)) continue;
-      this.enemies.push(createEnemy(s));
+      this.enemies.push(createEnemy(diff.promote ? promoteSpawn(s, this.data.stage) : s));
     }
     for (const p of this.data.props) {
       if (this.destroyedProps.has(p.id)) continue;
@@ -780,6 +784,7 @@ export class World {
   }
   spawnEnemyBullet(x: number, y: number, ang: number, speed: number, dmg: number, kind: BulletKind, extra: Partial<BulletOpts> = {}) {
     this.noteThreat(x, y);
+    speed *= difficulty().bulletSpeed;
     const o: BulletOpts = { kind, team: 1, dmg, life: extra.life ?? 3, r: extra.r ?? (kind === 'bossShell' ? 5 : 3), ...extra };
     if (kind === 'sniper') {
       o.r = 3;
@@ -888,7 +893,7 @@ export class World {
     const hp = pl.nomad ? Math.min(pl.hp / pl.maxHp, 1) : pl.hp / pl.maxHp;
     const missing = 1 - clamp(hp, 0, 1);
     if (this.time - this.lastHealthDrop < 14) return false;
-    if (!rand.chance(0.015 + 0.3 * missing * missing)) return false;
+    if (!rand.chance((0.015 + 0.3 * missing * missing) * difficulty().supply)) return false;
     this.lastHealthDrop = this.time;
     return true;
   }
@@ -1129,6 +1134,7 @@ export class World {
       // acordado mas muito longe da câmera (ficou para trás): congela até voltar à cena
       if (!e.isBoss && !e.spawnedByArena && Math.abs(e.x - cx) > 1500) continue;
       e.update(this, dt);
+      e.flushDamage(this, dt);
     }
     // contato inimigo → jogador
     if (p.targetable && !p.isDashing && !introFreeze) {
@@ -1252,6 +1258,7 @@ export class World {
         g.restore();
       } else e.draw(g, this);
     }
+    for (const e of this.enemies) if (cam.visible(e.x, e.y, 80)) e.drawStatus(g);
     this.player.draw(g, this);
     for (const gr of this.grenades) gr.draw(g);
     for (const b of this.bullets) if (cam.visible(b.x, b.y, b.interceptable ? 24 : 60)) b.draw(g);
@@ -1488,3 +1495,13 @@ function pitSprites() {
 const CLIP_LEN: Record<ClipName, number> = { bossIntro: 15.7, karimboEncara: 3.7, karimboNomad: 1.5 };
 
 const WEAPON_AMMO_FLOOR: Record<WeaponId, number> = { pistol: Infinity, rifle: 18, shotgun: 4, launcher: 2, energy: 8 };
+
+/**
+ * DIFÍCIL: parte das tropas comuns vira um tipo mais duro (mesmo id e posição, então saves e
+ * inimigos já derrotados continuam valendo).
+ */
+function promoteSpawn(s: EnemySpawn, stage: number): EnemySpawn {
+  if (s.type !== 'rifle' || s.id % 3 !== 1) return s;
+  const type: EnemyType = stage === 2 ? (s.id % 2 ? 'grenadier' : 'hunter') : (s.id % 2 ? 'shotgun' : 'shield');
+  return { ...s, type };
+}

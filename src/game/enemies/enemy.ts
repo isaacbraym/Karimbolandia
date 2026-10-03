@@ -5,6 +5,24 @@ import type { Bullet } from '../bullets';
 import { rand } from '../../core/math';
 import { PK } from '../fx';
 import type { Rect } from '../../core/math';
+import { difficulty } from '../../core/difficulty';
+import { weaponEffect, type ArmorClass } from '../weapons';
+
+/** Classe de proteção por tipo (decide quais armas funcionam melhor). */
+const ARMOR: Record<EnemyType, ArmorClass> = {
+  rifle: 'flesh', shotgun: 'flesh', shield: 'flesh', jetpack: 'flesh', sniper: 'flesh', grenadier: 'flesh', hunter: 'flesh',
+  drone: 'mech', spider: 'mech', roller: 'mech', turret: 'armor', heavy: 'armor', minimech: 'armor', boss: 'flesh',
+};
+/** Sorteio estável por id de spawn: recarregar o save não troca quem é elite. */
+const stableRoll = (id: number) => {
+  let h = Math.imul(id ^ 0x5bd1e995, 0x27d4eb2d);
+  h ^= h >>> 15;
+  h = Math.imul(h, 0x165667b1);
+  h ^= h >>> 13;
+  return (h >>> 0) / 4294967296;
+};
+/** Tons dos números de dano: normal, eficaz, resistido, crítico. */
+const DMG_COLORS = ['#ffffff', '#ffd23a', '#9aa3b8', '#ff5a8a'];
 
 export interface HurtInfo {
   kx: number;
@@ -53,6 +71,18 @@ export abstract class Enemy {
   deadT = 0;
   contactDmg = 0;
   flashCd = 0;
+  /** proteção contra cada arma */
+  armor: ArmorClass;
+  /** inimigo ELITE (dificuldade): mais vida, couraça dourada, prêmio maior */
+  elite = false;
+  /** ritmo de decisão/recarga (dificuldade) */
+  aggro: number;
+  /** multiplicador da dispersão da mira (dificuldade) */
+  spreadMul: number;
+  private armorWeight: number;
+  private dmgAcc = 0;
+  private dmgTone = 0;
+  private dmgT = 0;
 
   constructor(spawn: EnemySpawn, stats: EnemyStats) {
     this.spawn = spawn;
@@ -61,9 +91,95 @@ export abstract class Enemy {
     this.body = newBody(stats.w, stats.h);
     this.body.x = spawn.x;
     this.body.y = spawn.y - stats.h / 2;
-    this.hp = this.maxHp = stats.hp;
+    const diff = difficulty();
+    this.armor = ARMOR[spawn.type] ?? 'flesh';
+    this.aggro = diff.aggro;
+    this.spreadMul = diff.spread;
+    this.armorWeight = diff.armorWeight;
+    const boss = spawn.type === 'boss';
+    // só inimigos do mapa (id ≥ 0); reforços gerados na hora nunca são elite
+    this.elite = !boss && spawn.id >= 0 && stableRoll(spawn.id) < diff.eliteChance;
+    this.hp = this.maxHp = Math.round(stats.hp * (boss ? diff.bossHp : diff.enemyHp) * (this.elite ? 1.6 : 1));
     this.facing = spawn.facing ?? (Math.random() < 0.5 ? -1 : 1);
-    this.score = stats.score;
+    this.score = Math.round(stats.score * (this.elite ? 1.5 : 1));
+  }
+
+  /**
+   * Multiplicador de dano da arma contra este alvo, já com crítico na cabeça (soldados) e couraça
+   * de elite. Também escolhe o tom do número flutuante.
+   */
+  protected damageScale(info: HurtInfo): number {
+    const weapon = info.bullet?.weapon ?? (info.type === 'explosion' ? 'launcher' : null);
+    let k = weapon ? weaponEffect(weapon, this.armor, this.armorWeight) : 1;
+    if (this.elite && k <= 1.01 && info.type !== 'melee' && info.type !== 'dash') k *= 0.85;
+    let tone = k > 1.08 ? 1 : k < 0.9 ? 2 : 0;
+    if (info.type === 'bullet' && this.armor === 'flesh' && info.y < this.body.y - this.body.h * 0.26) {
+      k *= 1.5;
+      info.crit = true;
+      tone = 3;
+    }
+    if (tone > this.dmgTone || this.dmgAcc === 0) this.dmgTone = tone;
+    return k;
+  }
+
+  /** Soma os danos de um instante num único número (balas de escopeta viram um só). */
+  protected noteDamage(dmg: number) {
+    if (dmg <= 0) return;
+    if (this.dmgAcc === 0) this.dmgT = 0.09;
+    this.dmgAcc += dmg;
+  }
+
+  flushDamage(w: World, dt: number, force = false) {
+    if (this.dmgAcc <= 0) return;
+    this.dmgT -= dt;
+    if (this.dmgT > 0 && !force) return;
+    const n = Math.max(1, Math.round(this.dmgAcc));
+    const tone = this.dmgTone;
+    const top = this.body.y - this.body.h / 2;
+    w.fx.popup(this.x + (Math.random() - 0.5) * 20, top - 4, tone === 3 ? `${n}!` : String(n), DMG_COLORS[tone], tone === 3 || n >= 40 ? 12 : n >= 18 ? 10.5 : 9);
+    this.dmgAcc = 0;
+    this.dmgTone = 0;
+  }
+
+  /** Barra de vida curta depois de levar dano + marca de elite (vetores simples, sem alocar). */
+  drawStatus(g: CanvasRenderingContext2D) {
+    if (!this.alive || this.isBoss) return;
+    const top = this.body.y - this.body.h / 2 - 9;
+    if (this.elite) {
+      const pulse = 0.75 + 0.25 * Math.sin(this.t * 5);
+      g.fillStyle = `rgba(255,210,58,${pulse})`;
+      g.strokeStyle = '#3a2408';
+      g.lineWidth = 1;
+      for (let i = 0; i < 2; i++) {
+        const y = top - 7 - i * 4;
+        g.beginPath();
+        g.moveTo(this.x - 6, y + 3);
+        g.lineTo(this.x, y - 1);
+        g.lineTo(this.x + 6, y + 3);
+        g.lineTo(this.x + 6, y + 5);
+        g.lineTo(this.x, y + 1.5);
+        g.lineTo(this.x - 6, y + 5);
+        g.closePath();
+        g.fill();
+        g.stroke();
+      }
+    }
+    const since = this.t - this.lastHurt;
+    if (this.lastHurt <= 0 || since > 2.6 || this.hp >= this.maxHp) return;
+    const a = since > 2.1 ? (2.6 - since) / 0.5 : 1;
+    const bw = Math.max(26, Math.min(58, this.body.w));
+    const x = this.x - bw / 2;
+    const f = Math.max(0, this.hp / this.maxHp);
+    g.globalAlpha = a;
+    g.fillStyle = 'rgba(14,10,34,0.85)';
+    g.fillRect(x - 1, top - 1, bw + 2, 5);
+    g.fillStyle = this.elite ? '#ffd23a' : f > 0.5 ? '#8fe05a' : f > 0.25 ? '#ffb83a' : '#ff4a4a';
+    g.fillRect(x, top, bw * f, 3);
+    if (this.armor === 'armor') {
+      g.fillStyle = 'rgba(200,220,255,0.55)';
+      g.fillRect(x, top, bw * f, 1);
+    }
+    g.globalAlpha = 1;
   }
 
   get x() {
@@ -91,7 +207,9 @@ export abstract class Enemy {
   /** Aplica dano. Retorna dano efetivo (0..), ou -1 se bloqueado (escudo). */
   hurt(w: World, dmg: number, info: HurtInfo): number {
     if (!this.alive || this.invulnerable) return 0;
+    dmg *= this.damageScale(info);
     this.hp -= dmg;
+    this.noteDamage(dmg);
     if (this.flashCd <= 0) {
       this.flash = 0.05;
       this.flashCd = 0.14;
@@ -111,6 +229,7 @@ export abstract class Enemy {
     w.fx.sparks(info.x, info.y, this.stats.metal ? 5 : 3, this.stats.metal ? '#ffe9a0' : '#ffb0b0', 180, -info.dir, 0, 1.6);
     w.audio(this.stats.metal ? 'hitMetal' : 'hit', 0.6, this.x);
     if (info.type !== 'explosion') w.fx.addHitStop(dmg >= 20 ? 0.03 : 0.012);
+    if (info.crit) w.fx.sparks(info.x, info.y, 5, '#ff8ab4', 220, -info.dir, 0, 1.4);
     if (this.hp <= 0) this.kill(w, info);
     else if (!this.stats.metal) w.audio('enemyHurt', 0.35, this.x);
     return dmg;
@@ -120,6 +239,7 @@ export abstract class Enemy {
     if (!this.alive) return;
     this.alive = false;
     this.deadT = 0;
+    this.flushDamage(w, 0, true);
     w.fx.addHitStop(0.045);
     w.onEnemyKilled(this, info);
     this.onDeath(w, info);
@@ -202,12 +322,14 @@ export abstract class Enemy {
   /** Empurrão de corpo (inimigos não se sobrepõem totalmente). */
   drops(w: World) {
     if (this.silentDeath) return;
+    const diff = difficulty();
     const [a, b] = this.stats.tokens;
-    const n = rand.int(a, b);
+    const raw = rand.int(a, b) * diff.tokens + (this.elite ? 2 : 0);
+    const n = Math.floor(raw) + (raw % 1 > 0 && rand.chance(raw % 1) ? 1 : 0);
     for (let i = 0; i < n; i++) w.spawnDrop('token', this.x, this.y - 8);
     if (w.wantsHealthDrop()) w.spawnDrop('health', this.x, this.y - 8);
-    else if (rand.chance(0.2)) w.spawnDrop('ammo', this.x, this.y - 8);
-    else if (rand.chance(0.07)) w.spawnDrop('nade', this.x, this.y - 8);
+    else if (rand.chance(Math.min(0.6, (this.elite ? 0.55 : 0.2) * diff.supply * (w.player.hasEmptyOwned() ? 1.6 : 1)))) w.spawnDrop('ammo', this.x, this.y - 8);
+    else if (rand.chance(0.07 * diff.supply)) w.spawnDrop('nade', this.x, this.y - 8);
   }
 
   fireBullet(w: World, x: number, y: number, ang: number, speed: number, dmg: number, kind: 'enemy' | 'orb' | 'sniper' | 'missile' | 'bossShell' | 'bossOrb' = 'enemy', extra: Partial<{ life: number; homing: number; gravity: number; explode: { radius: number; dmg: number } | null; turnDelay: number; r: number; color: string; trail: string; interceptable: boolean }> = {}) {

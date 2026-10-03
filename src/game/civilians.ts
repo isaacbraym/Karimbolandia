@@ -23,19 +23,29 @@ export const PHRASES = [
   'Eles levaram a Júlia pro telhado!', // 7
   'Que orelhas incríveis!', // 8
   'Cuidado com o Felipão!', // 9
+  'Os robôs tomaram a avenida!', // 10
+  'Tem munição nas caixas, pega!', // 11
+  'Eu sabia que você viria!', // 12
+  'Socorro! Eles estão por toda parte!', // 13
+  'Abaixa! Tão atirando!', // 14
+  'Mostra pra eles, orelhudo!', // 15
+  'O Tomé vende armas lá na oficina!', // 16
+  'Minha loja virou ferro-velho...', // 17
 ] as const;
 /** frases em grito (balão serrilhado) */
-export const SHOUTS: readonly number[] = [5, 6, 9];
+export const SHOUTS: readonly number[] = [5, 6, 9, 13, 14];
 
-const VICTORY: readonly number[] = [0, 6, 8];
-const HELP: readonly number[] = [1, 2, 3, 4, 7, 9];
-const FEAR: readonly number[] = [5, 9, 1];
+const VICTORY: readonly number[] = [0, 6, 8, 12, 15];
+const HELP: readonly number[] = [1, 2, 3, 4, 7, 9, 10, 11, 16, 17];
+const FEAR: readonly number[] = [5, 9, 13, 14];
 
 /** distância (px) em que o civil mais próximo fala */
 export const TALK_DIST = 260;
 const TALK_TIME = 2.7;
-const TALK_GAP = 0.7;
-const TALK_CD = 10;
+/** silêncio mínimo entre dois balões quaisquer */
+const TALK_GAP = 3.5;
+/** distância que o Karimbo precisa se afastar para o morador poder falar de novo */
+const FORGET_DIST = 900;
 
 export type CivAct = 'idle' | 'cheer' | 'help' | 'run' | 'cower';
 
@@ -63,6 +73,12 @@ export class Civilian {
   threatX = NaN;
   speakCd = 0;
   lastPhrase = -1;
+  /** já falou neste encontro: só volta a falar depois que o Karimbo se afasta bastante */
+  spoke = false;
+  /** quantas vezes falou na partida (cada vez mais raro) */
+  talks = 0;
+  /** relógio do mundo a partir do qual pode voltar a falar */
+  quietUntil = 0;
   /** fase própria (ninguém se mexe em sincronia com os vizinhos) */
   phase: number;
   /** arte assada (resolvida uma vez, no primeiro desenho) */
@@ -209,6 +225,8 @@ export class Crowd {
   talkT = 0;
   gap = 0;
   lastPhrase = -1;
+  /** frases ditas recentemente (ninguém repete o que o vizinho acabou de dizer) */
+  private recent: number[] = [];
 
   reset(spawns: CivilianSpawn[]) {
     this.list.length = 0;
@@ -217,20 +235,26 @@ export class Crowd {
     this.phrase = -1;
     this.talkT = 0;
     this.gap = 0;
+    this.recent.length = 0;
   }
 
+  private now = 0;
+
   update(w: World, dt: number) {
+    this.now = w.time;
     const cam = w.camera;
     const p = w.player;
     let best: Civilian | null = null;
     let bd = TALK_DIST;
     for (let i = 0; i < this.list.length; i++) {
       const c = this.list[i];
+      // o Karimbo foi embora: na próxima visita o morador pode dizer outra coisa (se já passou a recarga)
+      if (c.spoke && Math.abs(c.x - p.x) > FORGET_DIST && w.time >= c.quietUntil) c.spoke = false;
       // longe da câmera congela (não atualiza nem desenha)
       if (!cam.visible(c.x, c.y - 40, 220)) continue;
       c.update(w, dt);
       const d = Math.abs(c.x - p.x);
-      if (c.speakCd <= 0 && d < bd && Math.abs(c.y - p.y) < 160) {
+      if (!c.spoke && d < bd && Math.abs(c.y - p.y) < 160 && cam.visible(c.x, c.y - 40, 0)) {
         bd = d;
         best = c;
       }
@@ -256,12 +280,17 @@ export class Crowd {
     const pool = c.mood === 'cheer' ? VICTORY : c.mood === 'help' ? HELP : c.act === 'run' || c.act === 'cower' || c.mood === 'scared' ? FEAR : HELP;
     let k = Math.floor(rand.next() * pool.length);
     let ph = pool[k];
-    for (let n = 0; n < pool.length && (ph === c.lastPhrase || ph === this.lastPhrase); n++) {
+    for (let n = 0; n < pool.length && (ph === c.lastPhrase || this.recent.includes(ph)); n++) {
       k = (k + 1) % pool.length;
       ph = pool[k];
     }
     c.lastPhrase = ph;
-    c.speakCd = TALK_CD + rand.next() * 4;
+    c.spoke = true;
+    c.talks++;
+    // cada nova fala do mesmo morador demora mais (nada de papagaio)
+    c.quietUntil = this.now + 25 + c.talks * 20;
+    this.recent.push(ph);
+    if (this.recent.length > Math.min(5, pool.length - 1)) this.recent.shift();
     this.lastPhrase = ph;
     this.phrase = ph;
     this.talker = c;

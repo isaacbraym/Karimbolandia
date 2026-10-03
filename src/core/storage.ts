@@ -3,6 +3,7 @@ import { profileKey, readStored, writeStored } from './persistence';
 import { record, number, integer, ids } from './saveValidation';
 import { isSkinId, type SkinId } from './skinCatalog';
 import { validGear } from './gearCatalog';
+import { isDifficulty, type DifficultyId } from './difficulty';
 import { readGearReceipts, storeGearReceipts } from './gearReceipts';
 import { coinTotal, validateCoinLedger, mergeCoinLedgers, readCoinWriters, flushCoinWriter, type CoinLedger } from './coins';
 
@@ -20,6 +21,7 @@ export interface Settings {
   leftHanded: boolean;
   haptics: boolean; // vibração (celular) / rumble (gamepad)
   narrator: boolean; // voz do narrador da história
+  difficulty: DifficultyId; // nível das próximas partidas
 }
 
 export interface Progress {
@@ -58,6 +60,7 @@ export const defaultSettings = (): Settings => ({
   leftHanded: false,
   haptics: true,
   narrator: true,
+  difficulty: 'normal',
 });
 
 export const defaultProgress = (): Progress => ({
@@ -96,6 +99,7 @@ function save(key: string, v: object) {
 }
 
 export const settings: Settings = load(KEY_S, defaultSettings);
+if (!isDifficulty(settings.difficulty)) settings.difficulty = 'normal';
 export function validateProgress(v: unknown): Progress | null {
   if (!record(v)) return null;
   const p = { ...defaultProgress(), ...v };

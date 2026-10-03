@@ -175,20 +175,51 @@ export class Background {
       g.fillStyle = 'rgba(255,255,255,0.06)';
       g.fillRect(bx, top, b.w, 2);
       if (!far) {
-        // faixas horizontais e janelas
+        // coroamento escalonado (prédios altos ganham recuos no topo)
+        if (b.h > 140 && rng.chance(0.5)) {
+          const sw = b.w * rng.range(0.45, 0.7);
+          const sh = rng.range(14, 30);
+          g.fillStyle = baseTop;
+          g.fillRect(bx + (b.w - sw) * 0.4, top - sh, sw, sh + 1);
+          g.fillStyle = 'rgba(0,0,20,0.28)';
+          g.fillRect(bx + (b.w - sw) * 0.4 + sw * 0.68, top - sh, sw * 0.32, sh + 1);
+          g.fillStyle = 'rgba(255,170,140,0.22)';
+          g.fillRect(bx + (b.w - sw) * 0.4, top - sh, sw, 1.5);
+        }
+        // pilastras, faixas de andar e luz do pôr do sol na quina esquerda
+        g.fillStyle = 'rgba(255,255,255,0.035)';
+        for (let px = bx + 8; px < bx + b.w - 4; px += 16) g.fillRect(px, top, 1.5, b.h);
         g.fillStyle = 'rgba(255,255,255,0.05)';
         for (let yy = top + 14; yy < H - 8; yy += 22) g.fillRect(bx, yy, b.w, 2);
+        g.fillStyle = 'rgba(255,150,120,0.22)';
+        g.fillRect(bx, top, 1.5, b.h);
+        // janelas: grade apagada inteira + salas acesas em grupos (andares inteiros às vezes)
         const cols = Math.floor(b.w / 8);
-        for (let cx = 0; cx < cols; cx++) {
-          for (let yy = top + 12; yy < H - 12; yy += 10) {
+        for (let yy = top + 12, floor = 0; yy < H - 12; yy += 10, floor++) {
+          const litFloor = rng.chance(0.08);
+          const tint = rng.pick(['#ffb83a', '#ffd89a', '#39f0ff', '#ff8ad4']);
+          for (let cx = 0; cx < cols; cx++) {
             const roll = rng.next();
-            if (roll < 0.16) {
-              g.fillStyle = roll < 0.06 ? '#39f0ff' : roll < 0.11 ? '#ffb83a' : '#ff8ad4';
-              g.globalAlpha = 0.85;
-              g.fillRect(bx + 4 + cx * 8, yy, 4, 5);
-              g.globalAlpha = 1;
+            const on = litFloor ? roll < 0.75 : roll < 0.14;
+            g.fillStyle = on ? (litFloor ? tint : roll < 0.05 ? '#39f0ff' : roll < 0.1 ? '#ffb83a' : '#ff8ad4') : 'rgba(8,4,32,0.45)';
+            g.globalAlpha = on ? 0.85 : 1;
+            g.fillRect(bx + 4 + cx * 8, yy, 4, 5);
+            if (on) {
+              g.globalAlpha = 0.18;
+              g.fillRect(bx + 3 + cx * 8, yy - 1, 6, 7);
             }
+            g.globalAlpha = 1;
           }
+        }
+        // caixa d'água ou máquinas no telhado
+        if (rng.chance(0.35)) {
+          const tx = bx + b.w * rng.range(0.55, 0.75);
+          g.fillStyle = '#1a1248';
+          g.fillRect(tx - 6, top - 12, 12, 10);
+          g.fillRect(tx - 5, top - 2, 1.5, 2);
+          g.fillRect(tx + 3.5, top - 2, 1.5, 2);
+          g.fillStyle = 'rgba(255,170,140,0.25)';
+          g.fillRect(tx - 6, top - 12, 1.5, 10);
         }
         // letreiro neon vertical
         if (b.h > 150 && rng.chance(0.55)) {

@@ -11,9 +11,9 @@ describe('Comparacao das melhorias antes de comprar', () => {
     expect(gear).toEqual(['pistol.mag.1']);
   });
   it('explica o dano por projetil da shotgun e o dano de explosao do lancador', () => {
-    expect(gearPreview(gearItem('shotgun.damage.1')!, [])).toBe('7 → 8,05 dano × 8 projéteis');
-    expect(gearPreview(gearItem('launcher.damage.1')!, [])).toBe('30 → 34,5 dano • 60 → 69 explosão');
-    expect(tunedWeapon('launcher', ['launcher.damage.1']).explosive!.dmg).toBe(69);
+    expect(gearPreview(gearItem('shotgun.damage.1')!, [])).toBe('7 → 8,4 dano × 8 projéteis');
+    expect(gearPreview(gearItem('launcher.damage.1')!, [])).toBe('30 → 36 dano • 70 → 84 explosão');
+    expect(tunedWeapon('launcher', ['launcher.damage.1']).explosive!.dmg).toBe(84);
   });
   it('nao promete reduzir dispersao inexistente e inclui perfuracoes ja presentes no plasma', () => {
     expect(gearPreview(gearItem('energy.scope.1')!, [])).toBe('Já sem dispersão • alcance +15%');

@@ -8,6 +8,7 @@
 import { bake, glowSprite, softDot, shadedRR, poly, OUT, type Sprite } from './kit';
 import { Rng, shade } from '../core/math';
 import { prism } from './volume';
+import { barkTrunk, foliage, JUNGLE_LEAVES } from './foliage';
 
 /** Caixas (x0,y0,x1,y1) das decorações estáticas da selva — assadas em imagem. */
 export const JUNGLE_BOUNDS: Record<string, [number, number, number, number]> = {
@@ -143,26 +144,7 @@ function frond(g: CanvasRenderingContext2D, x: number, y: number, len: number, a
 }
 
 function crownBlob(g: CanvasRenderingContext2D, r: Rng, x: number, y: number, rad: number) {
-  const blobs: [number, number, number][] = [];
-  for (let i = 0; i < 8; i++) blobs.push([x + r.range(-1, 1) * rad, y + r.range(-0.5, 0.5) * rad * 0.7, rad * r.range(0.4, 0.7)]);
-  g.fillStyle = LEAF_D;
-  for (const [bx, by, br] of blobs) {
-    g.beginPath();
-    g.arc(bx, by + br * 0.2, br, 0, Math.PI * 2);
-    g.fill();
-  }
-  for (const [bx, by, br] of blobs) {
-    g.fillStyle = r.pick(LEAF);
-    g.beginPath();
-    g.arc(bx, by, br * 0.92, 0, Math.PI * 2);
-    g.fill();
-  }
-  g.fillStyle = 'rgba(160,230,120,0.35)';
-  for (const [bx, by, br] of blobs) {
-    g.beginPath();
-    g.arc(bx - br * 0.3, by - br * 0.35, br * 0.42, 0, Math.PI * 2);
-    g.fill();
-  }
+  foliage(g, r, x, y, rad, JUNGLE_LEAVES, rad > 50 ? 11 : 8);
 }
 
 function stoneBlock(g: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: Rng) {
@@ -188,29 +170,7 @@ export function paintJungle(g: CanvasRenderingContext2D, kind: string, seed: num
       // árvore gigante: tronco largo, raízes tabulares, epífitas, copa cortada no alto
       const tw = r.range(26, 38);
       const top = -410;
-      g.fillStyle = BARK_D;
-      g.beginPath();
-      g.moveTo(-tw * 0.5, top);
-      g.lineTo(tw * 0.5, top);
-      g.lineTo(tw * 0.62, -40);
-      g.lineTo(tw * 0.5, 0);
-      g.lineTo(-tw * 0.5, 0);
-      g.lineTo(-tw * 0.62, -40);
-      g.closePath();
-      g.fill();
-      g.fillStyle = BARK;
-      g.fillRect(-tw * 0.45, top, tw * 0.55, 400);
-      g.fillStyle = BARK_L;
-      g.fillRect(-tw * 0.4, top, tw * 0.14, 400);
-      // casca
-      g.strokeStyle = 'rgba(20,10,4,0.4)';
-      g.lineWidth = 1;
-      for (let y = top + 10; y < -10; y += r.range(12, 22)) {
-        g.beginPath();
-        g.moveTo(-tw * 0.4, y);
-        g.quadraticCurveTo(0, y + 3, tw * 0.4, y - 1);
-        g.stroke();
-      }
+      barkTrunk(g, r, 0, top, 0, tw, tw * 1.3, BARK);
       // raízes tabulares
       for (const s of [-1, 1]) {
         g.fillStyle = s < 0 ? BARK : BARK_D;
@@ -309,7 +269,12 @@ export function paintJungle(g: CanvasRenderingContext2D, kind: string, seed: num
       return true;
     }
     case 'jBush': {
-      crownBlob(g, r, 0, -24, 30);
+      g.fillStyle = 'rgba(10,30,14,0.3)';
+      g.beginPath();
+      g.ellipse(0, 1, 44, 7, 0, 0, Math.PI * 2);
+      g.fill();
+      crownBlob(g, r, -12, -20, 22);
+      crownBlob(g, r, 12, -24, 26);
       for (let i = 0; i < 6; i++) leafBlade(g, r.range(-30, 30), -6, r.range(14, 20), -Math.PI / 2 + r.range(-1.2, 1.2), 5, r.pick(LEAF));
       // flores/frutinhas
       const fc = r.pick(['#ff5a7a', '#ffd23a', '#ff8a3a', '#d06aff']);

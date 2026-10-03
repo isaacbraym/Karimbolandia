@@ -5,6 +5,7 @@ import { glowSprite } from '../art/kit';
 import type { Enemy } from './enemies/enemy';
 import { circleEntry } from './interception';
 import { drawInterceptableGrenade } from '../art/hazards';
+import type { WeaponId } from './weapons';
 
 export type BulletKind = 'std' | 'shell' | 'rocket' | 'plasma' | 'enemy' | 'orb' | 'sniper' | 'missile' | 'nomadShell' | 'bossShell' | 'bossOrb' | 'mine';
 
@@ -28,6 +29,8 @@ export interface BulletOpts {
   length?: number; // comprimento do traço visual
   breakProps?: boolean;
   dmgProps?: number;
+  /** arma do Karimbo que disparou (eficácia contra blindagem) */
+  weapon?: WeaponId;
 }
 
 export class Bullet {
@@ -58,6 +61,7 @@ export class Bullet {
   age = 0;
   hitList: object[] | null = null;
   dmgProps: number;
+  weapon: WeaponId | null;
 
   constructor(x: number, y: number, vx: number, vy: number, o: BulletOpts) {
     this.interceptable = o.interceptable === true && o.team === 1 && !!o.explode;
@@ -82,6 +86,7 @@ export class Bullet {
     this.fromNomad = o.fromNomad ?? false;
     this.length = o.length ?? Math.min(22, Math.hypot(vx, vy) * 0.028);
     this.dmgProps = o.dmgProps ?? o.dmg;
+    this.weapon = o.weapon ?? null;
     if (this.pierce > 0) this.hitList = [];
   }
 

@@ -96,9 +96,9 @@ abstract class Soldier extends Enemy {
   protected commonUpdate(w: World, dt: number) {
     this.tickCommon(dt);
     if (this.jumpCd > 0) this.jumpCd -= dt;
-    if (this.shootCd > 0) this.shootCd -= dt;
+    if (this.shootCd > 0) this.shootCd -= dt * this.aggro;
     this.kick = approach(this.kick, 0, dt * 9);
-    this.modeT += dt;
+    this.modeT += dt * this.aggro;
     if (this.stunned > 0) this.stunned -= dt;
     void w;
   }
@@ -120,7 +120,7 @@ abstract class Soldier extends Enemy {
 
   fireAt(w: World, speed = 400, dmg = 8, spread = 0.05, kind: 'enemy' | 'orb' = 'enemy') {
     const [mx, my] = this.muzzlePos(w);
-    const a = this.aim + rand.spread(spread);
+    const a = this.aim + rand.spread(spread * this.spreadMul);
     this.fireBullet(w, mx, my, a, speed, dmg, kind);
     this.muzzleFlash(w, mx, my, a);
     this.kick = 1;
@@ -304,7 +304,7 @@ export class RifleSoldier extends Soldier {
           break;
         case 'burst':
           b.vx = approach(b.vx, 0, 1400 * dt);
-          this.burstGap -= dt;
+          this.burstGap -= dt * this.aggro;
           if (this.burstLeft > 0 && this.burstGap <= 0) {
             this.fireAt(w, 380, 7, 0.05);
             this.burstLeft--;
@@ -565,7 +565,7 @@ export class JetpackSoldier extends Soldier {
     const b = this.body;
     const p = w.player;
     this.flyOsc += dt;
-    this.diveCd -= dt;
+    this.diveCd -= dt * this.aggro;
     const dx = p.x - this.x;
     this.faceToward(p.x);
     const see = this.canSee(w, 560);
@@ -606,7 +606,7 @@ export class JetpackSoldier extends Soldier {
         }
         break;
       case 'burst':
-        this.burstGap -= dt;
+        this.burstGap -= dt * this.aggro;
         if (this.burstLeft > 0 && this.burstGap <= 0) {
           this.fireAt(w, 340, 7, 0.04);
           this.burstLeft--;
@@ -681,7 +681,7 @@ export class Sniper extends Soldier {
     const see = this.canSee(w, 680);
     this.aiming = true;
     this.faceToward(p.x);
-    this.reload -= dt;
+    this.reload -= dt * this.aggro;
     const target = this.aimAngleTo(w, this.x, this.feetY - 44, 0);
     if (see && this.reload <= 0) {
       this.alert = true;

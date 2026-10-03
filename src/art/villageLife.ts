@@ -1,5 +1,7 @@
 import { poly, shadedRR, shadedEllipse } from './kit';
 import { prism } from './volume';
+import { barkTrunk, foliage, VILLAGE_LEAVES } from './foliage';
+import { Rng } from '../core/math';
 
 export const LIFE_BOUNDS: Record<string,[number,number,number,number]> = {
   villageStream:[-245,-46,247,9], villageLaundry:[-112,-102,112,8],
@@ -33,13 +35,13 @@ export function paintVillageLife(g:CanvasRenderingContext2D,kind:string,seed:num
     shadedRR(g,21,-54,23,4,1,'#55483c',{lw:.8});
     for(let i=0;i<3;i++)prism(g,-61+i*6,7-i*9,69,7,18,-9,'#946b46');
   } else if(kind==='villageOrchard') {
-    shadedRR(g,-8,-121,17,121,4,'#72593d',{lw:1});
-    for(const [x,y,rx,ry] of [[-42,-127,43,35],[38,-132,48,36],[-3,-160,50,35]])
-      shadedEllipse(g,x,y,rx,ry,'#63854b',{lw:1.1});
-    for(let i=0;i<12;i++) {
-      const x=Math.sin(i*2.2+seed)*66,y=-111-(i%4)*19;
-      shadedEllipse(g,x,y,4,5,i%3?'#d2af4c':'#d47b45',{lw:.5});
-    }
+    const r=new Rng(seed*13+5);
+    barkTrunk(g,r,0,-122,0,13,19,'#72593d');
+    g.strokeStyle='#5e4630';g.lineCap='round';g.lineWidth=5;
+    g.beginPath();g.moveTo(0,-96);g.quadraticCurveTo(-22,-108,-38,-122);g.moveTo(2,-104);g.quadraticCurveTo(22,-116,36,-128);g.stroke();
+    foliage(g,r,-42,-128,34,{...VILLAGE_LEAVES,bloom:'#e0a83a'},7);
+    foliage(g,r,38,-132,36,{...VILLAGE_LEAVES,bloom:'#d47b45'},7);
+    foliage(g,r,-2,-158,38,{...VILLAGE_LEAVES,bloom:'#e0c048'},8);
     shadedEllipse(g,33,-7,21,10,'#ad8655',{lw:.8});
     for(let i=0;i<6;i++)shadedEllipse(g,22+i*4,-13-i%2*3,4,4,'#cfaa52',{lw:.5});
   } else {

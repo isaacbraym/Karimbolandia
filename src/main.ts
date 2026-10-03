@@ -43,6 +43,11 @@ async function boot() {
     await runSpriteDebug(base);
     return;
   }
+  if (params.get('debug') === 'npcs') {
+    const { runNpcDebug } = await import('./debug/npcs');
+    runNpcDebug();
+    return;
+  }
   if (params.get('debug') === 'map') {
     const { runLevelMap } = await import('./debug/levelmap');
     runLevelMap();

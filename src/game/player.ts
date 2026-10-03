@@ -12,6 +12,7 @@ import { drawKarimbo, karimboMuzzle, type KState } from '../art/karimbo';
 import { drawNomad } from '../art/nomad';
 import { settings, progress } from '../core/storage';
 import { magazineCapacity, reloadSeconds, tunedWeapon } from '../core/gearCatalog';
+import { difficulty } from '../core/difficulty';
 import {
   FOOT_W, FOOT_H, CROUCH_H, NOMAD_W, NOMAD_H, RUN, RUN_ACC, RUN_DEC, AIR_ACC, AIR_DEC, GRAV, JUMP_V, FALL_MAX, COYOTE, JUMP_BUF,
   GLIDE_FALL, GLIDE_FUEL, GLIDE_SPEED, CROUCH_SPEED, N_RUN, N_ACC, N_DEC, N_GRAV, N_JUMP,
@@ -309,21 +310,47 @@ export class Player {
     this.reloadT=0;
   }
 
-  /** Caixa de munição: reabastece TODAS as armas que você tem (metade da carga de cada). */
+  /** Arma comprada no Tomé: é do Karimbo para sempre (descarrega, mas volta com munição). */
+  ownsForever(id: WeaponId) {
+    return id === 'pistol' || progress.gear.includes(`${id}.unlock.1`);
+  }
+  /** Alguma arma comprada está sem munição (caixas aparecem mais e devolvem um pente cheio). */
+  hasEmptyOwned() {
+    for (const [id, n] of this.weapons) if (n === 0 && id !== 'pistol' && this.ownsForever(id)) return true;
+    return false;
+  }
+
+  /**
+   * Caixa de munição: reabastece TODAS as armas que você tem (metade da carga de cada). Arma comprada
+   * que estava vazia volta com pelo menos um carregador cheio e já pronta para atirar.
+   */
   addAmmo(w: World): boolean {
     let gained = false;
+    let revived: WeaponId | null = null;
     for (const id of WEAPON_ORDER) {
       if (id === 'pistol') continue;
       const have = this.weapons.get(id);
       if (have === undefined) continue;
       const d = WEAPONS[id];
       if (have >= d.ammoMax) continue;
-      this.weapons.set(id, Math.min(d.ammoMax, have + Math.ceil(d.ammoPickup * 0.6)));
+      const cap = magazineCapacity(id, progress.gear);
+      const add = Math.max(Math.ceil(d.ammoPickup * 0.6), have === 0 ? cap : 0);
+      const total = Math.min(d.ammoMax, have + add);
+      this.weapons.set(id, total);
+      if ((this.magazines.get(id) ?? 0) === 0 && id !== this.cur) this.magazines.set(id, Math.min(total, cap));
+      if (have === 0 && !revived) revived = id;
       gained = true;
     }
     if (!gained) {
       if (this.grenades >= this.maxGrenades) return false;
       this.grenades = Math.min(this.maxGrenades, this.grenades + 2);
+    }
+    if (revived) {
+      w.fx.popup(this.x, this.y - 52, `${WEAPONS[revived].name} VOLTOU!`, '#ffd23a', 9);
+      if (this.cur === 'pistol' && this.reloadT <= 0) {
+        this.cur = revived;
+        this.magazines.set(revived, Math.min(this.weapons.get(revived) ?? 0, magazineCapacity(revived, progress.gear)));
+      }
     }
     w.fx.popup(this.x, this.y - 40, '+MUNIÇÃO', '#9dff7a');
     return true;
@@ -380,6 +407,7 @@ export class Player {
     if (!this.targetable) return;
     if (this.isDashing || w.village?.active) return;
     if (this.invuln > 0 && !o.ignoreInvuln) return;
+    if (dmg < 999) dmg = Math.max(1, Math.round(dmg * difficulty().playerDmg));
     w.stats.damageTaken += dmg;
     this.lastDamageT = w.time;
     if (this.nomad) {
@@ -1341,7 +1369,7 @@ export class Player {
     if (ammo !== Infinity) {
       this.weapons.set(this.cur, ammo - 1);
       if (ammo - 1 <= 0) {
-        w.fx.popup(this.x, this.y - 44, 'SEM MUNIÇÃO', '#ff8a8a', 8);
+        w.fx.popup(this.x, this.y - 44, this.ownsForever(this.cur) ? 'VAZIA • ACHE MUNIÇÃO' : 'SEM MUNIÇÃO', '#ff8a8a', 8);
       }
     }
     const [mx, my] = karimboMuzzle(this.facing, this.aim, this.cur, this.crouch, this.kick);
@@ -1371,6 +1399,7 @@ export class Player {
           trail: d.trail,
           explode: d.explosive ?? null,
           dmgProps: this.cur === 'launcher' ? 30 : d.dmg,
+          weapon: this.cur,
         }
       );
     }

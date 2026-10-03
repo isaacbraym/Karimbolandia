@@ -1,5 +1,6 @@
-import { poly, shadedRR, OUT, bake, drawSpr, shadedEllipse, type Sprite } from './kit';
-import { prism, clothFinish } from './volume';
+import { poly, shadedRR, OUT, type Sprite } from './kit';
+import { bakeFace, drawFigure, figureLook, handPos, newPose, type FaceHair, type FaceSpec, type FigureLook, type FigurePose } from './figure';
+import { prism } from './volume';
 import { LIFE_BOUNDS, paintVillageLife } from './villageLife';
 import { clapOpen } from '../core/clapRhythm';
 export const VILLAGE_BOUNDS: Record<string, [number,number,number,number]> = {
@@ -19,9 +20,23 @@ export function paintVillageProp(g: CanvasRenderingContext2D, kind: string, seed
     g.strokeStyle = '#6e563a'; g.lineWidth = 1.4;
     for (let x = -70; x < 75; x += 10) { g.beginPath(); g.moveTo(x,-81); g.lineTo(x,-2); g.stroke(); }
     poly(g,[[-102,-77],[-5,-163],[98,-91],[116,-110],[14,-177]],'#a89255');
-    poly(g,[[-102,-77],[-5,-163],[98,-91],[81,-76],[-80,-68]],'#c8af68');
-    g.strokeStyle = '#927b42'; g.lineWidth = 1;
-    for (let i = -82; i < 84; i += 7) { g.beginPath(); g.moveTo(-5+i*0.12,-156); g.lineTo(i,-76-i*0.07); g.stroke(); }
+    // telhado de palha: gradiente do sol, fios de palha em camadas e franja irregular no beiral
+    const roof = g.createLinearGradient(-60,-160,40,-70);
+    roof.addColorStop(0,'#e2c886'); roof.addColorStop(.55,'#c8af68'); roof.addColorStop(1,'#9c8448');
+    poly(g,[[-102,-77],[-5,-163],[98,-91],[81,-76],[-80,-68]],roof);
+    g.lineWidth = .8;
+    for (let layer = 0; layer < 4; layer++) {
+      const k = layer / 4;
+      g.strokeStyle = layer % 2 ? 'rgba(120,96,48,.55)' : 'rgba(250,230,170,.35)';
+      for (let i = -86; i < 88; i += 3.5) {
+        const x0 = -5 + i * (0.12 + k * 0.5), y0 = -156 + k * 70;
+        g.beginPath(); g.moveTo(x0, y0); g.lineTo(x0 + (i - x0 + 5) * 0.3, y0 + 22 + (i * 7 % 5)); g.stroke();
+      }
+    }
+    g.strokeStyle = '#7d6634'; g.lineWidth = 1.1;
+    g.beginPath();
+    for (let i = -100; i < 96; i += 4) { const y = -76 - i * 0.07 + (i * 13 % 7) * 0.6; g.moveTo(i, y - 4); g.lineTo(i + 1.5, y + 3); }
+    g.stroke();
     shadedRR(g,-17+v*8,-63,30,62,3,'#362c26');
     shadedRR(g,-61,-57,22,21,2,'#3c372a');
     g.strokeStyle = '#ad9060'; g.lineWidth = 2;
@@ -52,84 +67,161 @@ export function paintVillageProp(g: CanvasRenderingContext2D, kind: string, seed
 
 export type ResidentRole = 'resident'|'farmer'|'washer'|'weaver'|'carrier'|'carpenter'|'child';
 export interface ResidentPose { x:number; y:number; id:number; facing:number; walk:number; gesture:number; role?:ResidentRole; work?:number }
-const residents = new Map<number, { body: Sprite; head: Sprite; arm: Sprite; leg: Sprite; shoe: Sprite }>();
-function residentArt(id: number, skin: string, shirt: string) {
-  const key = id % 4, cached = residents.get(key); if (cached) return cached;
-  const body = bake(28, 30, g => {
-    shadedRR(g, 4, 3, 22, 25, 3, shirt, { lw: 1 }); clothFinish(g, 4, 3, 22, 25, shirt);
-    g.strokeStyle = '#d9bd84'; g.lineWidth = 1.2;
-    g.beginPath(); g.moveTo(6, 20); g.lineTo(15, 17); g.lineTo(24, 20); g.stroke();
-    g.fillStyle = '#d8c7a4'; g.fillRect(9, 9, 3, 2); g.fillRect(19, 24, 3, 1);
-  }, { scale: 3, ox: 14, oy: 28 });
-  const head = bake(30, 36, g => {
-    shadedEllipse(g, 15, 18, 9, 11, skin, { lw: 1 });
-    shadedEllipse(g, 7, 20, 2, 3, skin, { lw: .6 });
-    g.fillStyle = '#211c21'; g.beginPath(); g.ellipse(12, 12, 9, 7, 0, Math.PI, Math.PI * 2); g.fill();
-    if (id % 2 === 0) shadedRR(g, 5, 15, 5, 19, 2, '#211c21', { lw: .6 });
-    g.fillStyle = '#eee2cc'; g.fillRect(19, 17, 2.5, 2.1);
-    g.fillStyle = '#221c26'; g.fillRect(20, 17.4, 1.4, 1.8); g.fillRect(18.5, 15.2, 4, .8);
-    g.strokeStyle = '#744532'; g.lineWidth = .7; g.beginPath(); g.moveTo(19, 24); g.lineTo(23, 24); g.stroke();
-    g.fillStyle = '#f0c99c44'; g.beginPath(); g.ellipse(17, 22, 3, 1.5, 0, 0, Math.PI * 2); g.fill();
-  }, { scale: 3, ox: 14, oy: 30 });
-  const arm = bake(10, 24, g => {
-    shadedRR(g, 2, 2, 6, 20, 3, skin, { lw: .8 });
-    g.strokeStyle = '#efd3a766'; g.lineWidth = .7;
-    g.beginPath(); g.moveTo(3.5, 5); g.lineTo(3.5, 16); g.stroke();
-  }, { scale: 3, ox: 5, oy: 2 });
-  const leg = bake(12, 24, g => {
-    shadedRR(g, 2, 2, 8, 20, 2, '#42424b', { lw: .8 });
-    clothFinish(g, 2, 2, 8, 20, '#42424b');
-  }, { scale: 3, ox: 6, oy: 2 });
-  const shoe = bake(15, 9, g => {
-    shadedRR(g, 1, 2, 13, 5, 2, '#9d7651', { lw: .8 });
-    g.fillStyle = '#e2c59b'; g.fillRect(3, 2, 8, 1);
-    g.fillStyle = '#332b2d'; g.fillRect(2, 6, 11, 1.3);
-    g.strokeStyle = '#493b35'; g.lineWidth = 1; g.beginPath(); g.moveTo(5, 2); g.lineTo(8, 6); g.stroke();
-  }, { scale: 3, ox: 7, oy: 7 });
-  const art = { body, head, arm, leg, shoe }; residents.set(key, art); return art;
+
+// ------------------------------------------------------------------ moradores (figura contínua)
+const V_SKINS = ['#8a5634','#a86c43','#6e4026','#c18a5c','#5a3320','#9a6440'];
+const V_HAIR = ['#1b1210','#2a1a12','#3b2414','#16100e'];
+const V_CLOTH = ['#c4553a','#e0a63a','#3f7d6b','#7a3f6e','#2f5c8a','#d97b3f','#5f8a3a','#b8463f','#e8c868','#4a6fa0'];
+const V_IRIS = ['#3a2416','#4a2c18','#2e2a20','#5a3a20'];
+interface VillagerArt { calm: Sprite; talk: Sprite; joy: Sprite; look: FigureLook; pose: FigurePose; scale: number }
+const villagers = new Map<string, VillagerArt>();
+const keyOf = (role: ResidentRole, id: number) => role === 'child' ? `child|${id % 8}` : `${role}|${id % 6}`;
+
+function villagerSpecs(role: ResidentRole, id: number): { face: FaceSpec; body: FigureLook } {
+  const v = id * 7 + role.length * 3;
+  const kid = role === 'child';
+  const feminine = role === 'washer' || role === 'weaver' || (role === 'resident' || role === 'carrier' || kid) && id % 2 === 1;
+  const skin = V_SKINS[v % V_SKINS.length];
+  const cloth = V_CLOTH[(v + id) % V_CLOTH.length];
+  const cloth2 = V_CLOTH[(v * 3 + 4) % V_CLOTH.length];
+  const hairStyle: FaceHair = kid
+    ? (['puffs', 'curly', 'braids', 'spiky', 'afro', 'short', 'puffs', 'curly'] as FaceHair[])[id % 8]
+    : role === 'farmer' ? 'straw'
+    : role === 'washer' || role === 'weaver' ? 'wrap'
+    : role === 'carrier' ? (feminine ? 'wrap' : 'short')
+    : role === 'carpenter' ? (id % 2 ? 'bald' : 'short')
+    : feminine ? (id % 3 ? 'braids' : 'afro') : (id % 3 ? 'short' : 'curly');
+  const face: FaceSpec = {
+    skin, hair: V_HAIR[v % V_HAIR.length], hairStyle, accent: cloth2, iris: V_IRIS[v % V_IRIS.length],
+    kid, lashes: feminine, elder: !kid && id % 6 === 5,
+    beard: kid || feminine ? 'none' : role === 'carpenter' ? 'full' : id % 3 === 0 ? 'stubble' : 'none',
+    earring: feminine && !kid ? '#e8c868' : undefined,
+    paint: kid && id % 3 === 0 ? '#f2f0e6' : undefined,
+  };
+  const body = figureLook({
+    skin, top: cloth, top2: cloth2,
+    sleeve: role === 'carpenter' || role === 'farmer' ? 0.5 : kid ? 0.5 : feminine ? 0 : 0.5,
+    bottom: feminine ? cloth2 : kid ? V_CLOTH[(v + 2) % V_CLOTH.length] : ['#5a4a3a', '#3e4a5a', '#6a5a40'][id % 3],
+    bottomKind: feminine ? (kid ? 'skirt' : 'dress') : kid ? 'shorts' : role === 'farmer' ? 'shorts' : 'pants',
+    shoe: kid ? '#d9b26a' : '#7a5236',
+    limb: kid ? 2.9 : role === 'carpenter' || role === 'carrier' ? 3.8 : 3.3,
+    thigh: kid ? 5.8 : 9.4, shin: kid ? 5.4 : 8.8,
+    torso: kid ? 8.8 : 11.8, shoulder: kid ? 9 : role === 'carpenter' ? 14 : feminine ? 11 : 12.4,
+    hip: kid ? 8.2 : feminine ? 11.4 : 10.2, arm: kid ? 4.8 : 6.6, fore: kid ? 4.8 : 6.4,
+    headScale: kid ? 1.42 : 1.14,
+    belly: !kid && id % 6 === 5 ? 1.3 : 0,
+    apron: role === 'carpenter' ? '#a8865a' : role === 'washer' ? '#e9e0c8' : undefined,
+    necklace: feminine || kid && id % 2 ? (id % 2 ? '#e8c868' : '#d9503a') : undefined,
+  });
+  return { face, body };
 }
-function residentLimb(g: CanvasRenderingContext2D, art: Sprite, x: number, y: number, ex: number, ey: number) {
-  g.save(); g.translate(x, y); g.rotate(Math.atan2(ey - y, ex - x) - Math.PI / 2);
-  g.scale(1, Math.hypot(ex - x, ey - y) / 20); drawSpr(g, art, 0, 0); g.restore();
-}
-export function drawResident(g: CanvasRenderingContext2D, p: ResidentPose, t:number) {
-  g.save(); g.translate(p.x,p.y); g.scale(p.facing,1);
-  const child=p.role==='child',work=p.work??0;
-  if(child)g.scale(.64,.64);
-  if(p.role==='farmer'||p.role==='washer')g.rotate(work*.18);
-  const skin = ['#ba835b','#a46a48','#cd9468','#8c593d'][p.id%4];
-  const shirt = ['#467780','#ac6950','#667b51','#b49461'][p.id%4];
-  const art = residentArt(p.id, skin, shirt);
-  const stride = Math.sin(p.walk)*9;
-  for (const s of [-1,1]) {
-    const foot = s*5+stride*s;
-    residentLimb(g, art.leg, s*4, -26, foot, -12); residentLimb(g, art.leg, foot, -12, foot, 0);
-    drawSpr(g, art.shoe, foot + 2, 1);
+
+function villagerArt(role: ResidentRole, id: number): VillagerArt {
+  const key = keyOf(role, id);
+  let a = villagers.get(key);
+  if (!a) {
+    const { face, body } = villagerSpecs(role, id);
+    const calm = bakeFace(face, 'calm');
+    a = { calm, talk: bakeFace(face, 'talk'), joy: role === 'child' ? bakeFace(face, 'joy') : calm, look: body, pose: newPose(calm), scale: role === 'child' ? 1.3 : 1.42 };
+    villagers.set(key, a);
   }
-  drawSpr(g, art.body, 0, -24);
-  if(child) {
-    const open=clapOpen(t),spread=3+open*16;
-    for(const s of [-1,1]){residentLimb(g,art.arm,s*7,-45,s*13,-36);residentLimb(g,art.arm,s*13,-36,s*spread,-43);}
-    if(open<.08){g.strokeStyle='#f8df91';g.lineWidth=1;g.beginPath();g.moveTo(-3,-48);g.lineTo(-5,-52);g.moveTo(3,-48);g.lineTo(5,-52);g.stroke();}
-  } else if(p.role && p.role!=='resident') {
-    const handY=-27-work*12;
-    for(const s of [-1,1]){residentLimb(g,art.arm,s*7,-45,10+s*5,-32);residentLimb(g,art.arm,10+s*5,-32,22+s*4,handY);}
-    if(p.role==='farmer'||p.role==='carpenter'){
-      g.save();g.translate(24,handY);g.rotate(work*.4);shadedRR(g,-1,-17,3,p.role==='farmer'?58:32,1,'#806243',{lw:.6});
-      shadedRR(g,-7,p.role==='farmer'?37:-19,15,5,1,'#9bada7',{lw:.7});g.restore();
-    }else if(p.role==='washer'||p.role==='weaver'){
-      poly(g,[[17,handY],[35,handY+2],[32,handY+17],[18,handY+14]],p.role==='washer'?'#7f9fba':'#b77958',{lw:.7});
-      g.strokeStyle='#edc991';g.lineWidth=1;g.beginPath();g.moveTo(19,handY+7);g.lineTo(33,handY+8);g.stroke();
-    }else{
-      shadedEllipse(g,23,-29,11,13,'#ae8655',{lw:.8});g.strokeStyle='#6a4b31';g.lineWidth=.7;
-      for(let y=-39;y<-17;y+=5){g.beginPath();g.moveTo(14,y);g.lineTo(31,y);g.stroke();}
+  return a;
+}
+
+/** Assa todos os rostos da aldeia junto com a arte da selva (nunca no meio de um quadro). */
+export function bakeVillagers() {
+  const roles: ResidentRole[] = ['resident', 'farmer', 'washer', 'weaver', 'carrier', 'carpenter'];
+  for (const r of roles) for (let i = 0; i < 6; i++) villagerArt(r, i);
+  for (let i = 0; i < 8; i++) villagerArt('child', i);
+}
+
+/** Desenha um morador com os pés em (p.x, p.y). Pose reaproveitada, nada alocado. */
+export function drawResident(g: CanvasRenderingContext2D, p: ResidentPose, t:number, talking=false) {
+  const role = p.role ?? 'resident';
+  const a = villagerArt(role, p.id);
+  const L = a.look, P = a.pose, work = p.work ?? 0;
+  const reach = L.arm + L.fore;
+  const sway = Math.sin(t * 1.4 + p.id);
+  P.lean = sway * 0.02; P.hipDrop = 0; P.hipX = sway * 0.4; P.breath = Math.sin(t * 2.2 + p.id) * 0.02;
+  const stride = Math.sin(p.walk) * 5.5, lift = Math.max(0, Math.cos(p.walk)) * 2.4;
+  P.footFX = 2.4 + stride; P.footFY = stride > 0 ? -lift : 0; P.footBX = -2.2 - stride; P.footBY = stride < 0 ? -lift : 0;
+  P.handFX = 2.4 - stride * 0.35; P.handFY = reach * 0.9; P.handBX = -2.2 + stride * 0.35; P.handBY = reach * 0.9;
+  P.headTilt = Math.sin(t * 0.8 + p.id * 2) * 0.04;
+  P.head = talking ? (Math.sin(t * 20) > -0.25 ? a.talk : a.calm) : a.calm;
+  let tool = 0;
+  switch (role) {
+    case 'child': {
+      // palmas no ritmo da roda: mãos se encontram à frente do peito, pulinho no estalo
+      const open = clapOpen(t);
+      P.handFX = 3.2 + open * 4.5; P.handFY = reach * 0.42 - open * 2;
+      P.handBX = 2.6 - open * 5.5; P.handBY = reach * 0.42 - open * 1.6;
+      P.hipDrop = (1 - open) * 0.9; P.lean = -0.04; P.headTilt = Math.sin(t * 5 + p.id) * 0.08;
+      P.footFY = P.footBY = 0; P.footFX = 2.6; P.footBX = -2.4;
+      // olhos abertos e sorrindo; no estalo da palma, aperta os olhos de alegria
+      P.head = open < 0.12 ? a.joy : a.talk;
+      break;
     }
-  } else {
-    residentLimb(g, art.arm, -7, -45, -12, -32); residentLimb(g, art.arm, -12, -32, -8, -26);
-    const wave = p.gesture ? Math.sin(t*7+p.id)*3 : 0;
-    residentLimb(g, art.arm, 9, -45, 17, -38-p.gesture*14);
-    residentLimb(g, art.arm, 17, -38-p.gesture*14, 20+p.gesture*5, -29-p.gesture*27+wave);
+    case 'farmer':
+      // enxada: sobe e desce com o trabalho
+      P.lean = 0.12 + work * 0.18;
+      P.handFX = 6 + work * 2; P.handFY = reach * 0.3 - work * 6;
+      P.handBX = 3.4 + work * 1.5; P.handBY = reach * 0.5 - work * 4;
+      tool = 1;
+      break;
+    case 'washer':
+      // torcendo roupa à beira do rio
+      P.lean = 0.3 + work * 0.15; P.hipDrop = 2.2;
+      P.handFX = 6.5; P.handFY = reach * 0.72 + work * 1.5;
+      P.handBX = 4.6; P.handBY = reach * 0.74 - work * 1.5;
+      tool = 2;
+      break;
+    case 'weaver':
+      P.handFX = 6 + Math.sin(t * 6 + p.id) * 1.2; P.handFY = reach * 0.5;
+      P.handBX = 4; P.handBY = reach * 0.55 + Math.cos(t * 6 + p.id) * 1.2;
+      tool = 3;
+      break;
+    case 'carrier':
+      // cesto equilibrado na cabeça, duas mãos segurando
+      P.handFX = 4.6; P.handFY = -reach * 0.9; P.handBX = -3.4; P.handBY = -reach * 0.86;
+      P.headTilt = 0;
+      tool = 4;
+      break;
+    case 'carpenter':
+      P.lean = 0.08;
+      P.handFX = 6 + work * 1.5; P.handFY = reach * 0.18 - work * 9;
+      P.handBX = 5; P.handBY = reach * 0.6;
+      tool = 5;
+      break;
+    default:
+      if (p.gesture > 0.02) {
+        const wave = Math.sin(t * 7 + p.id) * 2.4;
+        P.handFX = 4 + p.gesture * 2 + wave; P.handFY = reach * (0.9 - p.gesture * 1.75);
+      }
   }
-  drawSpr(g, art.head, 0, -48);
+  g.save(); g.translate(p.x, p.y); g.scale(p.facing * a.scale, a.scale);
+  drawFigure(g, L, P);
+  if (tool) {
+    const h = handPos(L, P, true);
+    g.lineCap = 'round';
+    if (tool === 1 || tool === 5) {
+      g.save(); g.translate(h.x, h.y); g.rotate(tool === 1 ? 0.5 + work * 0.6 : -0.6 + work * 1.2);
+      g.strokeStyle = OUT; g.lineWidth = 2.6; g.beginPath(); g.moveTo(0, tool === 1 ? -9 : 1); g.lineTo(0, tool === 1 ? 17 : -9); g.stroke();
+      g.strokeStyle = '#8a6440'; g.lineWidth = 1.4; g.stroke();
+      g.fillStyle = '#a9b4ad'; g.strokeStyle = OUT; g.lineWidth = .7;
+      g.beginPath(); if (tool === 1) g.rect(-1.5, 15, 7, 3); else g.rect(-3.5, -12, 7, 3.2); g.fill(); g.stroke();
+      g.restore();
+    } else if (tool === 2 || tool === 3) {
+      g.fillStyle = tool === 2 ? '#d9e4ea' : '#c4553a'; g.strokeStyle = OUT; g.lineWidth = .7;
+      g.beginPath(); g.moveTo(h.x - 3, h.y - 1); g.quadraticCurveTo(h.x + 2, h.y + 4 + work * 2, h.x + 1, h.y + 8); g.lineTo(h.x - 4, h.y + 7); g.closePath(); g.fill(); g.stroke();
+      if (tool === 3) { g.strokeStyle = '#e8c868'; g.lineWidth = .6; g.beginPath(); g.moveTo(h.x - 3, h.y + 2); g.lineTo(h.x + 1, h.y + 3); g.moveTo(h.x - 3.5, h.y + 4.5); g.lineTo(h.x + 1, h.y + 5.5); g.stroke(); }
+    } else {
+      const fx = h.x, fy = h.y;
+      const bx = (fx + handPos(L, P, false).x) / 2, by = fy - 1;
+      g.fillStyle = '#b48a52'; g.strokeStyle = OUT; g.lineWidth = .9;
+      g.beginPath(); g.moveTo(bx - 8, by - 6); g.lineTo(bx + 8, by - 6); g.lineTo(bx + 6, by + 1); g.lineTo(bx - 6, by + 1); g.closePath(); g.fill(); g.stroke();
+      g.strokeStyle = '#7a5a32'; g.lineWidth = .6; g.beginPath(); g.moveTo(bx - 7, by - 3.5); g.lineTo(bx + 7, by - 3.5); g.stroke();
+      for (const [dx, c] of [[-4, '#d47b45'], [0, '#e0c048'], [4, '#7aa04a']] as [number, string][]) { g.fillStyle = c; g.beginPath(); g.arc(bx + dx, by - 7.5, 2.4, 0, Math.PI * 2); g.fill(); }
+    }
+  }
   g.restore();
 }

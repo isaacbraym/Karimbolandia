@@ -1,5 +1,7 @@
 /** Menus em DOM: carregamento, principal, configurações, controles, créditos, pausa, resultados, girar celular. */
 import { settings, saveSettings, progress, type QualityPref } from '../core/storage';
+import { DIFFICULTIES, DIFFICULTY_ORDER, difficulty } from '../core/difficulty';
+const fmt=(n:number)=>n.toLocaleString('pt-BR',{maximumFractionDigits:2});
 import { formatTime } from '../core/math';
 import { cloudSaves } from '../core/cloud';
 import { applyProfile, captureProfile, exportBackup, validateProfile, preserveProfile, type ProfileData } from '../core/profile';
@@ -13,10 +15,11 @@ import { drawKarimbo } from '../art/karimbo';
 import { listSaveCopies } from '../game/saveSession';
 import { loadSave, type SaveState } from '../game/save';
 import { STAGES, stageCheckpoints, type StageId } from '../game/stageSelect';
-import { GEAR, magazineCapacity } from '../core/gearCatalog';
+import { GEAR, reloadSeconds, UNLOCK_PRICE, type GearItem } from '../core/gearCatalog';
+import { attributeBars, effectChips, pips, weaponCanvas } from './forgeShop';
 import { buyGearWhenOpen, withWalletLock } from '../core/forge';
 import { gearPreview } from '../core/gearPreview';
-import { WEAPON_ORDER, WEAPONS, type WeaponId } from '../game/weapons';
+import { WEAPON_ORDER, WEAPONS, WEAPON_INFO, type WeaponId } from '../game/weapons';
 import type { World } from '../game/world';
 import { weaponReveal } from './weaponReveal';
 
@@ -305,6 +308,7 @@ export class Menus {
     const panel = el('div', 'panel stage-picker');
     panel.append(el('h2', '', 'ESCOLHA SUA AVENTURA'));
     const note = el('p', 'stage-picker-note', 'Escolha a fase e o ponto de partida.');
+    panel.append(this.difficultyPicker());
     const cards = el('div', 'stage-cards');
     const current = loadSave();
     const previous = readStored(profileKey('karimbolandia.before-restore.v1'), validateProfile)?.save;
@@ -351,6 +355,40 @@ export class Menus {
     }
     panel.append(note, cards);
     this.openPanel(panel, 'main');
+  }
+
+  /** Três níveis lado a lado; vale para novas partidas (saves continuam no nível em que foram gravados). */
+  private difficultyPicker() {
+    const box = el('div', 'difficulty-picker');
+    box.setAttribute('role', 'radiogroup');
+    box.setAttribute('aria-label', 'Dificuldade');
+    const info = el('p', 'difficulty-info');
+    const buttons: HTMLButtonElement[] = [];
+    const paint = () => {
+      const d = DIFFICULTIES[settings.difficulty];
+      buttons.forEach((b, i) => {
+        const on = DIFFICULTY_ORDER[i] === settings.difficulty;
+        b.classList.toggle('on', on);
+        b.setAttribute('aria-checked', String(on));
+      });
+      info.textContent = `${d.description} Inimigos ${Math.round(d.enemyHp * 100)}% de vida • dano recebido ${Math.round(d.playerDmg * 100)}%${d.eliteChance ? ` • elites ${Math.round(d.eliteChance * 100)}%` : ''}.`;
+    };
+    for (const id of DIFFICULTY_ORDER) {
+      const d = DIFFICULTIES[id];
+      const b = this.btn('', `difficulty-option diff-${id}`, () => {
+        settings.difficulty = id;
+        saveSettings();
+        paint();
+      });
+      b.setAttribute('role', 'radio');
+      b.append(el('strong', '', d.label), el('small', '', d.tag));
+      buttons.push(b);
+    }
+    const row = el('div', 'difficulty-row');
+    row.append(...buttons);
+    box.append(el('span', 'difficulty-title', 'DIFICULDADE'), row, info);
+    paint();
+    return box;
   }
 
   setStageLoading(loading: boolean) {
@@ -549,61 +587,101 @@ export class Menus {
     const player=w.player;
     ensureWallet();
     const panel=el('div','panel forge-shop');
-    const title=el('h2','','TOMÉ • OFICINA ITINERANTE'),balance=el('p','shop-balance');balance.setAttribute('role','status');
-    const selection=el('select','forge-selector');selection.setAttribute('aria-label','Arma para personalizar');
-    const nav=el('div','forge-nav');
-    const previous=this.btn('‹','alt small',()=>cycle(-1)),next=this.btn('›','alt small',()=>cycle(1));
-    previous.setAttribute('aria-label','Arma anterior');next.setAttribute('aria-label','Próxima arma');nav.append(previous,selection,next);
-    for(const id of WEAPON_ORDER){const option=el('option');option.value=id;option.textContent=WEAPONS[id].name;selection.append(option);}
-    selection.value=player.cur;
-    const stats=el('p','forge-stats'),cards=el('div','forge-cards'),status=el('p','forge-message','Armas e melhorias ficam no seu save.');status.setAttribute('role','status');
-    panel.append(title,balance,nav,stats,cards,status);
+    const head=el('header','forge-head');
+    const title=el('h2','','TOMÉ • OFICINA');
+    const balance=el('p','shop-balance');balance.setAttribute('role','status');
+    head.append(title,balance);
+    const list=el('div','forge-list');list.setAttribute('role','tablist');list.setAttribute('aria-label','Armas');
+    const detail=el('section','forge-detail');
+    const status=el('p','forge-message','Armas compradas são suas: descarregam, mas voltam ao achar munição.');status.setAttribute('role','status');
+    const body=el('div','forge-body');body.append(list,detail);
+    panel.append(head,body,status);
     const isOpen=()=>panel.isConnected&&!this.panel.classList.contains('hidden');
+    let selected:WeaponId=player.cur;
     let purchaseFocus:string|undefined;
+    const thumbs=new Map(WEAPON_ORDER.map(id=>[id,weaponCanvas(id,74,30,3)]));
+    const hero=new Map<WeaponId,HTMLCanvasElement>();
+    const ownsWeapon=(id:WeaponId)=>id==='pistol'||player.weapons.has(id)||progress.gear.includes(`${id}.unlock.1`);
+    const levelOf=(id:WeaponId,kind:string)=>progress.gear.filter(x=>x.startsWith(`${id}.${kind}.`)).length;
+    const buy=(item:GearItem,button:HTMLButtonElement)=>{
+      purchaseFocus=item.kind;button.disabled=true;
+      void buyGearWhenOpen(item.id,player.weapons,isOpen).then(result=>{
+        if(result==='cancelled'||!isOpen())return;
+        if(result==='bought'||result==='volatile') {
+          if(item.kind==='unlock'&&!player.weapons.has(item.weapon))player.giveWeapon(item.weapon,w);
+          onChange();
+        }
+        status.textContent=result==='bought'?(item.kind==='unlock'?`${WEAPONS[item.weapon].name} é sua! Volta sempre que achar munição.`:`${item.label} instalado. Sinta a diferença no próximo tiro!`):result==='volatile'?'Compra nesta sessão. Baixe um backup: o aparelho não conseguiu salvar.':result==='insufficient'?'Faltam moedas.':result==='locked'?'Adquira a arma ou a melhoria anterior primeiro.':'Você já tem esta melhoria.';
+        update();
+      }).catch(()=>{if(isOpen())status.textContent='A conta mudou. Feche e abra a oficina novamente.';});
+    };
     const update=()=>{
       const focused=document.activeElement as HTMLElement|null;
-      const focusedKind=focused?.closest<HTMLElement>('.forge-card')?.dataset.kind??(focused===document.body?purchaseFocus:undefined);
+      const focusedKind=focused?.closest<HTMLElement>('.forge-track')?.dataset.kind??(focused?.closest('.forge-tab')?'tab':undefined)??(focused===document.body?purchaseFocus:undefined);
       purchaseFocus=undefined;
       ensureWallet();
-      const id=selection.value as WeaponId,d=player.weaponDef(id),owned=player.weapons.has(id)||progress.gear.includes(`${id}.unlock.1`);
-      balance.textContent=`${coinBalance()} MOEDAS`;
-      stats.textContent=`${d.pellets>1?`${d.pellets} × `:''}${d.dmg.toLocaleString('pt-BR',{maximumFractionDigits:2})} dano${d.pellets>1?' por disparo':''} • ${magazineCapacity(id,progress.gear)} no carregador • ${(1/d.rate).toLocaleString('pt-BR',{maximumFractionDigits:1})} tiros/s`;
-      cards.replaceChildren();
-      for(const kind of ['unlock','mag','rate','damage','scope','pierce']) {
-        if(kind==='unlock'&&id==='pistol')continue;
-        const options=GEAR.filter(x=>x.weapon===id&&x.kind===kind),item=options.find(x=>!progress.gear.includes(x.id))??options[options.length-1];
-        const acquired=progress.gear.includes(item.id),allowed=kind==='unlock'||owned;
-        const card=el('article','forge-card');card.dataset.kind=kind;
-        const description=el('p',acquired?'':'forge-preview');description.textContent=acquired?item.detail:item.kind==='unlock'&&player.weapons.has(id)?'Permanente • munição mantida':gearPreview(item,progress.gear);
-        card.append(el('h3','',item.label),description);
-        const button=this.btn(acquired?'ADQUIRIDO':`COMPRAR • ${item.price}`, 'small '+(kind==='unlock'?'primary':'alt'),()=>{
-          purchaseFocus=kind;
-          button.disabled=true;
-          void buyGearWhenOpen(item.id,player.weapons,isOpen).then(result=>{
-            if(result==='cancelled'||!isOpen())return;
-            if(result==='bought'||result==='volatile') {
-              if(item.kind==='unlock'&&!player.weapons.has(id))player.giveWeapon(id,w);
-              onChange();
-            }
-            status.textContent=result==='bought'?'Compra salva! Boa viagem, Karimbo.':result==='volatile'?'Compra nesta sessão. Baixe um backup: o aparelho não conseguiu salvar.':result==='insufficient'?'Faltam moedas.':result==='locked'?'Adquira a arma ou a melhoria anterior primeiro.':'Você já tem esta melhoria.';
-            update();
-          }).catch(()=>{if(isOpen())status.textContent='A conta mudou. Feche e abra a oficina novamente.';});
-        });
-        button.disabled=acquired||!allowed||coinBalance()<item.price;
-        if(!allowed)button.textContent='ADQUIRA A ARMA';
-        if(allowed&&!acquired&&coinBalance()<item.price){const missing=el('small','forge-shortfall');missing.textContent=`Faltam ${item.price-coinBalance()} moedas`;card.append(missing);}
-        button.setAttribute('aria-label',acquired?`${item.label} adquirido`:`${item.label} • ${button.textContent}`);
-        card.append(button);cards.append(card);
+      const coins=coinBalance();
+      balance.textContent=`${coins} MOEDAS`;
+      list.replaceChildren();
+      for(const id of WEAPON_ORDER){
+        const info=WEAPON_INFO[id],owned=ownsWeapon(id),ammo=player.weapons.get(id);
+        const tab=el('button','forge-tab'+(id===selected?' on':''));tab.type='button';
+        tab.setAttribute('role','tab');tab.setAttribute('aria-selected',String(id===selected));
+        tab.style.setProperty('--tier',info.tierColor);
+        const state=id==='pistol'?'INFINITA':owned?(ammo===0?'VAZIA':player.cur===id?'EQUIPADA':'SUA'):`${UNLOCK_PRICE[id]} moedas`;
+        tab.append(thumbs.get(id)!,el('strong','',WEAPONS[id].name),el('small',owned?'owned':coins>=UNLOCK_PRICE[id]?'afford':'',state));
+        tab.addEventListener('click',()=>{this.cb.onClick();selected=id;status.textContent=WEAPON_INFO[id].lore;update();});
+        list.append(tab);
       }
+      const id=selected,info=WEAPON_INFO[id],owned=ownsWeapon(id),d=player.weaponDef(id);
+      if(!hero.has(id))hero.set(id,weaponCanvas(id,200,74,4));
+      const top=el('div','forge-hero');top.style.setProperty('--tier',info.tierColor);
+      const name=el('div','forge-name');
+      name.append(el('span','forge-tier',info.tier),el('h3','',WEAPONS[id].name),el('p','forge-role',info.role));
+      const facts=el('p','forge-facts');
+      const total=player.weapons.get(id);
+      facts.textContent=`${d.pellets>1?`${fmt(d.dmg)} × ${d.pellets}`:fmt(d.dmg)} dano${d.explosive?` • explosão ${fmt(d.explosive.dmg)}`:''}${d.pierce?` • perfura ${d.pierce}`:''} • recarga ${fmt(reloadSeconds(id))} s${owned&&total!==undefined?` • munição ${total===Infinity?'∞':total}`:''}`;
+      name.append(facts);
+      top.append(hero.get(id)!,name);
+      const stats=el('div','forge-stats-box');
+      // prévia: só as barras mudam (o resto da tela fica parado sob o ponteiro)
+      const renderStats=(item?:GearItem)=>stats.replaceChildren(attributeBars(id,progress.gear,item?[...progress.gear,item.id]:undefined),effectChips(id,difficulty().armorWeight));
+      renderStats();
+      const tracks=el('div','forge-tracks');
+      for(const kind of ['unlock','damage','rate','mag','scope','pierce']) {
+        if(kind==='unlock'&&(id==='pistol'||progress.gear.includes(`${id}.unlock.1`)))continue;
+        const options=GEAR.filter(x=>x.weapon===id&&x.kind===kind);
+        const item=options.find(x=>!progress.gear.includes(x.id))??options[options.length-1];
+        const acquired=progress.gear.includes(item.id),allowed=kind==='unlock'||owned;
+        const row=el('article','forge-track'+(kind==='unlock'?' unlock':''));row.dataset.kind=kind;
+        const label=el('div','forge-track-label');
+        label.append(el('strong','',kind==='unlock'?(player.weapons.has(id)?'Tornar permanente':'Comprar arma'):item.label.replace(/ \d$/,'')),kind==='unlock'?el('small','',player.weapons.has(id)?'Achada nesta partida':'Fica sua para sempre'):pips(levelOf(id,kind),options.length));
+        const text=el('p',acquired?'':'forge-preview');
+        text.textContent=acquired?'Nível máximo':!allowed?'Compre a arma primeiro':kind==='unlock'&&player.weapons.has(id)?'Permanente • munição mantida':gearPreview(item,progress.gear);
+        const button=this.btn(acquired?'MÁX':`${item.price}`,'small '+(kind==='unlock'?'primary':'alt')+' forge-buy',()=>buy(item,button));
+        button.disabled=acquired||!allowed||coins<item.price;
+        if(!acquired&&allowed&&coins<item.price)button.title=`Faltam ${item.price-coins} moedas`;
+        button.setAttribute('aria-label',acquired?`${item.label} no máximo`:`Comprar ${item.label} por ${item.price} moedas`);
+        if(!acquired&&allowed){
+          row.addEventListener('pointerenter',()=>renderStats(item));
+          row.addEventListener('pointerleave',()=>renderStats());
+          button.addEventListener('focus',()=>renderStats(item));
+          button.addEventListener('blur',()=>renderStats());
+        }
+        row.append(label,text,button);
+        if(!acquired&&allowed&&coins<item.price)row.append(el('small','forge-shortfall',`faltam ${item.price-coins}`));
+        tracks.append(row);
+      }
+      detail.replaceChildren(top,stats,tracks);
       if (this.weaponOpen) return;
       this.collectFocus(panel);
-      const restoreFocus=focusedKind
-        ? cards.querySelector<HTMLButtonElement>(`[data-kind="${focusedKind}"] button:not(:disabled)`)??selection
-        : focused&&panel.contains(focused)?focused:null;
+      const restoreFocus=focusedKind==='tab'
+        ? list.querySelector<HTMLButtonElement>('.forge-tab.on')
+        : focusedKind
+          ? tracks.querySelector<HTMLButtonElement>(`[data-kind="${focusedKind}"] button:not(:disabled)`)??list.querySelector<HTMLButtonElement>('.forge-tab.on')
+          : null;
       if(restoreFocus){this.focusIdx=this.focusable.indexOf(restoreFocus);this.applyFocus();restoreFocus.focus({preventScroll:true});}
     };
-    const cycle=(dir:number)=>{selection.value=WEAPON_ORDER[(WEAPON_ORDER.indexOf(selection.value as WeaponId)+dir+WEAPON_ORDER.length)%WEAPON_ORDER.length];update();};
-    selection.addEventListener('change',update);
     this.openPanel(panel,'pause');this.merchantExit=()=>this.cb.onResume();update();
     let pending=false;
     const changed=()=>{if(pending)return;pending=true;queueMicrotask(()=>{pending=false;if(isOpen())update();});};

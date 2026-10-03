@@ -48,7 +48,7 @@ export class Drone extends Enemy {
     const p = w.player;
     this.osc += dt;
     this.modeT += dt;
-    this.cd -= dt;
+    this.cd -= dt * this.aggro;
     const kbx = this.kbx;
     this.kbx = 0;
     b.vx += kbx * 0.6;
@@ -89,7 +89,7 @@ export class Drone extends Enemy {
         }
         break;
       case 'fire':
-        this.gap -= dt;
+        this.gap -= dt * this.aggro;
         if (this.burst > 0 && this.gap <= 0) {
           const mx = this.x + this.facing * 15;
           const my = this.y + 10;
@@ -153,7 +153,7 @@ export class Turret extends Enemy {
   update(w: World, dt: number) {
     this.tickCommon(dt);
     this.modeT += dt;
-    this.cd -= dt;
+    this.cd -= dt * this.aggro;
     this.kick = approach(this.kick, 0, dt * 8);
     const see = this.canSee(w, 500);
     const target = Math.atan2(w.player.y - 6 - this.headY, w.player.x - this.x);
@@ -183,7 +183,7 @@ export class Turret extends Enemy {
         }
         break;
       case 'fire':
-        this.gap -= dt;
+        this.gap -= dt * this.aggro;
         if (this.burst > 0 && this.gap <= 0) {
           const mx = this.x + Math.cos(this.aim) * 29;
           const my = this.headY + Math.sin(this.aim) * 29;
@@ -228,14 +228,10 @@ export class HeavyRobot extends Enemy {
   constructor(spawn: EnemySpawn) {
     super(spawn, { hp: 280, w: 62, h: 88, score: 500, wake: 620, tokens: [5, 8], metal: true });
   }
-  hurt(w: World, dmg: number, info: HurtInfo): number {
-    const armor = info.type === 'bullet' ? 0.72 : 1;
-    return super.hurt(w, Math.max(1, Math.round(dmg * armor)), info);
-  }
   update(w: World, dt: number) {
     this.tickCommon(dt);
     this.modeT += dt;
-    this.cd -= dt;
+    this.cd -= dt * this.aggro;
     this.kick = approach(this.kick, 0, dt * 7);
     const b = this.body;
     const p = w.player;
@@ -269,7 +265,7 @@ export class HeavyRobot extends Enemy {
         }
         break;
       case 'volley':
-        this.gap -= dt;
+        this.gap -= dt * this.aggro;
         if (this.burst > 0 && this.gap <= 0) {
           const mx = this.x + Math.cos(this.aim) * 40 * this.facing * this.facing + 0;
           const mxx = this.x + this.facing * 42;
@@ -345,7 +341,7 @@ export class SpiderBot extends Enemy {
   update(w: World, dt: number) {
     this.tickCommon(dt);
     this.modeT += dt;
-    this.cd -= dt;
+    this.cd -= dt * this.aggro;
     const b = this.body;
     const p = w.player;
     const dx = p.x - this.x;
@@ -422,8 +418,8 @@ export class MiniMech extends Enemy {
   update(w: World, dt: number) {
     this.tickCommon(dt);
     this.modeT += dt;
-    this.cd -= dt;
-    this.rocketCd -= dt;
+    this.cd -= dt * this.aggro;
+    this.rocketCd -= dt * this.aggro;
     this.kick = approach(this.kick, 0, dt * 8);
     const b = this.body;
     const p = w.player;
@@ -458,7 +454,7 @@ export class MiniMech extends Enemy {
         }
         break;
       case 'burst':
-        this.gap -= dt;
+        this.gap -= dt * this.aggro;
         if (this.burst > 0 && this.gap <= 0) {
           const mx = this.x + this.facing * 50;
           const my = this.feetY - 32 + Math.sin(this.aim) * 19;

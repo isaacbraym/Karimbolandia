@@ -54,16 +54,16 @@ describe('Arsenal e oficina',()=>{
     s.progress.coinsEarned=1000;s.progress.coinsMigrated=true;s.saveProgress();const old=profile.parseBackup(profile.exportBackup());
     expect(buyGear('rifle.damage.1',w.player.weapons)).toBe('locked');expect(buyGear('pistol.mag.2',w.player.weapons)).toBe('locked');
     for(const id of ['pistol.mag.1','pistol.rate.1','pistol.damage.1','pistol.scope.1','pistol.pierce.1'])expect(buyGear(id,w.player.weapons)).toBe('bought');
-    expect(coinBalance()).toBe(675);expect(buyGear('pistol.mag.1',w.player.weapons)).toBe('owned');expect(coinBalance()).toBe(675);
-    expect(w.player.weaponDef().dmg).toBeCloseTo(10.35);expect(w.player.weaponDef().rate).toBeLessThan(.24);expect(w.player.weaponDef().spread).toBeLessThan(.02);expect(w.player.weaponDef().pierce).toBe(1);
-    profile.applyProfile(old);expect(coinBalance()).toBe(675);
+    expect(coinBalance()).toBe(745);expect(buyGear('pistol.mag.1',w.player.weapons)).toBe('owned');expect(coinBalance()).toBe(745);
+    expect(w.player.weaponDef().dmg).toBeCloseTo(12);expect(w.player.weaponDef().rate).toBeLessThan(.24);expect(w.player.weaponDef().spread).toBeLessThan(.02);expect(w.player.weaponDef().pierce).toBe(1);
+    profile.applyProfile(old);expect(coinBalance()).toBe(745);
     const legacy={...s.defaultProgress(),coinsEarned:1000,coinsMigrated:true};
     disk.set('karimbolandia.wallet.v1',JSON.stringify(legacy));disk.set('karimbolandia.progress.v1',JSON.stringify(legacy));
-    s.reloadProgress();expect(s.progress.gear).toHaveLength(5);expect(coinBalance()).toBe(675);
+    s.reloadProgress();expect(s.progress.gear).toHaveLength(5);expect(coinBalance()).toBe(745);
   });
   it('mantém armas compradas em novas partidas e separa melhorias por perfil',async()=>{
     const w=await setup(),{buyGear}=await import('../src/core/forge'),s=await import('../src/core/storage'),scope=await import('../src/core/persistence');
-    s.progress.coinsEarned=80;s.progress.coinsMigrated=true;s.saveProgress();expect(buyGear('rifle.unlock.1',w.player.weapons)).toBe('bought');
+    s.progress.coinsEarned=90;s.progress.coinsMigrated=true;s.saveProgress();expect(buyGear('rifle.unlock.1',w.player.weapons)).toBe('bought');
     w.player.resetInventory();expect(w.player.weapons.get('rifle')).toBe(36);
     scope.setProfile('another');s.reloadProgress();w.player.resetInventory();expect(s.progress.gear).toEqual([]);expect([...w.player.weapons.keys()]).toEqual(['pistol']);
   });
@@ -74,7 +74,7 @@ describe('Arsenal e oficina',()=>{
   });
   it('serializa compras concorrentes e recusa uma compra pendente após trocar de conta',async()=>{
     const w=await setup(),{buyGear,withWalletLock}=await import('../src/core/forge'),s=await import('../src/core/storage'),scope=await import('../src/core/persistence');
-    s.progress.coinsEarned=100;s.progress.coinsMigrated=true;s.saveProgress();
+    s.progress.coinsEarned=80;s.progress.coinsMigrated=true;s.saveProgress();
     let tail=Promise.resolve();
     vi.stubGlobal('navigator',{locks:{request:(_name:string,fn:()=>unknown)=>{const next=tail.then(fn);tail=next.then(()=>{},()=>{});return next;}}});
     const results=await Promise.all([withWalletLock(()=>buyGear('pistol.damage.1',w.player.weapons)),withWalletLock(()=>buyGear('pistol.rate.1',w.player.weapons))]);
@@ -91,6 +91,6 @@ describe('Arsenal e oficina',()=>{
     open=false;run!();expect(await pending).toBe('cancelled');
     expect(coinBalance()).toBe(100);expect(s.progress.gear).toEqual([]);expect(disk).toEqual(before);
     open=true;const bought=buyGearWhenOpen('pistol.damage.1',w.player.weapons,()=>open);run!();
-    expect(await bought).toBe('bought');expect(coinBalance()).toBe(35);
+    expect(await bought).toBe('bought');expect(coinBalance()).toBe(50);
   });
 });

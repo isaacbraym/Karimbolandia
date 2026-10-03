@@ -1,4 +1,5 @@
 import { orient } from '../core/orient';
+import { setDifficulty } from '../core/difficulty';
 import { Input } from '../core/input';
 import { audio, type ClipHandle } from '../core/audio';
 import { PostFX } from './post';
@@ -444,6 +445,8 @@ export class Game {
     this.stopIntroAudio();
     this.stopNarr(0.2);
     if (!this.world || again || save || this.state === 'complete' || this.world.data.stage !== stage) {
+      // o nível vale para a partida inteira: save continua no nível em que foi gravado
+      setDifficulty(save?.difficulty ?? (save ? 'normal' : settings.difficulty));
       this.world = new World(stage === 2 ? buildJungle() : buildLevel());
       this.bindWorld(this.world);
     } else {

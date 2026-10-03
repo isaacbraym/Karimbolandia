@@ -1,6 +1,6 @@
 import { MAX_LIVES, COMBO_WINDOW, comboMult, type World } from './world';
 import { getArt } from '../art';
-import { WEAPONS } from './weapons';
+import { WEAPON_ORDER, WEAPONS } from './weapons';
 import { clamp, easeOutBack, formatTime } from '../core/math';
 import { drawSpr } from '../art/kit';
 import type { Felipao } from './enemies/felipao';
@@ -381,6 +381,35 @@ export class Hud {
       }
     }
     void def;
+    // inventário: armas que o Karimbo tem (vazias ficam apagadas até achar munição)
+    if (p.weapons.size > 1) {
+      let ix = bx + 100;
+      for (const id of WEAPON_ORDER) {
+        const n = p.weapons.get(id);
+        if (n === undefined) continue;
+        const spr = art.karimbo.weapons[id];
+        const cur = id === p.cur;
+        const empty = n === 0;
+        pill(g, ix, by + 14, 24, 22, 5, cur ? 'rgba(255,210,58,0.28)' : 'rgba(23,15,46,0.6)', cur ? '#ffd23a' : 'rgba(255,255,255,0.12)');
+        const k = Math.min(0.9, 20 / spr.w);
+        g.globalAlpha = empty ? 0.28 : 1;
+        g.save();
+        g.translate(ix + 12 - (spr.w / 2 - spr.ox) * k, by + 25);
+        g.scale(k, k);
+        g.drawImage(spr.c, -spr.ox, -spr.oy, spr.w, spr.h);
+        g.restore();
+        g.globalAlpha = 1;
+        if (empty) {
+          g.strokeStyle = '#ff6a6a';
+          g.lineWidth = 1.5;
+          g.beginPath();
+          g.moveTo(ix + 4, by + 32);
+          g.lineTo(ix + 20, by + 18);
+          g.stroke();
+        }
+        ix += 27;
+      }
+    }
     if(w.merchant.near(w))text(g,'TOMÉ • F / SELECT / OFICINA',W/2,H-68,12,'#ffe6a6','center');
 
     // ------------------------------------------------ Nômad

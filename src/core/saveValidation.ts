@@ -1,5 +1,6 @@
 import type { SaveState } from '../game/save';
 import { WEAPON_ORDER } from '../game/weapons';
+import { isDifficulty } from './difficulty';
 
 export const record = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
 export const number = (v: unknown, min = 0, max = 1e12) => typeof v === 'number' && Number.isFinite(v) && v >= min && v <= max;
@@ -31,6 +32,7 @@ export function validateSave(v: unknown): SaveState | null {
     const clips=new Set<string>();
     for(const pair of v.magazines){if(!Array.isArray(pair)||pair.length!==2||!seen.has(pair[0])||clips.has(pair[0])||!integer(pair[1],0,100))return null;clips.add(pair[0]);}
   }
+  if (v.difficulty !== undefined && !isDifficulty(v.difficulty)) return null;
   if (!integer(v.grenades, -1) || !number(v.nomad, -1) || !record(v.stats)) return null;
   for (const k of ['kills', 'deaths', 'damageTaken', 'dashes', 'shots', 'pitFalls']) if (!number(v.stats[k])) return null;
   // Clone também remove propriedades desconhecidas nos subobjetos usados pelo jogo.
@@ -46,5 +48,6 @@ export function validateSave(v: unknown): SaveState | null {
     magazines:s.magazines?.map(([id,n])=>[id,n]),
     stats: { kills: s.stats.kills, deaths: s.stats.deaths, damageTaken: s.stats.damageTaken, dashes: s.stats.dashes, shots: s.stats.shots, pitFalls: s.stats.pitFalls },
     savedAt: s.savedAt,
+    ...(s.difficulty ? { difficulty: s.difficulty } : {}),
   };
 }

@@ -3,6 +3,7 @@
  * selva e os bandidos. Prepara tudo em segundo plano depois do menu, para a fase abrir na hora.
  */
 import { makeCanvas } from './kit';
+import { bakeVillagers } from './village';
 import { JungleBackground } from './jungleBg';
 import { bakeBandit } from './bandits';
 import type { SoldierArt, SoldierStyle } from './soldiers';
@@ -94,6 +95,8 @@ export function loadJungle(base: string, quality: Quality): Promise<JungleArt> {
     await tick();
     prepareWildlifeArt();
     prepareForestLight();
+    await tick();
+    bakeVillagers();
     jungle = { fish, bg, bandits, banditVariants };
     return jungle;
   })();

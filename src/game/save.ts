@@ -8,6 +8,7 @@ import type { World } from './world';
 import type { WeaponId } from './weapons';
 import { profileKey, readStored, writeStored } from '../core/persistence';
 import { validateSave } from '../core/saveValidation';
+import { difficultyId, type DifficultyId } from '../core/difficulty';
 
 const KEY = 'karimbolandia.save.v1';
 
@@ -39,6 +40,8 @@ export interface SaveState {
   nomad: number;
   stats: { kills: number; deaths: number; damageTaken: number; dashes: number; shots: number; pitFalls: number };
   savedAt: number;
+  /** nível da partida (saves antigos não têm: valem como NORMAL) */
+  difficulty?: DifficultyId;
 }
 
 export function loadSave(): SaveState | null {
@@ -86,6 +89,7 @@ export function captureSave(w: World): SaveState {
     nomad: snap.nomad,
     stats: { kills: w.stats.kills, deaths: w.stats.deaths, damageTaken: w.stats.damageTaken, dashes: w.stats.dashes, shots: w.stats.shots, pitFalls: w.stats.pitFalls },
     savedAt: Date.now(),
+    difficulty: difficultyId(),
   };
 }
 
@@ -98,6 +102,7 @@ export function freshSave(stage: number, score = 0): SaveState {
     weapons: [], cur: '', grenades: -1, nomad: -1,
     stats: { kills: 0, deaths: 0, damageTaken: 0, dashes: 0, shots: 0, pitFalls: 0 },
     savedAt: Date.now(),
+    difficulty: difficultyId(),
   };
 }
 
