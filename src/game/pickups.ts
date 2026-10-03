@@ -5,6 +5,7 @@ import { drawSpr, glowSprite } from '../art/kit';
 import { PK } from './fx';
 import { moveBody, newBody, type Body } from './physics';
 import { music } from '../core/music';
+import { pickupPathClear } from './pickupReach';
 
 export class Pickup {
   kind: PickupKind;
@@ -18,6 +19,7 @@ export class Pickup {
   life = Infinity;
   magnet = false;
   collectDelay = 0;
+  private glintLeft = .3;
 
   constructor(kind: PickupKind, x: number, y: number, id = -1, itemId = 0, drop = false) {
     this.kind = kind;
@@ -42,6 +44,7 @@ export class Pickup {
   }
 
   update(w: World, dt: number) {
+    if (!this.alive || dt <= 0) return;
     this.t += dt;
     if (this.collectDelay > 0) this.collectDelay -= dt;
     if (this.body) {
@@ -55,25 +58,49 @@ export class Pickup {
     }
     this.life -= dt;
     if (this.life <= 0) this.alive = false;
+    if (!this.alive) return;
+    this.updateGlints(w, dt);
     const p = w.player;
     if (!p.canCollect) return;
     const px = p.x;
     const py = p.y - p.body.h * 0.1;
     const dx = px - this.x;
     const dy = py - this.y;
-    const d2 = dx * dx + dy * dy;
-    // ímã leve para tokens
-    if (this.kind === 'token' && d2 < 70 * 70 && this.collectDelay <= 0) {
-      const d = Math.sqrt(d2) || 1;
-      const s = 260 * dt;
-      if (this.body) this.body = null;
-      this.x += (dx / d) * s * (1 + (70 - d) / 30);
-      this.y += (dy / d) * s * (1 + (70 - d) / 30);
-    }
+    let d2 = dx * dx + dy * dy;
     const reach = this.radius + Math.max(p.body.w, 18) * 0.5;
-    if (this.collectDelay <= 0 && d2 < reach * reach + (p.body.h * 0.25) ** 2) {
+    const collectRange2 = reach * reach + (p.body.h * 0.25) ** 2;
+    const inMagnetRange = this.kind === 'token' && d2 < 70 * 70;
+    if (this.collectDelay > 0 || (!inMagnetRange && d2 >= collectRange2)) return;
+    if (!pickupPathClear(w.level, w.solidRects, this.x, this.y, px, py)) return;
+    // ímã leve para tokens
+    if (inMagnetRange) {
+      const d = Math.sqrt(d2) || 1;
+      const s = Math.min(d, 260 * dt * (1 + (70 - d) / 30));
+      if (this.body) this.body = null;
+      this.x += (dx / d) * s;
+      this.y += (dy / d) * s;
+      d2 = (px - this.x) ** 2 + (py - this.y) ** 2;
+    }
+    if (d2 < collectRange2) {
       if (w.collect(this)) this.alive = false;
     }
+  }
+
+  /** Simulation owns particle emission; drawing paused frames never fills the pool. */
+  private updateGlints(w: World, dt: number) {
+    const special = this.kind === 'emblem' || this.kind === 'secret';
+    const health = this.kind === 'health' || this.kind === 'healthBig';
+    if (!special && !health) return;
+    const interval = special ? 1 / 3.6 : 1 / 3;
+    this.glintLeft -= dt;
+    if (!w.camera.visible(this.x, this.y, 40)) { this.glintLeft = interval;return; }
+    if (this.glintLeft > 1e-9) return;
+    // Keep cadence across frame rates, but never catch up with a burst after a long step.
+    this.glintLeft += Math.max(1, Math.floor(-this.glintLeft / interval) + 1) * interval;
+    if (!w.fx.opt()) return;
+    w.fx.add(PK.Glint, this.x + (Math.random() - .5) * (special ? 22 : 18),
+      this.y + (Math.random() - .5) * (special ? 22 : 16), 0, special ? -6 : -8,
+      special ? .45 : .4, special ? 5 : 4, special ? '#fff2a0' : '#ffd0e0', { front: true });
   }
 
   draw(g: CanvasRenderingContext2D, w: World) {
@@ -129,7 +156,6 @@ export class Pickup {
       g.drawImage(spr.c, x - r, y - r, r * 2, r * 2);
       g.globalAlpha = 1;
       g.globalCompositeOperation = 'source-over';
-      if (Math.random() < 0.06) w.fx.add(PK.Glint, x + (Math.random() - 0.5) * 22, y + (Math.random() - 0.5) * 22, 0, -6, 0.45, 5, '#fff2a0', { front: true });
     }
     if (this.kind === 'health' || this.kind === 'healthBig') {
       const big = this.kind === 'healthBig';
@@ -141,7 +167,6 @@ export class Pickup {
       g.drawImage(glow.c, x - r, y - r, r * 2, r * 2);
       g.globalAlpha = 1;
       g.globalCompositeOperation = 'source-over';
-      if (Math.random() < 0.05) w.fx.add(PK.Glint, x + (Math.random() - 0.5) * 18, y + (Math.random() - 0.5) * 16, 0, -8, 0.4, 4, '#ffd0e0', { front: true });
       drawSpr(g, art[this.kind], x, y, { sx: pulse, sy: pulse });
       return;
     }
