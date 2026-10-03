@@ -10,6 +10,7 @@ import type { KarimboHeads } from './photo';
 import { WEAPONS, type WeaponId } from '../game/weapons';
 import { progress } from '../core/storage';
 import type { SkinId } from '../core/skinCatalog';
+import { clothFinish } from './volume';
 
 export interface KarimboArt {
   torso: Sprite;
@@ -113,6 +114,13 @@ export function bakeKarimbo(heads: KarimboHeads, skin: SkinId = 'classic', equip
       g.clip();
       g.fillStyle = 'rgba(80,50,20,0.16)';
       g.fillRect(18, 0, 10, 20);
+      clothFinish(g, 3, 2, 22, 17, SHIRT);
+      // Gola dobrada e costura de ombro acompanham o volume da camiseta.
+      g.strokeStyle = shade(SHIRT, -0.38); g.lineWidth = .85;
+      g.beginPath(); g.moveTo(7, 3); g.quadraticCurveTo(14, 6, 20, 3);
+      g.moveTo(4, 5); g.lineTo(7, 6.5); g.stroke();
+      g.strokeStyle = shade(SHIRT, .22); g.lineWidth = .6;
+      g.beginPath(); g.moveTo(7, 2.2); g.quadraticCurveTo(14, 5, 20, 2.2); g.stroke();
       g.fillStyle = 'rgba(255,255,255,0.22)';
       g.beginPath();
       g.ellipse(9, 11.5, 3.2, 5.6, 0.15, 0, Math.PI * 2);
@@ -173,6 +181,7 @@ export function bakeKarimbo(heads: KarimboHeads, skin: SkinId = 'classic', equip
     11,
     (g) => {
       shadedRR(g, 1.5, 0.6, 21, 9.6, 3, SHORTS);
+      clothFinish(g, 2, 1, 20, 9, SHORTS);
       g.fillStyle = shade(SHORTS, -0.35);
       g.fillRect(2.4, 1.4, 19.2, 1.6); // cós
       g.strokeStyle = shade(SHORTS, -0.4);
@@ -195,6 +204,7 @@ export function bakeKarimbo(heads: KarimboHeads, skin: SkinId = 'classic', equip
       (g) => {
         const sk = dark ? shade(SKIN, -0.2) : SKIN;
         shadedRR(g, 2.2, 0, 6.2, 14, 2.6, sk);
+        g.fillStyle = shade(sk, -0.22); g.fillRect(7, 4, .7, 7);
         g.fillStyle = 'rgba(255,255,255,0.16)';
         g.fillRect(3, 1, 1.6, 10);
         // pé + dedos aparecendo (papete)
@@ -252,6 +262,9 @@ export function bakeKarimbo(heads: KarimboHeads, skin: SkinId = 'classic', equip
           g.fillStyle = skin === 'explorer' ? '#d6bf72' : '#39f0ff';
           g.fillRect(1.8, 2, 2, 3.6);
         }
+        g.fillStyle = shade(sk, .22); g.fillRect(13.3, 2.4, 2.2, .7);
+        g.strokeStyle = shade(sk, -.28); g.lineWidth = .45;
+        g.beginPath(); g.moveTo(15.5, 4); g.lineTo(15.5, 5.5); g.moveTo(14.3, 4.2); g.lineTo(14.3, 5.7); g.stroke();
       },
       { scale: S, ox: 3, oy: 4 }
     );

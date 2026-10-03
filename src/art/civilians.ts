@@ -8,6 +8,7 @@ import { shade } from '../core/math';
 import { SOLDIER_SCALE } from './soldiers';
 import { SKINS, HAIR_COLORS, CLOTH, SHOES, lookKey, buildDims, type CivLook, type BuildDims } from '../game/civLook';
 import { PHRASES, SHOUTS, type CivAct } from '../game/civilians';
+import { clothFinish } from './volume';
 
 export interface CivArt {
   head: Sprite;
@@ -297,6 +298,7 @@ function bakeOne(l: CivLook): CivArt {
         g.fill();
       }
       // cós (calça/bermuda)
+      clothFinish(g, x0 + .6, 5.5, w - 1.2, 14, top);
       if (l.top !== 'dress' && l.top !== 'overalls' && l.bottom !== 'skirt') {
         shadedRR(g, x0 + 0.4, 17.2, w - 0.8, 3.6, 1.2, bot, { lw: 0.9 });
       }

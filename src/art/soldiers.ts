@@ -3,6 +3,7 @@ import { bake, drawSpr, glowSprite, shadedRR, shadedEllipse, poly, OUT, rrPath, 
 import { PAL } from './palette';
 import { shade } from '../core/math';
 import { WEAPONS } from '../game/weapons';
+import { clothFinish } from './volume';
 
 export type SoldierStyle = 'rifle' | 'shotgun' | 'shield' | 'jetpack' | 'sniper';
 
@@ -105,10 +106,18 @@ export function bakeSoldier(style: SoldierStyle): SoldierArt {
     (g) => {
       const wide = style === 'shotgun' ? 1 : 0;
       shadedRR(g, 3 - wide, 2, 16 + wide * 2, 19, 4.4, d.armor);
+      clothFinish(g, 3 - wide, 2, 16 + wide * 2, 19, d.armor);
       // peitoral
       shadedRR(g, 5, 3.6, 12, 9, 3, shade(d.armor, 0.12), { lw: 0.9 });
       g.fillStyle = d.trim;
       g.fillRect(9.6, 4.6, 2.8, 6);
+      // Placas facetadas, rebites e porta-carregadores dão leitura de equipamento real.
+      poly(g, [[5,4],[8,3.6],[8,11.5],[5,10]], d.armorDark, { lw: .6 });
+      for (const x of [6, 15]) { g.fillStyle = '#e5dccc'; g.fillRect(x, 5, .8, .8); }
+      for (const x of [4, 14]) {
+        shadedRR(g, x, 12.5, 4, 4.8, .7, d.armorDark, { lw: .55 });
+        g.fillStyle = d.trim; g.fillRect(x + .6, 13, 2.7, .6);
+      }
       // cinto
       shadedRR(g, 3, 16.6, 16, 4, 1.4, d.armorDark, { lw: 1 });
       g.fillStyle = d.trim;

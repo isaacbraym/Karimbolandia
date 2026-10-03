@@ -74,6 +74,8 @@ export function bakeTiles(): TileArt {
   // ---- cache de blocos: 8×8 tiles viram UMA imagem (≈300 drawImage/quadro → ≈12–24)
   const CH = 8;
   const CPX = CH * CELL; // 512 px (2x, igual ao atlas)
+  const OVERHANG = 12 * (CELL / TILE); // projeção + contorno fora da última coluna
+  const DOWNHANG = CELL + 2; // face lateral pode nascer na borda inferior do bloco
   interface Chunk { c: HTMLCanvasElement | null; empty: boolean; hazards: number[]; used: number }
   const chunks = new Map<number, Chunk>();
   let cacheRev = -1;
@@ -102,6 +104,14 @@ export function bakeTiles(): TileArt {
         g.fillStyle = th.light;
         g.beginPath(); g.moveTo(x, y - h0); g.lineTo(x + TILE * k, y - h1);
         g.lineTo(x + TILE * k + d, y - h1 - 8 * k); g.lineTo(x + d, y - h0 - 8 * k); g.closePath(); g.fill();
+        if (level.get(tx + 1, ty + 1) === T.EMPTY) {
+          const height = (below === T.ONEWAY ? 7 : TILE) * k;
+          g.fillStyle = th.dark;
+          g.beginPath(); g.moveTo(x + TILE * k, y - h1);
+          g.lineTo(x + TILE * k + d, y - h1 - 8 * k);
+          g.lineTo(x + TILE * k + d, y + height - 8 * k); g.lineTo(x + TILE * k, y + height); g.closePath(); g.fill();
+          g.strokeStyle = th.edge; g.lineWidth = .8 * k; g.stroke();
+        }
         g.strokeStyle = th.edge; g.lineWidth = 1.4 * k;
         g.beginPath(); g.moveTo(x, y - h0); g.lineTo(x + TILE * k, y - h1); g.stroke();
         // Juntas diagonais, folhas e pedrinhas pequenas no plano de cima.
@@ -158,7 +168,7 @@ export function bakeTiles(): TileArt {
       }
     }
     if (!any) return { c: null, empty: true, hazards, used: frame };
-    const c = pool.pop() ?? makeCanvas(CPX + 2, CPX + 2);
+    const c = pool.pop() ?? makeCanvas(CPX + OVERHANG, CPX + DOWNHANG);
     const cg = c.getContext('2d')!;
     cg.clearRect(0, 0, c.width, c.height);
     const k = CELL / TILE;
@@ -211,7 +221,7 @@ export function bakeTiles(): TileArt {
           built++;
         }
         ch.used = frame;
-        if (ch.c) g.drawImage(ch.c, 0, 0, CPX + 0.6 * (CELL / TILE), CPX + 0.6 * (CELL / TILE), cx * CH * TILE, cy * CH * TILE, CH * TILE + 0.6, CH * TILE + 0.6);
+        if (ch.c) g.drawImage(ch.c, 0, 0, CPX + OVERHANG, CPX + DOWNHANG, cx * CH * TILE, cy * CH * TILE, CH * TILE + OVERHANG / (CELL / TILE), CH * TILE + DOWNHANG / (CELL / TILE));
         for (const i of ch.hazards) drawTile(g, level, i % level.w, Math.floor(i / level.w), 0, 0, 1, time);
       }
     }

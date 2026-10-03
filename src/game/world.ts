@@ -33,6 +33,8 @@ import { drawWaterBack, drawWaterFront } from '../art/waterDraw';
 import { drawBlockade, COLLAPSE_SHAKE, COLLAPSE_FALL } from '../art/blockade';
 import { setDecoFocus } from '../art/jungleDecor';
 import { drawVines, drawRoomBack, drawRoomDark, drawDoorPrompt, drawDrums, drawBeams } from '../art/jungleWorld';
+import { ForestLight } from './forestLight';
+import { drawForestLight } from '../art/forestLight';
 
 export interface Stats {
   kills: number;
@@ -90,6 +92,7 @@ export interface Wreck {
 }
 
 export class World {
+  readonly forestLight: ForestLight;
   data: LevelData;
   level: Level;
   fx = new Fx();
@@ -204,6 +207,7 @@ export class World {
   constructor(data: LevelData) {
     this.data = data;
     this.level = data.level;
+    this.forestLight = new ForestLight(data);
     this.baseTiles = data.level.tiles.slice();
     this.baseTheme = data.level.theme.slice();
     this.water = new Waters(data.water ?? [], this.level, data.decos);
@@ -1211,6 +1215,7 @@ export class World {
     if (this.data.rooms?.length) drawRoomDark(g, this);
     if (this.data.drums?.length) drawDrums(g, this);
     if (this.data.beams?.length) drawBeams(g, this);
+    drawForestLight(g, this);
     this.director.drawBarriers(g);
     for (const pk of this.pickups) if (cam.visible(pk.x, pk.y, 40)) pk.draw(g, this);
     this.drawShadows(g);

@@ -8,6 +8,7 @@ import { bakeBandit } from './bandits';
 import type { SoldierArt, SoldierStyle } from './soldiers';
 import type { Quality } from './index';
 import { prepareWildlifeArt } from './wildlife';
+import { prepareForestLight } from './forestLight';
 
 export interface FishArt {
   /** cópias reduzidas (maior → menor) para desenhar nítido e barato em qualquer tamanho */
@@ -92,6 +93,7 @@ export function loadJungle(base: string, quality: Quality): Promise<JungleArt> {
     }
     await tick();
     prepareWildlifeArt();
+    prepareForestLight();
     jungle = { fish, bg, bandits, banditVariants };
     return jungle;
   })();

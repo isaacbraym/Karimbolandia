@@ -374,7 +374,7 @@ export class JungleBackground {
   draw(g: CanvasRenderingContext2D, s: BgState, dt: number) {
     const W = s.viewW;
     const H = s.viewH;
-    const dusk = clamp(s.sky, 0, 1);
+    const dusk = clamp(s.sky + (s.canopy ?? 0) * .3, 0, 1);
     // céu
     g.drawImage(this.day, 0, 0, 2, 256, 0, 0, W, H);
     if (dusk > 0.01) {
@@ -470,7 +470,7 @@ export class JungleBackground {
     g.globalCompositeOperation = 'lighter';
     for (let i = 0; i < 4; i++) {
       const x = ((i * 260 + 90 - s.camX * 0.18) % 1040 + 1040) % 1040 - 160;
-      g.globalAlpha = (0.07 + 0.04 * Math.sin(t * 0.5 + i * 1.7)) * (1 - dusk * 0.6);
+      g.globalAlpha = (0.07 + 0.04 * Math.sin(t * 0.5 + i * 1.7)) * (1 - dusk * 0.6) * .3 * (1 - (s.canopy ?? 0));
       g.drawImage(this.shaft, x, -20, 150, H + 40);
     }
     // pólen / esporos dourados

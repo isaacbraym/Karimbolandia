@@ -7,6 +7,7 @@
 import { bake, shadedRR, shadedEllipse, poly, OUT, type Sprite } from './kit';
 import { shade } from '../core/math';
 import { GUN_LEN, type SoldierArt, type SoldierStyle } from './soldiers';
+import { clothFinish } from './volume';
 
 const S = 2;
 
@@ -200,6 +201,7 @@ export function bakeBandit(style: SoldierStyle, variant = 0): SoldierArt {
       const wide = style === 'shield' ? 1.4 : style === 'shotgun' ? 0.8 : 0;
       // camisa/regata (braços nus em quem usa regata)
       shadedRR(g, 3.6 - wide, 2, 15 + wide * 2, 18.6, 4.4, L.shirt, { lw: 1.1 });
+      clothFinish(g, 3.6 - wide, 2, 15 + wide * 2, 18.6, L.shirt);
       // gola em V da camiseta
       g.fillStyle = L.skin;
       g.beginPath();
@@ -235,6 +237,8 @@ export function bakeBandit(style: SoldierStyle, variant = 0): SoldierArt {
       shadedRR(g, 3.2 - wide, 16.6, 15.6 + wide * 2, 3.6, 1.2, '#3a2416', { lw: 0.9, shine: false });
       g.fillStyle = '#d6b04a';
       g.fillRect(9.6, 17.2, 2.8, 2.4);
+      shadedRR(g, 14.8, 16, 4.7, 5, .9, L.cloth, { lw: .6, shine: false });
+      g.fillStyle = '#d7c38d'; g.fillRect(16.4, 17, 1.1, .8);
       // facão na cintura
       poly(g, [[3.6, 18], [2.2, 22], [3.6, 22.4], [5.2, 18.4]], '#9a9aa8', { lw: 0.6 });
     },

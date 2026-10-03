@@ -7,49 +7,50 @@
  */
 import { bake, glowSprite, softDot, shadedRR, poly, OUT, type Sprite } from './kit';
 import { Rng, shade } from '../core/math';
+import { prism } from './volume';
 
 /** Caixas (x0,y0,x1,y1) das decorações estáticas da selva — assadas em imagem. */
 export const JUNGLE_BOUNDS: Record<string, [number, number, number, number]> = {
-  jTree: [-96, -430, 96, 8],
-  jPalm: [-84, -250, 84, 4],
-  jPillar: [-30, -170, 30, 4],
-  jFern: [-44, -46, 44, 2],
-  jBush: [-50, -54, 50, 2],
-  jRock: [-40, -40, 40, 4],
+  jTree: [-114, -475, 118, 10],
+  jPalm: [-120, -270, 113, 10],
+  jPillar: [-36, -176, 40, 5],
+  jFern: [-48, -46, 44, 11],
+  jBush: [-52, -56, 52, 11],
+  jRock: [-40, -42, 42, 8],
   jStump: [-28, -40, 28, 4],
   jCrates: [-44, -54, 44, 2],
-  jStoneHead: [-48, -92, 48, 4],
-  jRoots: [-64, -40, 64, 4],
-  jTotem: [-22, -132, 22, 2],
-  jBanana: [-56, -128, 56, 2],
+  jStoneHead: [-50, -97, 50, 9],
+  jRoots: [-66, -40, 66, 8],
+  jTotem: [-26, -136, 26, 3],
+  jBanana: [-62, -128, 62, 3],
   jFlowers: [-30, -30, 30, 2],
-  jReeds: [-30, -70, 30, 4],
-  jSedge: [-40, -62, 40, 5],
-  jCattails: [-34, -86, 34, 5],
-  jLily: [-34, -12, 34, 4],
-  jMangrove: [-80, -210, 80, 10],
+  jReeds: [-30, -70, 43, 6],
+  jSedge: [-42, -62, 42, 8],
+  jCattails: [-42, -88, 38, 8],
+  jLily: [-42, -16, 40, 5],
+  jMangrove: [-83, -219, 83, 13],
   jSign: [-24, -56, 24, 2],
   jHut: [-96, -150, 96, 104],
   jSkull: [-12, -64, 12, 2],
-  uGrass: [-18, -34, 18, 2],
-  uRock: [-34, -34, 34, 3],
-  uArch: [-80, -150, 80, 3],
-  uChest: [-22, -26, 22, 2],
-  uBones: [-30, -16, 30, 2],
+  uGrass: [-20, -34, 20, 5],
+  uRock: [-36, -34, 36, 6],
+  uArch: [-82, -168, 82, 3],
+  uChest: [-28, -28, 27, 4],
+  uBones: [-30, -16, 36, 6],
   uStatue: [-28, -96, 28, 3],
-  jTower: [-60, -230, 60, 4],
+  jTower: [-62, -251, 62, 7],
   jPalisade: [-72, -100, 72, 4],
-  jTent: [-64, -78, 64, 3],
-  jGate: [-90, -200, 90, 4],
-  jPost: [-12, -60, 12, 2],
-  jTempleBack: [-230, -300, 230, 4],
-  jJeep: [-70, -62, 70, 4],
-  jSandbags: [-44, -30, 44, 2],
-  jAmmo: [-30, -34, 30, 2],
+  jTent: [-74, -78, 74, 5],
+  jGate: [-92, -215, 92, 5],
+  jPost: [-14, -60, 15, 5],
+  jTempleBack: [-234, -308, 244, 5],
+  jJeep: [-74, -62, 70, 5],
+  jSandbags: [-44, -37, 55, 3],
+  jAmmo: [-32, -42, 32, 3],
   jFlag: [-6, -150, 60, 2],
   jBranch: [-176, -70, 20, 24],
   jDoorway: [-42, -90, 42, 2],
-  jDoorExit: [-30, -74, 30, 2],
+  jDoorExit: [-37, -74, 35, 3],
   jIdol: [-22, -52, 22, 2],
 };
 
@@ -165,7 +166,7 @@ function crownBlob(g: CanvasRenderingContext2D, r: Rng, x: number, y: number, ra
 }
 
 function stoneBlock(g: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: Rng) {
-  shadedRR(g, x, y, w, h, 2, STONE, { lw: 1.2 });
+  prism(g, x, y, w, h, 4, -3, STONE, 1.1);
   g.fillStyle = 'rgba(0,0,0,0.18)';
   g.fillRect(x + w * 0.65, y + 2, w * 0.3, h - 4);
   if (r.chance(0.6)) {
@@ -285,7 +286,10 @@ export function paintJungle(g: CanvasRenderingContext2D, kind: string, seed: num
     case 'jPillar': {
       // coluna do templo quebrada, com musgo e cipó
       const h = r.range(110, 160);
-      for (let y = 0; y > -h; y -= 26) stoneBlock(g, -18, y - 26, 36, 26, r);
+      for (let y = 0; y > -h; y -= 26) {
+        const height = Math.min(26, h + y);
+        stoneBlock(g, -18, y - height, 36, height, r);
+      }
       // topo quebrado
       poly(g, [[-20, -h], [-8, -h - 10], [4, -h - 4], [20, -h - 12], [20, -h + 4], [-20, -h + 4]], STONE_L);
       // base
@@ -666,7 +670,7 @@ export function paintJungle(g: CanvasRenderingContext2D, kind: string, seed: num
       g.stroke();
       // paredes
       poly(g, [[56,-92],[79,-106],[79,-14],[56,0]], '#756438');
-      poly(g, [[-56,0],[56,0],[79,-14],[-33,-14]], '#a68d55');
+      prism(g, -56, 0, 112, 6, 23, -14, '#a68d55');
       for (let x = -56; x < 56; x += 7) {
         g.fillStyle = (x / 7) % 2 ? '#b89a5a' : '#a88a4a';
         g.fillRect(x, -92, 7, 92);

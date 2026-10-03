@@ -11,6 +11,26 @@ import { newCtl } from './helpers/bot';
 
 const data = buildJungle();
 
+describe('Brejo ampliado do crocodilo', () => {
+  it('triplica o primeiro pantano sem agua sobreposta nem checkpoints inundados', () => {
+    const swamps = data.water.filter(z => z.kind === 'swamp');
+    expect(swamps[0].x).toBe(222 * TILE);
+    expect(swamps[0].w).toBe(13 * 3 * TILE);
+    for (let i = 1; i < swamps.length; i++) expect(swamps[i].x).toBeGreaterThanOrEqual(swamps[i - 1].x + swamps[i - 1].w);
+    for (const cp of data.checkpoints) expect(swamps.some(z => cp.x >= z.x && cp.x < z.x + z.w)).toBe(false);
+    const w = new World(buildJungle());
+    expect(w.wildlife.crocodile!.x).toBeGreaterThan(swamps[0].x);
+    expect(w.wildlife.crocodile!.x).toBeLessThan(swamps[0].x + swamps[0].w);
+  });
+  it('oferece apoios ao longo do brejo e mais fauna distribuida pelo novo espaco', () => {
+    for (const [x, y] of [[226, G - 2], [235, G - 2], [242, G - 3], [247, G - 3], [257, G]]) expect(data.level.get(x, y)).not.toBe(T.EMPTY);
+    const swamp = data.water.find(z => z.kind === 'swamp')!;
+    const inside = data.decos.filter(d => d.x >= swamp.x && d.x < swamp.x + swamp.w);
+    expect(inside.filter(d => d.kind === 'jDragonfly').length).toBeGreaterThanOrEqual(5);
+    expect(inside.filter(d => d.kind === 'jFrogLily').length).toBeGreaterThanOrEqual(5);
+  });
+});
+
 function jungleWorld() {
   const w = new World(buildJungle());
   w.screenToWorldFn = (x, y) => ({ x, y });

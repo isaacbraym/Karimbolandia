@@ -1143,7 +1143,7 @@ export class Game {
     // pintado numa imagem com ~65% da resolução e ampliado: um terço da pintura de tela, sem
     // diferença visível; o mundo, os personagens e o HUD continuam na resolução cheia.
     const atm = this.atmosphere(w);
-    const bgs = { camX: cam.x, camY: cam.y, viewW: W, viewH: H, time: w.time, sky: atm.sky, ruin: atm.ruin, refY: w.data.playerStart.y - 200, intensity: w.musicState.startsWith('boss') || w.musicState === 'combat' ? 1 : 0.6 };
+    const bgs = { camX: cam.x, camY: cam.y, viewW: W, viewH: H, time: w.time, sky: atm.sky, ruin: atm.ruin, canopy: w.forestLight.shadeAt(w.player.x), refY: w.data.playerStart.y - 200, intensity: w.musicState.startsWith('boss') || w.musicState === 'combat' ? 1 : 0.6 };
     const bdt = this.state === 'playing' ? dt : 0;
     if (this.quality !== 'high') {
       const f = BG_RES[this.quality];
@@ -1172,7 +1172,7 @@ export class Game {
     w.drawWorld(g);
     // primeiro plano e HUD
     g.setTransform(k, 0, 0, k, 0, 0);
-    bg.drawForeground(g, { camX: cam.x, camY: cam.y, viewW: W, viewH: H, time: w.time, sky: atm.sky, ruin: atm.ruin, refY: 0, intensity: 0.6, under: w.underwater || (w.inRoom() ? 1 : 0) }, this.state === 'playing' ? dt : 0);
+    bg.drawForeground(g, { camX: cam.x, camY: cam.y, viewW: W, viewH: H, time: w.time, sky: atm.sky, ruin: atm.ruin, canopy: w.forestLight.shadeAt(w.player.x), refY: 0, intensity: 0.6, under: w.underwater || (w.inRoom() ? 1 : 0) }, this.state === 'playing' ? dt : 0);
     if (this.state === 'playing') this.post.drawRain(g, w, W, H);
     this.post.bloom(g, this.canvas, this.quality);
     this.post.grade(g, W, H, this.quality);

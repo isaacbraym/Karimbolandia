@@ -30,8 +30,9 @@ export const TEMPLE_DOOR_OUT: [number, number] = [274 + SHIFT, G - 1];
 
 /** Poços do pântano (1 tile de fundo, areia movediça). */
 const SWAMPS: [number, number][] = [
-  [72 + SHIFT, 85 + SHIFT],
-  [93 + SHIFT, 107 + SHIFT],
+  // 13 → 39 blocos: incorpora o poço vizinho sem sobrepor zonas de água.
+  // A margem termina antes do checkpoint 263; o restante da fase não é deslocado.
+  [72 + SHIFT, 111 + SHIFT],
   [119 + SHIFT, 133 + SHIFT],
   [146 + SHIFT, 160 + SHIFT],
 ];
@@ -177,6 +178,14 @@ function swamps(b: LevelBuilder) {
     b.deco('jFrog', x1, G, 'back');
     b.deco('jDragonfly', x0 + 3, G - 1, 'front');
     b.deco('jDragonfly', x1 - 4, G - 2, 'front');
+    if (x1 - x0 >= 39) {
+      // Vida espalhada pelo brejo amplo, sem concentrar tudo ao redor do crocodilo.
+      for (let x = x0 + 10; x < x1 - 7; x += 9) {
+        b.deco('jFrogLily', x, G + 1, 'back', { scale: r.range(0.8, 1), flip: r.chance(0.5) });
+        b.deco('jDragonfly', x + 2, G - r.int(2, 3), 'front', { scale: r.range(0.7, 0.95), flip: r.chance(0.5) });
+        b.deco('jMangrove', x - 1, G + 1, 'back', { scale: r.range(0.6, 0.85), flip: r.chance(0.5) });
+      }
+    }
     b.deco('jButterfly', x0 - 3, G - 1, 'back');
     b.deco('pReeds', x1 - 2, G + 3, 'front', { par: 0.4, flip: r.chance(0.5) });
     // Touceiras, taboas e folhas flutuantes em planos diferentes da água.
@@ -425,6 +434,10 @@ export function buildJungle(): LevelData {
   swamps(b);
   // troncos boiando sobre o pântano
   b.plat(226, G - 2, 4, THEME.WOOD);
+  // Apoios intermediários e saída seca para o brejo do crocodilo, agora 3× maior.
+  b.plat(235, G - 2, 4, THEME.WOOD);
+  b.plat(242, G - 3, 3, THEME.WOOD);
+  b.plat(257, G, 4, THEME.WOOD);
   // ponte de corda atravessando o pântano
   b.plat(267, G - 2, 18, THEME.WOOD);
   b.deco('jPost', 267, G - 2, 'back');
@@ -435,7 +448,7 @@ export function buildJungle(): LevelData {
   b.plat(249, G - 6, 4, THEME.WOOD);
   b.deco('jHut', 251, G - 3, 'back');
   b.enemy('sniper', 251, G - 6, { facing: -1, idle: true });
-  b.enemy('rifle', 238, G, { facing: -1, patrol: 40 });
+  b.enemy('rifle', 238, G - 2, { facing: -1, patrol: 40 });
   b.enemy('shotgun', 262, G, { facing: -1, patrol: 50 });
   b.crate(260, G, 'health');
   b.checkpoint('Pântano', 263, G);

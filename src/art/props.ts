@@ -5,6 +5,7 @@ import { shade } from '../core/math';
 import type { PropKind, PickupKind } from '../game/level';
 import type { WeaponId } from '../game/weapons';
 import { bakeWeapons } from './karimbo';
+import { prism } from './volume';
 
 const S = 2;
 
@@ -13,24 +14,25 @@ export function bakeProps(): Record<PropKind, Sprite> {
 
   const crate = (w: number, base: string) =>
     bake(w, w, (g) => {
-      shadedRR(g, 0.8, 0.8, w - 1.6, w - 1.6, 2.4, base);
+      const front = w - 7;
+      prism(g, 1, 5, front, w - 6, 5, -4, base, 1.1);
       g.strokeStyle = shade(base, -0.45);
       g.lineWidth = 1.4;
       g.beginPath();
-      g.moveTo(3, 3);
-      g.lineTo(w - 3, w - 3);
-      g.moveTo(w - 3, 3);
+      g.moveTo(3, 7);
+      g.lineTo(front - 1, w - 3);
+      g.moveTo(front - 1, 7);
       g.lineTo(3, w - 3);
       g.stroke();
       g.strokeStyle = shade(base, 0.25);
       g.lineWidth = 0.8;
       g.beginPath();
-      g.moveTo(3, 4.4);
-      g.lineTo(w - 4.4, w - 3);
+      g.moveTo(3, 8.4);
+      g.lineTo(front - 2.4, w - 3);
       g.stroke();
       // cantoneiras metálicas
       g.fillStyle = '#3a3f55';
-      for (const [x, y] of [[0.8, 0.8], [w - 5.8, 0.8], [0.8, w - 5.8], [w - 5.8, w - 5.8]]) g.fillRect(x, y, 5, 5);
+      for (const [x, y] of [[1, 5], [front - 4, 5], [1, w - 6], [front - 4, w - 6]]) g.fillRect(x, y, 4, 4);
       g.fillStyle = PAL.neonAmber;
       g.fillRect(w / 2 - 3, w / 2 - 1, 6, 2);
       g.fillRect(w / 2 - 1, w / 2 - 3, 2, 6);

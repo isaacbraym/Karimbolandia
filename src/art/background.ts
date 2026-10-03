@@ -17,6 +17,7 @@ interface Layer {
 }
 
 export interface BgState {
+  canopy?: number;
   camX: number;
   camY: number;
   viewW: number;
