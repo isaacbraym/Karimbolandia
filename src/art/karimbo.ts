@@ -12,6 +12,7 @@ import { WEAPONS, type WeaponId } from '../game/weapons';
 import { progress } from '../core/storage';
 import type { SkinId } from '../core/skinCatalog';
 import { clothFinish } from './volume';
+import { weaponFinish } from './weaponFinish';
 
 export interface KarimboArt {
   torso: Sprite;
@@ -286,6 +287,7 @@ export function bakeWeapons(): Record<WeaponId, Sprite> {
       g.fillRect(13, 2, 1.6, 1.3);
       g.fillStyle = 'rgba(255,255,255,0.35)';
       g.fillRect(3, 2.2, 8, 0.9);
+      weaponFinish(g,'pistol');
     },
     { scale: S, ox: 4, oy: 5.5 }
   );
@@ -302,6 +304,7 @@ export function bakeWeapons(): Record<WeaponId, Sprite> {
       g.fillRect(12, 1.3, 1.4, 1.2);
       g.fillStyle = 'rgba(255,255,255,0.3)';
       g.fillRect(8, 3, 12, 0.9);
+      weaponFinish(g,'rifle');
     },
     { scale: S, ox: 8, oy: 5 }
   );
@@ -318,6 +321,7 @@ export function bakeWeapons(): Record<WeaponId, Sprite> {
       g.fillRect(9, 2, 4.5, 1.2);
       g.fillStyle = 'rgba(255,255,255,0.3)';
       g.fillRect(17, 3, 11, 0.7);
+      weaponFinish(g,'shotgun');
     },
     { scale: S, ox: 8, oy: 5.5 }
   );
@@ -337,6 +341,7 @@ export function bakeWeapons(): Record<WeaponId, Sprite> {
       shadedRR(g, 10, 10.4, 5, 3.4, 1, '#2d3a2b');
       g.fillStyle = 'rgba(255,255,255,0.3)';
       g.fillRect(8, 3.6, 15, 1);
+      weaponFinish(g,'launcher');
     },
     { scale: S, ox: 8, oy: 7 }
   );
@@ -368,6 +373,7 @@ export function bakeWeapons(): Record<WeaponId, Sprite> {
       g.beginPath();
       g.arc(26.5, 5.3, 1.6, 0, Math.PI * 2);
       g.fill();
+      weaponFinish(g,'energy');
     },
     { scale: S, ox: 6, oy: 6 }
   );

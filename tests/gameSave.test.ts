@@ -18,7 +18,8 @@ async function makeGame() {
 // Exercita a mesma gravação usada pelo pagehide sem inicializar áudio, arte ou loop de render.
 const saveOnExit = (game: unknown) => (game as { saveGame(): void }).saveGame();
 
-describe('Saída preserva o save mais recente', () => {
+// O primeiro teste importa o jogo inteiro (transformação de todos os módulos): sob carga passa de 5 s.
+describe('Saída preserva o save mais recente', { timeout: 30000 }, () => {
   it('não sobrescreve no menu o progresso atualizado por outra aba', async () => {
     const game = await makeGame();
     const { writeSave, freshSave, loadSave } = await import('../src/game/save');

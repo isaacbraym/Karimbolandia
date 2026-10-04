@@ -518,7 +518,6 @@ export function buildJungle(): LevelData {
   b.enemy('shield', 444, G, { facing: -1, patrol: 40 });
   b.enemy('rifle', 448, G - 5, { facing: -1, idle: true });
   b.deco('jStoneHead', 450, G, 'back');
-  b.deco('jLizard', 398, G - 2, 'back');
   b.deco('jLizard', 420, G - 2, 'back', { flip: true });
   // abismo com ponte de corda
   b.pit(454, 460);
@@ -593,7 +592,7 @@ export function buildJungle(): LevelData {
   b.enemy('sniper', 580, G - 6, { facing: -1, idle: true });
   b.deco('jPalisade', 574, G, 'back');
   b.deco('jPalisade', 588, G, 'back', { flip: true });
-  b.deco('jTent', 594, G, 'back');
+  b.deco('jHut', 594, G, 'back');
   b.deco('jCampfire', 599, G, 'back');
   b.deco('jJeep', 567, G, 'back');
   b.deco('jSandbags', 585, G, 'back');
@@ -613,7 +612,7 @@ export function buildJungle(): LevelData {
   b.plat(638, G - 4, 5, THEME.WOOD);
   b.deco('jTent', 614, G, 'back', { flip: true });
   b.deco('jCampfire', 632, G, 'back');
-  b.deco('jTent', 644, G, 'back');
+  b.deco('jHut', 644, G, 'back');
   b.deco('jAmmo', 620, G, 'back');
   b.deco('jSandbags', 637, G, 'back');
   b.deco('jAmmo', 650, G, 'back');

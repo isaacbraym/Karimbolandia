@@ -1654,11 +1654,12 @@ function paintAnimated(g: CanvasRenderingContext2D, kind: string, seed: number, 
     case 'jDragonfly': {
       // libélula: voa em oito, para no ar de vez em quando, asas tremendo
       const s = seed * 0.37;
-      const slow = 0.6 + 0.4 * Math.sin(t * 0.5 + s);
-      const tt = t * slow;
+      // Integrar a velocidade de fase (0.15–0.65), sem multiplicar o tempo
+      // por uma velocidade variável: isso acelerava o voo a cada minuto.
+      const tt = t * 0.4 + 0.5 * (Math.cos(s) - Math.cos(t * 0.5 + s));
       const x = Math.sin(tt * 0.9 + s) * 70 + Math.sin(tt * 2.3 + s) * 12;
       const y = -20 + Math.sin(tt * 1.8 + s) * 16;
-      const dx = Math.cos(tt * 0.9 + s) * 0.9;
+      const dx = Math.cos(tt * 0.9 + s) * 63 + Math.cos(tt * 2.3 + s) * 27.6;
       g.save();
       g.translate(x, y);
       if (dx < 0) g.scale(-1, 1);

@@ -395,19 +395,23 @@ export class Grenade {
   }
 
   update(w: World, dt: number) {
+    if (this.dead) return;
     this.fuse -= dt;
     this.vy += 900 * dt;
     this.rot += this.vx * dt * 0.06;
-    const nx = this.x + this.vx * dt;
-    const ny = this.y + this.vy * dt;
     const L = w.level;
     const r = 4;
-    // colisão simples por eixo com ricochete
-    if (L.solidAtPx(nx + Math.sign(this.vx) * r, this.y)) {
+    const ox = this.x;
+    const oy = this.y;
+    // Colisão por eixo com ricochete, contra tiles E coberturas/objetos sólidos (antes os objetos eram
+    // testados depois do movimento e a granada era empurrada para dentro deles, ficando presa).
+    const nx = this.x + this.vx * dt;
+    if (L.solidAtPx(nx + Math.sign(this.vx) * r, this.y) || this.blocked(w, nx, this.y, r)) {
       this.vx *= -0.55;
       this.bounce(w);
     } else this.x = nx;
-    if (L.solidAtPx(this.x, ny + Math.sign(this.vy) * r)) {
+    const ny = this.y + this.vy * dt;
+    if (L.solidAtPx(this.x, ny + Math.sign(this.vy) * r) || this.blocked(w, this.x, ny, r)) {
       if (this.vy > 0) {
         this.vy *= -0.5;
         this.vx *= 0.8;
@@ -415,30 +419,54 @@ export class Grenade {
       } else this.vy *= -0.4;
       this.bounce(w);
     } else this.y = ny;
-    // props sólidos
-    for (const p of w.props) {
-      if (!p.alive || !p.solid) continue;
-      if (this.x > p.x - p.w / 2 - r && this.x < p.x + p.w / 2 + r && this.y > p.y - p.h / 2 - r && this.y < p.y + p.h / 2 + r) {
-        this.vx *= -0.5;
-        this.vy *= 0.6;
-        this.x -= Math.sign(this.vx) * 2;
-        this.bounce(w);
-      }
-    }
-    // contato com inimigos: explode ao tocar
+    // nasceu/foi empurrada para dentro de um objeto: sai pelo lado mais próximo
+    this.escape(w, r);
+    // contato com inimigos ao longo do percurso: explode uma única vez
     if (this.team === 0) {
       for (const e of w.enemies) {
         if (!e.alive || !e.canBeHit) continue;
         const hb = e.hitbox;
-        if (this.x > hb.x && this.x < hb.x + hb.w && this.y > hb.y && this.y < hb.y + hb.h) {
+        if (segHitsRect(ox, oy, this.x, this.y, r, hb.x, hb.y, hb.w, hb.h)) {
           this.detonate(w);
           return;
         }
       }
     }
-    if (this.fuse <= 0) this.detonate(w);
+    if (this.fuse <= 0) {
+      this.detonate(w);
+      return;
+    }
     if (this.y > L.pxH + 200) this.dead = true;
     if (w.fx.opt() && Math.random() < 0.35) w.fx.add(PK.Spark, this.x, this.y, rand.spread(20), rand.spread(20) - 20, 0.2, 5, '#ffb347', { size1: 1, front: true });
+  }
+
+  private blocked(w: World, x: number, y: number, r: number) {
+    for (const s of w.solidRects) if (x + r > s.x && x - r < s.x + s.w && y + r > s.y && y - r < s.y + s.h) return true;
+    return false;
+  }
+
+  private escape(w: World, r: number) {
+    for (const s of w.solidRects) {
+      if (!(this.x + r > s.x && this.x - r < s.x + s.w && this.y + r > s.y && this.y - r < s.y + s.h)) continue;
+      const left = this.x + r - s.x;
+      const right = s.x + s.w - (this.x - r);
+      const top = this.y + r - s.y;
+      const bottom = s.y + s.h - (this.y - r);
+      const m = Math.min(left, right, top, bottom);
+      if (m === top) {
+        this.y = s.y - r;
+        if (this.vy > 0) this.vy = Math.abs(this.vy) < 40 ? 0 : -this.vy * 0.5;
+      } else if (m === bottom) {
+        this.y = s.y + s.h + r;
+        if (this.vy < 0) this.vy *= -0.4;
+      } else if (m === left) {
+        this.x = s.x - r;
+        if (this.vx > 0) this.vx *= -0.55;
+      } else {
+        this.x = s.x + s.w + r;
+        if (this.vx < 0) this.vx *= -0.55;
+      }
+    }
   }
 
   private bounce(w: World) {
@@ -447,6 +475,8 @@ export class Grenade {
   }
 
   detonate(w: World) {
+    if (this.dead) return;
+    this.dead = true;
     w.explode(this.x, this.y, this.radius, this.dmg, this.team, { kb: 380, fromNomad: this.fromNomad, big: true });
     if (this.team === 0) w.fx.grenadeBlast(this.x, this.y, this.radius);
     this.dead = true;

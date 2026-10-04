@@ -23,6 +23,8 @@ import { Hud, setHudTextScale } from './hud';
 import { MenuScene } from './menuScene';
 import { Menus, computeRank } from '../ui/menus';
 import { TouchUI } from '../ui/touch';
+import { Investigation } from '../ui/investigation';
+import type { ExplorationSpot } from './exploration';
 import { hintText } from './hints';
 import { VIEW_H } from './level';
 import { cloudSaves } from '../core/cloud';
@@ -46,6 +48,7 @@ const CAPS: Record<Quality, { parts: number; density: number }> = {
 };
 
 export class Game {
+  private investigation: Investigation | null = null;
   private pendingWeapons: WeaponId[] = [];
   canvas: HTMLCanvasElement;
   g: CanvasRenderingContext2D;
@@ -177,6 +180,7 @@ export class Game {
     };
     this.input.onMenuKey = (code) => {
       if (this.state === 'playing') return;
+      if(this.investigation){this.investigation.handleKey(code);return;}
       if (this.menus.handleKey(code)) return;
       if (code === 'Escape' && this.state === 'paused') this.resume();
     };
@@ -572,6 +576,7 @@ export class Game {
 
   resume() {
     if (this.state !== 'paused') return;
+    if(this.investigation){this.investigation.destroy();this.investigation=null;this.input.suppressHeldActions();}
     audio.wake();
     this.menus.hidePause();
     this.state = 'playing';
@@ -586,6 +591,7 @@ export class Game {
 
   restartLevel() {
     if (!this.world) return;
+    this.investigation?.destroy();this.investigation=null;
     this.stopIntroAudio();
     this.menus.hidePause();
     this.menus.hideAll();
@@ -605,6 +611,7 @@ export class Game {
   }
 
   toMenu(first = false) {
+    this.investigation?.destroy();this.investigation=null;
     this.pendingWeapons = [];
     this.cancelStageStart();
     if (this.state === 'playing' || this.state === 'paused') this.saveGame();
@@ -894,6 +901,7 @@ export class Game {
     const w = this.world;
 
     const t0 = performance.now();
+    if(this.investigation&&this.state==='paused')this.investigation.updatePad(this.input.state);
     if (this.state === 'playing' && w) {
       if (this.input.state.pause.pressed) {
         this.input.clearEdges();
@@ -946,6 +954,10 @@ export class Game {
   }
 
   private step(w: World, dt: number) {
+    const spot=w.exploration.nearest(w);
+    if(this.input.state.interact.pressed&&spot&&w.exploration.safe(w,spot)) {
+      this.openInvestigation(w,spot);return;
+    }
     if(this.input.state.interact.pressed&&w.merchant.near(w)) {
       this.input.clearEdges();this.pause();
       this.menus.showMerchant(w,()=>{w.checkpointSnap=w.player.snapshot();this.saveGame();});return;
@@ -1007,6 +1019,14 @@ export class Game {
     this.processHints(w);
   }
 
+  private openInvestigation(w:World,spot:ExplorationSpot) {
+    this.input.clearEdges();this.pause();this.menus.hidePause();
+    this.input.suppressHeldActions();
+    this.investigation=new Investigation(this.ui,w,spot,()=>this.resume(),()=>{
+      w.checkpointSnap=w.player.snapshot();this.saveGame();
+    });
+  }
+
   /** Sons da selva: pássaros, insetos e sapos (perto do pântano) em intervalos aleatórios. */
   private jungleAmbience(w: World, dt: number) {
     this.ambT -= dt;
@@ -1066,7 +1086,8 @@ export class Game {
     const n = p.nomad;
     let dash01 = 1;
     if (n) dash01 = n.window > 0 ? 1 : n.cooldown > 0 ? clamp(1 - n.cooldown / 3.4, 0, 1) : 1;
-    this.touch.sync({ weaponIcon: icon, ammo: p.mounted?(ammo===Infinity?'∞':String(ammo)):p.ammoLabel, lowAmmo: !p.mounted&&p.loadedAmmo===0, grenades: p.grenades, dash01,merchant:w.merchant.near(w),canReload:p.canReload,reloading:p.reloadT>0,reload01:p.reload01 });
+    const spot=w.exploration.nearest(w),explore=!!spot&&w.exploration.safe(w,spot);
+    this.touch.sync({ weaponIcon: icon, ammo: p.mounted?(ammo===Infinity?'∞':String(ammo)):p.ammoLabel, lowAmmo: !p.mounted&&p.loadedAmmo===0, grenades: p.grenades, dash01,merchant:w.merchant.near(w),interaction:explore?(spot.cabin?'ENTRAR':'INVESTIGAR'):undefined,canReload:p.canReload,reloading:p.reloadT>0,reload01:p.reload01 });
   }
 
   /**

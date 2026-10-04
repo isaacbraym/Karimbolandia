@@ -783,13 +783,18 @@ export class AudioEngine {
         this.tone({ type: 'square', f0: 1319, dur: 0.16, vol: 0.09 * v, delay: 0.06, pan });
         break;
       case 'clap':
-        this.tone({type:'sine',f0:155,f1:90,dur:.08,vol:.12*v,pan});
-        this.noise({dur:.07,vol:.14*v,type:'bandpass',f0:950,f1:650,q:.7,pan});
+      case 'clapAccent': {
+        // Palma de roda: várias mãos batendo quase juntas (rajadas curtas de ruído em 1–2,5 kHz)
+        // e uma cauda curta de ambiente. A acentuada é mais aguda e mais forte.
+        const acc = name === 'clapAccent';
+        const f = (acc ? 1900 : 1250) * r;
+        for (const [d, k] of [[0, 1], [0.009, 0.8], [0.019, 0.65]] as [number, number][]) {
+          this.noise({ dur: 0.022, vol: (acc ? 0.5 : 0.4) * k * v, type: 'bandpass', f0: f, f1: f * 0.85, q: 1.1, delay: d, pan });
+        }
+        this.noise({ dur: 0.14, vol: (acc ? 0.2 : 0.15) * v, type: 'bandpass', f0: f * 0.9, f1: f * 0.6, q: 0.8, delay: 0.022, pan });
+        if (!acc) this.tone({ type: 'sine', f0: 190, f1: 110, dur: 0.05, vol: 0.06 * v, pan });
         break;
-      case 'clapAccent':
-        this.noise({dur:.075,vol:.19*v,type:'bandpass',f0:2400,f1:1500,q:.7,pan});
-        this.noise({dur:.04,vol:.065*v,type:'highpass',f0:3400,delay:.012,pan});
-        break;
+      }
       case 'emblem':
         [523, 659, 784, 1047].forEach((f, i) => this.tone({ type: 'triangle', f0: f, dur: 0.22, vol: 0.2 * v, delay: i * 0.07, pan }));
         break;

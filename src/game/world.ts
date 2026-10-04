@@ -28,6 +28,8 @@ import { Waters } from './water';
 import { JungleWildlife } from './wildlife';
 import { Village } from './village';
 import { Merchant } from './merchant';
+import { Exploration } from './exploration';
+import { drawExploration } from '../art/exploration';
 import { Encounters } from './encounters';
 import { Vine } from './vines';
 import type { DoorSpawn } from './level';
@@ -132,6 +134,7 @@ export class World {
   wildlife!: JungleWildlife;
   village!: Village;
   merchant!: Merchant;
+  exploration!: Exploration;
   encounters!: Encounters;
   /** 0..1 cabeça do Karimbo debaixo d'água (som abafado, tom da tela) */
   underwater = 0;
@@ -218,6 +221,7 @@ export class World {
     this.wildlife = new JungleWildlife(data);
     this.village = new Village(data);
     this.merchant = new Merchant(data);
+    this.exploration = new Exploration(data);
     this.encounters = new Encounters(data);
     this.vines = (data.vines ?? []).map((v) => new Vine(v));
     this.director = new Director(this);
@@ -1236,6 +1240,7 @@ export class World {
     this.drawShadows(g);
     this.crowd.draw(g, this);
     this.village.draw(g, this);
+    drawExploration(g,this);
     this.merchant.draw(g,this);
     this.encounters.draw(g,this);
     for (const e of this.enemies) if (e.alive) e.drawWarnings(g, this);

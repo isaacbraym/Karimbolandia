@@ -1,0 +1,74 @@
+.investigation {
+  position:absolute;inset:0;z-index:80;pointer-events:auto;display:flex;flex-direction:column;
+  overflow:hidden;background:#122422;color:#f1e4c9;padding:clamp(8px,2vw,24px);
+  font-family:'Rajdhani',sans-serif;text-align:left;
+  background-image:radial-gradient(ellipse at 25% 5%,#4d534038,transparent 75%);
+}
+.investigation * {box-sizing:border-box;}
+.investigation-top {display:flex;align-items:center;justify-content:space-between;gap:12px;flex-shrink:0;padding-bottom:12px;}
+.investigation-identity {min-width:0;}
+.investigation-eyebrow {font-size:10px;letter-spacing:2px;color:#d2b374;font-weight:700;}
+.investigation h1 {font-family:'Lilita One',sans-serif;font-weight:400;font-size:clamp(20px,3vw,32px);margin:3px 0;color:#ffedc6;line-height:1;}
+.investigation-identity p {font-size:14px;color:#a9bdaf;margin:4px 0 0;}
+.investigation-exit {background:#34493e;border:1px solid #9b9267;color:#fff0cb;border-radius:8px;min-height:44px;min-width:94px;padding:8px 14px;font:700 14px 'Rajdhani',sans-serif;cursor:pointer;flex-shrink:0;}
+.investigation-body {display:grid;grid-template-columns:minmax(0,2.8fr) minmax(230px,1fr);gap:18px;min-height:0;flex:1;align-items:start;}
+.investigation-scene {width:100%;aspect-ratio:16/9;position:relative;align-self:center;isolation:isolate;border:1px solid #71816a55;border-radius:12px;overflow:hidden;box-shadow:0 14px 40px #0005;}
+.cabin-art {position:absolute;inset:0;width:100%;height:100%;display:block;}
+.cabin-drawer-loot {opacity:0;}
+.drawer-open .cabin-drawer {transform:translateY(16px);}
+.drawer-open .cabin-drawer-loot {opacity:1;}
+.drawer-empty .cabin-drawer-loot {opacity:0;}
+.investigation-hotspot {position:absolute;border:1px solid transparent;border-radius:6px;background:transparent;padding:0;cursor:pointer;min-width:28px;min-height:28px;color:#fff0c2;touch-action:manipulation;}
+.investigation-marker {position:absolute;bottom:3px;right:3px;width:22px;height:22px;border-radius:50%;background:#153b34d9;border:1px solid #c9b778;color:#ffe4a0;display:grid;place-items:center;font:700 15px 'Rajdhani',sans-serif;box-shadow:0 2px 6px #0008;}
+.investigation-label {position:absolute;left:50%;bottom:100%;transform:translateX(-50%);font-size:11px;line-height:1.1;padding:5px 7px;background:#172e28eb;border:1px solid #cfaf73;border-radius:4px;max-width:180px;width:max-content;pointer-events:none;opacity:0;}
+.investigation-hotspot:is(:hover,:focus-visible,.selected) {border-color:#ffe4a0;box-shadow:inset 0 0 26px #edc47a22;outline:2px solid #ffe4a055;outline-offset:2px;}
+.investigation-hotspot:is(:hover,:focus-visible) .investigation-label {opacity:1;}
+.investigation-hotspot.investigated .investigation-marker {background:#446547;}
+.investigation-hotspot.opened:not(.investigated) .investigation-marker {background:#85643b;}
+.investigation-detail {height:100%;max-height:100%;overflow-y:auto;padding:14px 16px;background:#20332d;border:1px solid #a7ab7340;border-radius:10px;scrollbar-color:#78977e #20332d;}
+.investigation-object-title {font-family:'Lilita One',sans-serif;font-weight:400;font-size:22px;line-height:1.05;margin:9px 0 12px;color:#f3d79f;}
+.investigation-message {white-space:pre-line;font-size:16px;line-height:1.45;margin:0;color:#e0e4d2;}
+.investigation-status {font-size:13px;color:#9dcaa2;min-height:18px;margin:12px 0;}
+.investigation h3 {font-size:17px;color:#cfb780;margin:18px 0 8px;border-top:1px solid #66806966;padding-top:12px;}
+.investigation-count {font-size:12px;margin:0 0 8px;color:#a8bda4;}
+.investigation-entry {border-bottom:1px solid #71816a33;padding:7px 0;}
+.investigation-entry summary {font-size:13px;cursor:pointer;color:#e8d9b5;min-height:28px;}
+.investigation-entry p {font-size:14px;line-height:1.4;color:#c7d1b9;margin:5px 0 9px;}
+.investigation-footer {font-size:11px;color:#9cad98;margin-top:10px;flex-shrink:0;text-align:center;}
+.investigation-lore-scene {background:radial-gradient(ellipse at 30% 20%,#667447 0%,#1e3830 70%);display:flex;align-items:center;gap:20px;padding:30px;}
+.investigation-lore-emblem {font-size:100px;color:#d8c07d;flex:0 0 22%;text-align:center;text-shadow:0 4px 30px #cbd88633;}
+.investigation-paper {padding:24px;background:#d5c8a6;color:#344638;border-radius:3px;box-shadow:8px 10px 0 #132b2755;transform:rotate(-1deg);}
+.investigation-paper h2 {font-family:'Lilita One',sans-serif;font-weight:400;font-size:23px;margin:10px 0;}
+.investigation-paper p {font-size:17px;line-height:1.5;margin:0;}
+.investigation-paper .investigation-eyebrow {color:#6d704c;}
+.investigation-paper .investigation-signature {font-size:12px;font-style:italic;margin-top:16px;color:#697052;}
+.investigation button:focus-visible,.investigation summary:focus-visible {outline:2px solid #ffe4a0;outline-offset:2px;}
+@container game-ui (max-width:700px) {
+  .investigation-body {grid-template-columns:minmax(0,1fr) minmax(200px,.8fr);gap:8px;}
+  .investigation {padding:8px;}
+  .investigation-top {padding-bottom:7px;gap:8px;}
+  .investigation h1 {font-size:21px;}
+  .investigation-identity p {font-size:11px;}
+  .investigation-eyebrow {font-size:8px;letter-spacing:1px;}
+  .investigation-detail {padding:10px;}
+  .investigation-object-title {font-size:18px;margin:6px 0 8px;}
+  .investigation-message {font-size:14px;line-height:1.3;}
+  .investigation-footer {font-size:9px;margin-top:5px;}
+  .investigation-lore-scene {padding:10px;gap:8px;}
+  .investigation-lore-emblem {display:none;}
+  .investigation-paper {padding:12px;}
+  .investigation-paper h2 {font-size:18px;}
+  .investigation-paper p {font-size:13px;}
+}
+@container game-ui (max-width:480px) {
+  .investigation-body {display:flex;flex-direction:column;align-items:stretch;overflow-y:auto;gap:12px;}
+  .investigation-scene {flex-shrink:0;align-self:stretch;min-height:188px;}
+  .investigation-detail {height:auto;max-height:none;overflow:visible;}
+  .investigation-exit {min-width:72px;padding:6px;font-size:12px;}
+  .investigation-identity p {display:none;}
+  .investigation-lore-scene {aspect-ratio:auto;min-height:240px;}
+  .investigation-hotspot {min-height:32px;min-width:32px;}
+}
+@media (prefers-reduced-motion:no-preference) {
+  .investigation-hotspot {transition:border-color .16s,box-shadow .16s;}
+}

@@ -11,9 +11,9 @@ const ROLES: Record<string,ResidentRole> = { villageResident:'resident',villageF
 export const CELEBRATION_SECONDS = 5.4;
 /** Falas por ofício (cada visita mostra a próxima; nunca a mesma frase em sequência). */
 const LINES: Record<string,string[]> = {
-  resident:['Aqui é nossa casa. Siga pela trilha.','A passagem é pelo rio, depois da praça.','Obrigado por espantar os mercenários!','Viu o jacaré dançando? Ele é a alegria da aldeia!'],
-  washer:['Água limpa, roupa no varal.','O rio está calmo hoje.','Cuidado: a pedra do rio escorrega!'],
-  farmer:['Hoje a colheita está boa!','A mandioca já pode sair da terra.','Choveu na hora certa este ano.'],
+  resident:['Entre-Raízes: o rio passa no quintal de todos.','O marco antigo conta como a aldeia nasceu.','O contrato deles esqueceu nossas trinta casas.','Duas palmas, uma resposta. Até o jacaré sabe.'],
+  washer:['Azul no tecido: água limpa. Amarelo: abrigo.','Almoço frio? Então a ponte está vigiada.','O radinho deles escuta. Entender é outra coisa.'],
+  farmer:['Guardamos sementes até de quem foi embora.','Pomar queimado cresce. Ordem ruim também.','Nas cabanas há papéis que o vento não levou.'],
   carpenter:['Esta madeira vai virar uma casa.','Mais uma tábua e o telhado fica pronto.','Martelo firme, prego reto!'],
   weaver:['Um fio de cada vez...','Estas cores vêm das sementes da mata.','Quer um cesto? Faço outro amanhã.'],
   carrier:['A praça fica logo adiante!','Levo frutas para a festa.','Abre caminho, está pesado!'],
@@ -71,7 +71,8 @@ export class Village {
       }
     }
     const beat=clapTick(w.time),tone=clapTone(beat);
-    if(beat!==this.clapBeat&&tone&&d&&Math.abs(p.x-d.x)<700)w.audio(tone,.45,d.x);
+    // palmas da roda (crianças + Karimbo quando entra): audíveis por cima da música da selva
+    if(beat!==this.clapBeat&&tone&&d&&Math.abs(p.x-d.x)<700)w.audio(tone,this.active?1.1:.9,d.x);
     this.clapBeat=beat;
     for (const r of this.residents) {
       // fala uma vez por visita: só volta a falar (outra frase) depois que o Karimbo se afasta
