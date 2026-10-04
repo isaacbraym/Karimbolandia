@@ -29,7 +29,17 @@ interface ArenaState {
   barriers: Prop[];
   bossEnemy: Enemy | null;
   t: number;
+  /** segundos seguidos com o Karimbo fora da faixa da arena ativa (rede de segurança) */
+  away: number;
 }
+
+/** Tolerâncias verticais (px) da faixa de uma arena: acima do topo da câmera e abaixo do chão. */
+const ARENA_BAND_ABOVE = 4 * 32;
+const ARENA_BAND_BELOW = 2 * 32;
+/** Checkpoint só vale com o Karimbo no nível dele (não numa caverna/lago bem embaixo). */
+const CHECKPOINT_BELOW = 6 * 32;
+/** Arena ativa com o Karimbo fora dela por este tempo é desfeita (nunca prende a câmera). */
+const ARENA_AWAY_ABORT = 1.2;
 
 interface Cine {
   kind: 'nomad' | 'bossDeath' | 'bossIntro' | 'opening' | 'soldier';
@@ -169,7 +179,7 @@ export class Director {
 
   private buildArenas() {
     this.arenas = this.w.data.arenas.map((def) => ({
-      def, status: 'idle' as ArenaStatus, wave: 0, waveTimer: 0, waveSpawned: false, alive: [], barriers: [], bossEnemy: null, t: 0,
+      def, status: 'idle' as ArenaStatus, wave: 0, waveTimer: 0, waveSpawned: false, alive: [], barriers: [], bossEnemy: null, t: 0, away: 0,
     }));
   }
 
@@ -214,6 +224,7 @@ export class Director {
         a.alive = [];
         a.barriers = [];
         a.bossEnemy = null;
+        a.away = 0;
       }
     }
     if (this.cine?.long) this.w.hooks.onBossIntroEnd?.();
@@ -301,6 +312,12 @@ export class Director {
   }
   arenaActiveContains(x: number) {
     return this.insideActiveArena(x);
+  }
+  /** O Karimbo está na faixa vertical da arena (chão/plataformas dela), não numa caverna ou lago por baixo. */
+  private inArenaBand(a: ArenaState) {
+    const r = a.def.rect;
+    const y = this.w.player.y;
+    return y >= r.y - ARENA_BAND_ABOVE && y <= r.y + r.h + ARENA_BAND_BELOW;
   }
 
   banner(title: string, sub?: string, dur = 2.2) {
@@ -407,7 +424,7 @@ export class Director {
       const cps = w.data.checkpoints;
       let next = -1;
       const previousX = cps[w.checkpointIdx]?.x ?? -Infinity;
-      for (let i = 0; i < cps.length; i++) if (cps[i].x > previousX && p.x >= cps[i].x
+      for (let i = 0; i < cps.length; i++) if (cps[i].x > previousX && p.x >= cps[i].x && p.y <= cps[i].y + CHECKPOINT_BELOW
         && (next < 0 || cps[i].x > cps[next].x)) next = i;
       if (next >= 0 && !this.insideActiveArena(p.x)) this.activateCheckpoint(next);
     }
@@ -797,8 +814,19 @@ export class Director {
     const p = w.player;
     if (a.status === 'cleared') return;
     if (a.status === 'idle') {
-      if (p.mode !== 'dead' && p.mode !== 'mounting' && p.x >= a.def.triggerX && p.x < a.def.rect.x + a.def.rect.w && !this.cine && !w.inRoom()) this.startArena(a);
+      if (p.mode !== 'dead' && p.mode !== 'mounting' && p.x >= a.def.triggerX && p.x < a.def.rect.x + a.def.rect.w
+        && this.inArenaBand(a) && !this.cine && !w.inRoom()) this.startArena(a);
       return;
+    }
+    // rede de segurança: a arena nunca prende a câmera com o Karimbo fora dela (caverna/lago embaixo, interior)
+    if (a.def.id !== 'boss' && p.mode !== 'dead' && !this.cine) {
+      const r = a.def.rect;
+      const out = !this.inArenaBand(a) || w.inRoom() || p.x < r.x - 2 * 32 || p.x > r.x + r.w + 2 * 32;
+      a.away = out ? a.away + dt : 0;
+      if (a.away > ARENA_AWAY_ABORT) {
+        this.abortArena(a);
+        return;
+      }
     }
     a.t += dt;
     if (!a.waveSpawned) {
@@ -827,6 +855,7 @@ export class Director {
     a.waveSpawned = false;
     a.waveTimer = a.def.waves[0]?.delay ?? 0.6;
     a.t = 0;
+    a.away = 0;
     w.audio('lock', 1);
     w.fx.addShake(3, 0.3);
     if (a.def.banner) this.banner(a.def.banner, undefined, 1.6);
@@ -884,6 +913,26 @@ export class Director {
       }
     }
     w.audio('alarm', 0.5);
+  }
+
+  /** Desfaz uma arena ativa sem o Karimbo nela: some com a onda, derruba as barreiras e volta a esperar. */
+  private abortArena(a: ArenaState) {
+    const w = this.w;
+    const wave = new Set(a.alive);
+    w.enemies = w.enemies.filter((e) => !wave.has(e));
+    for (const b of a.barriers) b.alive = false;
+    if (a.barriers.length) w.solidsDirty = true;
+    a.status = 'idle';
+    a.wave = 0;
+    a.waveSpawned = false;
+    a.waveTimer = 0;
+    a.alive = [];
+    a.barriers = [];
+    a.bossEnemy = null;
+    a.t = 0;
+    a.away = 0;
+    w.camera.lock = this.currentLock();
+    w.setMusic(w.player.mounted ? 'nomad' : 'explore');
   }
 
   private clearArena(a: ArenaState) {

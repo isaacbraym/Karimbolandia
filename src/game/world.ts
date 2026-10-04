@@ -776,10 +776,12 @@ export class World {
   }
   /** Altura Y abaixo da qual o jogador "caiu no abismo" (arenas ativas usam um limite mais curto). */
   deathY(x?: number) {
+    // acima/abaixo do lago fundo vale o mapa inteiro (a água pega o Karimbo, mesmo com arena ativa ao lado)
+    const overLake = x !== undefined && this.water.zones.some((z) => z.kind === 'lake' && x >= z.x - 64 && x < z.x + z.w + 64);
     const a = this.director.activeArenaRect();
-    if (a) return Math.min(this.level.pxH + 60, a.y + a.h + 140);
-    // acima/abaixo do lago fundo vale o mapa inteiro; nos demais buracos a queda continua curta
-    if (this.data.voidRow !== undefined && !(x !== undefined && this.water.zones.some((z) => z.kind === 'lake' && x >= z.x - 64 && x < z.x + z.w + 64))) return this.data.voidRow * TILE + 60;
+    if (a && !overLake) return Math.min(this.level.pxH + 60, a.y + a.h + 140);
+    // nos demais buracos a queda continua curta
+    if (this.data.voidRow !== undefined && !overLake) return this.data.voidRow * TILE + 60;
     return this.level.pxH + 60;
   }
   progressDashDiscovered() {
