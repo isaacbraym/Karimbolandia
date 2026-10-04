@@ -164,7 +164,14 @@ export class Game {
       }
     });
     this.input.onGesture = () => {
+      const unlocking = !audio.ctx;
       audio.init();
+      // o tema pedido antes do primeiro clique (navegador bloqueia áudio) começa agora
+      if (unlocking && audio.ctx && this.wasMusic) {
+        const s = this.wasMusic;
+        this.wasMusic = null;
+        this.setMusic(s);
+      }
       if (this.state === 'comic') this.comicTap = true;
       else if (this.state === 'playing' && (this.world?.director.longIntroActive() || this.world?.director.openingActive())) this.introTap = true;
     };
@@ -237,11 +244,11 @@ export class Game {
     if (settings.quality === 'auto') {
       const mem = (navigator as unknown as { deviceMemory?: number }).deviceMemory ?? 4;
       const cores = navigator.hardwareConcurrency ?? 4;
-      const small = Math.min(screen.width, screen.height) * (window.devicePixelRatio || 1) < 900;
       // celular: no máximo 'média' (telas com DPR 3 em 960p pesam demais; a resolução dinâmica ajusta o resto)
+      // Desktop também começa em 'média' (720p): 'alta' (960p) quase dobra os pixels de cada quadro e
+      // deixava o jogo pesado em tela cheia com GPU integrada. 'Alta' continua disponível nas configurações.
       if (this.isTouch) q = mem <= 3 || cores <= 4 ? 'low' : 'medium';
-      else q = 'high';
-      if (small && q === 'high') q = 'medium';
+      else q = cores <= 2 ? 'low' : 'medium';
     } else q = settings.quality;
     this.quality = q;
   }
@@ -1074,14 +1081,14 @@ export class Game {
     }
     this.drsAcc += Math.min(dt, 0.1);
     this.drsN++;
-    if (this.drsAcc < 1.2) return;
+    if (this.drsAcc < 0.75) return;
     const avg = this.drsAcc / this.drsN;
     this.drsAcc = this.drsN = 0;
-    const minScale = this.isTouch ? 0.5 : 0.6;
+    const minScale = 0.5;
     if (avg > 1 / 47 && this.renderScale > minScale + 0.01) {
-      // só baixa com lentidão sustentada (2 janelas seguidas): cada troca realoca o canvas
-      if (++this.drsBad >= 2) {
-        this.renderScale = Math.max(minScale, +(this.renderScale - 0.1).toFixed(2));
+      // lentidão clara (abaixo de ~40 fps) baixa já na primeira janela e em passo maior
+      if (++this.drsBad >= (avg > 1 / 40 ? 1 : 2)) {
+        this.renderScale = Math.max(minScale, +(this.renderScale - (avg > 1 / 40 ? 0.15 : 0.1)).toFixed(2));
         this.drsBad = 0;
         this.drsGood = 0;
         this.resize();
@@ -1102,13 +1109,13 @@ export class Game {
   private autoQuality(dt: number, now: number) {
     this.dynamicResolution(dt);
     // só troca a qualidade se nem a resolução mínima der conta
-    if (settings.quality !== 'auto' || this.state !== 'playing' || this.renderScale > (this.isTouch ? 0.51 : 0.61)) {
+    if (settings.quality !== 'auto' || this.state !== 'playing' || this.renderScale > 0.51) {
       this.frameTimes.length = 0;
       return;
     }
     this.frameTimes.push(dt);
     if (this.frameTimes.length > 120) this.frameTimes.shift();
-    if (now - this.lastQualityCheck < 3500 || this.frameTimes.length < 100) return;
+    if (now - this.lastQualityCheck < 2000 || this.frameTimes.length < 60) return;
     this.lastQualityCheck = now;
     const avg = this.frameTimes.reduce((a, b) => a + b, 0) / this.frameTimes.length;
     if (avg > 0.026 && this.downgrades < 2 && this.quality !== 'low') {
