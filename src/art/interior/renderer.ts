@@ -74,8 +74,8 @@ export class InteriorRenderer {
   fit(W: number, H: number) {
     if (W === this.lw && H === this.lh) return;
     this.lw = W; this.lh = H;
-    const bw = (this.w + this.h) * TW / 2 + 36, bh = WALL_H + (this.w + this.h) * TH / 2 + SLAB + 26;
-    const top = 30, bottom = 40;
+    const bw = (this.w + this.h) * TW / 2 + 28, bh = WALL_H + (this.w + this.h) * TH / 2 + SLAB + 14;
+    const top = 24, bottom = 34;
     this.s = Math.max(0.5, Math.min((W - 24) / bw, (H - top - bottom) / bh, 1.6));
     const cx = W / 2 + (this.w - this.h) * TW / 4 * this.s * 0.0;
     this.ox = cx - ((this.w - this.h) * TW / 4) * this.s;
@@ -217,6 +217,7 @@ export class InteriorRenderer {
     if (asm >= 0.999) g.drawImage(sh.floor, bx, by, bw, bh);
     else this.floorCascade(g, bx, by, bw, bh, asm);
     this.floorFx(g, st, t);
+    this.lightShafts(g, t);
     // paredes (sobem do chão)
     this.drawWalls(g, bx, by, bw, bh, asm);
     // itens de parede
@@ -304,7 +305,6 @@ export class InteriorRenderer {
     const e = easeOutBack(p), s = this.s;
     const c = this.toScreen(f.gx + f.w / 2, f.gy + f.h / 2, f.lift ?? 0, [0, 0]);
     const drop = (1 - e) * -90 * s;
-    const squash = p < 1 ? 1 - Math.max(0, Math.sin(p * Math.PI)) * 0.0 : 1;
     // raio-X: móvel alto na frente do Karimbo fica translúcido quando o cobre
     let alpha = Math.min(1, p * 1.4);
     let xray = false;
@@ -316,7 +316,9 @@ export class InteriorRenderer {
     g.save();
     g.globalAlpha = alpha;
     g.translate(c[0], c[1] + drop);
-    if (squash !== 1) g.scale(1, squash);
+    // ao pousar o móvel amassa e estica (squash & stretch)
+    const sq = p < 1 ? Math.sin(Math.max(0, (p - 0.72) / 0.28) * Math.PI) * 0.12 : 0;
+    if (sq > 0.001) g.scale(1 + sq, 1 - sq);
     g.drawImage(spr.c, -spr.ox * s, -spr.oy * s, spr.w * s, spr.h * s);
     const live = painterOf(f.paint).live;
     if (live && p >= 1) { g.scale(s, s); live(g, f, spr.key, this.sim.t); }
@@ -413,6 +415,28 @@ export class InteriorRenderer {
         g.fillStyle = 'rgba(255,255,255,.14)'; g.strokeStyle = 'rgba(255,255,255,.55)'; g.lineWidth = 1.2;
         g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.lineTo(c[0], c[1]); g.lineTo(d[0], d[1]); g.closePath(); g.fill(); g.stroke();
       }
+    }
+  }
+
+  /** Raios de sol das janelas no piso, com poeira dançando dentro. */
+  private lightShafts(g: CanvasRenderingContext2D, t: number) {
+    if (this.quality === 'low') return;
+    const sim = this.sim, s = this.s;
+    for (const f of sim.room.furniture) {
+      if (!f.wall || f.wall.side !== 'right' || !/window/i.test(f.paint)) continue;
+      const c = f.gx + f.w / 2, hw = 0.5;
+      const pulse = 0.85 + 0.15 * Math.sin(t * 0.7 + c);
+      for (let k = 0; k < 2; k++) {
+        const len = 3.2 - k * 1.2, grow = 1.35;
+        const a = this.toScreen(c - hw, 0, 0, [0, 0]), b = this.toScreen(c + hw, 0, 0, [0, 0]);
+        const d = this.toScreen(c + hw + grow * (len / 3.2), len, 0, [0, 0]), e = this.toScreen(c - hw + grow * (len / 3.2), len, 0, [0, 0]);
+        g.fillStyle = `rgba(255,238,170,${(0.085 + k * 0.045) * pulse})`;
+        g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.lineTo(d[0], d[1]); g.lineTo(e[0], e[1]); g.closePath(); g.fill();
+      }
+      if (this.quality !== 'medium' || ((t * 3) | 0) % 2 === 0) {
+        if (Math.random() < 0.05) this.particles.burst('dust', c + (Math.random() - 0.3) * 1.4, 0.4 + Math.random() * 2.6, 1);
+      }
+      void s;
     }
   }
 

@@ -352,7 +352,8 @@ export class InteriorSim {
     if (this.sneaking) p *= 0.25;
     const radio = this.rt.radio ? this.room.furniture.find((f) => f.id === 'radio') : undefined;
     if (radio && Math.hypot(this.px - (radio.gx + radio.w / 2), this.py - (radio.gy + radio.h / 2)) <= RADIO_R) p *= 0.5;
-    this.sfx(squeak ? 'creak' : 'step', this.sneaking ? 0.25 : 0.55);
+    const glass = this.grid.squeaky(c.x, c.y) && this.decals.some((d) => d.kind === 'glass' && Math.floor(d.gx) === c.x && Math.floor(d.gy) === c.y);
+    this.sfx(glass ? 'crunch' : squeak ? 'creak' : 'step', this.sneaking ? 0.25 : 0.55);
     this.noise(this.px, this.py, p);
   }
 

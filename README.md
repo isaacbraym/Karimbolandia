@@ -62,6 +62,26 @@ O endereço anterior continua funcionando. A v5 aproveita o progresso já salvo 
 * O Nômad é **obrigatório**: o portão da garagem só abre depois que você **pula em cima dele** para pilotá-lo. No trecho de guerra seguinte chegam hordas contínuas (frenesi): cada abate recupera um pouco do Nômad e sequências de 5 dão bônus. Ele tem barra de vida própria; ao chegar a zero o Karimbo é ejetado e segue a pé.
 * Existe uma mecânica secreta no avanço do Nômad. Só os atentos vão descobrir. 😉
 
+### Dentro das casas (interiores isométricos)
+
+Na fase 2, a **Palafita do vigia** (primeira cabana mercenária) e a **Casa da Dona Benedita** (primeira casa da aldeia) abrem um modo próprio: o Karimbo anda por uma grade isométrica 2:1 (sem pular, voar nem atirar), usa os móveis, come, pega ou rouba, derruba e fuça. Chegue na porta com a área livre de inimigos e aperte `F` (ou **ENTRAR**).
+
+* **Ruído e olhares:** cada ação mostra ondas de ruído e um olho se alguém vai ver; vermelho irrita o morador. O mercenário dorme (sono 0–100) e a moradora volta da roça no meio da visita, com uma suspeita 0–100 que a reputação na aldeia multiplica.
+* **Travessuras:** cada casa tem uma lista (papel no canto). Completar tudo dá o carimbo **KARIMBADO!**; a estrela dourada exige não acordar o Cabo / não ser expulso.
+* **Missão da panela:** pegue a panela apreendida na palafita e devolva à Dona Benedita (toque nela e escolha *Devolver*).
+* Tudo do interior só é baixado perto da porta e liberado ao sair.
+
+| Ação no interior | Teclado / mouse | Celular | Gamepad |
+|---|---|---|---|
+| Andar | clicar no chão · `WASD`/setas (relativas à tela) | tocar no chão | analógico esq. |
+| Escolher objeto / verbo | passar o mouse · `E` `Q` / roda | tocar no objeto | LB / RB |
+| Abrir o menu / confirmar | clique · `ESPAÇO` ou `F` | tocar na fatia | A / Select |
+| Examinar rápido | botão direito · `J` | toque longo | X |
+| Ponta dos pés (segurar) | `SHIFT` | **PONTA** | Y |
+| Fechar menu / sair pela porta | `G` | **SAIR** | B |
+| Lista de travessuras | clicar no papel · `R` | **LISTA** | R3 |
+| Pausa | `ESC` | botão de pausa | Start |
+
 ## A fase
 
 14 seções (~13–21 min): entrada na cidade → primeiros soldados → verticalidade e glide → primeiro segredo → grande combate (arena com ondas) → **encontro com o Nômad** → power trip → avanço → exploração → área de guerra (arena) → passagem estreita (saída do Nômad) → subida final → preparação → **Felipão** (3 fases, piso que desaba).
@@ -112,6 +132,8 @@ src/core      input unificado (teclado/mouse/gamepad/toque), áudio e música pr
 src/art       arte procedural (tiles, props, inimigos, parallax), fotos recortadas (Karimbo/Felipão/Nômad)
 src/game      mundo, jogador, inimigos, chefe, câmera, HUD, diretor (arenas, cinemáticas, checkpoints)
 src/game/level  DSL de fase (builder), 14 seções e validador de alcançabilidade
+src/game/interior  interiores isométricos (simulador puro, cérebros dos NPCs, cômodos); carregado por import()
+src/art/interior   desenho do diorama, móveis procedurais, partículas e UI do interior (também sob demanda)
 src/ui        menus (DOM) e controles de toque (Pointer Events)
 tests         validação da fase + simulações headless com bot
 ```

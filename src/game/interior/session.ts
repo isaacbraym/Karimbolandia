@@ -33,7 +33,7 @@ export interface SessionInit {
 export interface Outcome { reason: ExitReason; alerted: boolean; room: RoomDef['id']; spot: ExplorationSpot; mood: 'happy' | 'angry' | 'neutral' }
 
 const ASSEMBLE_S = 1.1, DISASSEMBLE_S = 0.4;
-const SFX_OK = new Set<string>(['step', 'creak', 'secret', 'coin', 'heal', 'pickup', 'crateBreak', 'debris', 'burp', 'whistle', 'clap', 'uiClick', 'uiBack', 'lock', 'unlock', 'splash', 'crush', 'knife', 'servo', 'spark', 'wade', 'bird', 'bird2', 'insect', 'frog', 'hurt', 'slam', 'warning']);
+const SFX_OK = new Set<string>(['step', 'creak', 'secret', 'coin', 'heal', 'pickup', 'crateBreak', 'debris', 'burp', 'whistle', 'clap', 'uiClick', 'uiBack', 'lock', 'unlock', 'splash', 'crush', 'knife', 'servo', 'spark', 'wade', 'bird', 'bird2', 'insect', 'frog', 'hurt', 'slam', 'warning', 'snore', 'cluck', 'tvStatic', 'thump', 'crunch']);
 
 export class InteriorSession {
   readonly sim: InteriorSim;
@@ -84,6 +84,7 @@ export class InteriorSession {
   resize(W: number, H: number) { this.viewW = W; this.viewH = H; }
 
   pointer(e: PointerEv) {
+    if (e.touch) this.touchSeen = true;
     lastPointer.x = e.x; lastPointer.y = e.y;
     this.pointerAge = 0;
     if (this.phase !== 'live') return;
@@ -175,7 +176,7 @@ export class InteriorSession {
   private hintText(step: number, device: string): string {
     if (step === 1) return device === 'touch' ? 'Toque no chão para andar e num objeto para ver o que dá para fazer.'
       : device === 'pad' ? 'Analógico anda · LB/RB escolhe objeto · A age · B sai pela porta.'
-      : 'Clique no chão para andar e num objeto para agir. Setas/WASD também andam · Espaço age.';
+      : 'Clique no chão para andar e num objeto para agir. Setas/WASD também andam · Espaço age · G sai.';
     if (step === 3) return device === 'touch' ? 'Segure PONTA para andar sem fazer barulho.' : 'Segure SHIFT para andar na ponta dos pés: bem menos barulho.';
     return '';
   }
@@ -216,16 +217,20 @@ export class InteriorSession {
     // dica de tutorial depois de um instante
     if (this.hintClock > 0 && this.tutorialStep === 1) {
       this.hintClock -= dt;
-      if (this.hintClock <= 0) this.setHint(this.hintText(1, ctl.device), 7, 2);
+      if (this.hintClock <= 0) this.setHint(this.hintText(1, this.dev(ctl)), 7, 2);
     }
+    audio.setUnderwater(0.38); // a música de fora fica abafada (a pausa a desfaz; aqui volta)
     this.input(dt, ctl);
     this.sim.update(dt, { mx: this.moveX, my: this.moveY, sneak: this.sneak });
+    this.ambience(dt);
     const resident = this.sim.npc('benedita');
     if (resident) this.w.village.setInside(this.spot.x, !resident.away);
     this.afterSim(ctl);
     this.drainEvents();
   }
 
+  private touchSeen = false;
+  private dev(ctl: ControlState) { return this.touchSeen ? 'touch' : ctl.device; }
   private moveX = 0; private moveY = 0; private sneak = false;
 
   private handleSkip(ctl: ControlState) {
@@ -258,13 +263,13 @@ export class InteriorSession {
     if (ctl.reload?.pressed) { ui.list = !ui.list; audio.play('uiClick', 0.4); }
     this.moveX = ctl.moveX; this.moveY = ctl.moveY;
     const reach = sim.reachable();
-    const usePointer = this.pointerAge < 2.5 && ctl.device === 'kb';
+    const usePointer = this.pointerAge < 2.5 && this.dev(ctl) === 'kb';
     if (!reach.some((f) => f.id === this.kbSel)) this.kbSel = reach[0]?.id ?? null;
     if (ctl.next.pressed && reach.length) { const i = reach.findIndex((f) => f.id === this.kbSel); this.kbSel = reach[(i + 1) % reach.length].id; audio.play('uiClick', 0.2); }
     if (ctl.prev.pressed && reach.length) { const i = reach.findIndex((f) => f.id === this.kbSel); this.kbSel = reach[(i - 1 + reach.length) % reach.length].id; audio.play('uiClick', 0.2); }
-    this.scene.selFid = ctl.device === 'touch' ? null : (usePointer ? this.hoverFid : this.kbSel);
-    ui.hoverFid = usePointer ? this.hoverFid : (ctl.device === 'touch' ? null : this.kbSel);
-    ui.hoverName = usePointer ? ui.hoverName : (ctl.device === 'touch' ? '' : (sim.furnById.get(this.kbSel ?? '')?.name ?? ''));
+    this.scene.selFid = this.dev(ctl) === 'touch' ? null : (usePointer ? this.hoverFid : this.kbSel);
+    ui.hoverFid = usePointer ? this.hoverFid : (this.dev(ctl) === 'touch' ? null : this.kbSel);
+    ui.hoverName = usePointer ? ui.hoverName : (this.dev(ctl) === 'touch' ? '' : (sim.furnById.get(this.kbSel ?? '')?.name ?? ''));
     if (accept && this.kbSel) { const f = sim.furnById.get(this.kbSel); if (f) this.openMenu(f); }
     else if (ctl.fire.pressed && this.kbSel) { const f = sim.furnById.get(this.kbSel); if (f) this.quickExamine(f); }
     else if (ctl.grenade.pressed) { if (!sim.leave()) sim.say('Daqui não dá para sair.', 'karimbo', 1.6); else this.scene.dest = sim.room.door; }
@@ -273,9 +278,30 @@ export class InteriorSession {
     void dt;
   }
 
+  private ambT = { snore: 1.2, hen: 6, room: 3, tv: 0.5 };
+  /** Sons da casa: ronco, galinha, chiado da TV e a selva lá fora (abafada pelo filtro). */
+  private ambience(dt: number) {
+    const sim = this.sim, a = this.ambT;
+    for (const k of Object.keys(a) as (keyof typeof a)[]) a[k] -= dt;
+    const cabo = sim.npc('cabo');
+    if (cabo && !cabo.away && a.snore <= 0 && (cabo.state === 'asleep' || cabo.state === 'stirring')) {
+      a.snore = 2.9 + sim.random() * 0.6;
+      const d = Math.hypot(sim.px - cabo.gx, sim.py - cabo.gy);
+      audio.play('snore', Math.max(0.18, 0.75 - d * 0.06), 0.3);
+    }
+    if (sim.room.id === 'benedita' && a.hen <= 0 && !sim.has('hen')) { a.hen = 5 + sim.random() * 5; audio.play('cluck', 0.5, 0.4); }
+    if (sim.room.id === 'benedita' && a.tv <= 0 && !sim.has('tv')) { a.tv = 0.9; audio.play('tvStatic', 0.5, -0.5); }
+    if (sim.rt.radio && a.tv <= 0) { a.tv = 1.1; audio.play('tvStatic', 0.35, 0.2); }
+    if (a.room <= 0) {
+      a.room = 2 + sim.random() * 3;
+      const r = sim.random();
+      audio.play(r < 0.35 ? 'frog' : r < 0.6 ? 'insect' : r < 0.8 ? 'bird' : 'bird2', 0.35, sim.random() * 1.6 - 0.8);
+    }
+  }
+
   private afterSim(ctl: ControlState) {
     const sim = this.sim;
-    if (sim.rings.length && this.tutorialStep === 3 && !sim.sneaking && this.ui.hintT <= 0) this.setHint(this.hintText(3, ctl.device), 6, 99);
+    if (sim.rings.length && this.tutorialStep === 3 && !sim.sneaking && this.ui.hintT <= 0) this.setHint(this.hintText(3, this.dev(ctl)), 6, 99);
     this.ui.rep = sim.rep;
     if ((sim.t * 4 | 0) !== ((sim.t - 0.016) * 4 | 0)) this.refreshLists();
   }
@@ -334,6 +360,7 @@ export class InteriorSession {
       case 'prank': this.toast('Travessura!', e.label, 'prank'); w.hooks.onProgress?.(); this.refreshLists(); break;
       case 'karimbado': {
         ui.stamp = { t: 0, gold: e.gold };
+        audio.play('thump', 1);
         const coins = e.gold ? 160 : 80;
         for (let i = 0; i < coins; i++) collectCoin();
         w.tokens += coins; w.score += coins * 10;
@@ -374,6 +401,7 @@ export class InteriorSession {
 
   // ─────────────── desenho ───────────────
   draw(g: CanvasRenderingContext2D, W: number, H: number) {
+    this.viewW = W; this.viewH = H;
     g.save();
     if (this.shakeT > 0) {
       const k = Math.min(1, this.shakeT / 0.3) * this.shakeM;

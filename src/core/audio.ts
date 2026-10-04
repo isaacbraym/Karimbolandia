@@ -15,7 +15,8 @@ export type SfxName =
   | 'uiClick' | 'uiBack' | 'uiStart' | 'alarm' | 'warning' | 'lock' | 'unlock' | 'missile' | 'laserCharge' | 'laserFire'
   | 'enemyShot' | 'sniperShot' | 'turretShot' | 'stomp' | 'bossRoar' | 'bossHit' | 'bossPhase' | 'bossDie' | 'thruster'
   | 'victory' | 'servo' | 'spark' | 'slam' | 'burp' | 'burpBig' | 'crush' | 'extraLife' | 'thunder' | 'knife'
-  | 'splash' | 'bigSplash' | 'wade' | 'swim' | 'bubble' | 'suitOn' | 'bird' | 'bird2' | 'insect' | 'frog' | 'creak' | 'rumble' | 'crocBite';
+  | 'splash' | 'bigSplash' | 'wade' | 'swim' | 'bubble' | 'suitOn' | 'bird' | 'bird2' | 'insect' | 'frog' | 'creak' | 'rumble' | 'crocBite'
+  | 'snore' | 'cluck' | 'tvStatic' | 'thump' | 'crunch';
 
 type LoopName = 'glide' | 'roll' | 'alarm' | 'laser' | 'thrusterLoop';
 
@@ -921,6 +922,26 @@ export class AudioEngine {
       case 'turretShot':
         this.tone({ type: 'square', f0: 460 * r, f1: 130, dur: 0.09, vol: 0.12 * v, pan, lp: 1800 });
         this.noise({ dur: 0.06, vol: 0.14 * v, type: 'bandpass', f0: 2200, f1: 900, pan });
+        break;
+      case 'snore':
+        // ronco em dó menor: inspira rouco e solta o ar vibrando
+        this.noise({ dur: 0.5, vol: 0.1 * v, type: 'lowpass', f0: 280 * r, f1: 520, q: 0.9, pan });
+        this.tone({ type: 'sawtooth', f0: 66 * r, f1: 50, dur: 0.46, vol: 0.06 * v, lp: 300, pan, vib: 10, vibHz: 24 });
+        this.noise({ dur: 0.7, vol: 0.12 * v, type: 'lowpass', f0: 520, f1: 200, q: 1, delay: 0.55, pan });
+        this.tone({ type: 'sawtooth', f0: 56 * r, f1: 42, dur: 0.62, vol: 0.08 * v, lp: 260, delay: 0.55, pan, vib: 14, vibHz: 20 });
+        break;
+      case 'cluck':
+        for (let i = 0; i < 3; i++) this.tone({ type: 'square', f0: (560 - i * 40) * r, f1: 360, dur: 0.05, vol: 0.05 * v, delay: i * 0.09 + (i === 2 ? 0.06 : 0), pan, lp: 1500 });
+        break;
+      case 'tvStatic':
+        this.noise({ dur: 0.4, vol: 0.05 * v, type: 'bandpass', f0: 3200, f1: 2400, q: 0.6, pan });
+        break;
+      case 'thump':
+        this.tone({ type: 'sine', f0: 110, f1: 38, dur: 0.28, vol: 0.4 * v, pan });
+        this.noise({ dur: 0.12, vol: 0.2 * v, type: 'lowpass', f0: 900, f1: 200, pan });
+        break;
+      case 'crunch':
+        for (let i = 0; i < 3; i++) this.noise({ dur: 0.04, vol: 0.16 * v, type: 'bandpass', f0: 4200 * r, f1: 2200, q: 2, delay: i * 0.035, pan });
         break;
       case 'burp':
         this.burp(false, v, pan);
