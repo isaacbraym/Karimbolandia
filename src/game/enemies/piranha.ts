@@ -86,10 +86,10 @@ export class Piranha extends Enemy {
     this.tickCommon(dt);
     const sc = (this.school ??= schoolFor(w, this.spawn));
     const p = w.player;
+    const inWater = p.swimming && p.mode === 'foot' && p.targetable;
     // decisão do cardume uma vez por quadro (o primeiro peixe atualizado decide por todos)
     if (sc.stamp !== w.time) {
       sc.stamp = w.time;
-      const inWater = p.swimming && p.mode === 'foot' && p.targetable;
       const d = Math.hypot(p.x - sc.hx, p.y - sc.hy);
       if (!sc.aggro && inWater && d < sc.radius + PIRANHA_TOLERANCE) {
         sc.aggro = true;
@@ -107,7 +107,9 @@ export class Piranha extends Enemy {
     let ty: number;
     let max: number;
     let acc: number;
-    if (sc.aggro) {
+    // O alerta tem memória para uma reentrada, mas não permite perseguir/morder fora da água.
+    const pursuing = sc.aggro && inWater;
+    if (pursuing) {
       tx = p.x + this.slotX * 0.42 + Math.sin(t * 3.1 + this.phase) * 10;
       ty = p.y - 12 + this.slotY * 0.42 + Math.cos(t * 2.7 + this.phase) * 8;
       max = (this.species === 1 ? 178 : 158) * this.speedK;
@@ -143,7 +145,7 @@ export class Piranha extends Enemy {
     // mordida
     if (this.biteT > 0) this.biteT -= dt;
     if (this.biteCd > 0) this.biteCd -= dt;
-    if (sc.aggro && this.biteCd <= 0 && Math.abs(p.x - b.x) < this.len * 0.5 + 12 && Math.abs(p.y - 12 - b.y) < 30) {
+    if (pursuing && this.biteCd <= 0 && Math.abs(p.x - b.x) < this.len * 0.5 + 12 && Math.abs(p.y - 12 - b.y) < 30) {
       this.biteT = 0.24;
       this.biteCd = 0.85 + hash(this.spawn.id, 7 + Math.floor(t)) * 0.6;
       p.nibble(w, this.species === 1 ? 4 : 6, b.x + this.facing * this.len * 0.4, b.y);
