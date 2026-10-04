@@ -85,8 +85,10 @@ function bakeKnife(): Sprite {
 }
 
 export function bakeKarimbo(heads: KarimboHeads, skin: SkinId = 'classic', equipment?: Pick<KarimboArt, 'weapons' | 'knife'>): KarimboArt {
-  const SHIRT = skin === 'explorer' ? '#728848' : skin === 'neon' ? '#25243f' : '#d2b892';
-  const SHORTS = skin === 'explorer' ? '#685137' : skin === 'neon' ? '#252d46' : '#3b4763';
+  const SHIRT = ({ classic: '#d2b892', explorer: '#728848', neon: '#25243f', diver: '#1d3f63', atlante: '#178a80' } as Record<SkinId, string>)[skin];
+  const SHORTS = ({ classic: '#3b4763', explorer: '#685137', neon: '#252d46', diver: '#152c46', atlante: '#a07a22' } as Record<SkinId, string>)[skin];
+  const BOOT = ({ classic: '#373152', explorer: '#493628', neon: '#373152', diver: '#0e1622', atlante: '#7a5a12' } as Record<SkinId, string>)[skin];
+  const STRIPE = ({ classic: '#39f0ff', explorer: '#c2a675', neon: '#39f0ff', diver: '#ffb52e', atlante: '#ffe27a' } as Record<SkinId, string>)[skin];
   // ---------------------------------------------------------------- tronco (camiseta + barriguinha)
   const torso = bake(
     28,
@@ -145,6 +147,37 @@ export function bakeKarimbo(heads: KarimboHeads, skin: SkinId = 'classic', equip
         g.fillRect(17.2, 9, 6, 1);
         g.fillRect(4.8, 16.4, 18.4, 1.6);
         shadedRR(g, 12, 16, 4, 2.6, 0.4, '#d6bf72', { lw: 0.6 });
+      } else if (skin === 'diver') {
+        // neoprene: faixa amarela no peito, zíper e o logo do Sivirino
+        g.fillStyle = '#ffb52e';
+        g.fillRect(2, 8, 24, 2.4);
+        g.fillStyle = '#0c1d30';
+        g.fillRect(13.4, 2, 1.2, 17);
+        g.fillStyle = '#d7e3ea';
+        for (let y = 3; y < 18; y += 2) g.fillRect(13.6, y, 0.8, 0.8);
+        g.fillStyle = 'rgba(160,220,255,0.25)';
+        g.beginPath();
+        g.ellipse(8, 13, 3, 4.5, 0.2, 0, Math.PI * 2);
+        g.fill();
+      } else if (skin === 'atlante') {
+        // escamas douradas e gola de ouro de Atlântida
+        g.strokeStyle = 'rgba(255,226,122,0.75)';
+        g.lineWidth = 0.7;
+        for (let row = 0; row < 6; row++) {
+          for (let col = 0; col < 7; col++) {
+            const x = 3 + col * 3.6 + (row % 2) * 1.8;
+            const y = 4 + row * 2.6;
+            g.beginPath();
+            g.arc(x, y, 1.8, 0, Math.PI);
+            g.stroke();
+          }
+        }
+        g.fillStyle = '#e8b93a';
+        g.fillRect(4, 1.4, 20, 1.8);
+        g.fillStyle = '#7ff9e0';
+        g.beginPath();
+        g.arc(14, 9.5, 1.6, 0, Math.PI * 2);
+        g.fill();
       } else if (skin === 'neon') {
         g.strokeStyle = '#39f0ff';
         g.lineWidth = 1.5;
@@ -230,10 +263,24 @@ export function bakeKarimbo(heads: KarimboHeads, skin: SkinId = 'classic', equip
         g.stroke();
         if (skin !== 'classic') {
           shadedRR(g, 1.5, 0, 7.5, 13.8, 2, dark ? shade(SHORTS, -0.2) : SHORTS, { lw: 0.8 });
-          shadedRR(g, 0.5, 12.2, 10, 5.3, 1.3, skin === 'explorer' ? '#493628' : '#373152', { lw: 0.8 });
-          g.fillStyle = skin === 'explorer' ? '#c2a675' : '#39f0ff';
+          shadedRR(g, 0.5, 12.2, 10, 5.3, 1.3, dark ? shade(BOOT, -0.2) : BOOT, { lw: 0.8 });
+          g.fillStyle = STRIPE;
           g.fillRect(2.5, skin === 'explorer' ? 13.4 : 16, 6.2, 1);
-          if (skin === 'neon') g.fillRect(6.8, 1, 1, 10);
+          if (skin === 'neon' || skin === 'diver' || skin === 'atlante') g.fillRect(6.8, 1, 1, 10);
+          if (skin === 'diver') {
+            // nadadeira amarela
+            g.fillStyle = '#ffb52e';
+            g.beginPath();
+            g.moveTo(6, 16.6);
+            g.lineTo(11, 15.4);
+            g.lineTo(11, 18.6);
+            g.lineTo(6, 18.2);
+            g.closePath();
+            g.fill();
+            g.strokeStyle = OUT;
+            g.lineWidth = 0.6;
+            g.stroke();
+          }
         }
       },
       { scale: S, ox: 5.5, oy: 1 }
@@ -261,8 +308,15 @@ export function bakeKarimbo(heads: KarimboHeads, skin: SkinId = 'classic', equip
         g.lineWidth = 0.9;
         g.stroke();
         if (skin !== 'classic') {
-          g.fillStyle = skin === 'explorer' ? '#d6bf72' : '#39f0ff';
+          g.fillStyle = skin === 'explorer' ? '#d6bf72' : STRIPE;
           g.fillRect(1.8, 2, 2, 3.6);
+          if (skin === 'diver' || skin === 'atlante') {
+            // manga longa até o punho
+            g.fillStyle = dark ? shade(SHIRT, -0.22) : SHIRT;
+            g.fillRect(6.6, 1.6, 5.4, 4.8);
+            g.fillStyle = STRIPE;
+            g.fillRect(10.6, 1.6, 1.2, 4.8);
+          }
         }
         g.fillStyle = shade(sk, .22); g.fillRect(13.3, 2.4, 2.2, .7);
         g.strokeStyle = shade(sk, -.28); g.lineWidth = .45;
@@ -422,6 +476,8 @@ export interface KPose {
   scope?: boolean;
   clap?: boolean;
   clapTime?: number;
+  /** balada: tempo da dança (apito + pulseiras neon); indefinido = não dança */
+  dance?: number;
 }
 
 // ombro abaixo do queixo: o braço/arma nunca cobre o rosto
@@ -472,7 +528,10 @@ export function drawKarimbo(g: CanvasRenderingContext2D, art: KarimboArt, x: num
   const c = p.runPhase;
   const idle = p.state === 'idle';
   // corrida: dois "quiques" por ciclo; parado: respiração
-  const bob = running ? -Math.abs(Math.sin(c)) * 2.1 : idle ? Math.sin(p.t * 2.6) * 0.55 : 0;
+  const dancing = p.dance !== undefined;
+  // dança no tempo da balada (150 bpm): meia volta do seno por batida
+  const db = (p.dance ?? 0) * (150 / 60) * Math.PI;
+  const bob = dancing ? -Math.abs(Math.sin(db)) * 3.4 : running ? -Math.abs(Math.sin(c)) * 2.1 : idle ? Math.sin(p.t * 2.6) * 0.55 : 0;
   const breath = idle ? Math.sin(p.t * 2.6) * 0.022 : 0;
   const recoil = (p.kick ?? 0) * 1.1; // o tronco recua com o disparo
   const [lagX, lagY] = p.headLag ?? [0, 0];
@@ -528,7 +587,11 @@ export function drawKarimbo(g: CanvasRenderingContext2D, art: KarimboArt, x: num
     hipY = -11;
     torsoDrop = 3;
   }
-  const bodyRot = p.state === 'slide' ? -0.34 : p.state === 'slam' ? 0.14 : 0;
+  if (dancing) {
+    legF = Math.sin(db) * 0.55;
+    legB = -Math.sin(db) * 0.55;
+  }
+  const bodyRot = p.state === 'slide' ? -0.34 : p.state === 'slam' ? 0.14 : dancing ? Math.sin(db * 0.5) * 0.08 : 0;
 
   g.save();
   g.rotate(hurtRot + bodyRot);
@@ -541,7 +604,8 @@ export function drawKarimbo(g: CanvasRenderingContext2D, art: KarimboArt, x: num
   // Sequência do Animator_AI: aproximar, buscar carregador, encaixar, retomar mira.
   if(reloadWeight>0)drawSpr(g,art.armBack,sh[0]-3,shY+1,{rot:1.25-Math.sin(Math.PI*Math.min(1,reload*1.6))*.9,white:w});
   // braço de trás (só quando sem arma)
-  if (!p.hasGun&&!p.clap) drawSpr(g, art.armBack, sh[0] - 4, shY + 0.5, { rot: 1.1 + Math.sin(c) * (running ? 0.5 : 0), white: w });
+  if (dancing) danceArm(g, art.armBack, sh[0] - 4, shY + 0.5, -2.75 + Math.sin(db) * 0.45, '#ff4fd0', w);
+  else if (!p.hasGun&&!p.clap) drawSpr(g, art.armBack, sh[0] - 4, shY + 0.5, { rot: 1.1 + Math.sin(c) * (running ? 0.5 : 0), white: w });
   // cilindro de ar nas costas (traje de mergulho)
   const suit = p.suit ?? 0;
   if (suit > 0.02) {
@@ -584,7 +648,8 @@ export function drawKarimbo(g: CanvasRenderingContext2D, art: KarimboArt, x: num
     }
     g.restore();
   } else {
-    if(!p.clap)drawSpr(g, art.armFront, sh[0], shY, { rot: 0.9 + Math.sin(c + 3) * (running ? 0.5 : 0), white: w });
+    if (dancing) danceArm(g, art.armFront, sh[0], shY, -0.5 - Math.sin(db) * 0.75, '#39f0ff', w);
+    else if(!p.clap)drawSpr(g, art.armFront, sh[0], shY, { rot: 0.9 + Math.sin(c + 3) * (running ? 0.5 : 0), white: w });
     if(p.clap){
       const open=clapOpen(p.clapTime??p.t);
       for(const s of [-1,1]) {
@@ -633,6 +698,7 @@ export function drawKarimbo(g: CanvasRenderingContext2D, art: KarimboArt, x: num
   } else {
     drawEars(g, art, p, w);
     drawSpr(g, hd.right, 0, 0, { white: w });
+    if (dancing) drawWhistle(g, db);
   }
   g.restore();
 
@@ -845,3 +911,58 @@ function diveGear(art: KarimboArt): DiveGear {
 }
 
 export { glowSprite };
+
+/** Braço da dança erguido, com a pulseira neon brilhando no pulso. */
+function danceArm(g: CanvasRenderingContext2D, arm: Sprite, x: number, y: number, rot: number, neon: string, white: boolean) {
+  drawSpr(g, arm, x, y, { rot, white });
+  const wx = x + Math.cos(rot) * ARM_LEN * 0.78;
+  const wy = y + Math.sin(rot) * ARM_LEN * 0.78;
+  const glow = glowSprite(neon, 32);
+  g.globalCompositeOperation = 'lighter';
+  g.globalAlpha = 0.85;
+  g.drawImage(glow.c, wx - 9, wy - 9, 18, 18);
+  g.globalAlpha = 1;
+  g.globalCompositeOperation = 'source-over';
+  g.strokeStyle = neon;
+  g.lineWidth = 1.7;
+  g.beginPath();
+  g.ellipse(wx, wy, 2.6, 1.6, rot, 0, Math.PI * 2);
+  g.stroke();
+  g.strokeStyle = '#ffffff';
+  g.lineWidth = 0.6;
+  g.stroke();
+}
+
+/** Apito na boca (com cordão) e o sopro saindo a cada batida. */
+function drawWhistle(g: CanvasRenderingContext2D, db: number) {
+  g.strokeStyle = '#ff4fd0';
+  g.lineWidth = 0.7;
+  g.beginPath();
+  g.moveTo(5, -8);
+  g.quadraticCurveTo(1, 2, -3, 3);
+  g.stroke();
+  g.fillStyle = '#d9e2ea';
+  g.strokeStyle = OUT;
+  g.lineWidth = 0.7;
+  g.beginPath();
+  g.roundRect(5.4, -10.6, 6.2, 2.8, 1.1);
+  g.fill();
+  g.stroke();
+  g.beginPath();
+  g.arc(10.6, -8.2, 1.6, 0, Math.PI * 2);
+  g.fill();
+  g.stroke();
+  const puff = Math.max(0, Math.sin(db));
+  if (puff > 0.55) {
+    g.strokeStyle = '#ffffff';
+    g.globalAlpha = (puff - 0.55) * 2.2;
+    g.lineWidth = 0.8;
+    g.beginPath();
+    for (const a of [-0.35, 0, 0.35]) {
+      g.moveTo(13 + Math.cos(a) * 1.5, -9.5 + Math.sin(a) * 1.5);
+      g.lineTo(13 + Math.cos(a) * 5, -9.5 + Math.sin(a) * 5);
+    }
+    g.stroke();
+    g.globalAlpha = 1;
+  }
+}

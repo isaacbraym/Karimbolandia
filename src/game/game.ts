@@ -6,6 +6,7 @@ import { PostFX } from './post';
 import { BossComic } from './comic';
 import { IntroOverlay, INTRO_COMIC, INTRO_VOICE_AT } from './bossIntro';
 import { bakeCivilians } from '../art/civilians';
+import { bakeClubArt } from '../art/club';
 import { OpeningOverlay } from './opening';
 import { NARR_COUNT } from './narrator';
 import { setDecoDensity } from '../art/decor';
@@ -225,6 +226,7 @@ export class Game {
     this.menus.setLoading(0.95, 'Chamando os moradores...');
     await new Promise((r) => setTimeout(r, 0));
     bakeCivilians(buildLevel().civilians.map((c) => c.look));
+    bakeClubArt();
     this.intro.prepare();
     this.opening.prepare();
     this.menus.setLoading(0.98, 'Afinando as vozes...');
@@ -843,6 +845,7 @@ export class Game {
       case 'boss2': m('boss', MIX.boss2); break;
       case 'boss3': m('boss', MIX.boss3); break;
       case 'victory': m('stage', MIX.victory); break;
+      case 'rave': music.play('rave', MIX.rave); break;
       case 'silence': music.setMix({}, 0.15); break;
     }
   }

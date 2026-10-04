@@ -39,6 +39,10 @@ export const JUNGLE_BOUNDS: Record<string, [number, number, number, number]> = {
   uChest: [-28, -28, 27, 4],
   uBones: [-30, -16, 36, 6],
   uStatue: [-28, -96, 28, 3],
+  aColumn: [-26, -176, 26, 4],
+  aDome: [-150, -150, 150, 4],
+  aTrident: [-30, -132, 30, 4],
+  aSign: [-34, -66, 34, 2],
   jTower: [-62, -251, 62, 7],
   jPalisade: [-72, -100, 72, 4],
   jTent: [-74, -78, 74, 5],
@@ -819,6 +823,112 @@ export function paintJungle(g: CanvasRenderingContext2D, kind: string, seed: num
       }
       return true;
     }
+    case 'aColumn': {
+      // coluna canelada de Atlântida, quebrada no alto, com cracas e algas
+      const h = 120 + (Math.abs(seed) % 50);
+      shadedRR(g, -24, -12, 48, 12, 2, '#5d7c86', { lw: 1.2 });
+      g.beginPath();
+      g.moveTo(-16, -12);
+      g.lineTo(-16, -h);
+      g.lineTo(-6, -h - 14);
+      g.lineTo(4, -h - 4);
+      g.lineTo(16, -h - 18);
+      g.lineTo(16, -12);
+      g.closePath();
+      const gr = g.createLinearGradient(-16, 0, 16, 0);
+      gr.addColorStop(0, '#3f5d68');
+      gr.addColorStop(0.35, '#86a8ac');
+      gr.addColorStop(1, '#2c4650');
+      g.fillStyle = gr;
+      g.fill();
+      g.strokeStyle = OUT;
+      g.lineWidth = 1.2;
+      g.stroke();
+      g.strokeStyle = 'rgba(20,40,48,0.5)';
+      g.lineWidth = 1;
+      for (let x = -11; x <= 11; x += 5.5) {
+        g.beginPath();
+        g.moveTo(x, -14);
+        g.lineTo(x, -h + 4);
+        g.stroke();
+      }
+      g.fillStyle = 'rgba(120,200,170,0.5)';
+      for (let i = 0; i < 9; i++) {
+        g.beginPath();
+        g.ellipse(r.range(-14, 14), r.range(-h + 10, -18), r.range(2, 4), r.range(1.5, 3), 0, 0, Math.PI * 2);
+        g.fill();
+      }
+      for (let i = 0; i < 3; i++) leafBlade(g, r.range(-14, 14), -14, r.range(18, 30), -Math.PI / 2 + r.range(-0.5, 0.5), 3.4, '#3c8a62');
+      return true;
+    }
+    case 'aDome': {
+      // cúpula afundada ao fundo (silhueta azulada, janelas apagadas)
+      g.fillStyle = '#1d3a4c';
+      g.beginPath();
+      g.moveTo(-140, 0);
+      g.lineTo(-140, -60);
+      g.quadraticCurveTo(-136, -146, 0, -148);
+      g.quadraticCurveTo(136, -146, 140, -60);
+      g.lineTo(140, 0);
+      g.closePath();
+      g.fill();
+      g.strokeStyle = '#2f5a6c';
+      g.lineWidth = 3;
+      for (let i = -3; i <= 3; i++) {
+        g.beginPath();
+        g.moveTo(i * 36, -4);
+        g.quadraticCurveTo(i * 30, -120, 0, -146);
+        g.stroke();
+      }
+      g.fillStyle = '#0f2230';
+      for (let i = -2; i <= 2; i++) {
+        g.beginPath();
+        g.roundRect(i * 50 - 10, -48, 20, 40, 10);
+        g.fill();
+      }
+      g.fillStyle = 'rgba(127,249,224,0.18)';
+      g.fillRect(-140, -64, 280, 4);
+      return true;
+    }
+    case 'aTrident': {
+      // tridente cravado no altar
+      g.strokeStyle = OUT;
+      g.lineWidth = 6;
+      g.beginPath();
+      g.moveTo(0, -2);
+      g.lineTo(0, -110);
+      g.stroke();
+      g.strokeStyle = '#d9b44a';
+      g.lineWidth = 4;
+      g.stroke();
+      g.lineWidth = 4;
+      g.beginPath();
+      g.moveTo(-20, -126);
+      g.lineTo(-20, -104);
+      g.quadraticCurveTo(-20, -96, 0, -96);
+      g.quadraticCurveTo(20, -96, 20, -104);
+      g.lineTo(20, -126);
+      g.moveTo(0, -96);
+      g.lineTo(0, -130);
+      g.stroke();
+      g.fillStyle = '#fff4c2';
+      for (const x of [-20, 0, 20]) poly(g, [[x - 4, -124 - (x ? 0 : 4)], [x, -134 - (x ? 0 : 4)], [x + 4, -124 - (x ? 0 : 4)]], '#fff4c2', { lw: 0.8 });
+      return true;
+    }
+    case 'aSign': {
+      // placa na margem do lago
+      shadedRR(g, -3, -40, 6, 40, 1, BARK, { lw: 1 });
+      shadedRR(g, -32, -64, 64, 28, 3, '#2f6f7a', { lw: 1.4 });
+      g.fillStyle = '#e8fff6';
+      g.font = '400 9px "Lilita One", Impact, sans-serif';
+      g.textAlign = 'center';
+      g.fillText('ATLÂNTIDA ↓', 0, -52);
+      g.font = '700 7px sans-serif';
+      g.fillStyle = '#ffd23a';
+      g.fillText('SÓ COM TRAJE', 0, -42);
+      g.textAlign = 'left';
+      return true;
+    }
     case 'uStatue': {
       // ídolo de pedra tombado, com algas
       g.fillStyle = '#3a5a5e';
@@ -1259,6 +1369,40 @@ function flame(g: CanvasRenderingContext2D, t: number, seed: number, size: numbe
 
 function paintAnimated(g: CanvasRenderingContext2D, kind: string, seed: number, t: number): boolean {
   switch (kind) {
+    case 'aCrystal': {
+      // cristais de Atlântida: brilho pulsante que ilumina o breu do fundo
+      const pulse = 0.65 + 0.35 * Math.sin(t * 1.8 + seed);
+      const glow = glowSprite('#7ff9e0', 32);
+      g.globalCompositeOperation = 'lighter';
+      g.globalAlpha = 0.45 * pulse;
+      g.drawImage(glow.c, -70, -110, 140, 140);
+      g.globalAlpha = 0.8 * pulse;
+      g.drawImage(glow.c, -26, -58, 52, 52);
+      g.globalAlpha = 1;
+      g.globalCompositeOperation = 'source-over';
+      for (const [x, h, a] of [[-9, 30, -0.35], [0, 44, 0], [9, 26, 0.4], [4, 18, 0.2]] as [number, number, number][]) {
+        g.save();
+        g.translate(x, 0);
+        g.rotate(a);
+        g.fillStyle = '#6fe8d2';
+        g.strokeStyle = '#173a3c';
+        g.lineWidth = 1.2;
+        g.beginPath();
+        g.moveTo(-4, 0);
+        g.lineTo(-4, -h * 0.75);
+        g.lineTo(0, -h);
+        g.lineTo(4, -h * 0.75);
+        g.lineTo(4, 0);
+        g.closePath();
+        g.fill();
+        g.stroke();
+        g.fillStyle = 'rgba(255,255,255,0.6)';
+        g.fillRect(-2.5, -h * 0.7, 1.4, h * 0.55);
+        g.restore();
+      }
+      return true;
+    }
+
     case 'jLightShaft': {
       // facho de sol atravessando a copa (aditivo)
       const a = 0.08 + 0.05 * Math.sin(t * 0.5 + seed);
@@ -1972,6 +2116,48 @@ function paintAnimated(g: CanvasRenderingContext2D, kind: string, seed: number, 
         }
       }, 6);
       drawPiece(g, s, Math.sin(t * 0.9 + seed) * 0.04, 0.9);
+      return true;
+    }
+    case 'clubFront': {
+      // fachada do prédio da balada (sobre o paredão): letreiro vertical, marquise e janelas piscando
+      const col = Math.sin(t * 6) > 0 ? '#ff3fb4' : '#39f0ff';
+      g.fillStyle = '#120e1f';
+      g.fillRect(-52, -880, 104, 880);
+      g.strokeStyle = '#2c2440';
+      g.lineWidth = 2;
+      for (let y = -860; y < -20; y += 40) {
+        g.beginPath();
+        g.moveTo(-52, y);
+        g.lineTo(52, y);
+        g.stroke();
+      }
+      for (let y = -840; y < -140; y += 80) {
+        for (const x of [-34, 14]) {
+          const lit = Math.sin(t * 3 + y * 0.07 + x) > 0.2;
+          g.fillStyle = lit ? (x < 0 ? '#ff4fd0' : '#39f0ff') : '#1d1730';
+          g.globalAlpha = lit ? 0.85 : 1;
+          g.fillRect(x, y, 20, 26);
+        }
+      }
+      g.globalAlpha = 1;
+      neon(g, -26, -640, 52, 330, col, 1);
+      g.fillStyle = '#0c0a14';
+      g.fillRect(-24, -638, 48, 326);
+      g.fillStyle = col;
+      g.font = '400 30px "Lilita One", Impact, sans-serif';
+      g.textAlign = 'center';
+      ['B', 'A', 'L', 'A', 'D', 'A'].forEach((ch, i) => g.fillText(ch, 0, -600 + i * 52));
+      g.textAlign = 'left';
+      // marquise com lâmpadas correndo
+      g.fillStyle = '#2a2140';
+      g.fillRect(-62, -150, 124, 16);
+      for (let i = 0; i < 12; i++) {
+        const on = (Math.floor(t * 10) + i) % 3 === 0;
+        g.fillStyle = on ? '#ffe27a' : '#5a4a2a';
+        g.beginPath();
+        g.arc(-56 + i * 10.2, -142, 2.6, 0, Math.PI * 2);
+        g.fill();
+      }
       return true;
     }
     case 'clubDoor':

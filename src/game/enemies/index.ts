@@ -3,6 +3,7 @@ import type { Enemy } from './enemy';
 import { RifleSoldier, ShotgunSoldier, ShieldSoldier, JetpackSoldier, Sniper, Grenadier, Hunter } from './soldiers';
 import { Drone, Turret, HeavyRobot, SpiderBot, MiniMech, RollerMine } from './robots';
 import { Felipao } from './felipao';
+import { Piranha } from './piranha';
 
 export function createEnemy(s: EnemySpawn): Enemy {
   switch (s.type) {
@@ -20,5 +21,6 @@ export function createEnemy(s: EnemySpawn): Enemy {
     case 'minimech': return new MiniMech(s);
     case 'roller': return new RollerMine(s);
     case 'boss': return new Felipao(s);
+    case 'piranha': return new Piranha(s);
   }
 }

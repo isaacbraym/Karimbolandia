@@ -12,7 +12,8 @@ import { getArt } from '../art';
 import { drawKarimbo, karimboMuzzle, type KState } from '../art/karimbo';
 import { drawNomad } from '../art/nomad';
 import { settings, progress } from '../core/storage';
-import { magazineCapacity, reloadSeconds, tunedWeapon } from '../core/gearCatalog';
+import { karimboStats, magazineCapacity, reloadSeconds, tunedWeapon } from '../core/gearCatalog';
+import { breathesUnderwater } from '../core/skinCatalog';
 import { difficulty } from '../core/difficulty';
 import {
   FOOT_W, FOOT_H, CROUCH_H, NOMAD_W, NOMAD_H, RUN, RUN_ACC, RUN_DEC, AIR_ACC, AIR_DEC, GRAV, JUMP_V, FALL_MAX, COYOTE, JUMP_BUF,
@@ -153,6 +154,16 @@ export class Player {
   landSquash = 0;
   /** dentro do lago (nadando) */
   swimming = false;
+  /** Ar (segundos) para nadar sem traje; a pressão do fundo gasta mais rápido. */
+  oxygen = 12;
+  oxyMax = 12;
+  /** profundidade da cabeça abaixo da superfície (linhas de tile) — HUD e pressão */
+  depthRows = 0;
+  private drownT = 0;
+  private gaspT = 0;
+  private lowAirWarned = false;
+  private nibbleT = 0;
+  private deepWarned = false;
   /** 0..1 traje de mergulho (capacete de latão + cilindro) */
   suit = 0;
   suitOn = false;
@@ -196,6 +207,8 @@ export class Player {
   respawnQueued = false;
   lockInput = false;
   clapping = false;
+  /** balada: tempo da dança (−1 = não dança) */
+  danceT = -1;
   justLanded = 0;
   fallCount = 0;
   aimAssistTarget: object | null = null;
@@ -242,12 +255,16 @@ export class Player {
   // ------------------------------------------------------------------ ciclo de vida
   reset(x: number, feetY: number) {
     this.clapping = false;
+    this.danceT = -1;
     this.body = newBody(FOOT_W, FOOT_H);
     this.body.x = x;
     this.body.y = feetY - FOOT_H / 2;
     this.mode = 'foot';
     this.nomad = null;
+    this.applyPerks(false);
     this.hp = this.maxHp;
+    this.oxygen = this.oxyMax;
+    this.drownT = 0;
     this.invuln = 1.2;
     this.hurtT = 0;
     this.crouch = false;
@@ -281,7 +298,7 @@ export class Player {
     for(const id of WEAPON_ORDER)if(progress.gear.includes(`${id}.unlock.1`))this.weapons.set(id,WEAPONS[id].ammoStart);
     this.magazines=new Map([...this.weapons].map(([id,n])=>[id,Math.min(n,magazineCapacity(id,progress.gear))]));
     this.cur = 'pistol';this.reloadT=0;
-    this.grenades = 2;
+    this.grenades = karimboStats(progress.gear).nades;
   }
 
   snapshot() {
@@ -311,7 +328,40 @@ export class Player {
     this.reloadT=0;
   }
 
-  /** Arma comprada no Tomé: é do Karimbo para sempre (descarrega, mas volta com munição). */
+  /** Melhorias do Karimbo compradas com o Sivirino (vida e ar). `heal` cura a diferença na hora. */
+  applyPerks(heal: boolean) {
+    const st = karimboStats(progress.gear);
+    if (heal && st.hp > this.maxHp) this.hp += st.hp - this.maxHp;
+    this.maxHp = st.hp;
+    if (this.hp > this.maxHp) this.hp = this.maxHp;
+    const full = this.oxygen >= this.oxyMax - 0.01;
+    this.oxyMax = st.air;
+    if (full || heal) this.oxygen = this.oxyMax;
+  }
+  /** Traje que respira debaixo d'água está vestido. */
+  get canBreathe() {
+    return breathesUnderwater(progress.equippedSkin);
+  }
+  /** Mordida de piranha: dano direto, sem empurrão e com folga curta (um cardume é perigoso). */
+  nibble(w: World, dmg: number, x: number, y: number) {
+    if (!this.targetable || this.nibbleT > 0 || w.invulnerable || w.village?.active) return false;
+    this.nibbleT = 0.28;
+    const d = Math.max(1, Math.round(dmg * difficulty().playerDmg));
+    w.stats.damageTaken += d;
+    this.lastDamageT = w.time;
+    this.hp -= d;
+    this.hurtT = Math.max(this.hurtT, 0.12);
+    w.fx.sparks(x, y, 5, '#ff6a6a', 160);
+    for (let i = 0; i < 3; i++) w.water.addBubble(x + rand.spread(8), y, rand.range(1, 2.4), y - 400);
+    w.audio('hurt', 0.55, this.x);
+    if (this.hp <= 0) {
+      this.hp = 0;
+      this.die(w);
+    }
+    return true;
+  }
+
+  /** Arma comprada com o Sivirino: é do Karimbo para sempre (descarrega, mas volta com munição). */
   ownsForever(id: WeaponId) {
     return id === 'pistol' || progress.gear.includes(`${id}.unlock.1`);
   }
@@ -586,7 +636,7 @@ export class Player {
     if (w.water.zones.length) this.updateSuit(w, dt);
 
     // queda no abismo
-    if (this.y > w.deathY()) this.fellIntoPit(w);
+    if (this.y > w.deathY(this.x)) this.fellIntoPit(w);
     // espinhos/hazard
     this.checkHazards(w);
     // último ponto seguro
@@ -1028,20 +1078,26 @@ export class Player {
     b.vy *= hard ? 0.3 : 0.45;
     b.vx *= 0.6;
     if (hard) w.fx.addShake(2, 0.2);
-    if (!this.suitOn) {
+    if (!this.suitOn && this.canBreathe) {
       this.suitOn = true;
       w.audio('suitOn', 0.9, this.x);
       w.fx.add(PK.Ring, this.x, this.y - 18, 0, 0, 0.35, 6, '#ffe27a', { size1: 40, a0: 0.8, front: true });
       if (!this.suitShown) {
         this.suitShown = true;
-        w.director.banner('TRAJE DE MERGULHO', 'Explore o fundo do lago!', 2.4);
+        w.director.banner('TRAJE DE MERGULHO', 'Ar sem limite: desça até Atlântida!', 2.4);
       }
+    } else if (!this.canBreathe && !this.suitShown) {
+      this.suitShown = true;
+      w.director.banner('SEM TRAJE', 'Fique de olho no ar • o fundo esmaga quem desce demais', 2.6);
     }
     this.dryT = 0;
   }
 
   /** Traje: veste ao cair no lago e tira depois de um tempo em terra firme. */
   private updateSuit(w: World, dt: number) {
+    if (this.suitOn && !this.canBreathe) this.suitOn = false;
+    if (!this.suitOn && this.canBreathe && this.swimming) this.suitOn = true;
+    this.updateOxygen(w, dt);
     if (this.suitOn && !this.swimming) {
       this.dryT += this.body.onGround ? dt : 0;
       if (this.dryT > 1.1) {
@@ -1055,9 +1111,65 @@ export class Player {
     w.underwater = this.swimming && w.water.lakeAt(this.x, this.body.y - 22) ? 1 : 0;
   }
 
+  /**
+   * Ar: só gasta com a cabeça debaixo d'água e sem traje. Abaixo da profundidade segura (a do lago
+   * antigo, ~10 blocos) a pressão multiplica o gasto — dá para nadar bem, mas não para descer até
+   * Atlântida sem o traje. Sem ar, perde vida em pulsos até subir.
+   */
+  private updateOxygen(w: World, dt: number) {
+    if (this.nibbleT > 0) this.nibbleT -= dt;
+    const z = this.swimming ? w.water.lakeAt(this.x, this.body.y - 22) : null;
+    const surface = z ? (z.surface ?? z.y) : 0;
+    this.depthRows = z ? Math.max(0, (this.body.y - 22 - surface) / TILE) : 0;
+    if (!z || this.canBreathe || this.mode === 'dead') {
+      if (this.oxygen < this.oxyMax) {
+        if (this.oxygen < this.oxyMax * 0.35 && this.gaspT <= 0 && z === null && this.mode !== 'dead') {
+          this.gaspT = 2;
+          w.audio('splash', 0.35, this.x);
+          w.fx.popup(this.x, this.y - 48, 'AAAH, AR!', '#bff4ff', 8);
+        }
+        this.oxygen = Math.min(this.oxyMax, this.oxygen + dt * this.oxyMax / 1.4);
+      }
+      if (this.gaspT > 0) this.gaspT -= dt;
+      this.drownT = 0;
+      this.lowAirWarned = false;
+      return;
+    }
+    const SAFE = 10;
+    const pressure = 1 + Math.max(0, this.depthRows - SAFE) * 0.45;
+    this.oxygen = Math.max(0, this.oxygen - dt * pressure);
+    if (this.depthRows > SAFE + 3 && !this.deepWarned) {
+      this.deepWarned = true;
+      w.director.banner('PRESSÃO!', 'Sem traje o fundo esmaga o ar • Sivirino vende o traje', 2.4);
+    }
+    if (this.oxygen < this.oxyMax * 0.3 && !this.lowAirWarned) {
+      this.lowAirWarned = true;
+      w.audio('uiClick', 0.8, this.x);
+      w.fx.popup(this.x, this.y - 50, 'POUCO AR!', '#ff9a9a', 9);
+    }
+    if (this.oxygen <= 0) {
+      this.drownT -= dt;
+      if (this.drownT <= 0) {
+        this.drownT = 0.85;
+        const d = 9;
+        this.hp -= d;
+        w.stats.damageTaken += d;
+        this.hurtT = Math.max(this.hurtT, 0.15);
+        w.audio('hurt', 0.7, this.x);
+        for (let i = 0; i < 6; i++) w.water.addBubble(this.x + rand.spread(10), this.y - 20, rand.range(1.5, 3.2), surface);
+        if (this.hp <= 0) {
+          this.hp = 0;
+          this.die(w);
+        }
+      }
+    }
+  }
+
   /** Nado: afunda devagar, braçadas no pulo, joystick sobe/desce, salto para fora na superfície. */
-  private updateSwim(w: World, dt: number, ctl: ControlState, z: { y: number; h: number }) {
+  private updateSwim(w: World, dt: number, ctl: ControlState, zone: { y: number; h: number; surface?: number }) {
     const b = this.body;
+    // câmaras fundas guardam a superfície real do lago (acima delas)
+    const z = { y: zone.surface ?? zone.y, h: zone.h };
     if (!this.swimming) this.enterWater(w, z);
     const hurt = this.hurtT > 0;
     if (this.crouch) this.setCrouch(false, w);
@@ -1071,7 +1183,7 @@ export class Player {
     const depth = b.y - z.y;
     const atSurface = depth < 16;
     // horizontal
-    const SW = 150;
+    const SW = 150 * karimboStats(progress.gear).swim * (progress.equippedSkin === 'atlante' ? 1.3 : 1);
     const tx = hurt ? 0 : ctl.moveX * SW;
     b.vx = approach(b.vx, tx, (Math.abs(tx) > 0 ? 540 : 240) * dt);
     if (Math.abs(ctl.moveX) > 0.3) this.facing = ctl.moveX > 0 ? 1 : -1;
@@ -1930,9 +2042,10 @@ export class Player {
       earGlide: this.earGlide,
       vy: b.vy,
       alpha,
-      hasGun: !this.clapping,
+      hasGun: !this.clapping && this.danceT < 0,
       clap: this.clapping,
       clapTime: w.time,
+      dance: this.danceT >= 0 ? this.danceT : undefined,
       reload:this.reload01,
       scope:progress.gear.includes(`${this.cur}.scope.1`),
       scarf: this.scarfT,
@@ -2001,7 +2114,7 @@ export function nomadMuzzle(facing: 1 | -1, aim: number, which: 0 | 1): [number,
   return [lx * facing, ly];
 }
 
-const nullControls: ControlState = {
+export const nullControls: ControlState = {
   moveX: 0, moveY: 0, aimVecX: 0, aimVecY: 0, mouseAim: null, padAim: null,
   jump: { held: false, pressed: false, released: false },
   fire: { held: false, pressed: false, released: false },

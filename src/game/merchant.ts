@@ -2,7 +2,7 @@ import type { LevelData, SecretRoom } from './level';
 import type { World } from './world';
 import { drawMerchant, type MerchantArt } from '../art/merchant';
 
-/** Tomé ocupa uma única oficina escondida, nunca o caminho dos checkpoints. */
+/** Sivirino ocupa uma única oficina escondida, nunca o caminho dos checkpoints. */
 export class Merchant {
   readonly spots: { x: number; y: number }[];
   readonly room: SecretRoom | undefined;

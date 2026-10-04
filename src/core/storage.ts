@@ -1,7 +1,7 @@
 /** Configurações do aparelho; progresso separado por conta, com recuperação local. */
 import { profileKey, readStored, writeStored } from './persistence';
 import { record, number, integer, ids } from './saveValidation';
-import { isSkinId, type SkinId } from './skinCatalog';
+import { isSkinId, SKINS, type SkinId } from './skinCatalog';
 import { validGear } from './gearCatalog';
 import { isDifficulty, type DifficultyId } from './difficulty';
 import { readGearReceipts, storeGearReceipts } from './gearReceipts';
@@ -41,6 +41,8 @@ export interface Progress {
   equippedSkin: SkinId;
   coinsLedger?: CoinLedger;
   gear: string[];
+  /** relíquias de Atlântida já encontradas (0..4) — permanentes */
+  relics: number[];
 }
 
 const KEY_S = 'karimbolandia.settings.v1';
@@ -79,6 +81,7 @@ export const defaultProgress = (): Progress => ({
   equippedSkin: 'classic',
   coinsLedger: undefined,
   gear: [],
+  relics: [],
 });
 
 function load<T extends object>(key: string, def: () => T): T {
@@ -109,11 +112,12 @@ export function validateProgress(v: unknown): Progress | null {
   for (const k of ['emblemsFound', 'secretsFound', 'stagesDone'] as const) if (!ids(p[k])) return null;
   if (!p.stagesDone.every(s => s === 1 || s === 2)) return null;
   if (!integer(p.coinsEarned) || typeof p.coinsMigrated !== 'boolean' || !isSkinId(p.equippedSkin)) return null;
-  if (!Array.isArray(p.ownedSkins) || p.ownedSkins.length > 2 || !p.ownedSkins.every(s => isSkinId(s) && s !== 'classic') || new Set(p.ownedSkins).size !== p.ownedSkins.length) return null;
+  if (!Array.isArray(p.ownedSkins) || p.ownedSkins.length > SKINS.length - 1 || !p.ownedSkins.every(s => isSkinId(s) && s !== 'classic') || new Set(p.ownedSkins).size !== p.ownedSkins.length) return null;
   if (p.equippedSkin !== 'classic' && !p.ownedSkins.includes(p.equippedSkin)) return null;
   const ledger=p.coinsLedger===undefined?undefined:validateCoinLedger(p.coinsLedger);
   if(ledger===null)return null;
   if(!validGear(p.gear))return null;
+  if(!ids(p.relics)||p.relics.some(r=>r>4)||new Set(p.relics).size!==p.relics.length)return null;
   return {
     bestScore: p.bestScore, bestTime: p.bestTime, bestEmblems: p.bestEmblems,
     bestSecrets: p.bestSecrets, completed: p.completed, dashDiscovered: p.dashDiscovered,
@@ -122,6 +126,7 @@ export function validateProgress(v: unknown): Progress | null {
     ownedSkins: [...p.ownedSkins], equippedSkin: p.equippedSkin,
     coinsLedger: ledger,
     gear: [...p.gear],
+    relics: [...p.relics],
   };
 }
 type Wallet = Pick<Progress, 'coinsEarned' | 'coinsMigrated' | 'ownedSkins' | 'equippedSkin' | 'coinsLedger' | 'gear'>;
@@ -159,6 +164,7 @@ export function mergeProgress(a: Progress, b: Progress): Progress {
     coinsEarned: Math.max(a.coinsEarned, b.coinsEarned,ledger?coinTotal(ledger):0), coinsMigrated: a.coinsMigrated || b.coinsMigrated,
     coinsLedger:ledger,
     gear: [...new Set([...a.gear,...b.gear])],
+    relics: union(a.relics ?? [], b.relics ?? []),
     ownedSkins: [...new Set([...a.ownedSkins, ...b.ownedSkins])], equippedSkin: b.equippedSkin,
   };
 }

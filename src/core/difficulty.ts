@@ -64,3 +64,12 @@ export const difficultyId = () => current;
 export function setDifficulty(id: DifficultyId) {
   current = isDifficulty(id) ? id : 'normal';
 }
+
+/** Progressão entre fases: cada fase nova endurece os inimigos por cima da dificuldade escolhida. */
+const STAGE_SCALE: Record<number, { hp: number; aggro: number }> = { 1: { hp: 1, aggro: 1 }, 2: { hp: 1.25, aggro: 1.1 } };
+let stageScale = STAGE_SCALE[1];
+export function setStageScale(stage: number) {
+  stageScale = STAGE_SCALE[stage] ?? STAGE_SCALE[1];
+}
+export const stageHp = () => stageScale.hp;
+export const stageAggro = () => stageScale.aggro;

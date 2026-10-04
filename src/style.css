@@ -1269,7 +1269,7 @@ kbd {
   .difficulty-info { font-size: 11px; min-height: 0; }
 }
 
-/* ---------- Oficina do Tomé (loja de armas) ---------- */
+/* ---------- Oficina do Sivirino (loja de armas) ---------- */
 .panel.forge-shop { width: min(860px, 96cqw); display: flex; flex-direction: column; gap: 8px; padding: 12px 14px;
   background: radial-gradient(ellipse at 20% 0, #4a2c1a 0, transparent 60%), repeating-linear-gradient(135deg, #ffffff05 0 2px, transparent 2px 9px), linear-gradient(180deg, #2a1d3d, #140d24); border-color: #1a0e08; }
 .forge-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
@@ -1382,7 +1382,7 @@ kbd {
 .panel.forge-shop .forge-head .shop-balance { font-size: 22px; padding: 8px 14px; }
 .panel.forge-shop .forge-close { min-height: 42px; padding: 6px 12px; font-size: 18px; letter-spacing: 0; }
 .forge-shop .forge-body { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
-.forge-shop .forge-list { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; overflow: visible; min-height: 0; padding: 0; }
+.forge-shop .forge-list { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 8px; overflow: visible; min-height: 0; padding: 0; }
 .forge-shop .forge-tab { display: grid; grid-template-columns: 68px minmax(0, 1fr); grid-template-rows: auto auto; column-gap: 8px; padding: 10px 8px; text-align: left; min-width: 0; }
 .forge-shop .forge-tab canvas { grid-row: 1 / 3; width: 68px; height: 28px; margin: 0; }
 .forge-shop .forge-tab strong { font: 700 19px/1.1 var(--ui); }
@@ -1499,4 +1499,20 @@ kbd {
   .panel.forge-shop .forge-buy { min-width: 46px; min-height: 34px; }
   .forge-shop .forge-tier { font-size: 13px; }
   .panel.forge-shop .forge-message { font-size: 15px; }
+}
+
+/* ---------- trajes com poder e oficina: TRAJE / KARIMBO ---------- */
+.skin-card .skin-perk { margin: -2px 0 6px; font: 700 13px/1.2 var(--ui); color: #7ff9e0; }
+.forge-perks { margin: 0; padding: 8px 10px 8px 22px; border-radius: 10px; background: #0f0c19; border: 1px solid #ffffff18; display: grid; gap: 4px; font-size: 14px; color: #dcd2ed; }
+.forge-perks li::marker { color: #ffd23a; }
+@container game-ui (max-height: 420px) {
+  .forge-perks { font-size: 10px; padding: 4px 6px 4px 16px; gap: 1px; }
+  .skin-card .skin-perk { font-size: 11px; }
+}
+/* 7 abas na oficina (armas + TRAJE + KARIMBO): em telas baixas, só o nome e o estado */
+@container game-ui (max-height: 420px) {
+  .forge-shop .forge-list { gap: 4px; }
+  .forge-shop .forge-tab { grid-template-columns: minmax(0, 1fr); text-align: center; padding: 4px 2px; column-gap: 0; }
+  .forge-shop .forge-tab canvas { display: none; }
+  .forge-shop .forge-tab strong, .forge-shop .forge-tab small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 }

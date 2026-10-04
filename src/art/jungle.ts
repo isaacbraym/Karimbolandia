@@ -21,8 +21,11 @@ export interface FishArt {
   tailY: number;
 }
 
+/** Piranha: quadro de boca fechada (a) e mordendo (b), já reduzidos (a foto olha para a ESQUERDA). */
+export interface PiranhaArt { a: HTMLCanvasElement; b: HTMLCanvasElement; aspect: number }
 export interface JungleArt {
   fish: FishArt[];
+  piranhas: PiranhaArt[];
   bg: JungleBackground;
   bandits: Record<SoldierStyle, SoldierArt>;
   banditVariants: Record<SoldierStyle, SoldierArt>[];
@@ -73,6 +76,15 @@ export function loadJungle(base: string, quality: Quality): Promise<JungleArt> {
     const [a, b] = await Promise.all([loadImage(u('fish_a.webp')), loadImage(u('fish_b.webp'))]);
     await tick();
     const fish = [fishArt(a, 0.79, 0.45), fishArt(b, 0.8, 0.47)];
+    const pir = await Promise.all(['piranha1a', 'piranha1b', 'piranha2a', 'piranha2b'].map((n) => loadImage(u(n + '.webp'))));
+    const shrink = (img: HTMLImageElement) => {
+      const c = makeCanvas(160, Math.round(160 * img.naturalHeight / img.naturalWidth));
+      const g = c.getContext('2d')!;
+      g.imageSmoothingQuality = 'high';
+      g.drawImage(img, 0, 0, c.width, c.height);
+      return c;
+    };
+    const piranhas: PiranhaArt[] = [0, 2].map((i) => ({ a: shrink(pir[i]), b: shrink(pir[i + 1]), aspect: pir[i].naturalHeight / pir[i].naturalWidth }));
     await tick();
     const bg = new JungleBackground(quality === 'high' ? 1.5 : quality === 'medium' ? 1.25 : 1);
     await tick();
@@ -97,7 +109,7 @@ export function loadJungle(base: string, quality: Quality): Promise<JungleArt> {
     prepareForestLight();
     await tick();
     bakeVillagers();
-    jungle = { fish, bg, bandits, banditVariants };
+    jungle = { fish, piranhas, bg, bandits, banditVariants };
     return jungle;
   })();
   pending.catch(() => {

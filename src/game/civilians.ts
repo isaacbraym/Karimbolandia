@@ -29,7 +29,7 @@ export const PHRASES = [
   'Socorro! Eles estão por toda parte!', // 13
   'Abaixa! Tão atirando!', // 14
   'Mostra pra eles, orelhudo!', // 15
-  'O Tomé vende armas lá na oficina!', // 16
+  'O Sivirino vende armas lá na oficina!', // 16
   'Minha loja virou ferro-velho...', // 17
 ] as const;
 /** frases em grito (balão serrilhado) */

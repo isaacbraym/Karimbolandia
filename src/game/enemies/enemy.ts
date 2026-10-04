@@ -5,13 +5,13 @@ import type { Bullet } from '../bullets';
 import { rand } from '../../core/math';
 import { PK } from '../fx';
 import type { Rect } from '../../core/math';
-import { difficulty } from '../../core/difficulty';
+import { difficulty, stageAggro, stageHp } from '../../core/difficulty';
 import { weaponEffect, type ArmorClass } from '../weapons';
 
 /** Classe de proteção por tipo (decide quais armas funcionam melhor). */
 const ARMOR: Record<EnemyType, ArmorClass> = {
   rifle: 'flesh', shotgun: 'flesh', shield: 'flesh', jetpack: 'flesh', sniper: 'flesh', grenadier: 'flesh', hunter: 'flesh',
-  drone: 'mech', spider: 'mech', roller: 'mech', turret: 'armor', heavy: 'armor', minimech: 'armor', boss: 'flesh',
+  drone: 'mech', spider: 'mech', roller: 'mech', turret: 'armor', heavy: 'armor', minimech: 'armor', boss: 'flesh', piranha: 'flesh',
 };
 /** Sorteio estável por id de spawn: recarregar o save não troca quem é elite. */
 const stableRoll = (id: number) => {
@@ -93,13 +93,13 @@ export abstract class Enemy {
     this.body.y = spawn.y - stats.h / 2;
     const diff = difficulty();
     this.armor = ARMOR[spawn.type] ?? 'flesh';
-    this.aggro = diff.aggro;
+    this.aggro = diff.aggro * stageAggro();
     this.spreadMul = diff.spread;
     this.armorWeight = diff.armorWeight;
     const boss = spawn.type === 'boss';
     // só inimigos do mapa (id ≥ 0); reforços gerados na hora nunca são elite
     this.elite = !boss && spawn.id >= 0 && stableRoll(spawn.id) < diff.eliteChance;
-    this.hp = this.maxHp = Math.round(stats.hp * (boss ? diff.bossHp : diff.enemyHp) * (this.elite ? 1.6 : 1));
+    this.hp = this.maxHp = Math.round(stats.hp * (boss ? diff.bossHp : diff.enemyHp) * (this.elite ? 1.6 : 1) * (boss ? 1 : stageHp()));
     this.facing = spawn.facing ?? (Math.random() < 0.5 ? -1 : 1);
     this.score = Math.round(stats.score * (this.elite ? 1.5 : 1));
   }

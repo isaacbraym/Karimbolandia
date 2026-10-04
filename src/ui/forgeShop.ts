@@ -1,5 +1,5 @@
 /**
- * Peças visuais da oficina do Tomé: miniaturas das armas, barras de atributo com prévia da
+ * Peças visuais da oficina do Sivirino: miniaturas das armas, barras de atributo com prévia da
  * melhoria e a tabela de eficácia contra cada tipo de inimigo. Tudo DOM simples, criado só quando
  * a oficina abre (nada roda por quadro).
  */

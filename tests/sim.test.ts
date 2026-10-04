@@ -30,7 +30,7 @@ describe('Simulação headless (bot invencível)', () => {
       run(w, bot, ctl, 10);
       expect(Number.isFinite(w.player.x)).toBe(true);
     }
-  });
+  }, 20000); // ~1 s sozinho; em paralelo com toda a suíte passa de 5 s
 
   it('limpa a arena 1 (ondas de inimigos) e destrava a câmera', () => {
     const w = makeWorld();

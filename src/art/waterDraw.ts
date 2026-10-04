@@ -8,7 +8,7 @@ import type { World } from '../game/world';
 import type { WaterZone } from '../game/level';
 import type { Fish } from '../game/water';
 import { getJungle, type FishArt } from './jungle';
-import { makeCanvas, softDot } from './kit';
+import { glowSprite, makeCanvas, softDot } from './kit';
 import { Rng } from '../core/math';
 
 interface Tex {
@@ -258,8 +258,16 @@ export function drawWaterBack(g: CanvasRenderingContext2D, w: World) {
     if (z.kind !== 'lake') continue;
     const v = visRect(w, z);
     if (!v) continue;
-    const sy = ((v.y0 - z.y) / z.h) * 256;
-    const sh = Math.max(0.5, ((v.y1 - v.y0) / z.h) * 256);
+    // câmaras fundas: o degradê é medido da superfície real até o fundo de toda a coluna
+    const top = z.surface ?? z.y;
+    const span = z.y + z.h - top;
+    const sy = ((v.y0 - top) / span) * 256;
+    const sh = Math.max(0.5, ((v.y1 - v.y0) / span) * 256);
+    // câmara funda: fundo opaco (a selva lá de cima não aparece através da água)
+    if (z.surface !== undefined) {
+      g.fillStyle = '#062035';
+      g.fillRect(v.x0, v.y0, v.x1 - v.x0, v.y1 - v.y0);
+    }
     g.drawImage(T.lake, 0, sy, 2, sh, v.x0, v.y0, v.x1 - v.x0, v.y1 - v.y0);
     g.save();
     g.beginPath();
@@ -270,9 +278,9 @@ export function drawWaterBack(g: CanvasRenderingContext2D, w: World) {
     const fw = 512;
     let x = ox + Math.floor((v.x0 - ox) / fw) * fw;
     for (; x < v.x1; x += fw) g.drawImage(T.far, x, z.y + z.h - 200, fw, 200);
-    // fachos de luz descendo da superfície
+    // fachos de luz descendo da superfície (não existem no breu da câmara funda)
     g.globalCompositeOperation = 'lighter';
-    const n = Math.max(3, Math.round(z.w / 260));
+    const n = z.surface === undefined ? Math.max(3, Math.round(z.w / 260)) : 0;
     for (let i = 0; i < n; i++) {
       const rx = z.x + (i + 0.5) * (z.w / n) + Math.sin(t * 0.21 + i * 1.9) * 46;
       if (rx < v.x0 - 120 || rx > v.x1 + 120) continue;
@@ -288,8 +296,23 @@ export function drawWaterBack(g: CanvasRenderingContext2D, w: World) {
     g.fillRect(v.x0, v.y0, v.x1 - v.x0, v.y1 - v.y0);
     g.globalAlpha = 1;
     fishLayer(g, w, 1);
+    if (z.surface !== undefined) abyss(g, z, v);
     g.restore();
   }
+}
+
+/** Escurece a câmara funda em faixas (sem gradiente por quadro): quanto mais fundo, mais breu. */
+function abyss(g: CanvasRenderingContext2D, z: WaterZone, v: { x0: number; x1: number; y0: number; y1: number }, k0 = 1) {
+  const top = z.surface ?? z.y;
+  const span = z.y + z.h - top;
+  g.fillStyle = '#020c1c';
+  const band = 48;
+  for (let y = Math.floor(v.y0 / band) * band; y < v.y1; y += band) {
+    const k = Math.min(1, Math.max(0, (y - top) / span));
+    g.globalAlpha = (0.12 + k * 0.5) * k0;
+    g.fillRect(v.x0, Math.max(y, v.y0), v.x1 - v.x0, Math.min(band, v.y1 - y));
+  }
+  g.globalAlpha = 1;
 }
 
 /** Na frente de tudo (antes das decorações da frente): tom da água, luz, bolhas e superfície. */
@@ -313,7 +336,7 @@ export function drawWaterFront(g: CanvasRenderingContext2D, w: World) {
       // cáusticas: duas redes se movendo em sentidos opostos, mais fortes perto da superfície
       g.globalCompositeOperation = 'lighter';
       const top = z.y;
-      for (let layer = 0; layer < 2; layer++) {
+      for (let layer = 0; layer < (z.surface === undefined ? 2 : 0); layer++) {
         const dx = (layer ? -t * 9 : t * 13) % 128;
         const dy = (layer ? t * 4 : -t * 3) % 128;
         for (let row = 0; row < 3; row++) {
@@ -337,6 +360,8 @@ export function drawWaterFront(g: CanvasRenderingContext2D, w: World) {
       g.globalAlpha = 1;
       g.globalCompositeOperation = 'source-over';
       fishLayer(g, w, 2);
+      // breu do fundo também por cima das ruínas e do Karimbo (os cristais brilham por cima)
+      if (z.surface !== undefined) abyss(g, z, v, 0.9);
       g.restore();
     } else {
       // pântano: água turva cobrindo as pernas
@@ -357,7 +382,7 @@ export function drawWaterFront(g: CanvasRenderingContext2D, w: World) {
       }
     }
     // superfície com reflexos (lago e pântano)
-    if (z.y > cam.y - 30 && z.y < cam.y + cam.h + 30) {
+    if (z.surface === undefined && z.y > cam.y - 30 && z.y < cam.y + cam.h + 30) {
       const sx0 = Math.max(z.x, cam.x - 40);
       const sx1 = Math.min(z.x + z.w, cam.x + cam.w + 40);
       const alpha = z.kind === 'lake' ? 1 : 0.45;
@@ -395,4 +420,34 @@ export function drawWaterFront(g: CanvasRenderingContext2D, w: World) {
     g.stroke();
   }
   g.globalAlpha = 1;
+}
+
+/** Luzes por cima do breu: cristais de Atlântida e a lanterna do capacete do traje. */
+let crystals: { x: number; y: number }[] | null = null;
+let crystalsOf: unknown = null;
+export function drawDeepLights(g: CanvasRenderingContext2D, w: World) {
+  if (!w.water.zones.some((z) => z.surface !== undefined)) return;
+  if (crystalsOf !== w.data) {
+    crystalsOf = w.data;
+    crystals = w.data.decos.filter((d) => d.kind === 'aCrystal').map((d) => ({ x: d.x, y: d.y }));
+  }
+  const glow = glowSprite('#7ff9e0', 32);
+  g.globalCompositeOperation = 'lighter';
+  for (const c of crystals!) {
+    if (!w.camera.visible(c.x, c.y - 30, 120)) continue;
+    const p = 0.7 + 0.3 * Math.sin(w.time * 1.8 + c.x);
+    g.globalAlpha = 0.35 * p;
+    g.drawImage(glow.c, c.x - 90, c.y - 130, 180, 180);
+  }
+  const pl = w.player;
+  if (pl.swimming && pl.suitOn && pl.depthRows > 12) {
+    const lamp = glowSprite('#fff4d0', 32);
+    const k = Math.min(1, (pl.depthRows - 12) / 10);
+    g.globalAlpha = 0.42 * k;
+    g.drawImage(lamp.c, pl.x + pl.facing * 30 - 80, pl.y - 110, 160, 160);
+    g.globalAlpha = 0.25 * k;
+    g.drawImage(lamp.c, pl.x - 40, pl.y - 75, 80, 80);
+  }
+  g.globalAlpha = 1;
+  g.globalCompositeOperation = 'source-over';
 }

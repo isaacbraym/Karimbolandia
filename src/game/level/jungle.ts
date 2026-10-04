@@ -7,16 +7,14 @@ import { THEME, TILE, type LevelData } from '../level';
 import { G, LEVEL_H, LevelBuilder } from './builder';
 import { addPatrolStories } from './story';
 import { expandCommunity, COMMUNITY_EXTRA, DANCE_TILE } from './community';
+import { buildAtlantis, JUNGLE_H, LAKE_X0, LAKE_X1, LAKE_TOP, LAKE_FLOOR } from './atlantis';
 
 /** a masmorra do templo ocupa as primeiras SHIFT colunas do mapa; a selva vem depois */
 export const SHIFT = 150;
 export const JUNGLE_W = 726 + SHIFT + COMMUNITY_EXTRA;
 
-/** Lago: colunas [LAKE_X0, LAKE_X1), superfície na linha LAKE_TOP, fundo na linha LAKE_FLOOR. */
-export const LAKE_X0 = 324 + SHIFT;
-export const LAKE_X1 = 400 + SHIFT;
-export const LAKE_TOP = 34;
-export const LAKE_FLOOR = 44;
+/** Lago: colunas [LAKE_X0, LAKE_X1), superfície na linha LAKE_TOP, fundo antigo na LAKE_FLOOR (a fenda desce para Atlântida). */
+export { LAKE_X0, LAKE_X1, LAKE_TOP, LAKE_FLOOR } from './atlantis';
 
 /** Desfiladeiro dos cipós: abismo [GORGE_X0, GORGE_X1) com uma pilastra no meio. */
 export const GORGE_X0 = 181 + SHIFT;
@@ -122,7 +120,7 @@ function expandJungle(b: LevelBuilder) {
   b.enemy('hunter',761,G,{patrol:90,facing:-1});
   b.deco('patrolWorkshop',764,G,'back');
   b.pit(773,789);
-  b.fill(773,G+5,16,LEVEL_H-G-5,1,THEME.MUD);
+  b.fill(773,G+5,16,b.level.h-G-5,1,THEME.MUD);
   b.waterZone('lake',773,789,G+1,G+5,0);
   b.plat(772,G,18,THEME.WOOD);
   b.deco('jPost',772,G,'back'); b.deco('jPost',789,G,'back',{flip:true});
@@ -397,14 +395,15 @@ function templeInterior(b: LevelBuilder) {
 }
 
 export function buildJungle(): LevelData {
-  const b = new LevelBuilder(JUNGLE_W - COMMUNITY_EXTRA, LEVEL_H);
+  // mais alto que a cidade só por causa do lago fundo (Atlântida); buracos comuns matam na mesma altura
+  const b = new LevelBuilder(JUNGLE_W - COMMUNITY_EXTRA, JUNGLE_H);
   b.stage = 2;
   b.setTheme(THEME.EARTH);
   b.ground(0, b.level.w);
   // o começo do mapa é rocha maciça: lá dentro fica a masmorra do templo (só se chega pelas portas)
   b.fill(0, 0, SHIFT, LEVEL_H, 1, THEME.TEMPLE);
   // a câmera nunca mostra a rocha da masmorra quando se está do lado de fora
-  b.camZone(SHIFT, 0, b.level.w - SHIFT, LEVEL_H);
+  b.camZone(SHIFT, 0, b.level.w - SHIFT, JUNGLE_H);
 
   // ================================================================ A — ORLA DA SELVA (0–64)
   b.playerStart = { x: b.px(154), y: b.py(G) };
@@ -469,7 +468,7 @@ export function buildJungle(): LevelData {
   b.deco('jSign', 329, G, 'back');
   b.pit(GORGE_X0, GORGE_X1);
   // pilastra de pedra no meio (descanso entre os balanços)
-  b.fill(GORGE_ISLAND[0], G - 1, GORGE_ISLAND[1] - GORGE_ISLAND[0], LEVEL_H - G + 1, 1, THEME.TEMPLE);
+  b.fill(GORGE_ISLAND[0], G - 1, GORGE_ISLAND[1] - GORGE_ISLAND[0], b.level.h - G + 1, 1, THEME.TEMPLE);
   b.deco('jTotem', 354, G - 1, 'back');
   b.tokens(352, G - 2, 4);
   // cipós presos nos galhos de árvores gigantes (balance, solte no alto e agarre o próximo)
@@ -535,15 +534,14 @@ export function buildJungle(): LevelData {
   b.deco('jSign', 470, G, 'back', { flip: true });
   // o lago: buraco largo e fundo com piso de lama/pedra
   b.pit(LAKE_X0, LAKE_X1, G);
-  b.fill(LAKE_X0, LAKE_FLOOR, LAKE_X1 - LAKE_X0, LEVEL_H - LAKE_FLOOR, 1, THEME.MUD);
+  b.fill(LAKE_X0, LAKE_FLOOR, LAKE_X1 - LAKE_X0, b.level.h - LAKE_FLOOR, 1, THEME.MUD);
   b.waterZone('lake', LAKE_X0, LAKE_X1, LAKE_TOP, LAKE_FLOOR, 0);
   b.trigger('hint:swim', LAKE_X0, LAKE_TOP, LAKE_X1 - LAKE_X0, LAKE_FLOOR - LAKE_TOP);
   // paredão de pedra da esquerda (de onde cai a cachoeira)
   b.fill(LAKE_X0, G, 2, LAKE_TOP - G + 2, 1, THEME.TEMPLE);
   b.deco('jFall', LAKE_X0 + 6, LAKE_TOP, 'back');
   // relevo submerso: pedras, colunas tombadas do templo, uma arcada afundada
-  b.block(482, LAKE_FLOOR - 2, 4, 2, THEME.TEMPLE);
-  b.block(489, LAKE_FLOOR - 1, 3, 1, THEME.MUD);
+  b.block(494, LAKE_FLOOR - 2, 3, 2, THEME.TEMPLE);
   b.block(497, LAKE_FLOOR - 5, 2, 5, THEME.TEMPLE);
   b.block(507, LAKE_FLOOR - 3, 6, 3, THEME.TEMPLE);
   b.block(509, LAKE_FLOOR - 4, 2, 1, THEME.TEMPLE);
@@ -634,5 +632,9 @@ export function buildJungle(): LevelData {
   b.atmosphere.sort((a, c) => a.x - c.x);
   rollingGround(b);
   addPatrolStories(b);
-  return b.build('none');
+  // Atlântida por último: só acrescenta (IDs antigos de inimigos e itens continuam os mesmos)
+  buildAtlantis(b);
+  const data = b.build('none');
+  data.voidRow = LEVEL_H;
+  return data;
 }

@@ -110,13 +110,14 @@ function run(level: Level, tx: number, ty: number, m: Macro, b: Body, deathY: nu
   return null;
 }
 
-export function analyzeReach(data: LevelData, extraStarts: { x: number; y: number }[] = [], opts: { noGlide?: boolean } = {}): ReachResult {
+export function analyzeReach(data: LevelData, extraStarts: { x: number; y: number }[] = [], opts: { noGlide?: boolean; noDoors?: boolean } = {}): ReachResult {
   const level = data.level;
   const key = (tx: number, ty: number) => ty * level.w + tx;
   const reached = new Set<number>();
   const queue: [number, number][] = [];
   const b = newBody(FOOT_W, FOOT_H);
-  const deathY = level.pxH + 60;
+  // mesma queda do jogo: fora do lago fundo o abismo continua na linha antiga (mapa alto só pelo lago)
+  const deathY = (data.voidRow ?? level.h) * TILE + 60;
   const push = (tx: number, ty: number) => {
     const k = key(tx, ty);
     if (reached.has(k)) return;
@@ -124,12 +125,21 @@ export function analyzeReach(data: LevelData, extraStarts: { x: number; y: numbe
     reached.add(k);
     queue.push([tx, ty]);
   };
+  // portas (templo, balada): de pé na frente da porta, ↑ leva ao outro lado
+  const doorsAt = new Map<number, [number, number][]>();
+  for (const d of opts.noDoors ? [] : data.doors ?? []) {
+    const k = key(Math.floor(d.x / TILE), Math.round(d.y / TILE));
+    const list = doorsAt.get(k) ?? [];
+    list.push([Math.floor(d.tx / TILE), Math.round(d.ty / TILE)]);
+    doorsAt.set(k, list);
+  }
   const s = data.playerStart;
   push(Math.floor(s.x / TILE), Math.floor(s.y / TILE));
   for (const e of extraStarts) push(Math.floor(e.x / TILE), Math.floor(e.y / TILE));
   let head = 0;
   while (head < queue.length) {
     const [tx, ty] = queue[head++];
+    for (const [dx, dy] of doorsAt.get(key(tx, ty)) ?? []) push(dx, dy);
     // caminhar (mesma linha)
     for (const d of [-1, 1]) {
       if (tx + d < 0 || tx + d >= level.w) continue;
@@ -246,7 +256,8 @@ export function analyzeReachNomad(data: LevelData, start: { x: number; y: number
   const reached = new Set<number>();
   const queue: [number, number][] = [];
   const b = newBody(NOMAD_W, NOMAD_H);
-  const deathY = level.pxH + 60;
+  // mesma queda do jogo: fora do lago fundo o abismo continua na linha antiga (mapa alto só pelo lago)
+  const deathY = (data.voidRow ?? level.h) * TILE + 60;
   const roomy = (tx: number, ty: number) => standRows(level, tx, ty) >= 3;
   const push = (tx: number, ty: number) => {
     if (tx > maxTx) return;

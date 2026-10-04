@@ -1,5 +1,5 @@
 import { Level, T, TILE, type LevelData, type EnemySpawn, type EnemyType, type PickupKind } from './level';
-import { difficulty } from '../core/difficulty';
+import { difficulty, setStageScale } from '../core/difficulty';
 import { Fx, PK } from './fx';
 import { Camera } from './camera';
 import { Player } from './player';
@@ -28,12 +28,14 @@ import { Waters } from './water';
 import { JungleWildlife } from './wildlife';
 import { Village } from './village';
 import { Merchant } from './merchant';
+import { ClubScene } from './club';
+import { drawClub } from '../art/club';
 import { Exploration } from './exploration';
 import { drawExploration } from '../art/exploration';
 import { Encounters } from './encounters';
 import { Vine } from './vines';
 import type { DoorSpawn } from './level';
-import { drawWaterBack, drawWaterFront } from '../art/waterDraw';
+import { drawWaterBack, drawWaterFront, drawDeepLights } from '../art/waterDraw';
 import { drawBlockade, COLLAPSE_SHAKE, COLLAPSE_FALL } from '../art/blockade';
 import { setDecoFocus } from '../art/jungleDecor';
 import { drawVines, drawRoomBack, drawRoomDark, drawDoorPrompt, drawDrums, drawBeams } from '../art/jungleWorld';
@@ -50,7 +52,7 @@ export interface Stats {
   time: number;
 }
 
-export type MusicState = 'explore' | 'combat' | 'nomad' | 'nomadCombat' | 'boss1' | 'boss2' | 'boss3' | 'silence' | 'calm' | 'victory' | 'rhythm' | 'celebrate' | 'club' | 'drop';
+export type MusicState = 'explore' | 'combat' | 'nomad' | 'nomadCombat' | 'boss1' | 'boss2' | 'boss3' | 'silence' | 'calm' | 'victory' | 'rhythm' | 'celebrate' | 'club' | 'drop' | 'rave';
 
 export const MAX_LIVES = 3;
 export const COMBO_WINDOW = 3;
@@ -134,6 +136,7 @@ export class World {
   wildlife!: JungleWildlife;
   village!: Village;
   merchant!: Merchant;
+  club!: ClubScene;
   exploration!: Exploration;
   encounters!: Encounters;
   /** 0..1 cabeça do Karimbo debaixo d'água (som abafado, tom da tela) */
@@ -213,6 +216,7 @@ export class World {
 
   constructor(data: LevelData) {
     this.data = data;
+    setStageScale(data.stage);
     this.level = data.level;
     this.forestLight = new ForestLight(data);
     this.baseTiles = data.level.tiles.slice();
@@ -221,6 +225,7 @@ export class World {
     this.wildlife = new JungleWildlife(data);
     this.village = new Village(data);
     this.merchant = new Merchant(data);
+    this.club = new ClubScene(this);
     this.exploration = new Exploration(data);
     this.encounters = new Encounters(data);
     this.vines = (data.vines ?? []).map((v) => new Vine(v));
@@ -270,6 +275,7 @@ export class World {
     this.water?.reset();
     this.wildlife?.reset();
     this.village?.reset(this);
+    this.club?.reset(this);
     this.encounters?.reset(true);
     for (const v of this.vines) {
       v.held = false;
@@ -359,7 +365,8 @@ export class World {
       if (r.done) this.setMusic(r.club ? 'drop' : 'celebrate');
       else {
         this.setMusic(r.club ? 'club' : 'rhythm');
-        if (r.club) this.hooks.onBanner?.('PISTA DE NEON', 'Passe pelos lasers no ritmo e pegue as notas: você toca a música!', 3.4);
+        if (r.club && this.club.active) { /* a cena da balada anuncia por conta própria */ }
+        else if (r.club) this.hooks.onBanner?.('PISTA DE NEON', 'Passe pelos lasers no ritmo e pegue as notas: você toca a música!', 3.4);
         else this.hooks.onBanner?.('SALA DO RITMO', 'Pule nos tambores e pegue as notas: você toca a música!', 3.2);
       }
     } else if (!inside && r.active) {
@@ -593,6 +600,7 @@ export class World {
     const sy = cp ? cp.y : this.data.playerStart.y;
     this.director.onRespawn();
     this.village.reset(this);
+    this.club.reset(this);
     this.encounters.reset();
     this.narrator.onRespawn();
     this.restoreTiles();
@@ -767,9 +775,11 @@ export class World {
     return !this.director.insideActiveArena(x) || this.director.arenaActiveContains(x);
   }
   /** Altura Y abaixo da qual o jogador "caiu no abismo" (arenas ativas usam um limite mais curto). */
-  deathY() {
+  deathY(x?: number) {
     const a = this.director.activeArenaRect();
     if (a) return Math.min(this.level.pxH + 60, a.y + a.h + 140);
+    // acima/abaixo do lago fundo vale o mapa inteiro; nos demais buracos a queda continua curta
+    if (this.data.voidRow !== undefined && !(x !== undefined && this.water.zones.some((z) => z.kind === 'lake' && x >= z.x - 64 && x < z.x + z.w + 64))) return this.data.voidRow * TILE + 60;
     return this.level.pxH + 60;
   }
   progressDashDiscovered() {
@@ -1011,6 +1021,38 @@ export class World {
         this.fx.popup(pk.x, pk.y - 26, `ORELHA DOURADA ${this.secrets.size}/3`, '#9ffcff', 10);
         this.hooks.onBanner?.('ORELHA DOURADA!', `Segredo ${this.secrets.size} de 3`, 2.4);
         break;
+      case 'relic': {
+        if (pk.id >= 0) this.collectedPickups.add(pk.id);
+        const first = !progress.relics.includes(pk.itemId);
+        this.score += first ? 3000 : 300;
+        a('secret');
+        this.fx.addFlash(0.35, '#7ff9e0');
+        this.fx.sparks(pk.x, pk.y, 34, '#7ff9e0', 320);
+        const coins = first ? 60 : 5;
+        for (let i = 0; i < coins; i++) collectCoin();
+        this.tokens += coins;
+        if (first) {
+          progress.relics.push(pk.itemId);
+          const n = progress.relics.length;
+          let sub = `+${coins} moedas • ${n}/5 relíquias`;
+          if (n >= 5 && !progress.ownedSkins.includes('atlante')) {
+            progress.ownedSkins.push('atlante');
+            sub = 'TRAJE ATLANTE LIBERADO • vista no menu PERSONAGEM';
+          }
+          saveProgress();
+          this.hooks.onBanner?.(`RELÍQUIA DE ATLÂNTIDA ${n}/5`, sub, 3);
+        } else this.fx.popup(pk.x, pk.y - 22, 'RELÍQUIA JÁ GUARDADA • +5', '#7ff9e0', 9);
+        break;
+      }
+      case 'chest':
+        if (pk.id >= 0) this.collectedPickups.add(pk.id);
+        this.score += 800;
+        a('secret');
+        this.fx.addFlash(0.2, '#ffe27a');
+        this.fx.sparks(pk.x, pk.y, 26, '#ffe27a', 300);
+        for (let i = 0; i < 22; i++) this.spawnDrop('token', pk.x, pk.y - 6);
+        this.fx.popup(pk.x, pk.y - 26, 'TESOURO!', '#ffe27a', 11);
+        break;
       case 'health':
         if (!pl.heal(30, this)) return false;
         a('heal');
@@ -1100,7 +1142,8 @@ export class World {
     this.director.update(dt, ctl);
     this.narrator.update(dt);
     this.village.update(this, dt, ctl);
-    p.update(this, dt, ctl);
+    this.club.update(this, dt);
+    p.update(this, dt, this.club.control(ctl));
     this.encounters.update(this, dt);
     this.wildlife.update(this, dt);
     if (this.water.zones.length) this.water.update(dt, p.x, p.y, p.swimming, this.camera.x, this.camera.x + this.camera.w);
@@ -1108,6 +1151,8 @@ export class World {
     if (this.blockAnimT >= 0) this.updateCollapse(dt);
     if (this.data.doors?.length) this.updateDoors(dt, ctl);
     if (this.rhythm.room) this.updateRhythm(dt);
+    // a cena da balada manda na música até o fim (nada de trilha de combate por cima)
+    this.club.music(this);
     if (this.data.beams?.length) this.updateBeams(dt);
     for (const [id, k] of this.drumHit) {
       const n = k - dt * 4;
@@ -1184,6 +1229,7 @@ export class World {
     const cam = this.camera;
     this.director.cameraUpdate(dt);
     this.village.camera(this);
+    this.club.camera(this);
     cam.update(dt, p.x, p.y - (p.mode === 'nomad' ? 6 : 14), p.facing, p.body.vx, p.body.onGround, this.fx.shake, settings.screenShake);
   }
 
@@ -1265,11 +1311,16 @@ export class World {
       } else e.draw(g, this);
     }
     for (const e of this.enemies) if (cam.visible(e.x, e.y, 80)) e.drawStatus(g);
+    drawClub(g, this, 'back');
     this.player.draw(g, this);
+    drawClub(g, this, 'front');
     for (const gr of this.grenades) gr.draw(g);
     for (const b of this.bullets) if (cam.visible(b.x, b.y, b.interceptable ? 24 : 60)) b.draw(g);
     this.director.drawWorldOverlays(g);
-    if (this.water.zones.length) drawWaterFront(g, this);
+    if (this.water.zones.length) {
+      drawWaterFront(g, this);
+      drawDeepLights(g, this);
+    }
     this.fx.draw(g, true);
     this.director.drawDecos(g, 'front');
     this.encounters.drawPrompts(g, this);

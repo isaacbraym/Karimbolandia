@@ -34,6 +34,8 @@ export interface Photos {
   nomadUpper: HTMLImageElement;
   nomadFrame: HTMLImageElement;
   nomadSphere: HTMLImageElement;
+  /** Sivirino, o mercador (foto recortada: cabelo, rosto e pescoço) */
+  sivirino: HTMLImageElement;
   meta: CharMeta;
   nomadMeta: NomadMeta;
 }
@@ -50,7 +52,7 @@ function loadImage(src: string): Promise<HTMLImageElement> {
 
 export async function loadPhotos(base: string, onProgress?: (p: number) => void): Promise<Photos> {
   const u = (n: string) => `${base}assets/img/${n}`;
-  const names = ['karimbo_head.webp', 'karimbo_ear_l.webp', 'karimbo_ear_r.webp', 'felipao.webp', 'nomad_upper.webp', 'nomad_frame.webp', 'nomad_sphere.webp', 'karimbo_head_noears.webp', 'felipao_upper.webp', 'felipao_legL.webp', 'felipao_legR.webp'];
+  const names = ['karimbo_head.webp', 'karimbo_ear_l.webp', 'karimbo_ear_r.webp', 'felipao.webp', 'nomad_upper.webp', 'nomad_frame.webp', 'nomad_sphere.webp', 'karimbo_head_noears.webp', 'felipao_upper.webp', 'felipao_legL.webp', 'felipao_legR.webp', 'sivirino.webp'];
   let done = 0;
   const imgs = await Promise.all(
     names.map((n) =>
@@ -78,6 +80,7 @@ export async function loadPhotos(base: string, onProgress?: (p: number) => void)
     felipaoUpper: imgs[8],
     felipaoLegL: imgs[9],
     felipaoLegR: imgs[10],
+    sivirino: imgs[11],
     meta,
     nomadMeta,
   };
@@ -277,7 +280,7 @@ function shapeJaw(g: CanvasRenderingContext2D, w: number, h: number, pad: number
  * Copia do sprite com um contorno escuro em volta (silhueta engordada em 12 direções, por baixo).
  * `cutY` (lógico, a partir do topo): abaixo disso o contorno some (a base do pescoço entra na roupa).
  */
-function outlineSprite(spr: Sprite, width = 1.1, cutY = Infinity, color = '#170f2e', openings: { x: number; y: number; w: number; h: number }[] = []): Sprite {
+export function outlineSprite(spr: Sprite, width = 1.1, cutY = Infinity, color = '#170f2e', openings: { x: number; y: number; w: number; h: number }[] = []): Sprite {
   const s = spr.s;
   const padL = Math.ceil(width + 1);
   const c = makeCanvas(spr.c.width + padL * 2 * s, spr.c.height + padL * 2 * s);
@@ -302,4 +305,12 @@ function outlineSprite(spr: Sprite, width = 1.1, cutY = Infinity, color = '#170f
   for (const r of openings) g.clearRect(o + r.x * s, o + r.y * s, r.w * s, r.h * s);
   g.drawImage(spr.c, o, o);
   return { c, w: spr.w + padL * 2, h: spr.h + padL * 2, s, ox: spr.ox + padL, oy: spr.oy + padL };
+}
+
+/** Cabeça do Sivirino: a foto é o rosto (nunca redesenhado), com contorno cartoon. Pivô no pescoço. */
+export function bakeSivirinoHead(p: Photos, scale = 3): Sprite {
+  const img = p.sivirino;
+  const h = 30;
+  const w = h * img.naturalWidth / img.naturalHeight;
+  return outlineSprite(imageToSprite(img, w, h, w / 2, h - 1.5, scale), 0.55);
 }

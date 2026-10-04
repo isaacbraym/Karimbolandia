@@ -5,6 +5,7 @@ import { drawSpr, glowSprite } from '../art/kit';
 import { PK } from './fx';
 import { moveBody, newBody, type Body } from './physics';
 import { music } from '../core/music';
+import { progress } from '../core/storage';
 import { pickupPathClear } from './pickupReach';
 
 export class Pickup {
@@ -40,7 +41,7 @@ export class Pickup {
   }
 
   get radius() {
-    return this.kind === 'token' ? 13 : this.kind === 'note' ? 18 : this.kind === 'emblem' || this.kind === 'secret' ? 18 : this.kind === 'healthBig' ? 22 : 18;
+    return this.kind === 'relic' || this.kind === 'chest' ? 22 : this.kind === 'token' ? 13 : this.kind === 'note' ? 18 : this.kind === 'emblem' || this.kind === 'secret' ? 18 : this.kind === 'healthBig' ? 22 : 18;
   }
 
   update(w: World, dt: number) {
@@ -142,6 +143,10 @@ export class Pickup {
       g.restore();
       return;
     }
+    if (this.kind === 'relic' || this.kind === 'chest') {
+      drawTreasure(g, this.kind, x, y, this.t, this.kind === 'relic' && progress.relics.includes(this.itemId));
+      return;
+    }
     if (this.kind === 'token') {
       const sx = Math.cos(this.t * 5);
       drawSpr(g, art.token, x, y, { sx: Math.abs(sx) < 0.12 ? 0.12 : sx });
@@ -173,4 +178,78 @@ export class Pickup {
     const spr = art[this.kind];
     if (spr) drawSpr(g, spr, x, y);
   }
+}
+
+/**
+ * Relíquia de Atlântida (medalhão com tridente girando, brilho turquesa) e baú do tesouro.
+ * Vetores simples por quadro; o brilho é o sprite pronto de glowSprite.
+ */
+function drawTreasure(g: CanvasRenderingContext2D, kind: 'relic' | 'chest', x: number, y: number, t: number, known: boolean) {
+  const relic = kind === 'relic';
+  const glow = glowSprite(relic ? '#7ff9e0' : '#ffd23a', 32);
+  const pulse = 1 + 0.12 * Math.sin(t * 3);
+  g.globalCompositeOperation = 'lighter';
+  g.globalAlpha = (known ? 0.25 : 0.6) * (0.75 + 0.25 * Math.sin(t * 2.4));
+  const r = (relic ? 30 : 34) * pulse;
+  g.drawImage(glow.c, x - r, y - r, r * 2, r * 2);
+  g.globalAlpha = 1;
+  g.globalCompositeOperation = 'source-over';
+  g.save();
+  g.translate(x, y);
+  if (known) g.globalAlpha = 0.5;
+  g.strokeStyle = '#170f2e';
+  g.lineWidth = 1.4;
+  if (relic) {
+    g.scale(Math.cos(t * 1.6) * 0.25 + 0.85, 1);
+    g.fillStyle = '#1aa79a';
+    g.beginPath();
+    g.arc(0, 0, 11, 0, Math.PI * 2);
+    g.fill();
+    g.stroke();
+    g.strokeStyle = '#d9b44a';
+    g.lineWidth = 2.2;
+    g.beginPath();
+    g.arc(0, 0, 8.5, 0, Math.PI * 2);
+    g.stroke();
+    // tridente
+    g.strokeStyle = '#fff4c2';
+    g.lineWidth = 1.6;
+    g.beginPath();
+    g.moveTo(0, 7);
+    g.lineTo(0, -6);
+    g.moveTo(-4.5, -6);
+    g.lineTo(-4.5, -2);
+    g.quadraticCurveTo(-4.5, 0.5, 0, 0.5);
+    g.quadraticCurveTo(4.5, 0.5, 4.5, -2);
+    g.lineTo(4.5, -6);
+    g.stroke();
+    g.fillStyle = '#ffffff';
+    g.globalAlpha *= 0.7;
+    g.fillRect(-6, -7, 2.2, 2.2);
+  } else {
+    // baú de madeira com cintas douradas e moedas aparecendo
+    g.fillStyle = '#7a4a2a';
+    g.beginPath();
+    g.roundRect(-13, -6, 26, 14, 2);
+    g.fill();
+    g.stroke();
+    g.fillStyle = '#9a6038';
+    g.beginPath();
+    g.moveTo(-13, -6);
+    g.quadraticCurveTo(0, -17, 13, -6);
+    g.closePath();
+    g.fill();
+    g.stroke();
+    g.fillStyle = '#e8b93a';
+    g.fillRect(-9, -11, 3, 19);
+    g.fillRect(6, -11, 3, 19);
+    g.fillRect(-2.5, -3, 5, 6);
+    g.fillStyle = '#ffe27a';
+    for (let i = 0; i < 4; i++) {
+      g.beginPath();
+      g.arc(-6 + i * 4, -7 - Math.abs(Math.sin(t * 2 + i)) * 2, 2, 0, Math.PI * 2);
+      g.fill();
+    }
+  }
+  g.restore();
 }

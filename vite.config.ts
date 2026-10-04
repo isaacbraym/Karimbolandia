@@ -138,5 +138,7 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['tests/**/*.test.ts'],
+    // simulações e validadores de alcançabilidade em paralelo passam de 5 s em máquinas/CI carregados
+    testTimeout: 20000,
   },
 });

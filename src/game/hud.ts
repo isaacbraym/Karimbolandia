@@ -381,6 +381,35 @@ export class Hud {
       }
     }
     void def;
+    // ar: bolhas que estouram uma a uma (só aparece mergulhando sem traje ou recuperando o fôlego)
+    if (p.oxygen < p.oxyMax - 0.05 || (p.swimming && !p.canBreathe && w.underwater)) {
+      const f = clamp(p.oxygen / p.oxyMax, 0, 1);
+      const n = 10;
+      const low = f < 0.3;
+      const blink = low && Math.floor(this.time * 7) % 2 === 0;
+      for (let i = 0; i < n; i++) {
+        const k = clamp(f * n - i, 0, 1);
+        const cx = bx + 6 + i * 9.4;
+        const cy = by + 54;
+        g.globalAlpha = k > 0 ? 1 : 0.25;
+        g.fillStyle = k > 0 ? (blink ? '#ff8a8a' : '#bff4ff') : 'rgba(255,255,255,0.3)';
+        g.beginPath();
+        g.arc(cx, cy, 2.2 + 1.6 * k, 0, 6.283);
+        g.fill();
+        if (k > 0) {
+          g.fillStyle = 'rgba(255,255,255,0.8)';
+          g.fillRect(cx - 1.4, cy - 1.8, 1.2, 1.2);
+        }
+      }
+      g.globalAlpha = 1;
+      text(g, 'AR', bx + 8 + n * 9.4, by + 57.5, 9, low ? '#ff9a9a' : '#bff4ff', 'left');
+    }
+    // profundidade e pressão (lago da selva)
+    if (p.swimming && p.depthRows > 1.5) {
+      const deep = !p.canBreathe && p.depthRows > 10;
+      numText(g, 'depth', Math.round(p.depthRows), (v) => `↓ ${v} m`, W - 16, T + 46, 12, deep ? '#ff8a8a' : '#bff4ff', 'right');
+      if (deep && Math.floor(this.time * 3) % 2 === 0) text(g, 'PRESSÃO', W - 16, T + 62, 10, '#ff8a8a', 'right');
+    }
     // inventário: armas que o Karimbo tem (vazias ficam apagadas até achar munição)
     if (p.weapons.size > 1) {
       let ix = bx + 100;
@@ -410,7 +439,7 @@ export class Hud {
         ix += 27;
       }
     }
-    if(w.merchant.near(w))text(g,'TOMÉ • F / SELECT / OFICINA',W/2,H-68,12,'#ffe6a6','center');
+    if(w.merchant.near(w))text(g,'SIVIRINO • F / SELECT / OFICINA',W/2,H-68,12,'#ffe6a6','center');
 
     // ------------------------------------------------ Nômad
     if (p.nomad) {

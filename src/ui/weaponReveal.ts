@@ -36,7 +36,7 @@ export function weaponReveal(id: WeaponId, gear: string[], close: () => void) {
   const footer = document.createElement('footer');
   const tip = document.createElement('p');
   const d = tunedWeapon(id, gear);
-  tip.textContent = `Barra clara: atual • tracejada: potencial no Tomé.${d.explosive ? ` Explosão: ${number(d.explosive.dmg)} de dano.` : d.pellets > 1 ? ' Dano por projétil × quantidade.' : ''} Alcance nominal; obstáculos bloqueiam tiros.`;
+  tip.textContent = `Barra clara: atual • tracejada: potencial com o Sivirino.${d.explosive ? ` Explosão: ${number(d.explosive.dmg)} de dano.` : d.pellets > 1 ? ' Dano por projétil × quantidade.' : ''} Alcance nominal; obstáculos bloqueiam tiros.`;
   const button = document.createElement('button'); button.type = 'button'; button.className = 'btn primary'; button.textContent = 'CONTINUAR'; button.onclick = close;
   footer.append(tip, button); card.append(header, art, stats, footer); overlay.append(card);
   return { overlay, button };

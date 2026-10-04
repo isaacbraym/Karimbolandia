@@ -17,7 +17,7 @@ export function buyGear(id:string,ownedWeapons:ReadonlyMap<string,number>):'boug
   const item=gearItem(id);if(!item)return 'invalid';
   ensureWallet();
   if(progress.gear.includes(id))return 'owned';
-  if(item.kind!=='unlock'&&!ownedWeapons.has(item.weapon)&&!progress.gear.includes(`${item.weapon}.unlock.1`))return 'locked';
+  if(item.weapon!=='karimbo'&&item.kind!=='unlock'&&!ownedWeapons.has(item.weapon)&&!progress.gear.includes(`${item.weapon}.unlock.1`))return 'locked';
   if(item.tier>1&&!progress.gear.includes(`${item.weapon}.${item.kind}.${item.tier-1}`))return 'locked';
   if(coinBalance()<item.price)return 'insufficient';
   progress.gear.push(id);

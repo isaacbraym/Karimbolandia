@@ -67,7 +67,7 @@ describe('Arsenal e oficina',()=>{
     w.player.resetInventory();expect(w.player.weapons.get('rifle')).toBe(36);
     scope.setProfile('another');s.reloadProgress();w.player.resetInventory();expect(s.progress.gear).toEqual([]);expect([...w.player.weapons.keys()]).toEqual(['pistol']);
   });
-  it('recusa gastar saldo insuficiente e permite abrir a oficina só perto de Tomé',async()=>{
+  it('recusa gastar saldo insuficiente e permite abrir a oficina só perto de Sivirino',async()=>{
     const w=await setup(),{buyGear}=await import('../src/core/forge');expect(buyGear('pistol.damage.1',w.player.weapons)).toBe('insufficient');
     const spot=w.merchant.spots[0];w.player.reset(spot.x,spot.y);expect(w.merchant.near(w)).toBe(true);
     w.player.reset(spot.x+300,spot.y);expect(w.merchant.near(w)).toBe(false);

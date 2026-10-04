@@ -106,7 +106,7 @@ export class Level {
 // ------------------------------------------------------------------ dados de fase
 export type EnemyType =
   | 'rifle' | 'shotgun' | 'shield' | 'jetpack' | 'sniper' | 'drone' | 'turret' | 'heavy' | 'spider' | 'minimech' | 'roller'
-  | 'boss' | 'grenadier' | 'hunter';
+  | 'boss' | 'grenadier' | 'hunter' | 'piranha';
 
 export interface EnemySpawn {
   id: number;
@@ -122,6 +122,11 @@ export interface EnemySpawn {
   patrol?: number; // metade da largura de patrulha em px
   drop?: boolean; // entra caindo do céu (paraquedas/jato)
   fromSide?: -1 | 1; // entra correndo pela lateral
+  /** piranhas: cardume (id), centro do território (px) e espécie (1 = alongada, 2 = redonda) */
+  school?: number;
+  homeX?: number;
+  homeY?: number;
+  species?: 1 | 2;
 }
 
 export type PropKind =
@@ -151,7 +156,7 @@ export interface PropSpawn {
 
 export type PickupKind =
   | 'token' | 'emblem' | 'secret' | 'health' | 'healthBig' | 'ammo' | 'nade' | 'rifle' | 'shotgun' | 'launcher'
-  | 'energy' | 'repair' | 'note';
+  | 'energy' | 'repair' | 'note' | 'relic' | 'chest';
 
 export interface PickupSpawn {
   id: number;
@@ -238,6 +243,8 @@ export interface WaterZone {
   y: number;
   w: number;
   h: number;
+  /** superfície real (px) quando a zona é uma câmara funda abaixo de outra zona */
+  surface?: number;
 }
 
 /** Cipó de balançar: preso em (x, y) px, com `len` px de comprimento. */
@@ -289,6 +296,8 @@ export interface RoomZone {
 }
 
 export interface LevelData {
+  /** linha do 'abismo' fora do lago (mapas mais altos só por causa do lago fundo mantêm a queda curta) */
+  voidRow?: number;
   /** 1 = cidade (Felipão), 2 = selva */
   stage: number;
   water: WaterZone[];

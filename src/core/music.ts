@@ -6,7 +6,7 @@ import { audio } from './audio';
 import { clamp } from './math';
 
 export type Layer = 'pad' | 'bass' | 'arp' | 'hat' | 'kick' | 'snare' | 'lead' | 'power' | 'choir' | 'tom';
-export type ThemeName = 'menu' | 'stage' | 'boss' | 'jungle';
+export type ThemeName = 'menu' | 'stage' | 'boss' | 'jungle' | 'rave';
 
 const LAYERS: Layer[] = ['pad', 'bass', 'arp', 'hat', 'kick', 'snare', 'lead', 'power', 'choir', 'tom'];
 const mtof = (m: number) => 440 * Math.pow(2, (m - 69) / 12);
@@ -126,7 +126,32 @@ const JUNGLE: Theme = {
   ],
 };
 
-const THEMES: Record<ThemeName, Theme> = { menu: MENU, stage: STAGE, boss: BOSS, jungle: JUNGLE };
+// -------- Balada (fase 1): Lá menor, 150 bpm — eletrônica frenética ----------
+// bumbo 4×4, chimbal em semicolcheias, baixo pulsando no contratempo, arpejo rápido e um riff
+// de sintetizador que gruda (pergunta e resposta), com virada de caixa no fim de cada volta
+const RAVE: Theme = {
+  bpm: 150,
+  chords: [
+    { root: 45, notes: [57, 60, 64, 69] }, // Am
+    { root: 41, notes: [53, 57, 60, 65] }, // F
+    { root: 48, notes: [55, 60, 64, 67] }, // C
+    { root: 43, notes: [55, 59, 62, 67] }, // G
+  ],
+  bassPat: '.o.o.o.o.o.o.o.o',
+  kickPat: 'x...x...x...x...',
+  snarePat: '....x.......x.xx',
+  hatPat: 'xxxxxxxxxxxxxxxx',
+  arpPat: [0, 1, 2, 3, 2, 1, 0, 1, 2, 3, 2, 3, 0, 3, 1, 2],
+  lead: [
+    [81, null, 81, 84, null, 81, 79, null, 76, null, 79, null, 81, null, 84, 86],
+    [84, null, 84, 81, null, 77, 76, null, 77, null, 81, null, 84, null, 81, null],
+    [79, null, 79, 84, null, 88, 86, null, 84, null, 79, null, 76, null, 79, 81],
+    [86, null, 83, 79, null, 83, 86, null, 91, null, 88, null, 86, 83, 79, null],
+  ],
+  tomPat: '..............xx',
+};
+
+const THEMES: Record<ThemeName, Theme> = { menu: MENU, stage: STAGE, boss: BOSS, jungle: JUNGLE, rave: RAVE };
 
 class MusicEngine {
   private layerGain = new Map<Layer, GainNode>();
@@ -678,6 +703,8 @@ export const MIX = {
   /** "drop" da boate: tudo, com a guitarra e o coro */
   drop: { pad: 0.8, bass: 1, arp: 0.9, hat: 1, kick: 1, snare: 1, lead: 1, power: 0.9, choir: 0.8, tom: 0.7 } as Partial<Record<Layer, number>>,
   victory: { pad: 1, lead: 0.8, arp: 0.7, bass: 0.6 } as Partial<Record<Layer, number>>,
+  /** balada com o Karimbo dançando: tudo no máximo */
+  rave: { pad: 0.55, bass: 1, arp: 1, hat: 1, kick: 1, snare: 1, lead: 1, power: 0.45, tom: 0.8 } as Partial<Record<Layer, number>>,
 };
 
 /** Melodia do tema da cidade (as notas da boate tocam em sintetizador). */

@@ -17,6 +17,8 @@ const H: Record<string, Record<Device, string>> = {
   swing: { kb: 'Cipó: ← → balança, W/S sobe e desce, ESPAÇO solta com impulso', touch: 'Cipó: joystick balança e sobe/desce, PULO solta com impulso', pad: 'Cipó: analógico balança, A solta com impulso' },
   quicksand: { kb: 'Areia movediça! Aperte ESPAÇO várias vezes para se soltar', touch: 'Areia movediça! Toque em PULO várias vezes para se soltar', pad: 'Areia movediça! Aperte A várias vezes para se soltar' },
   door: { kb: 'Na porta do templo, aperte ↑ (W) para entrar', touch: 'Na porta do templo, empurre o joystick para cima para entrar', pad: 'Na porta do templo, analógico para cima para entrar' },
+  deep: { kb: 'Fenda para ATLÂNTIDA! Sem traje o ar acaba rápido lá embaixo • o Sivirino vende o traje', touch: 'Fenda para ATLÂNTIDA! Sem traje o ar acaba rápido • o Sivirino vende o traje', pad: 'Fenda para ATLÂNTIDA! Sem traje o ar acaba rápido • o Sivirino vende o traje' },
+  club: { kb: 'Balada à frente: aperte ↑ (W) na porta para entrar', touch: 'Balada à frente: joystick para cima na porta para entrar', pad: 'Balada à frente: analógico para cima na porta para entrar' },
   crouch: { kb: 'Segure S / ↓ para engatinhar', touch: 'Empurre o joystick para baixo para engatinhar', pad: 'Analógico para baixo para engatinhar' },
 };
 

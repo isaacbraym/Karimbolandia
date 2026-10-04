@@ -8,14 +8,14 @@ import { applyProfile, captureProfile, exportBackup, validateProfile, preservePr
 import { exportAllBackups, parseBackupChoices, MAX_ARCHIVE_BYTES } from '../core/backupArchive';
 import { persistenceStatus, onPersist, profileKey, readStored } from '../core/persistence';
 import { storageUsage } from '../core/storageUsage';
-import { SKINS } from '../core/skinCatalog';
+import { SKINS, skinPrice, type SkinId } from '../core/skinCatalog';
 import { chooseSkin, coinBalance, ensureWallet } from '../core/skins';
 import { getArt } from '../art';
 import { drawKarimbo } from '../art/karimbo';
 import { listSaveCopies } from '../game/saveSession';
 import { loadSave, type SaveState } from '../game/save';
 import { STAGES, stageCheckpoints, type StageId } from '../game/stageSelect';
-import { GEAR, reloadSeconds, UNLOCK_PRICE, type GearItem } from '../core/gearCatalog';
+import { GEAR, PERKS, karimboStats, perkLevel, reloadSeconds, UNLOCK_PRICE, type GearItem } from '../core/gearCatalog';
 import { attributeBars, effectChips, pips, weaponCanvas } from './forgeShop';
 import { buyGearWhenOpen, withWalletLock } from '../core/forge';
 import { gearPreview } from '../core/gearPreview';
@@ -188,6 +188,7 @@ export class Menus {
     const btns = el('div', 'btns');
     btns.append(
       this.btn('CONTINUAR', 'primary', () => this.cb.onResume()),
+      this.btn('PERSONAGEM', 'alt', () => this.showShop('pause')),
       this.btn('SAVE E CONTA', 'alt', () => this.showSaves('pause')),
       this.btn('CONFIGURAÇÕES', 'alt', () => this.showSettings('pause')),
       this.btn('REINICIAR FASE', 'alt', () => this.cb.onRestart()),
@@ -523,25 +524,27 @@ export class Menus {
   }
 
   // ------------------------------------------------------------------ estados
-  showShop() {
+  /** Trajes do Karimbo. Na pausa vira o menu PERSONAGEM: troca de traje no meio da partida. */
+  showShop(from: 'main' | 'pause' = 'main') {
     ensureWallet();
     const panel = el('div', 'panel skin-shop');
-    panel.append(el('h2', '', 'TRAJES DO KARIMBO'));
+    panel.append(el('h2', '', from === 'pause' ? 'PERSONAGEM • TRAJES' : 'TRAJES DO KARIMBO'));
     const balance = el('p', 'shop-balance');
     balance.setAttribute('role', 'status');
-    const note = el('p', 'shop-note', 'Junte moedas na cidade e na selva. Seu saldo e seus trajes ficam guardados entre partidas. Os trajes são apenas visuais.');
+    const note = el('p', 'shop-note', 'Junte moedas na cidade e na selva. Saldo e trajes ficam guardados entre partidas. O traje de mergulho (Sivirino) e o Atlante (relíquias de Atlântida) têm poderes.');
     const cards = el('div', 'skin-cards');
     panel.append(balance, note, cards);
     const update = () => {
       ensureWallet();
-      balance.textContent = `${coinBalance()} MOEDAS • ${progress.ownedSkins.length + 1}/3 TRAJES`;
+      balance.textContent = `${coinBalance()} MOEDAS • ${progress.ownedSkins.length + 1}/${SKINS.length} TRAJES`;
       cards.replaceChildren();
       for (const skin of SKINS) {
         const owned = skin.id === 'classic' || progress.ownedSkins.includes(skin.id);
         const equipped = progress.equippedSkin === skin.id;
         const card = el('article', 'skin-card' + (equipped ? ' equipped' : ''));
         card.style.setProperty('--skin-color', skin.color);
-        card.append(el('span', 'skin-tag', equipped ? 'EQUIPADO' : owned ? 'SEU TRAJE' : `${skin.price} MOEDAS`));
+        const viaSivirino = skin.shop === 'sivirino', viaRelics = skin.shop === 'relics';
+        card.append(el('span', 'skin-tag', equipped ? 'EQUIPADO' : owned ? 'SEU TRAJE' : viaRelics ? 'EXCLUSIVO' : viaSivirino ? `SIVIRINO • ${skin.price}` : `${skin.price} MOEDAS`));
         const canvas = el('canvas', 'skin-preview');
         canvas.width = 320; canvas.height = 330;
         canvas.setAttribute('role', 'img');
@@ -550,30 +553,33 @@ export class Menus {
         g.scale(3.2, 3.2);
         drawKarimbo(g, getArt().karimbo, 50, 97, {
           facing: 1, state: 'idle', t: 0, runPhase: 0, speed01: 0, aim: 0,
-          weapon: 'pistol', kick: 0, flash: false, earGlide: 0, vy: 0, alpha: 1, hasGun: false,
+          weapon: 'pistol', kick: 0, flash: false, earGlide: 0, vy: 0, alpha: 1, hasGun: false, suit: skin.id === 'diver' ? 1 : 0,
         }, skin.id);
         card.append(canvas, el('h3', '', skin.name));
+        if (skin.perk) card.append(el('p', 'skin-perk', `✦ ${skin.perk}`));
         const description = el('p', 'skin-description');
         description.textContent = skin.description;
         const affordable = coinBalance() >= skin.price;
-        const action = this.btn(equipped ? 'EQUIPADO' : owned ? `USAR ${skin.name.toUpperCase()}` : `COMPRAR • ${skin.price}`, owned ? 'alt small' : 'primary small', () => {
+        const lockedText = viaRelics ? `RELÍQUIAS ${progress.relics.length}/5` : 'COMPRE COM O SIVIRINO';
+        const action = this.btn(equipped ? 'EQUIPADO' : owned ? `USAR ${skin.name.toUpperCase()}` : viaRelics || viaSivirino ? lockedText : `COMPRAR • ${skin.price}`, owned ? 'alt small' : 'primary small', () => {
           void withWalletLock(()=>chooseSkin(skin.id)).then(result=>{
-          if (result === 'insufficient') this.toast('Ainda faltam moedas para este traje.');
+          if (result === 'locked') this.toast(viaRelics ? 'Ache as 5 relíquias de Atlântida para vestir o Atlante.' : 'O traje de mergulho só se compra com o Sivirino, na oficina.');
+          else if (result === 'insufficient') this.toast('Ainda faltam moedas para este traje.');
           else if (result === 'volatile') this.toast('Traje disponível nesta sessão. Baixe um backup: não foi possível gravar no aparelho.');
           else this.toast(result === 'bought' ? `${skin.name} comprado e equipado!` : `${skin.name} equipado!`);
           update();
           }).catch(()=>this.toast('A conta mudou. Abra a loja novamente antes de comprar.'));
         });
-        action.disabled = equipped || (!owned && !affordable);
+        action.disabled = equipped || (!owned && (!affordable || viaRelics || viaSivirino));
         action.setAttribute('aria-label', equipped ? `${skin.name} equipado` : owned ? `Usar ${skin.name}` : `Comprar ${skin.name} por ${skin.price} moedas`);
         card.append(description, action);
-        if (!owned && !affordable) card.append(el('small', 'skin-shortfall', `Faltam ${skin.price - coinBalance()} moedas`));
+        if (!owned && !affordable && !viaRelics && !viaSivirino) card.append(el('small', 'skin-shortfall', `Faltam ${skin.price - coinBalance()} moedas`));
         cards.append(card);
       }
       this.shopBtn.textContent = `LOJA DE SKINS • ${coinBalance()} MOEDAS`;
       this.collectFocus(panel);
     };
-    this.openPanel(panel, 'main');
+    this.openPanel(panel, from);
     update();
     const persisted = onPersist(() => update());
     const changed = () => update();
@@ -588,7 +594,7 @@ export class Menus {
     ensureWallet();
     const panel=el('div','panel forge-shop');
     const head=el('header','forge-head');
-    const title=el('h2','','TOMÉ • OFICINA');
+    const title=el('h2','','SIVIRINO • OFICINA');
     const balance=el('p','shop-balance');balance.setAttribute('role','status');
     const close=this.btn('FECHAR','alt small forge-close',()=>this.closePanel());
     close.setAttribute('aria-label','Fechar oficina');
@@ -599,7 +605,7 @@ export class Menus {
     const body=el('div','forge-body');body.append(list,detail);
     panel.append(head,body,status);
     const isOpen=()=>panel.isConnected&&!this.panel.classList.contains('hidden');
-    let selected:WeaponId=player.cur;
+    let selected:WeaponId|'traje'|'karimbo'=player.cur;
     let purchaseFocus:string|undefined;
     const thumbs=new Map(WEAPON_ORDER.map(id=>[id,weaponCanvas(id,74,30,3)]));
     const hero=new Map<WeaponId,HTMLCanvasElement>();
@@ -610,10 +616,11 @@ export class Menus {
       void buyGearWhenOpen(item.id,player.weapons,isOpen).then(result=>{
         if(result==='cancelled'||!isOpen())return;
         if(result==='bought'||result==='volatile') {
-          if(item.kind==='unlock'&&!player.weapons.has(item.weapon))player.giveWeapon(item.weapon,w);
+          if(item.weapon!=='karimbo'&&item.kind==='unlock'&&!player.weapons.has(item.weapon))player.giveWeapon(item.weapon,w);
+          if(item.weapon==='karimbo')player.applyPerks(true);
           onChange();
         }
-        status.textContent=result==='bought'?(item.kind==='unlock'?`${WEAPONS[item.weapon].name} é sua! Volta sempre que achar munição.`:`${item.label} instalado. Sinta a diferença no próximo tiro!`):result==='volatile'?'Compra nesta sessão. Baixe um backup: o aparelho não conseguiu salvar.':result==='insufficient'?'Faltam moedas.':result==='locked'?'Adquira a arma ou a melhoria anterior primeiro.':'Você já tem esta melhoria.';
+        status.textContent=result==='bought'?(item.weapon==='karimbo'?`${item.label}: o Karimbo já sentiu a diferença!`:item.kind==='unlock'?`${WEAPONS[item.weapon].name} é sua! Volta sempre que achar munição.`:`${item.label} instalado. Sinta a diferença no próximo tiro!`):result==='volatile'?'Compra nesta sessão. Baixe um backup: o aparelho não conseguiu salvar.':result==='insufficient'?'Faltam moedas.':result==='locked'?'Adquira a arma ou a melhoria anterior primeiro.':'Você já tem esta melhoria.';
         update();
       }).catch(()=>{if(isOpen())status.textContent='A conta mudou. Feche e abra a oficina novamente.';});
     };
@@ -636,6 +643,75 @@ export class Menus {
         tab.append(thumbs.get(id)!,el('strong','',navName),el('small',owned?'owned':coins>=UNLOCK_PRICE[id]?'afford':'',state));
         tab.addEventListener('click',()=>{this.cb.onClick();selected=id;status.textContent=WEAPON_INFO[id].lore;update();});
         list.append(tab);
+      }
+      for(const special of ['traje','karimbo'] as const){
+        const owned=special==='karimbo'||progress.ownedSkins.includes('diver');
+        const tab=el('button','forge-tab'+(special===selected?' on':''));tab.type='button';
+        tab.setAttribute('role','tab');tab.setAttribute('aria-selected',String(special===selected));
+        tab.style.setProperty('--tier',special==='traje'?'#4fb3ff':'#ffd23a');
+        const state=special==='karimbo'?`${progress.gear.filter(g=>g.startsWith('karimbo.')).length}/7`:owned?(progress.equippedSkin==='diver'?'VESTIDO':'SEU'):`● ${skinPrice('diver')}`;
+        tab.append(karimboCanvas(special==='traje'?'diver':progress.equippedSkin,special==='traje'?1:0,74,30),el('strong','',special==='traje'?'TRAJE':'KARIMBO'),el('small',owned?'owned':coins>=skinPrice('diver')?'afford':'',state));
+        tab.addEventListener('click',()=>{this.cb.onClick();selected=special;status.textContent=special==='traje'?'Sem traje, o ar acaba e a pressão do fundo não perdoa. Com ele, Atlântida é sua.':'Tunar o Karimbo vale para todas as fases e partidas.';update();});
+        list.append(tab);
+      }
+      if(selected==='traje'||selected==='karimbo'){
+        const sel=selected;
+        const top=el('div','forge-hero');top.style.setProperty('--tier',sel==='traje'?'#4fb3ff':'#ffd23a');
+        const name=el('div','forge-name');
+        const st=karimboStats(progress.gear);
+        if(sel==='traje'){
+          name.append(el('span','forge-tier','ÉPICO'),el('h3','','TRAJE DE MERGULHO'),el('p','forge-role','Respira debaixo da água'));
+          name.append(el('p','forge-facts','Sem barra de ar • lanterna no capacete • pressão do fundo não afeta'));
+        } else {
+          name.append(el('span','forge-tier','PERSONAGEM'),el('h3','','KARIMBO'),el('p','forge-role','Melhorias permanentes'));
+          name.append(el('p','forge-facts',`Vida ${st.hp} • Ar ${fmt(st.air)} s • Granadas ${st.nades} • Nado ×${fmt(st.swim)}`));
+        }
+        top.append(karimboCanvas(sel==='traje'?'diver':progress.equippedSkin,sel==='traje'?1:0,124,64),name);
+        const stats=el('div','forge-stats-box');
+        const lore=el('ul','forge-perks');
+        const lines=sel==='traje'
+          ?['Mergulhe sem limite de ar e sem a pressão do fundo.','A cidade submersa de Atlântida fica no fundo do lago da selva.','Troque de traje no menu PERSONAGEM (pausa).']
+          :['Vida: +20 por nível.','Fôlego: mais tempo debaixo da água sem traje.','Cinturão: mais granadas ao começar e ao voltar.','Nadadeira: nada 25% mais rápido.'];
+        for(const line of lines)lore.append(el('li','',line));
+        stats.append(lore);
+        const tracks=el('div','forge-tracks');
+        if(sel==='traje'){
+          const owned=progress.ownedSkins.includes('diver'),worn=progress.equippedSkin==='diver',price=skinPrice('diver');
+          const row=el('article','forge-track unlock');row.dataset.kind='traje';
+          const label=el('div','forge-track-label');label.append(el('strong','',owned?(worn?'Traje vestido':'Vestir traje'):'Comprar traje'));
+          const text=el('p','forge-preview',owned?(worn?'Troque no menu PERSONAGEM':'Seu para sempre • veste agora'):'Compra e já veste');
+          const button=this.btn(owned?(worn?'EM USO':'VESTIR'):`${price}`,'small primary forge-buy',()=>{
+            purchaseFocus='traje';button.disabled=true;
+            void withWalletLock(()=>isOpen()?chooseSkin('diver','sivirino'):'invalid' as const).then(r=>{
+              if(!isOpen())return;
+              status.textContent=r==='bought'?'Traje comprado e vestido. O fundo do lago te espera!':r==='equipped'?'Traje vestido.':r==='insufficient'?`Faltam ${price-coinBalance()} moedas.`:r==='volatile'?'Traje nesta sessão. Baixe um backup: o aparelho não conseguiu salvar.':'Não foi possível comprar agora.';
+              if(r==='bought'||r==='equipped'||r==='volatile')onChange();
+              update();
+            }).catch(()=>{if(isOpen())status.textContent='A conta mudou. Feche e abra a oficina novamente.';});
+          });
+          button.disabled=worn||(!owned&&coins<price);
+          row.append(label,text,button);
+          if(!owned&&coins<price)row.append(el('small','forge-shortfall',`faltam ${price-coins}`));
+          tracks.append(row);
+        } else for(const [kind] of PERKS){
+          const options=GEAR.filter(x=>x.weapon==='karimbo'&&x.kind===kind);
+          const item=options.find(x=>!progress.gear.includes(x.id))??options[options.length-1];
+          const acquired=progress.gear.includes(item.id);
+          const row=el('article','forge-track');row.dataset.kind=kind;
+          const label=el('div','forge-track-label');label.append(el('strong','',item.label.replace(/ \d$/,'')),pips(perkLevel(progress.gear,kind),options.length));
+          const text=el('p',acquired?'':'forge-preview',acquired?'Nível máximo':gearPreview(item,progress.gear));
+          const button=this.btn(acquired?'MÁX':`${item.price}`,'small alt forge-buy',()=>buy(item,button));
+          button.disabled=acquired||coins<item.price;
+          row.append(label,text,button);
+          if(!acquired&&coins<item.price)row.append(el('small','forge-shortfall',`faltam ${item.price-coins}`));
+          tracks.append(row);
+        }
+        detail.replaceChildren(top,stats,tracks);
+        if (this.weaponOpen) return;
+        this.collectFocus(panel);
+        const restoreFocus=focusedKind==='tab'?list.querySelector<HTMLButtonElement>('.forge-tab.on'):focusedKind?tracks.querySelector<HTMLButtonElement>(`[data-kind="${focusedKind}"] button:not(:disabled)`)??list.querySelector<HTMLButtonElement>('.forge-tab.on'):null;
+        if(restoreFocus){this.focusIdx=this.focusable.indexOf(restoreFocus);this.applyFocus();restoreFocus.focus({preventScroll:true});}
+        return;
       }
       const id=selected,info=WEAPON_INFO[id],owned=ownsWeapon(id),d=player.weaponDef(id);
       if(!hero.has(id))hero.set(id,weaponCanvas(id,200,74,4));
@@ -1156,4 +1232,21 @@ export class Menus {
     }
     return false;
   }
+}
+
+/** Karimbo desenhado num canvas (oficina): traje e capacete de mergulho opcionais. */
+function karimboCanvas(skin: SkinId, suit: number, w: number, h: number) {
+  const c = document.createElement('canvas');
+  c.width = w * 2; c.height = h * 2;
+  c.setAttribute('aria-hidden', 'true');
+  const g = c.getContext('2d');
+  if (g) {
+    const k = (h * 2) / 74;
+    g.scale(k, k);
+    drawKarimbo(g, getArt().karimbo, (w * 2) / k / 2, 86, {
+      facing: 1, state: 'idle', t: 0, runPhase: 0, speed01: 0, aim: 0,
+      weapon: 'pistol', kick: 0, flash: false, earGlide: 0, vy: 0, alpha: 1, hasGun: false, suit,
+    }, skin);
+  }
+  return c;
 }

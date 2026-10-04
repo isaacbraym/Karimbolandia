@@ -275,6 +275,15 @@ export function addClub(b: LevelBuilder): number {
   b.deco('clubDoor', x0 + 2, G, 'back');
   b.deco('clubExit', x0 + W - 2, G, 'back');
   b.trigger('hint:door', x0 - 1, 0, 6, G);
+  // prédio da balada atravessando a calçada no fim do quarteirão: a única passagem é por dentro
+  // (porta da frente com seguranças logo antes do paredão; a saída dos fundos fica depois dele)
+  const front = x0 + W - 12;
+  const wall0 = x0 + W - 9;
+  b.fill(wall0, 2, 3, G - 2, T.SOLID, THEME.STEEL);
+  b.door(front, G, x0 + 3, FLOOR, 'in');
+  b.deco('clubDoor', front, G, 'back');
+  b.deco('clubFront', wall0 + 1, G, 'front'); // por cima dos blocos do paredão
+  b.trigger('hint:club', front - 7, 0, 6, G);
   // ---- dentro: aquecimento com uma caixa de som e uma plataforma
   b.drum(x0 + 7, FLOOR - 1, 2, 'speaker');
   b.plat(x0 + 10, FLOOR - 5, 4, THEME.HANGAR);

@@ -8,6 +8,7 @@ import { TILE, T } from '../src/game/level';
 import { analyzeReach } from '../src/game/level/reach';
 import { RUN } from '../src/game/movement';
 import { newCtl } from './helpers/bot';
+import { progress } from '../src/core/storage';
 
 const data = buildJungle();
 
@@ -45,13 +46,16 @@ describe('Fase 2 (selva): dados', () => {
     const swamps = data.water.filter((z) => z.kind === 'swamp');
     const lakes = data.water.filter((z) => z.kind === 'lake');
     expect(swamps.length).toBeGreaterThanOrEqual(3);
-    expect(lakes.length).toBe(2);
+    // lago, câmara funda de Atlântida (com a superfície real do lago) e o laguinho da aldeia
+    expect(lakes.length).toBe(3);
+    expect(lakes.filter((z) => z.surface !== undefined)).toHaveLength(1);
     expect(lakes[0].h).toBeGreaterThan(8 * TILE);
     expect(data.finishX).toBeGreaterThan(LAKE_X1 * TILE);
   });
 
   it('inimigos são só humanos (mercenários) — nada de robôs', () => {
-    const human = new Set(['rifle', 'shotgun', 'shield', 'sniper', 'grenadier', 'hunter']);
+    // piranhas são fauna hostil do lago, não máquinas
+    const human = new Set(['rifle', 'shotgun', 'shield', 'sniper', 'grenadier', 'hunter', 'piranha']);
     expect(data.enemies.filter((e) => !human.has(e.type))).toEqual([]);
   });
 
@@ -68,6 +72,7 @@ describe('Fase 2 (selva): dados', () => {
     const L = data.level;
     const bad: string[] = [];
     for (const e of data.enemies) {
+      if (e.type === 'piranha') continue;
       const t = L.get(Math.floor(e.x / TILE), Math.round(e.y / TILE));
       if (!L.solidAtPx(e.x,e.y+1) && t !== T.SOLID && t !== T.ONEWAY) bad.push(`${e.type} @${Math.floor(e.x / TILE)} sem chão`);
       if (data.water.some((z) => e.x >= z.x && e.x < z.x + z.w && e.y > z.y)) bad.push(`${e.type} @${Math.floor(e.x / TILE)} na água`);
@@ -79,7 +84,12 @@ describe('Fase 2 (selva): dados', () => {
     const w = jungleWorld();
     const lake = data.water.find((z) => z.kind === 'lake')!;
     for (const p of w.pits) expect(p.x1 <= lake.x || p.x0 >= lake.x + lake.w).toBe(true);
-    for (let tx = LAKE_X0; tx < LAKE_X1; tx++) expect(data.level.isSolid(tx, LAKE_FLOOR)).toBe(true);
+    // a fenda sob a cachoeira desce para Atlântida, mas toda coluna do lago tem leito lá embaixo
+    for (let tx = LAKE_X0; tx < LAKE_X1; tx++) {
+      let floor = false;
+      for (let ty = LAKE_FLOOR; ty < data.level.h && !floor; ty++) floor = data.level.isSolid(tx, ty);
+      expect(floor, `coluna ${tx}`).toBe(true);
+    }
   });
 });
 
@@ -97,11 +107,13 @@ describe('Fase 2 (selva): caminho alcançável', () => {
     expect(missing).toEqual([]);
     const fx = Math.floor(data.finishX / TILE);
     expect(res.reached.has(res.key(fx, 32))).toBe(true);
-  }, 20000); // Simulates the full campaign, including the 620-column community.
+  }, 60000); // Simulates the full campaign, including the 620-column community.
 });
 
 describe('Fase 2 (selva): água', () => {
-  it('cair no lago veste o traje e o Karimbo nada até a outra margem', () => {
+  it('cair no lago (com o traje do Sivirino) veste o capacete e o Karimbo nada até a outra margem', () => {
+    progress.ownedSkins.push('diver');
+    progress.equippedSkin = 'diver';
     const w = jungleWorld();
     const ctl = newCtl();
     // pula do paredão para dentro do lago
@@ -124,6 +136,8 @@ describe('Fase 2 (selva): água', () => {
     expect(wasSwimming).toBe(true);
     expect(suited).toBe(true);
     expect(out).toBe(true);
+    progress.equippedSkin = 'classic';
+    progress.ownedSkins.length = 0;
   });
 
   it('nadando o Karimbo afunda devagar (sem a gravidade de terra)', () => {
@@ -238,7 +252,8 @@ describe('Fase 2 (selva): templo', () => {
     expect(data.vines.filter((v) => v.x < TEMPLE_X1 * TILE).length).toBeGreaterThanOrEqual(9);
     // os poços de cipós não entram no validador (ele só pula): parte de depois de cada um
     const after = [[49, 14], [121, 14], [95, 28], [17, 28], [72, 45]].map(([x, r]) => ({ x: x * TILE + 16, y: r * TILE }));
-    const res = analyzeReach(data, [{ x: inn.tx, y: inn.ty }, ...after]);
+    // só o caminho de dentro da masmorra (sem atravessar a porta de saída para a selva toda)
+    const res = analyzeReach(data, [{ x: inn.tx, y: inn.ty }, ...after], { noDoors: true });
     expect(res.reached.has(res.key(Math.floor(out.x / TILE), Math.round(out.y / TILE)))).toBe(true);
   });
 });
