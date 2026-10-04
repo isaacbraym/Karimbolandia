@@ -76,6 +76,10 @@ export class InteriorSim {
   private armed = false;
   private armT = 0;
   readonly furnById = new Map<string, FurnitureDef>();
+  /** móveis "sintéticos" dos NPCs com verbos: tocar neles abre o menu como num móvel */
+  private npcFurn = new Map<string, FurnitureDef>();
+  /** expulsão: Karimbo é levado à força até a porta */
+  forced = false;
 
   constructor(readonly room: RoomDef, readonly store: InteriorStore, readonly host: InteriorHost = nullHost, seed = 1) {
     this.flags = store.flags(room.id);
@@ -91,6 +95,11 @@ export class InteriorSim {
         facing: screenSide(d.dx ?? 1, d.dy ?? 1), state: d.state, t: 0, meter: d.meter ?? 0, mark: '', markT: 0,
         path: [], speed: 2.4, away: !!d.away, walk: 0, data: {},
       });
+    }
+    for (const n of this.npcs) {
+      if (!n.brain.verbs) continue;
+      const f: FurnitureDef = { id: 'npc:' + n.id, name: n.name, paint: 'npc', gx: Math.floor(n.gx), gy: Math.floor(n.gy), w: 1, h: 1, solid: false, height: 60, verbs: (s) => (n.away ? [] : n.brain.verbs!(s, n)) };
+      this.npcFurn.set(n.id, f); this.furnById.set(f.id, f);
     }
     room.onEnter?.(this);
     for (const p of room.pranks) if (p.done(this)) this.pranksSeen.add(p.id);
@@ -181,7 +190,7 @@ export class InteriorSim {
     const c = centerOf(f);
     const seen = this.npcs.some((n) => this.canSee(n, c.gx, c.gy));
     return f.verbs(this, f).map((v) => ({
-      id: v.id, label: v.label, hostile: !!v.hostile, witness: seen,
+      id: v.id, label: v.label, hostile: !!v.hostile || (v.irritation ?? 0) > 0, witness: seen,
       waves: v.noise <= 0 ? 0 : v.noise <= 8 ? 1 : v.noise <= 25 ? 2 : 3,
     }));
   }
@@ -189,7 +198,7 @@ export class InteriorSim {
   /** Móveis ao alcance do braço, do mais perto para o mais longe (seleção por teclado/controle). */
   reachable(max = 1.9): FurnitureDef[] {
     const out: { f: FurnitureDef; d: number }[] = [];
-    for (const f of this.room.furniture) {
+    for (const f of [...this.room.furniture, ...this.npcFurn.values()]) {
       if (!f.verbs(this, f).length) continue;
       const nx = Math.max(f.gx, Math.min(this.px, f.gx + f.w)), ny = Math.max(f.gy, Math.min(this.py, f.gy + f.h));
       const d = Math.hypot(this.px - nx, this.py - ny);
@@ -234,6 +243,15 @@ export class InteriorSim {
     if (!p) return false;
     this.path = p;
     return true;
+  }
+
+  /** Expulsão: o Karimbo é varrido até a porta (ignora comandos) e a visita termina como "expulso". */
+  forceOut() {
+    if (this.forced || this.exited) return;
+    const p = findPath(this.grid, this.cell(), [this.room.door]);
+    this.forced = true; this.busy = 0; this.intent = null; this.on = null; this.pose = 'idle';
+    this.path = p ?? [];
+    this.pop('VASSOURADA!', this.px, this.py, '#ff7a5a'); this.shake(4, 0.35); this.sfx('slam', 1);
   }
 
   /** Esc/“Sair”: vai até o tapete da porta. */
@@ -308,6 +326,16 @@ export class InteriorSim {
     return true;
   }
 
+  /** Aproxima o NPC de uma célula: vai até a vizinhança livre (3×3) mais próxima, mesmo se a célula for ocupada. */
+  npcApproach(n: Npc, c: Cell): boolean {
+    const goals: Cell[] = [];
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if (this.grid.walkable(c.x + dx, c.y + dy)) goals.push({ x: c.x + dx, y: c.y + dy });
+    const p = findPath(this.grid, { x: Math.floor(n.gx), y: Math.floor(n.gy) }, goals);
+    if (!p) return false;
+    n.path = p;
+    return true;
+  }
+
   private blocked(cx: number, cy: number) { return !this.grid.walkable(cx, cy); }
   private boxFree(x: number, y: number) {
     return !this.blocked(Math.floor(x - HALF), Math.floor(y - HALF)) && !this.blocked(Math.floor(x + HALF), Math.floor(y - HALF))
@@ -335,9 +363,12 @@ export class InteriorSim {
     this.armT += dt;
     this.poseT += dt;
     if (!this.armed && (this.armT > 0.9 || this.cell().x !== this.room.door.x || this.cell().y !== this.room.door.y)) this.armed = true;
-    this.sneaking = inp.sneak;
+    this.sneaking = inp.sneak && !this.forced;
     this.moving = false;
-    if (this.busy > 0) {
+    for (const n of this.npcs) { const f = this.npcFurn.get(n.id); if (f) { f.gx = Math.floor(n.gx); f.gy = Math.floor(n.gy); } }
+    if (this.forced) {
+      this.updateForced(dt);
+    } else if (this.busy > 0) {
       this.busy -= dt;
       if (this.busy <= 0) { this.busy = 0; if (this.pose !== 'lie' && this.pose !== 'sit') this.pose = 'idle'; }
     } else {
@@ -376,7 +407,7 @@ export class InteriorSim {
       else if (this.pose === 'sneak' && !(inp.sneak && this.moving)) this.pose = 'idle';
     }
     const c = this.cell();
-    if (this.armed && c.x === this.room.door.x && c.y === this.room.door.y && !this.busy) this.escapeOrLeave();
+    if (!this.forced && this.armed && c.x === this.room.door.x && c.y === this.room.door.y && !this.busy) this.escapeOrLeave();
     for (const n of this.npcs) {
       n.t += dt;
       if (n.markT > 0) { n.markT -= dt; if (n.markT <= 0) n.mark = ''; }
@@ -386,6 +417,17 @@ export class InteriorSim {
     if (this.talkT > 0) { this.talkT -= dt; if (this.talkT <= 0) this.talking = ''; }
     this.pranksTimer -= dt;
     if (this.pranksTimer <= 0) { this.pranksTimer = 0.2; this.checkPranks(); }
+  }
+
+  private updateForced(dt: number) {
+    let left = 6.2 * dt;
+    while (left > 1e-4 && this.path.length) {
+      const c = this.path[0], tx = c.x + 0.5, ty = c.y + 0.5, vx = tx - this.px, vy = ty - this.py, d = Math.hypot(vx, vy);
+      if (d <= left) { this.px = tx; this.py = ty; left -= d; this.path.shift(); } else { this.px += (vx / d) * left; this.py += (vy / d) * left; left = 0; }
+      if (d > 1e-4) this.facing = screenSide(vx, vy);
+    }
+    this.moving = true; this.walkPhase += 6.2 * dt * 2.1;
+    if (!this.path.length) this.exit('expelled');
   }
 
   /** Pisar no tapete: sai. Um mercenário acordado e a caminho vira “fuga”. */

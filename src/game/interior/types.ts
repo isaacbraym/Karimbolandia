@@ -102,6 +102,8 @@ export interface Brain {
   witness?(s: InteriorSim, n: Npc, act: ActInfo): void;
   /** olhos abertos? (dormindo não vê) */
   sees?(n: Npc): boolean;
+  /** verbos que o jogador pode usar NO personagem (toque nele): devolver a panela, cumprimentar... */
+  verbs?(s: InteriorSim, n: Npc): VerbDef[];
   /** a cena acabou: o cérebro pode pedir saídas especiais */
   onExit?(s: InteriorSim, reason: ExitReason): void;
 }
@@ -154,6 +156,8 @@ export interface RoomDef {
   onLeave?(s: InteriorSim, reason: ExitReason): void;
   /** zona "privada": a moradora fica mais desconfiada se Karimbo estiver aqui */
   isPrivate?(c: Cell): boolean;
+  /** humor do morador ao fim da visita (muda as falas lá fora): 'happy' | 'angry' | 'neutral' */
+  mood?(s: InteriorSim): 'happy' | 'angry' | 'neutral';
   /** luzes pontuais (lampião, fogão, janela): sprite radial somado ao quadro */
   lights?: { gx: number; gy: number; z: number; r: number; color: string; flicker?: number }[];
 }

@@ -30,10 +30,10 @@ export interface SessionInit {
   tutorial: boolean;
 }
 
-export interface Outcome { reason: ExitReason; alerted: boolean; room: RoomDef['id']; spot: ExplorationSpot }
+export interface Outcome { reason: ExitReason; alerted: boolean; room: RoomDef['id']; spot: ExplorationSpot; mood: 'happy' | 'angry' | 'neutral' }
 
 const ASSEMBLE_S = 1.1, DISASSEMBLE_S = 0.4;
-const SFX_OK = new Set<string>(['step', 'creak', 'secret', 'coin', 'heal', 'pickup', 'crateBreak', 'debris', 'burp', 'whistle', 'clap', 'uiClick', 'uiBack', 'lock', 'unlock', 'splash', 'crush', 'knife', 'servo', 'spark', 'wade', 'bird', 'insect', 'frog', 'hurt']);
+const SFX_OK = new Set<string>(['step', 'creak', 'secret', 'coin', 'heal', 'pickup', 'crateBreak', 'debris', 'burp', 'whistle', 'clap', 'uiClick', 'uiBack', 'lock', 'unlock', 'splash', 'crush', 'knife', 'servo', 'spark', 'wade', 'bird', 'bird2', 'insect', 'frog', 'hurt', 'slam', 'warning']);
 
 export class InteriorSession {
   readonly sim: InteriorSim;
@@ -53,7 +53,7 @@ export class InteriorSession {
   private hintClock = 0;
   private padHeld = { x: 0, y: 0 };
   private viewW: number; private viewH: number;
-  private pendingExit: { reason: ExitReason; alerted: boolean } | null = null;
+  private pendingExit: { reason: ExitReason; alerted: boolean; mood: 'happy' | 'angry' | 'neutral' } | null = null;
   private asked = false;
 
   constructor(init: SessionInit) {
@@ -120,6 +120,8 @@ export class InteriorSession {
     const f = r.pickFurniture(e.x, e.y);
     if (f) { this.openMenu(f); return; }
     const npc = this.pickNpc(e.x, e.y);
+    const nf = npc ? this.sim.furnById.get('npc:' + npc.id) : undefined;
+    if (nf && this.sim.verbsFor(nf.id).length) { this.openMenu(nf); return; }
     if (npc) { this.sim.say(this.sim.line('npc:' + npc.id, this.sim.room.id === 'palafita' ? ['Melhor não cutucar.', 'Ele ronca em dó menor.'] : ['Ela está de olho!', 'Educação primeiro, Karimbo.']), 'karimbo', 2.2); return; }
     const c = r.cellAt(e.x, e.y);
     if (c && this.sim.walkTo(c)) this.scene.dest = c;
@@ -218,6 +220,8 @@ export class InteriorSession {
     }
     this.input(dt, ctl);
     this.sim.update(dt, { mx: this.moveX, my: this.moveY, sneak: this.sneak });
+    const resident = this.sim.npc('benedita');
+    if (resident) this.w.village.setInside(this.spot.x, !resident.away);
     this.afterSim(ctl);
     this.drainEvents();
   }
@@ -343,7 +347,7 @@ export class InteriorSession {
       case 'alert': audio.play('warning', 0.4); break;
       case 'hurt': break;
       case 'exit': {
-        this.pendingExit = { reason: e.reason, alerted: e.alerted };
+        this.pendingExit = { reason: e.reason, alerted: e.alerted, mood: sim.room.mood?.(sim) ?? 'neutral' };
         this.phase = 'out';
         ui.menu = null; ui.reader = null;
         sim.commit();
@@ -383,6 +387,7 @@ export class InteriorSession {
   /** Para a sessão e libera tudo. */
   dispose() {
     this.renderer.dispose();
+    this.w.village.setInside(this.spot.x, false);
     clearActorCache();
     this.phase = 'done';
   }

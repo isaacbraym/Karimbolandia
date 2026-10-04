@@ -170,7 +170,7 @@ export class InteriorFlow {
       p.body.vx = -p.facing * 190; p.body.vy = -150;
       w.audio('lock', 0.7, p.x);
     }
-    w.village.afterInterior(o.room, o.reason);
+    w.village.afterInterior(o.room, o.reason, spot.x, o.mood);
   }
 
   // ─────────────── desenho ───────────────

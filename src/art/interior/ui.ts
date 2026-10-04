@@ -253,7 +253,7 @@ function drawCaptions(g: CanvasRenderingContext2D, r: InteriorRenderer, ui: UiSt
     if (!c.lines) { c.lines = text2(g, c.text); c.w = Math.max(...c.lines.map((l) => g.measureText(l).width)) + 18; }
     let x: number, y: number;
     if (c.who === 'karimbo') { const p = r.toScreen(sim.px, sim.py, 78, [0, 0]); x = p[0]; y = p[1]; }
-    else { const n = sim.npc(c.who); if (!n) continue; const p = r.toScreen(n.gx, n.gy, 96, [0, 0]); x = p[0]; y = p[1]; }
+    else { const n = sim.npc(c.who); if (!n) continue; const p = r.toScreen(n.gx, n.gy, 88, [0, 0]); x = p[0]; y = p[1]; }
     const w = c.w!, h = c.lines.length * 13 + 9;
     const a = c.age < 0.15 ? c.age / 0.15 : c.ttl - c.age < 0.35 ? Math.max(0, (c.ttl - c.age) / 0.35) : 1;
     const cx = Math.max(w / 2 + 6, Math.min(lastW - w / 2 - 6, x));

@@ -11,7 +11,6 @@ import type { Npc } from '../../game/interior/types';
 import { heightOf } from './furniture';
 
 const K_SCALE = 0.62;
-const NPC_SCALE = 0.62;
 
 interface NpcArt { look: FigureLook; faces: Record<'calm' | 'talk' | 'fear' | 'joy', Sprite>; pose: FigurePose; scale: number }
 const npcArt = new Map<string, NpcArt>();
@@ -114,7 +113,7 @@ export function drawNpc(g: CanvasRenderingContext2D, sim: InteriorSim, n: Npc, x
     return;
   }
   const L = a.look, P = a.pose;
-  const sc = NPC_SCALE * s * (a.scale / 1.42) * 1.0;
+  const sc = s * 0.95 * (a.scale / 1.42);
   const talking = n.markT > 0 && n.mark === '!' || sim.talking === n.id;
   const lying = n.state === 'asleep' || n.state === 'stirring' || n.state === 'tripped';
   const sit = n.state === 'half';
@@ -142,18 +141,18 @@ export function drawNpc(g: CanvasRenderingContext2D, sim: InteriorSim, n: Npc, x
     g.translate(0, -2);
     P.hipDrop = 1; P.footFX = 3; P.footBX = -1; P.footFY = P.footBY = 0;
   }
-  const big = lying ? 1.65 : 1;
+  const big = lying ? 1 : 1;
   g.scale(n.facing * sc * big, sc * big);
   drawFigure(g, L, P);
   g.restore();
   // chapéu sobre o rosto do Cabo dormindo
   if (n.id === 'cabo' && n.state === 'asleep') {
     g.save();
-    g.translate(x + n.facing * 27 * s, y - 29 * s);
+    g.translate(x + n.facing * 26 * s, y - 28 * s);
     g.rotate(n.facing * 0.3);
     g.fillStyle = '#4a5a34'; g.strokeStyle = OUT; g.lineWidth = 1.2;
-    g.beginPath(); g.ellipse(0, 0, 14 * s, 6.5 * s, 0, 0, Math.PI * 2); g.fill(); g.stroke();
-    g.fillStyle = '#3a4828'; g.beginPath(); g.ellipse(-1 * s, -3 * s, 8 * s, 3.2 * s, 0, 0, Math.PI * 2); g.fill();
+    g.beginPath(); g.ellipse(0, 0, 12 * s, 5.6 * s, 0, 0, Math.PI * 2); g.fill(); g.stroke();
+    g.fillStyle = '#3a4828'; g.beginPath(); g.ellipse(-1 * s, -2.6 * s, 7 * s, 2.8 * s, 0, 0, Math.PI * 2); g.fill();
     g.restore();
   }
 }

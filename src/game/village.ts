@@ -19,6 +19,13 @@ const LINES: Record<string,string[]> = {
   carrier:['A praça fica logo adiante!','Levo frutas para a festa.','Abre caminho, está pesado!'],
 };
 
+/** falas da moradora da primeira casa depois da visita do Karimbo */
+const MOOD_LINES: Record<'happy'|'angry'|'neutral',string[]> = {
+  happy:['Foi o Karimbo que trouxe a panela de volta!','Panela de barro é herança. Obrigada, menino!','Vem comer feijão quando quiser!'],
+  angry:['Só volta com a minha panela!','Esse Karimbo quase me leva a casa inteira!','O filtro era da minha mãe... Meu Deus!'],
+  neutral:[],
+};
+
 export class Village {
   readonly residents: (ResidentPose & { home:number; baseY:number; speech:number; cooldown:number; spoke:boolean; line:number; quiet:number })[];
   readonly dance: {x:number;y:number}|null;
@@ -34,14 +41,32 @@ export class Village {
     this.residents = data.decos.filter(d=>ROLES[d.kind]).map((d,id)=>
       ({x:d.x,y:d.y,baseY:d.y,home:d.x,id,facing:1,walk:0,gesture:0,speech:0,cooldown:0,spoke:false,line:id,quiet:0,role:ROLES[d.kind],work:0}));
   }
-  /** Consequência de uma visita ao interior (fase 4: falas lá fora conforme o desfecho). */
-  afterInterior(_room: string, _reason: string) {}
+  /** a moradora da primeira casa está lá dentro (some do lado de fora) */
+  private inside = false;
+  private insideX = 0;
+  private mood: 'happy' | 'angry' | 'neutral' = 'neutral';
+  private moodX = 0;
+  setInside(doorX: number, on: boolean) { this.inside = on; this.insideX = doorX; }
+  /** a moradora que mora na casa cuja porta está em `doorX` */
+  private houseResident(doorX: number) {
+    let best: (typeof this.residents)[number] | undefined, bd = 320;
+    for (const r of this.residents) if (r.role === 'resident' && Math.abs(r.home - doorX) < bd) { bd = Math.abs(r.home - doorX); best = r; }
+    return best;
+  }
+  /** Consequência da visita: o que ela diz lá fora depende de como terminou (panela devolvida, expulsão...). */
+  afterInterior(room: string, _reason: string, doorX: number, mood: 'happy' | 'angry' | 'neutral') {
+    this.inside = false;
+    if (room !== 'benedita') return;
+    this.mood = mood; this.moodX = doorX;
+    const r = this.houseResident(doorX);
+    if (r) { r.spoke = false; r.quiet = 0; }
+  }
   reset(w?:World) {
     if(w&&this.ownsLock){
       if(!w.director.cine){w.player.lockInput=false;w.camera.focus=null;}
       w.player.clapping=false;
     }
-    this.active=false;this.ownsLock=false;this.sceneTime=0;
+    this.active=false;this.ownsLock=false;this.sceneTime=0;this.inside=false;this.mood='neutral';
     for (const r of this.residents) { r.x=r.home;r.y=r.baseY;r.walk=r.gesture=r.speech=r.cooldown=r.quiet=0;r.spoke=false; }
   }
   canJoin(w:World) {
@@ -76,7 +101,9 @@ export class Village {
     // palmas da roda (crianças + Karimbo quando entra): audíveis por cima da música da selva
     if(beat!==this.clapBeat&&tone&&d&&Math.abs(p.x-d.x)<700)w.audio(tone,this.active?1.1:.9,d.x);
     this.clapBeat=beat;
+    const host = this.inside ? this.houseResident(this.insideX) : undefined;
     for (const r of this.residents) {
+      if (r === host) { r.speech = 0; continue; }
       // fala uma vez por visita: só volta a falar (outra frase) depois que o Karimbo se afasta
       if (r.spoke&&Math.abs(w.player.x-r.x)>520&&w.time>=r.quiet)r.spoke=false;
       if (Math.abs(w.player.x-r.home)>1200) continue;
@@ -121,9 +148,11 @@ export class Village {
     }
     for (const r of this.residents) {
       if (!w.camera.visible(r.x,r.y,130)) continue;
+      if (this.inside && r === this.houseResident(this.insideX)) continue;
       if (!balloons) { drawResident(g,r,w.time,r.speech>0); continue; }
       if (r !== speaker) continue;
-      const lines=LINES[r.role??'resident']??LINES.resident;
+      const mooded=this.mood!=='neutral'&&r===this.houseResident(this.moodX);
+      const lines=mooded?MOOD_LINES[this.mood]:(LINES[r.role??'resident']??LINES.resident);
       const x=r.x,y=r.y-91;
       g.save(); g.font='10px sans-serif'; g.textAlign='center';
       const text=lines[r.line%lines.length], width=g.measureText(text).width+16;
