@@ -4,6 +4,7 @@ import type { World } from './world';
 import { PK } from './fx';
 import { glowSprite } from '../art/kit';
 import type { Enemy } from './enemies/enemy';
+import type { Prop } from './props';
 import { circleEntry } from './interception';
 import { drawInterceptableGrenade } from '../art/hazards';
 import type { WeaponId } from './weapons';
@@ -118,9 +119,7 @@ export class Bullet {
     this.py = this.y;
     this.x += this.vx * dt;
     this.y += this.vy * dt;
-    // Primeiro alvo no caminho: colisões posteriores não podem esconder uma interceptação.
-    const interception = this.team === 0 && !this.explode ? this.firstInterception(w) : null;
-    if (interception) { this.x = interception.x; this.y = interception.y; }
+    this.resolveContacts(w);
 
     // trilha de partículas leve
     if (this.kind === 'rocket' || this.kind === 'missile') {
@@ -130,94 +129,86 @@ export class Bullet {
       if (w.fx.opt()) w.fx.add(PK.Fire, this.x, this.y, 0, 0, 0.16, 6, '#2ad0ff', { size1: 1 });
     }
 
-    // colisão com o cenário (segmento)
-    const t = w.level.rayHit(this.px, this.py, this.x, this.y);
-    if (t >= 0) {
-      const hx = this.px + (this.x - this.px) * t;
-      const hy = this.py + (this.y - this.py) * t;
-      if (this.wallBounce) {
-        this.x = this.px;
-        this.y = this.py;
-        this.vx *= -1;
-        this.life -= 0.15;
-        return;
-      }
-      this.x = hx;
-      this.y = hy;
-      this.impactWorld(w);
-      return;
-    }
-
-    // props (destrutíveis e sólidos)
-    const minX = Math.min(this.px, this.x) - this.r;
-    const maxX = Math.max(this.px, this.x) + this.r;
-    const minY = Math.min(this.py, this.y) - this.r;
-    const maxY = Math.max(this.py, this.y) + this.r;
-    for (const p of w.props) {
-      if (!p.alive || !p.hittable) continue;
-      if (p.x + p.w / 2 < minX || p.x - p.w / 2 > maxX || p.y + p.h / 2 < minY || p.y - p.h / 2 > maxY) continue;
-      if (segHitsRect(this.px, this.py, this.x, this.y, this.r, p.x - p.w / 2, p.y - p.h / 2, p.w, p.h)) {
-        if (this.team === 0 && (this.dmgProps > 0 || this.explode)) {
-          p.hurt(w, this.dmgProps, 'bullet', Math.sign(this.vx));
-          w.fx.sparks(this.x, this.y, 4, '#ffd27a', 160, -this.vx, -this.vy, 1.4);
-          if (this.explode) {
-            this.impactWorld(w);
-            return;
-          }
-          if (this.pierce > 0 && p.kind !== 'wall' && !p.solid) {
-            this.pierce--;
-            continue;
-          }
-          this.finish(w, false);
-          return;
-        }
-        if (p.solid && p.kind !== 'sign' && this.team === 1) {
-          w.fx.sparks(this.x, this.y, 3, '#ffd27a', 140, -this.vx, -this.vy, 1.4);
-          this.dead = true;
-          return;
-        }
-      }
-    }
-
-    if (this.team === 0) {
-      // contra inimigos
-      for (const e of w.enemies) {
-        if (!e.alive || !e.canBeHit) continue;
-        if (this.hitList && this.hitList.includes(e)) continue;
-        if (e.x + e.stats.w < minX || e.x - e.stats.w > maxX || e.y + e.stats.h < minY || e.y - e.stats.h > maxY) continue;
-        const hb = e.hitbox;
-        if (segHitsRect(this.px, this.py, this.x, this.y, this.r, hb.x, hb.y, hb.w, hb.h)) {
-          this.hitEnemy(w, e);
-          if (this.dead) return;
-        }
-      }
-    } else {
-      w.player.tryHitByBullet(w, this);
-    }
-    if (interception && !this.dead) {
-      const target = interception.target;
-      target.dead = true;
-      w.interceptableBullets.delete(target);
-      w.audio('hitMetal', .65, target.x);
-      w.fx.sparks(target.x, target.y, 7, '#ffe19e', 130);
-      w.fx.popup(target.x, target.y - 15, 'INTERCEPTADA!', '#ffe19e', 9);
-      // Até munição perfurante é consumida ao neutralizar a granada.
-      this.dead = true;
-      return;
-    }
     // fora do mundo
     if (this.y > w.level.pxH + 200 || this.x < -100 || this.x > w.level.pxW + 100) this.dead = true;
   }
 
-  private firstInterception(w: World): { target: Bullet; x: number; y: number } | null {
-    // Registro pequeno só de granadas: tiros comuns não percorrem todos os projéteis do mundo.
-    let target: Bullet | null = null, first = Infinity;
-    for (const b of w.interceptableBullets) {
-      if (b.dead) continue;
-      const t = circleEntry(this.px, this.py, this.x, this.y, b.x, b.y, this.r + b.r);
-      if (t !== null && t < first) { target = b; first = t; }
+  /** Resolve the earliest contact across categories, without sorting world arrays.
+   * Only a piercing hit needs another scan; its existing hitList prevents repeats.
+   */
+  private resolveContacts(w: World) {
+    const endX = this.x, endY = this.y, dx = endX - this.px, dy = endY - this.py;
+    const tile = w.level.rayHit(this.px, this.py, endX, endY);
+    const minX = Math.min(this.px, endX) - this.r, maxX = Math.max(this.px, endX) + this.r;
+    const minY = Math.min(this.py, endY) - this.r, maxY = Math.max(this.py, endY) + this.r;
+    if (this.pierce > 0 && !this.hitList) this.hitList = [];
+    while (true) {
+      let first = tile >= 0 ? tile : Infinity;
+      let prop: Prop | null = null, enemy: Enemy | null = null, grenade: Bullet | null = null, player = false;
+      for (const p of w.props) {
+        if (!p.alive || !p.hittable || this.hitList?.includes(p)) continue;
+        if (this.team === 0 ? !(this.dmgProps > 0 || this.explode) : !p.solid || p.kind === 'sign') continue;
+        if (p.x + p.w / 2 < minX || p.x - p.w / 2 > maxX || p.y + p.h / 2 < minY || p.y - p.h / 2 > maxY) continue;
+        const t = segmentRectEntry(this.px, this.py, endX, endY, p.x - p.w / 2, p.y - p.h / 2, p.w, p.h, this.r);
+        if (t !== null && t < first) { first = t;prop = p; }
+      }
+      if (this.team === 0) {
+        for (const e of w.enemies) {
+          if (!e.alive || !e.canBeHit || this.hitList?.includes(e)) continue;
+          if (e.x + e.stats.w < minX || e.x - e.stats.w > maxX || e.y + e.stats.h < minY || e.y - e.stats.h > maxY) continue;
+          const hb = e.hitbox, t = segmentRectEntry(this.px, this.py, endX, endY, hb.x, hb.y, hb.w, hb.h, this.r);
+          if (t !== null && t < first) { first = t;enemy = e;prop = null; }
+        }
+        // Small registry of explicitly interceptable grenades, not all bullets.
+        if (!this.explode) for (const b of w.interceptableBullets) {
+          if (b.dead) continue;
+          const t = circleEntry(this.px, this.py, endX, endY, b.x, b.y, this.r + b.r);
+          if (t !== null && t < first) { first = t;grenade = b;enemy = null;prop = null; }
+        }
+      } else if (w.player.targetable && !w.village?.active && (w.player.invuln <= 0 || w.player.isDashing)) {
+        const hb = w.player.hitbox, t = segmentRectEntry(this.px, this.py, endX, endY, hb.x, hb.y, hb.w, hb.h, this.r);
+        if (t !== null && t < first) { first = t;player = true;prop = null; }
+      }
+      if (first === Infinity) { this.x = endX;this.y = endY;return; }
+      const x = this.px + dx * first, y = this.py + dy * first;
+      if (player) {
+        // Let the player's existing dash / i-frame handling use the full segment.
+        this.x = endX;this.y = endY;w.player.tryHitByBullet(w, this);
+        if (this.dead) { this.x = x;this.y = y; }
+        return;
+      }
+      this.x = x;this.y = y;
+      if (grenade) {
+        grenade.dead = true;w.interceptableBullets.delete(grenade);
+        w.audio('hitMetal', .65, grenade.x);
+        w.fx.sparks(grenade.x, grenade.y, 7, '#ffe19e', 130);
+        w.fx.popup(grenade.x, grenade.y - 15, 'INTERCEPTADA!', '#ffe19e', 9);
+        this.dead = true;return; // Even a piercing round is consumed.
+      }
+      if (enemy) {
+        this.hitEnemy(w, enemy);
+        if (this.dead) return;
+        continue;
+      }
+      if (prop) {
+        if (this.team === 1) {
+          w.fx.sparks(x, y, 3, '#ffd27a', 140, -this.vx, -this.vy, 1.4);
+          this.dead = true;return;
+        }
+        prop.hurt(w, this.dmgProps, 'bullet', Math.sign(this.vx));
+        w.fx.sparks(x, y, 4, '#ffd27a', 160, -this.vx, -this.vy, 1.4);
+        if (this.explode) { this.impactWorld(w);return; }
+        if (this.pierce > 0 && prop.kind !== 'wall' && !prop.solid) {
+          this.hitList!.push(prop);this.pierce--;continue;
+        }
+        this.finish(w, false);return;
+      }
+      // Terrain wins exact ties with targets embedded in a wall.
+      if (this.wallBounce) {
+        this.x = this.px;this.y = this.py;this.vx *= -1;this.life -= .15;
+      } else this.impactWorld(w);
+      return;
     }
-    return target ? { target, x: this.px + (this.x - this.px) * first, y: this.py + (this.y - this.py) * first } : null;
   }
 
   private hitEnemy(w: World, e: Enemy) {
