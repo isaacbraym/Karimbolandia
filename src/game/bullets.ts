@@ -400,49 +400,73 @@ export class Grenade {
     this.vy += 900 * dt;
     this.rot += this.vx * dt * 0.06;
     const L = w.level;
-    const r = 4;
-    const ox = this.x;
-    const oy = this.y;
-    // Colisão por eixo com ricochete, contra tiles E coberturas/objetos sólidos (antes os objetos eram
-    // testados depois do movimento e a granada era empurrada para dentro deles, ficando presa).
-    const nx = this.x + this.vx * dt;
-    if (L.solidAtPx(nx + Math.sign(this.vx) * r, this.y) || this.blocked(w, nx, this.y, r)) {
-      this.vx *= -0.55;
-      this.bounce(w);
-    } else this.x = nx;
-    const ny = this.y + this.vy * dt;
-    if (L.solidAtPx(this.x, ny + Math.sign(this.vy) * r) || this.blocked(w, this.x, ny, r)) {
+    if (w.solidsDirty) w.rebuildSolids();
+    this.escape(w, 4);
+    // Passos curtos acompanham o relevo; o limite também protege contra dt anormal.
+    // Objetos e inimigos usam varredura contínua mesmo no passo limitado.
+    const steps = Math.max(1, Math.min(64, Math.ceil(Math.max(Math.abs(this.vx), Math.abs(this.vy)) * dt / 4)));
+    const step = dt / steps;
+    for (let i = 0; i < steps; i++) {
+      const ax = this.x, ay = this.y;
+      this.moveAxis(w, this.vx * step, false);
+      this.moveAxis(w, this.vy * step, true);
+      if (this.team === 0) {
+        let first = Infinity;
+        const minX = Math.min(ax, this.x) - 4, maxX = Math.max(ax, this.x) + 4;
+        const minY = Math.min(ay, this.y) - 4, maxY = Math.max(ay, this.y) + 4;
+        for (const e of w.enemies) {
+          if (!e.alive || !e.canBeHit) continue;
+          if (e.x + e.stats.w < minX || e.x - e.stats.w > maxX || e.y + e.stats.h < minY || e.y - e.stats.h > maxY) continue;
+          const hb = e.hitbox;
+          const t = segmentRectEntry(ax, ay, this.x, this.y, hb.x, hb.y, hb.w, hb.h, 4);
+          if (t !== null && t < first) first = t;
+        }
+        if (first !== Infinity) {
+          this.x = ax + (this.x - ax) * first;
+          this.y = ay + (this.y - ay) * first;
+          this.detonate(w);
+          return;
+        }
+      }
+      if (this.y > L.pxH + 200) { this.dead = true; return; }
+    }
+    if (this.fuse <= 0) { this.detonate(w); return; }
+    if (w.fx.opt() && Math.random() < 0.35) w.fx.add(PK.Spark, this.x, this.y, rand.spread(20), rand.spread(20) - 20, 0.2, 5, '#ffb347', { size1: 1, front: true });
+  }
+
+  private moveAxis(w: World, delta: number, vertical: boolean) {
+    if (delta === 0) return;
+    const origin = vertical ? this.y : this.x;
+    const across = vertical ? this.x : this.y;
+    let dest = origin + delta, first = Infinity, collision = 0;
+    for (const p of w.solidRects) {
+      const low = (vertical ? p.y : p.x) - 4;
+      const high = (vertical ? p.y + p.h : p.x + p.w) + 4;
+      const acrossLow = (vertical ? p.x : p.y) - 4;
+      const acrossHigh = (vertical ? p.x + p.w : p.y + p.h) + 4;
+      if (across < acrossLow || across > acrossHigh) continue;
+      // Uma face tocada ao se afastar não deve prender a granada.
+      if (delta > 0 ? origin >= high || origin + delta < low : origin <= low || origin + delta > high) continue;
+      const t = Math.max(0, ((delta > 0 ? low : high) - origin) / delta);
+      if (t >= first) continue;
+      first = t;
+      dest = delta > 0 ? low - 0.01 : high + 0.01;
+      collision = 1;
+    }
+    if (w.level.solidAtPx(vertical ? this.x : dest + Math.sign(delta) * 4, vertical ? dest + Math.sign(delta) * 4 : this.y)) {
+      dest = origin;
+      collision = 2;
+    }
+    if (vertical) this.y = dest; else this.x = dest;
+    if (!collision) return;
+    if (vertical) {
       if (this.vy > 0) {
         this.vy *= -0.5;
         this.vx *= 0.8;
         if (Math.abs(this.vy) < 40) this.vy = 0;
       } else this.vy *= -0.4;
-      this.bounce(w);
-    } else this.y = ny;
-    // nasceu/foi empurrada para dentro de um objeto: sai pelo lado mais próximo
-    this.escape(w, r);
-    // contato com inimigos ao longo do percurso: explode uma única vez
-    if (this.team === 0) {
-      for (const e of w.enemies) {
-        if (!e.alive || !e.canBeHit) continue;
-        const hb = e.hitbox;
-        if (segHitsRect(ox, oy, this.x, this.y, r, hb.x, hb.y, hb.w, hb.h)) {
-          this.detonate(w);
-          return;
-        }
-      }
-    }
-    if (this.fuse <= 0) {
-      this.detonate(w);
-      return;
-    }
-    if (this.y > L.pxH + 200) this.dead = true;
-    if (w.fx.opt() && Math.random() < 0.35) w.fx.add(PK.Spark, this.x, this.y, rand.spread(20), rand.spread(20) - 20, 0.2, 5, '#ffb347', { size1: 1, front: true });
-  }
-
-  private blocked(w: World, x: number, y: number, r: number) {
-    for (const s of w.solidRects) if (x + r > s.x && x - r < s.x + s.w && y + r > s.y && y - r < s.y + s.h) return true;
-    return false;
+    } else this.vx *= -0.55;
+    this.bounce(w);
   }
 
   private escape(w: World, r: number) {
@@ -476,13 +500,14 @@ export class Grenade {
 
   detonate(w: World) {
     if (this.dead) return;
+    // Consome antes dos callbacks: explosões em cadeia não podem repetir o dano.
     this.dead = true;
     w.explode(this.x, this.y, this.radius, this.dmg, this.team, { kb: 380, fromNomad: this.fromNomad, big: true });
     if (this.team === 0) w.fx.grenadeBlast(this.x, this.y, this.radius);
-    this.dead = true;
   }
 
   draw(g: CanvasRenderingContext2D) {
+    if (this.dead) return;
     g.save();
     g.translate(this.x, this.y);
     g.rotate(this.rot);
