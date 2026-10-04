@@ -1,6 +1,7 @@
 import type { SaveState } from '../game/save';
 import { WEAPON_ORDER } from '../game/weapons';
 import { isDifficulty } from './difficulty';
+import { MAX_ROOM_ENTRIES, REP_MAX, REP_MIN } from '../game/interiorStore';
 
 export const record = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
 export const number = (v: unknown, min = 0, max = 1e12) => typeof v === 'number' && Number.isFinite(v) && v >= min && v <= max;
@@ -17,6 +18,16 @@ export function validateSave(v: unknown): SaveState | null {
   for (const k of ['emblems', 'secrets', 'killed', 'collected', 'destroyed']) if (!ids(v[k])) return null;
   if (!Array.isArray(v.secretRooms) || v.secretRooms.length > 1000 || !v.secretRooms.every(x => typeof x === 'string' && x.length <= 100)) return null;
   if (v.encounters !== undefined && (!Array.isArray(v.encounters) || v.encounters.length > 64 || !v.encounters.every(x => typeof x === 'string' && /^[a-z0-9:-]{1,80}$/.test(x)))) return null;
+  if (v.interiors !== undefined) {
+    if (!Array.isArray(v.interiors) || v.interiors.length > MAX_ROOM_ENTRIES) return null;
+    const rooms = new Set<string>();
+    for (const pair of v.interiors) {
+      if (!Array.isArray(pair) || pair.length !== 2 || typeof pair[0] !== 'string' || !/^[a-z0-9:-]{1,40}$/.test(pair[0])
+        || rooms.has(pair[0]) || !integer(pair[1], 0, 2 ** 31 - 1)) return null;
+      rooms.add(pair[0]);
+    }
+  }
+  if (v.villageRep !== undefined && !integer(v.villageRep, REP_MIN, REP_MAX)) return null;
   for (const k of ['nomadUsed', 'nomadLost', 'bossLivesGiven']) if (typeof v[k] !== 'boolean') return null;
   if (!Array.isArray(v.weapons) || v.weapons.length > WEAPON_ORDER.length) return null;
   const seen = new Set<string>();
@@ -42,6 +53,8 @@ export function validateSave(v: unknown): SaveState | null {
     time: s.time, score: s.score, tokens: s.tokens, lives: s.lives, bestCombo: s.bestCombo,
     emblems: [...s.emblems], secrets: [...s.secrets], secretRooms: [...s.secretRooms],
     encounters: [...new Set(s.encounters ?? [])],
+    ...(s.interiors !== undefined ? { interiors: s.interiors.map(([id, m]): [string, number] => [id, m]) } : {}),
+    ...(s.villageRep !== undefined ? { villageRep: s.villageRep } : {}),
     killed: [...s.killed], collected: [...s.collected], destroyed: [...s.destroyed],
     nomadUsed: s.nomadUsed, nomadLost: s.nomadLost, bossLivesGiven: s.bossLivesGiven,
     weapons: s.weapons.map(([id, n]) => [id, n]), cur: s.cur, grenades: s.grenades, nomad: s.nomad,

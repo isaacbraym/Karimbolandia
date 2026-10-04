@@ -84,6 +84,8 @@ export class Input {
   // A press/release can fit entirely between two rendered frames, especially after pacing.
   private keyTaps=new Set<string>();
   private prevRaw: Record<ActionName, boolean> = { jump: false, fire: false, grenade: false, special: false, next: false, prev: false, pause: false, reload:false, interact:false };
+  /** false nos interiores: o mouse vira só ponteiro (não dispara tiro/granada) */
+  mouseActions = true;
   private mouseDown = false;
   private mouseRight = false;
   private mouseTap=false;
@@ -244,8 +246,8 @@ export class Input {
     if (this.k('KeyW', 'ArrowUp')) my -= 1;
     if (this.k('KeyS', 'ArrowDown')) my += 1;
     raw.jump = this.k('Space', 'KeyK', 'KeyZ');
-    raw.fire = this.k('KeyJ', 'KeyX') || this.mouseDown||this.mouseTap;
-    raw.grenade = this.k('KeyG', 'KeyL', 'KeyC') || this.mouseRight||this.mouseRightTap;
+    raw.fire = this.k('KeyJ', 'KeyX') || (this.mouseActions && (this.mouseDown||this.mouseTap));
+    raw.grenade = this.k('KeyG', 'KeyL', 'KeyC') || (this.mouseActions && (this.mouseRight||this.mouseRightTap));
     raw.special = this.k('ShiftLeft', 'ShiftRight', 'KeyV', 'KeyI');
     raw.next = this.k('KeyE') || this.wheelNext;
     raw.prev = this.k('KeyQ') || this.wheelPrev;

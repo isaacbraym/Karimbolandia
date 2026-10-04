@@ -35,6 +35,7 @@ import { preserveProfile } from '../core/profile';
 import type { WeaponId } from './weapons';
 import { FramePacer } from '../core/framePacing';
 import { backingSize, resizeBacking, targetRenderHeight } from '../core/renderBudget';
+import { InteriorFlow } from './interiorFlow';
 
 type State = 'loading' | 'menu' | 'playing' | 'paused' | 'complete' | 'continue' | 'gameover' | 'comic';
 
@@ -50,6 +51,9 @@ const CAPS: Record<Quality, { parts: number; density: number }> = {
 
 export class Game {
   private investigation: Investigation | null = null;
+  /** entrada/saída dos interiores jogáveis (o módulo pesado só carrega por import()) */
+  private flow!: InteriorFlow;
+  private flowPrefetchT = 0;
   private pendingWeapons: WeaponId[] = [];
   canvas: HTMLCanvasElement;
   g: CanvasRenderingContext2D;
@@ -129,6 +133,12 @@ export class Game {
     const app = document.getElementById('app') as HTMLElement;
     this.input.attach(app);
     this.touch = new TouchUI(this.ui, this.input);
+    this.flow = new InteriorFlow({
+      canvas: this.canvas, input: this.input, quality: () => this.quality, view: () => ({ W: this.viewW, H: this.viewH }),
+      touchMode: (on) => this.touch.setInterior(on),
+      saved: () => { const w = this.world; if (w) { w.checkpointSnap = w.player.snapshot(); this.saveGame(); } },
+      banner: (t, sub, d) => this.world?.hooks.onBanner?.(t, sub, d),
+    });
     this.menus = new Menus(this.ui, {
       onSelectStage: (stage, save) => {
         if (!save) this.startNewGame(stage);
@@ -408,6 +418,7 @@ export class Game {
     else this.play(true, stage);
   }
   profileChanged() {
+    this.flow.reset(this.world ?? undefined);
     this.world = null;
     this.menus.closeResume();
     this.toMenu();
@@ -457,6 +468,7 @@ export class Game {
     this.menus.fade(false);
     this.stopIntroAudio();
     this.stopNarr(0.2);
+    this.flow.reset(this.world ?? undefined);
     if (!this.world || again || save || this.state === 'complete' || this.world.data.stage !== stage) {
       // o nível vale para a partida inteira: save continua no nível em que foi gravado
       setDifficulty(save?.difficulty ?? (save ? 'normal' : settings.difficulty));
@@ -594,6 +606,7 @@ export class Game {
   restartLevel() {
     if (!this.world) return;
     this.investigation?.destroy();this.investigation=null;
+    this.flow.reset(this.world);
     this.stopIntroAudio();
     this.menus.hidePause();
     this.menus.hideAll();
@@ -614,6 +627,7 @@ export class Game {
 
   toMenu(first = false) {
     this.investigation?.destroy();this.investigation=null;
+    this.flow.reset(this.world ?? undefined);
     this.pendingWeapons = [];
     this.cancelStageStart();
     if (this.state === 'playing' || this.state === 'paused') this.saveGame();
@@ -957,8 +971,15 @@ export class Game {
   }
 
   private step(w: World, dt: number) {
+    if (this.flow.active) { this.flow.step(w, dt, this.input.state); return; }
+    this.flowPrefetchT -= dt;
+    if (this.flowPrefetchT <= 0) { this.flowPrefetchT = 0.4; this.flow.prefetch(w.exploration.nearInterior(w)); }
     const spot=w.exploration.nearest(w);
     if(this.input.state.interact.pressed&&spot&&w.exploration.safe(w,spot)) {
+      if (spot.interior) {
+        this.input.clearEdges(); this.input.suppressHeldActions();
+        if (this.flow.tryEnter(w, spot)) return;
+      }
       this.openInvestigation(w,spot);return;
     }
     if(this.input.state.interact.pressed&&w.merchant.near(w)) {
@@ -1068,6 +1089,7 @@ export class Game {
   private weaponIcons = new Map<string, string>();
   private lastHp = -1;
   private updateTouchState(w: World) {
+    if (this.flow.active) return;
     const p = w.player;
     const m = p.mounted;
     if (m !== this.lastMounted) {
@@ -1172,6 +1194,7 @@ export class Game {
       return;
     }
     if (!w) return;
+    if (this.flow.drawsInterior && this.flow.draw(g, W, H)) return;
     const cam = w.camera;
     const bg = stageBg();
     // fundo (espaço de tela). No celular ('média'/'baixa') o fundo distante — que já é suave — é
@@ -1220,7 +1243,9 @@ export class Game {
       g.fillRect(0, 0, W, H);
       g.globalAlpha = 1;
     }
-    if (this.state === 'comic' && this.comic) this.comic.draw(g, W, H);
+    this.flow.postWorld(g, this.canvas, W, H, w);
+    if (this.flow.active) { /* o mundo congela: sem HUD durante a íris */ }
+    else if (this.state === 'comic' && this.comic) this.comic.draw(g, W, H);
     else if (w.director.longIntroActive()) this.intro.draw(g, W, H, w.director.introTime(), w.director.introLandT());
     else if (w.director.openingActive()) this.opening.draw(g, W, H, w.director.openingTime());
     else this.hud.draw(g, w, W, H);

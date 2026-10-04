@@ -44,6 +44,9 @@ export class TouchUI {
       <button class="tbtn t-pause" data-act="pause" aria-label="Pausar">${ICONS.pause}</button>
       <button class="tbtn t-reload" data-act="reload" aria-label="Recarregar arma">↻</button>
       <button class="tbtn t-merchant hidden" data-act="interact" aria-label="Conversar com o mercador">OFICINA</button>
+      <button class="tbtn ibtn t-isneak" data-act="special" aria-label="Andar na ponta dos pés (segurar)">PONTA</button>
+      <button class="tbtn ibtn t-ileave" data-act="grenade" aria-label="Sair pela porta">SAIR</button>
+      <button class="tbtn ibtn t-ilist" data-act="reload" aria-label="Lista de travessuras">LISTA</button>
     `;
     parent.appendChild(this.root);
     this.stickZone = this.root.querySelector('.stick-zone') as HTMLElement;
@@ -51,6 +54,7 @@ export class TouchUI {
     this.knob = this.root.querySelector('.stick-knob') as HTMLElement;
     this.ghost = this.root.querySelector('.stick-ghost') as HTMLElement;
     this.root.querySelectorAll<HTMLElement>('.tbtn').forEach((el) => {
+      if (el.classList.contains('ibtn')) { this.bindButton(el, el.dataset.act as ActionName); return; }
       this.buttons.set(el.dataset.act as ActionName, el);
       if (el.dataset.act === 'fire') this.bindFireStick(el);
       else this.bindButton(el, el.dataset.act as ActionName);
@@ -75,6 +79,12 @@ export class TouchUI {
     this.enabled = v;
     this.root.classList.toggle('hidden', !v);
     if (!v) this.releaseAll();
+  }
+
+  /** Interior isométrico: some o joystick/tiro e aparecem PONTA, SAIR e LISTA. */
+  setInterior(on: boolean) {
+    this.root.classList.toggle('interior', on);
+    this.releaseAll();
   }
 
   /** O botão ESPECIAL só aparece quando o Nômad é pilotado. */

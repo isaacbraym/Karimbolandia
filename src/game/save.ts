@@ -26,6 +26,10 @@ export interface SaveState {
   secrets: number[];
   secretRooms: string[];
   encounters?: string[];
+  /** interiores jogáveis: [id do cômodo, bitmask de flags]; ausente em saves antigos */
+  interiors?: [string, number][];
+  /** reputação na aldeia (−100..100); ausente em saves antigos */
+  villageRep?: number;
   killed: number[];
   collected: number[];
   destroyed: number[];
@@ -76,6 +80,7 @@ export function captureSave(w: World): SaveState {
     secrets: [...w.secrets],
     secretRooms: [...w.secretRooms],
     encounters: [...w.encounters.completed],
+    ...(w.interiors.toSave().length || w.interiors.rep ? { interiors: w.interiors.toSave(), villageRep: w.interiors.rep } : {}),
     killed: [...w.killedEnemies],
     collected: [...w.collectedPickups],
     destroyed: [...w.destroyedProps],
@@ -123,6 +128,7 @@ export function applySave(w: World, s: SaveState) {
   for (const e of s.secrets) w.secrets.add(e);
   for (const e of s.secretRooms) w.secretRooms.add(e);
   for (const e of s.encounters ?? []) w.encounters.completed.add(e);
+  w.interiors.load(s.interiors, s.villageRep);
   for (const e of s.killed) w.killedEnemies.add(e);
   for (const e of s.collected) w.collectedPickups.add(e);
   for (const e of s.destroyed) w.destroyedProps.add(e);

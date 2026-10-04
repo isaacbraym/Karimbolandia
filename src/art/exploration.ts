@@ -6,7 +6,14 @@ export function drawExploration(g:CanvasRenderingContext2D,w:World) {
   for(const s of w.exploration.spots) {
     if(s.x<w.blockX||!w.camera.visible(s.x,s.y-65,160))continue;
     g.save();g.translate(s.x,s.y);
-    if(s.cabin) {
+    if(s.home) {
+      // Casa de morador: porta entreaberta com luz quente, capacho e lampião no batente.
+      g.fillStyle='#2a1c14e8';g.beginPath();g.roundRect(-17,-66,34,64,4);g.fill();
+      g.fillStyle='#ffd88a55';g.beginPath();g.moveTo(-14,-4);g.lineTo(14,-4);g.lineTo(26,6);g.lineTo(-26,6);g.fill();
+      g.fillStyle='#a8483a';g.beginPath();g.roundRect(-20,3,40,7,2);g.fill();
+      g.strokeStyle='#e9d29a';g.lineWidth=1;g.beginPath();g.moveTo(-14,6);g.lineTo(14,6);g.stroke();
+      g.fillStyle='#ffe29a';g.beginPath();g.arc(22,-58,3,0,Math.PI*2);g.fill();
+    } else if(s.cabin) {
       // Porta sombreada, puxador, trilha de botas, varal e placa ironicamente oficial.
       g.fillStyle='#191f1be0';g.beginPath();g.roundRect(-18,-77,36,75,4);g.fill();
       g.strokeStyle='#b88d59';g.lineWidth=3;g.stroke();g.fillStyle='#e7c586';g.beginPath();g.arc(9,-38,2.5,0,Math.PI*2);g.fill();
@@ -30,7 +37,7 @@ export function drawExploration(g:CanvasRenderingContext2D,w:World) {
       }
     }
     if(near===s) {
-      const safe=w.exploration.safe(w,s),label=safe?(s.cabin?'F · ENTRAR':'F · INVESTIGAR'):'ÁREA SOB AMEAÇA';
+      const safe=w.exploration.safe(w,s),locked=w.exploration.locked(w,s),label=safe?(s.cabin?'F · ENTRAR':'F · INVESTIGAR'):locked?'PORTA TRANCADA':'ÁREA SOB AMEAÇA';
       g.font='bold 10px sans-serif';g.textAlign='center';const width=g.measureText(label).width+24;
       g.fillStyle='#1b302de8';g.strokeStyle=safe?'#e5c37f':'#de8e6a';g.lineWidth=1;
       g.beginPath();g.roundRect(-width/2,-125,width,25,6);g.fill();g.stroke();g.fillStyle='#fff0ce';g.fillText(label,0,-109);

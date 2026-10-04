@@ -41,6 +41,10 @@ export interface FurnitureDef {
   height?: number;
   /** célula onde Karimbo deve ficar para usar (padrão: vizinha livre mais próxima) */
   stand?: Cell;
+  /** item de parede (retrato, janela, espelho): desenhado na parede, sem pegada sólida */
+  wall?: { side: 'left' | 'right'; z: number; w: number; h: number };
+  /** chave do aspecto atual (aberto, quebrado, comido...): o desenho assado é refeito quando muda */
+  look?(s: InteriorSim, f: FurnitureDef): string;
   verbs(s: InteriorSim, f: FurnitureDef): VerbDef[];
 }
 
@@ -109,6 +113,8 @@ export type FxKind = 'crash' | 'crumbs' | 'feathers' | 'dust' | 'splash' | 'spar
 export type InteriorEvent =
   | { type: 'say'; who: string; text: string; ttl: number }
   | { type: 'ring'; gx: number; gy: number; power: number }
+  | { type: 'pop'; text: string; gx: number; gy: number; color: string }
+  | { type: 'read'; title: string; text: string }
   | { type: 'fx'; kind: FxKind; gx: number; gy: number; n?: number }
   | { type: 'sfx'; name: string; vol?: number }
   | { type: 'shake'; mag: number; dur: number }
@@ -143,6 +149,8 @@ export interface RoomDef {
   onLeave?(s: InteriorSim, reason: ExitReason): void;
   /** zona "privada": a moradora fica mais desconfiada se Karimbo estiver aqui */
   isPrivate?(c: Cell): boolean;
+  /** luzes pontuais (lampião, fogão, janela): sprite radial somado ao quadro */
+  lights?: { gx: number; gy: number; z: number; r: number; color: string; flicker?: number }[];
 }
 
 /** Pedido de menu para a UI: já resolvido (ruído em ondas, testemunha, hostilidade). */

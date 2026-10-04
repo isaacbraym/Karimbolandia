@@ -43,6 +43,11 @@ export class InteriorSim {
   readonly npcs: Npc[] = [];
   readonly events: InteriorEvent[] = [];
   readonly traces: Trace[] = [];
+  /** anéis de ruído para o desenho (envelhecem em update) */
+  readonly rings: { gx: number; gy: number; power: number; age: number; life: number }[] = [];
+  /** NPC falando agora (boca animada) */
+  talking = '';
+  private talkT = 0;
   /** estado só desta visita (rádio ligado, cacos...) */
   readonly rt: Record<string, number> = {};
   px: number; py: number;
@@ -99,7 +104,12 @@ export class InteriorSim {
   emit(e: InteriorEvent) { this.events.push(e); }
   drain(): InteriorEvent[] { return this.events.splice(0, this.events.length); }
 
-  say(text: string, who = 'karimbo', ttl = 3.4) { this.emit({ type: 'say', who, text, ttl }); }
+  say(text: string, who = 'karimbo', ttl = 3.4) {
+    this.emit({ type: 'say', who, text, ttl });
+    if (who !== 'karimbo') { this.talking = who; this.talkT = Math.min(ttl, 2.4); }
+  }
+  /** Karimbo está levando a panela apreendida (para o desenho e para o bolso). */
+  get carrying() { return !!this.room.pocket?.(this).some((i) => i.id === 'panela'); }
   /** Escolhe uma fala que não repete a anterior da mesma chave. */
   line(key: string, lines: readonly string[]): string {
     if (lines.length === 1) return lines[0];
@@ -108,6 +118,10 @@ export class InteriorSim {
     this.lastLine.set(key, i);
     return lines[i];
   }
+  /** Onomatopeia em balão de quadrinho sobre o chão. */
+  pop(text: string, gx: number, gy: number, color = '#ffd24a') { this.emit({ type: 'pop', text, gx, gy, color }); }
+  /** Texto longo (lore): abre a folha de leitura em vez de um balão. */
+  read(title: string, text: string) { this.emit({ type: 'read', title, text }); }
   fx(kind: FxKind, gx: number, gy: number, n = 1) { this.emit({ type: 'fx', kind, gx, gy, n }); }
   sfx(name: string, vol = 1) { this.emit({ type: 'sfx', name, vol }); }
   shake(mag: number, dur: number) { this.emit({ type: 'shake', mag, dur }); }
@@ -139,7 +153,10 @@ export class InteriorSim {
   /** Evento de ruído: cada NPC ouve `power − 4·distância` (metade se há parede no meio). */
   noise(gx: number, gy: number, power: number) {
     if (power <= 0) return;
-    if (power >= 8) this.emit({ type: 'ring', gx, gy, power });
+    if (power >= 8) {
+      this.emit({ type: 'ring', gx, gy, power });
+      if (this.rings.length < 8) this.rings.push({ gx, gy, power, age: 0, life: 0.9 });
+    }
     const cx = Math.floor(gx), cy = Math.floor(gy);
     for (const n of this.npcs) {
       // quem está fora escuta pela porta (a casa tem "ouvido" na entrada)
@@ -360,6 +377,8 @@ export class InteriorSim {
       if (n.markT > 0) { n.markT -= dt; if (n.markT <= 0) n.mark = ''; }
       n.brain.update(this, n, dt);
     }
+    for (let i = this.rings.length - 1; i >= 0; i--) { this.rings[i].age += dt; if (this.rings[i].age >= this.rings[i].life) this.rings.splice(i, 1); }
+    if (this.talkT > 0) { this.talkT -= dt; if (this.talkT <= 0) this.talking = ''; }
     this.pranksTimer -= dt;
     if (this.pranksTimer <= 0) { this.pranksTimer = 0.2; this.checkPranks(); }
   }
@@ -382,7 +401,7 @@ export class InteriorSim {
       if (d && !this.pranksSeen.has(p.id)) {
         this.pranksSeen.add(p.id);
         this.emit({ type: 'prank', id: p.id, label: p.label });
-        this.sfx('prank', 0.7);
+        this.sfx('secret', 0.6);
       }
       if (p.bonus) { anyBonus = true; if (!d) bonus = false; } else if (!d) main = false;
     }

@@ -2,6 +2,7 @@ import type { LevelData } from './level';
 import type { World } from './world';
 import { WEAPONS, WEAPON_ORDER } from './weapons';
 import { segHitsRect } from './bullets';
+import type { RoomId } from './interiorStore';
 
 export interface Clue { id: string; title: string; text: string; }
 export interface InvestigationObject {
@@ -11,6 +12,19 @@ export interface InvestigationObject {
 export interface ExplorationSpot {
   id: string; x: number; y: number; title: string; subtitle: string; cabin: boolean;
   objects: InvestigationObject[]; clue?: Clue;
+  /** casa de morador (não é cabana mercenária) */
+  home?: boolean;
+  /** tem interior jogável em grade isométrica (em vez do modal de investigação) */
+  interior?: RoomId;
+}
+
+/**
+ * Centro da porta de uma `villageHome` em px de mundo. Espelha o desenho em art/village.ts
+ * (porta em x = −17 + 8·v + 15, com v = variação da semente) sem importar arte.
+ */
+export function villageHomeDoorX(d:{x:number;y:number;scale?:number;flip?:boolean}):number {
+  const seed=Math.floor(d.x*7.13+d.y*3.1),v=((Math.abs(seed)%8)*977+13)%3;
+  return d.x+(d.flip?-1:1)*(8*v-2)*(d.scale??1);
 }
 export const VILLAGE_LORE: Clue[] = [
   {id:'river',title:'01 · A aldeia de Entre-Raízes',text:'A enchente levou a estrada, mas deixou uma semente debaixo de cada casa. As famílias reconstruíram sobre as raízes. Aqui, ninguém vende o rio: a água atravessa o quintal de todos.'},
@@ -41,8 +55,15 @@ export class Exploration {
     this.spots=data.stage!==2?[]:data.decos.filter(d=>d.kind==='jHut').map((d,i)=>({
       id:`cabin:${Math.round(d.x/32)}`,x:d.x,y:d.y,cabin:true,
       title:['Palafita do vigia','Cabana do comando','Cabana da retaguarda'][i]??'Cabana mercenária',
+      ...(i===0?{interior:'palafita' as const}:{}),
       subtitle:['O brejo guarda mais que pegadas.','A burocracia chegou antes da paz.','Há uma ordem que ninguém quis cumprir.'][i%3],objects:cabinObjects(i),
     }));
+    const home=data.stage===2?data.decos.filter(d=>d.kind==='villageHome').sort((a,b)=>a.x-b.x)[0]:undefined;
+    if(home) {
+      const x=villageHomeDoorX(home);
+      this.spots.push({id:`house:${Math.round(x/32)}`,x,y:data.level.reliefSurface(x)??home.y,cabin:true,home:true,interior:'benedita',
+        title:'Casa da Dona Benedita',subtitle:'A porta está encostada. Alguém tece lá dentro... ou saiu para a roça.',objects:[]});
+    }
     if(data.stage===2) for(const [i,x] of [774,936,1024].entries()) {
       const y=data.level.reliefSurface(x*32)??1024;
       this.spots.push({id:`village:clue:${i}`,x:x*32,y,cabin:false,
@@ -58,8 +79,15 @@ export class Exploration {
       &&!w.solidRects.some(r=>segHitsRect(p.x,p.y,s.x,s.y-28,0,r.x,r.y,r.w,r.h)))
       .sort((a,b)=>Math.abs(a.x-p.x)-Math.abs(b.x-p.x))[0];
   }
+  /** Morador expulsou o Karimbo neste trecho: a porta só reabre no próximo checkpoint. */
+  locked(w:World,spot:ExplorationSpot) {return !!spot.interior&&w.interiorLock.get(spot.interior)===w.checkpointIdx;}
+  /** Há uma porta de interior perto o bastante para valer a pena pré-carregar o módulo. */
+  nearInterior(w:World,range=620):ExplorationSpot|undefined {
+    const p=w.player;
+    return this.spots.find(s=>s.interior&&Math.abs(s.x-p.x)<range&&Math.abs(s.y-p.feetY)<260);
+  }
   safe(w:World,spot:ExplorationSpot) {
-    return this.nearest(w)===spot&&!w.enemies.some(e=>e.alive&&Math.hypot(e.x-w.player.x,e.y-w.player.y)<360)
+    return this.nearest(w)===spot&&!this.locked(w,spot)&&!w.enemies.some(e=>e.alive&&Math.hypot(e.x-w.player.x,e.y-w.player.y)<360)
       &&!w.bullets.some(b=>!b.dead&&b.team!==0&&Math.hypot(b.x-w.player.x,b.y-w.player.y)<260)
       &&!w.grenades.some(g=>!g.dead&&Math.hypot(g.x-w.player.x,g.y-w.player.y)<260);
   }

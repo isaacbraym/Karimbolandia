@@ -854,6 +854,12 @@ kbd {
 .t-reload.reloading {opacity:1;color:#a9eadb;}
 .t-reload.reloading::after {content:'';position:absolute;inset:-4px;border-radius:50%;pointer-events:none;background:conic-gradient(#85e1d1 calc(var(--reload,0) * 360deg),rgba(255,255,255,.12) 0);-webkit-mask:radial-gradient(circle,transparent 60%,#000 63%);mask:radial-gradient(circle,transparent 60%,#000 63%);}
 .touch.mounted .t-reload {display:none;}
+.touch .ibtn { display: none; }
+.touch.interior > *:not(.ibtn):not(.t-pause) { display: none !important; }
+.touch.interior .ibtn { display: flex; }
+.t-isneak { right: calc(var(--sar) + 20px * var(--ts)); bottom: calc(var(--sab) + 26px * var(--ts)); width: calc(78px * var(--ts)); height: calc(78px * var(--ts)); font-size: calc(12px * var(--ts)); background: radial-gradient(circle at 35% 30%, rgba(255,255,255,calc(var(--to) * .4)), rgba(90,200,170,calc(var(--to) * .7)) 72%); }
+.t-ileave { right: calc(var(--sar) + 112px * var(--ts)); bottom: calc(var(--sab) + 18px * var(--ts)); width: calc(58px * var(--ts)); height: calc(58px * var(--ts)); font-size: calc(11px * var(--ts)); }
+.t-ilist { right: calc(var(--sar) + 62px); top: calc(var(--sat) + 8px); width: 46px; height: 38px; border-radius: 12px; font-size: 10px; }
 .t-merchant {left:50%;bottom:calc(var(--sab) + 8px);transform:translateX(-50%);width:102px;height:40px;border-radius:12px;font-size:12px;}
 .forge-shop {width:min(790px,96vw);padding:12px;display:flex;flex-direction:column;gap:7px;}
 .forge-shop h2,.forge-shop p {margin:0;}

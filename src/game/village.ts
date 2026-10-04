@@ -34,6 +34,8 @@ export class Village {
     this.residents = data.decos.filter(d=>ROLES[d.kind]).map((d,id)=>
       ({x:d.x,y:d.y,baseY:d.y,home:d.x,id,facing:1,walk:0,gesture:0,speech:0,cooldown:0,spoke:false,line:id,quiet:0,role:ROLES[d.kind],work:0}));
   }
+  /** Consequência de uma visita ao interior (fase 4: falas lá fora conforme o desfecho). */
+  afterInterior(_room: string, _reason: string) {}
   reset(w?:World) {
     if(w&&this.ownsLock){
       if(!w.director.cine){w.player.lockInput=false;w.camera.focus=null;}

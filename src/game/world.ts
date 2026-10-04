@@ -40,6 +40,7 @@ import { drawBlockade, COLLAPSE_SHAKE, COLLAPSE_FALL } from '../art/blockade';
 import { setDecoFocus } from '../art/jungleDecor';
 import { drawVines, drawRoomBack, drawRoomDark, drawDoorPrompt, drawDrums, drawBeams } from '../art/jungleWorld';
 import { ForestLight } from './forestLight';
+import { InteriorStore } from './interiorStore';
 import { drawForestLight } from '../art/forestLight';
 
 export interface Stats {
@@ -139,6 +140,10 @@ export class World {
   club!: ClubScene;
   exploration!: Exploration;
   encounters!: Encounters;
+  /** interiores jogáveis: flags por cômodo + reputação na aldeia (persistidos no save) */
+  readonly interiors = new InteriorStore();
+  /** portas trancadas por expulsão: cômodo → checkpoint em que aconteceu (abre no seguinte) */
+  readonly interiorLock = new Map<string, number>();
   /** 0..1 cabeça do Karimbo debaixo d'água (som abafado, tom da tela) */
   underwater = 0;
   /**
@@ -256,6 +261,8 @@ export class World {
     this.destroyedProps.clear();
     this.killedEnemies.clear();
     this.collectedPickups.clear();
+    this.interiors?.clear();
+    this.interiorLock?.clear();
     this.stats = { kills: 0, deaths: 0, damageTaken: 0, dashes: 0, shots: 0, pitFalls: 0, time: 0 };
     this.checkpointIdx = -1;
     this.checkpointSnap = null;
