@@ -22,6 +22,8 @@ export interface UiState {
   hint: string;
   hintT: number;
   hoverName: string;
+  /** móvel apontado/selecionado (o rótulo fica em cima dele) */
+  hoverFid: string | null;
   /** folha de leitura (lore): fecha com qualquer toque */
   reader: { title: string; text: string; t: number } | null;
   pranks: PranksView[];
@@ -33,7 +35,7 @@ export interface UiState {
 }
 
 export const newUi = (): UiState => ({
-  menu: null, list: false, captions: [], toasts: [], stamp: null, hint: '', hintT: 0, hoverName: '', reader: null, pranks: [], pocket: [], rep: 0, title: '',
+  menu: null, list: false, captions: [], toasts: [], stamp: null, hint: '', hintT: 0, hoverName: '', hoverFid: null, reader: null, pranks: [], pocket: [], rep: 0, title: '',
   listRect: { x: 0, y: 0, w: 0, h: 0 },
 });
 
@@ -139,10 +141,11 @@ export function drawOverlay(g: CanvasRenderingContext2D, r: InteriorRenderer, ui
   // marcas e medidor de atenção sobre os NPCs
   for (const n of sim.npcs) if (!n.away) drawNpcMarks(g, r, n, t);
   // rótulo do móvel apontado
-  if (ui.hoverName && !ui.menu) {
+  const hf = ui.hoverFid ? sim.furnById.get(ui.hoverFid) : undefined;
+  if (hf && ui.hoverName && !ui.menu) {
     g.font = 'bold 11px sans-serif';
-    const w = g.measureText(ui.hoverName).width + 18;
-    const x = Math.max(w / 2 + 6, Math.min(W - w / 2 - 6, lastPointer.x)), y = Math.max(24, lastPointer.y - 20);
+    const w = g.measureText(ui.hoverName).width + 18, a = r.anchor(hf, [0, 0]);
+    const x = Math.max(w / 2 + 6, Math.min(W - w / 2 - 6, a[0])), y = Math.max(30, a[1] - 14);
     pill(g, x - w / 2, y - 12, w, 20, 7, 'rgba(23,15,46,.88)', '#e6ce88', 1);
     g.fillStyle = '#fff4cf'; g.fillText(ui.hoverName, x, y + 2);
   }
@@ -194,7 +197,7 @@ function drawReader(g: CanvasRenderingContext2D, rd: { title: string; text: stri
   const max = Math.min(330, W - 60), lines: string[] = [];
   for (const para of rd.text.split(/\r?\n/)) lines.push(...wrap(g, para, max - 30), '');
   lines.pop();
-  const h = Math.min(H - 40, 56 + lines.length * 15), w = max;
+  const h = Math.min(H - 30, 72 + lines.length * 15), w = max;
   g.save();
   g.translate(W / 2, H / 2 + (1 - e) * 24); g.rotate(-0.015 * (1 - e) - 0.012); g.scale(0.9 + 0.1 * e, 0.9 + 0.1 * e);
   g.fillStyle = 'rgba(0,0,0,.35)'; g.fillRect(-w / 2 + 3, -h / 2 + 5, w, h);
@@ -237,8 +240,10 @@ function wrap(g: CanvasRenderingContext2D, text: string, max: number): string[] 
   return lines;
 }
 
+const placed: { x0: number; x1: number; y0: number; y1: number }[] = [];
 function drawCaptions(g: CanvasRenderingContext2D, r: InteriorRenderer, ui: UiState) {
   const sim = r.sim;
+  placed.length = 0;
   g.font = '10.5px sans-serif';
   const drawn = new Set<string>();
   for (let i = ui.captions.length - 1; i >= 0; i--) {
@@ -251,7 +256,15 @@ function drawCaptions(g: CanvasRenderingContext2D, r: InteriorRenderer, ui: UiSt
     else { const n = sim.npc(c.who); if (!n) continue; const p = r.toScreen(n.gx, n.gy, 96, [0, 0]); x = p[0]; y = p[1]; }
     const w = c.w!, h = c.lines.length * 13 + 9;
     const a = c.age < 0.15 ? c.age / 0.15 : c.ttl - c.age < 0.35 ? Math.max(0, (c.ttl - c.age) / 0.35) : 1;
-    const cx = Math.max(w / 2 + 6, Math.min(lastW - w / 2 - 6, x)), top = Math.max(6, y - h - 6);
+    const cx = Math.max(w / 2 + 6, Math.min(lastW - w / 2 - 6, x));
+    let top = Math.max(6, y - h - 6);
+    // balões não se sobrepõem: sobe o que colidir com um já desenhado
+    for (let k = 0; k < 4; k++) {
+      const hit = placed.find((p) => cx - w / 2 < p.x1 && cx + w / 2 > p.x0 && top < p.y1 && top + h > p.y0);
+      if (!hit) break;
+      top = Math.max(6, hit.y0 - h - 4);
+    }
+    placed.push({ x0: cx - w / 2, x1: cx + w / 2, y0: top, y1: top + h });
     g.globalAlpha = a;
     pill(g, cx - w / 2, top, w, h, 6, c.who === 'karimbo' ? '#e9f7ff' : PILL, PILL_EDGE, 1.2);
     g.beginPath(); g.moveTo(x - 4, top + h - 0.5); g.lineTo(x, top + h + 6); g.lineTo(x + 4, top + h - 0.5); g.fillStyle = c.who === 'karimbo' ? '#e9f7ff' : PILL; g.fill();
@@ -296,8 +309,10 @@ function drawMenu(g: CanvasRenderingContext2D, m: Menu, W: number, H: number, t:
     // rótulo
     g.font = `${sel ? 'bold ' : ''}9.5px sans-serif`;
     const lw = g.measureText(v.label).width + 12;
-    pill(g, px - lw / 2, py + rad + 3, lw, 14, 5, sel ? '#fff1cd' : 'rgba(23,15,46,.9)', sel ? PILL_EDGE : '#8c78b8', 1);
-    g.fillStyle = sel ? INK : '#efe6ff'; g.fillText(v.label, px, py + rad + 13.5);
+    const above = (py - m.ay) < -rad * 0.6 && Math.abs(px - m.ax) < rad * 1.4; // fatias do alto: rótulo em cima, longe do nome
+    const ly = above ? py - rad - 17 : py + rad + 3;
+    pill(g, px - lw / 2, ly, lw, 14, 5, sel ? '#fff1cd' : 'rgba(23,15,46,.9)', sel ? PILL_EDGE : '#8c78b8', 1);
+    g.fillStyle = sel ? INK : '#efe6ff'; g.fillText(v.label, px, ly + 10.5);
   }
 }
 
@@ -338,7 +353,7 @@ function drawList(g: CanvasRenderingContext2D, ui: UiState, W: number, H: number
 function drawPocket(g: CanvasRenderingContext2D, ui: UiState, W: number, H: number) {
   const x0 = 10, y0 = H - 40;
   g.font = '9px sans-serif';
-  for (let i = 0; i < Math.max(1, ui.pocket.length); i++) {
+  for (let i = 0; i < ui.pocket.length; i++) {
     const x = x0 + i * 34;
     g.fillStyle = 'rgba(23,15,46,.8)'; g.strokeStyle = '#8c78b8'; g.lineWidth = 1.2;
     g.beginPath(); g.roundRect(x, y0, 30, 30, 7); g.fill(); g.stroke();

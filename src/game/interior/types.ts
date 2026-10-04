@@ -39,6 +39,8 @@ export interface FurnitureDef {
   solid?: boolean;
   /** altura visual aproximada em px para o raio-X e a ordenação */
   height?: number;
+  /** item pousado sobre outro móvel (panela na caixa, rádio na mesa): altura da base em px */
+  lift?: number;
   /** célula onde Karimbo deve ficar para usar (padrão: vizinha livre mais próxima) */
   stand?: Cell;
   /** item de parede (retrato, janela, espelho): desenhado na parede, sem pegada sólida */
@@ -53,6 +55,8 @@ export interface PrankDef {
   label: string;
   /** extra: não conta para o KARIMBADO!, rende estrela dourada */
   bonus?: boolean;
+  /** só para bônus: o jogador "mereceu" a estrela no instante em que a lista completa? (marca a flag 'clean') */
+  earn?(s: InteriorSim): boolean;
   done(s: InteriorSim): boolean;
 }
 
@@ -120,6 +124,7 @@ export type InteriorEvent =
   | { type: 'shake'; mag: number; dur: number }
   | { type: 'legacy'; obj: string }
   | { type: 'heal'; n: number }
+  | { type: 'grenade'; n: number }
   | { type: 'coins'; n: number }
   | { type: 'rep'; delta: number; total: number }
   | { type: 'prank'; id: string; label: string }

@@ -38,6 +38,8 @@ export class Grid {
     }
   }
 
+  /** Marca uma tábua como rangente em tempo de execução (cacos de vidro no chão). */
+  setSqueak(x: number, y: number) { if (this.inBounds(x, y)) this.terrain[y * this.w + x] |= SQUEAK; }
   inBounds(x: number, y: number) { return x >= 0 && y >= 0 && x < this.w && y < this.h; }
   isWall(x: number, y: number) { return !this.inBounds(x, y) || (this.terrain[y * this.w + x] & WALL) !== 0; }
   isSolid(x: number, y: number) { return this.isWall(x, y) || this.block[y * this.w + x] === 1; }

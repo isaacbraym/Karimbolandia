@@ -15,6 +15,7 @@ export const VIEW_RANGE = 5;
 const COS_CONE = Math.cos((50 * Math.PI) / 180); // cone de 100°
 const HALF = 0.2;                // meia largura do Karimbo no chão
 const STEP_DIST = 0.9;
+const RADIO_R = 2.7;             // alcance da máscara de ruído do rádio ligado
 const NOISE_FALLOFF = 4;         // ruído perdido por tile de distância
 
 export interface SimInput { mx: number; my: number; sneak: boolean }
@@ -108,6 +109,9 @@ export class InteriorSim {
     this.emit({ type: 'say', who, text, ttl });
     if (who !== 'karimbo') { this.talking = who; this.talkT = Math.min(ttl, 2.4); }
   }
+  /** manchas no chão (cacos, poças, migalhas): só desenho; as flags refazem tudo ao reentrar */
+  readonly decals: { kind: string; gx: number; gy: number }[] = [];
+  decal(kind: string, gx: number, gy: number) { if (this.decals.length < 24) this.decals.push({ kind, gx, gy }); }
   /** Karimbo está levando a panela apreendida (para o desenho e para o bolso). */
   get carrying() { return !!this.room.pocket?.(this).some((i) => i.id === 'panela'); }
   /** Escolhe uma fala que não repete a anterior da mesma chave. */
@@ -126,6 +130,7 @@ export class InteriorSim {
   sfx(name: string, vol = 1) { this.emit({ type: 'sfx', name, vol }); }
   shake(mag: number, dur: number) { this.emit({ type: 'shake', mag, dur }); }
   heal(n: number) { this.emit({ type: 'heal', n }); }
+  grenade(n = 1) { this.emit({ type: 'grenade', n }); }
   coins(n: number) { this.emit({ type: 'coins', n }); }
   legacy(obj: string) { this.emit({ type: 'legacy', obj }); }
   addRep(delta: number) {
@@ -318,7 +323,7 @@ export class InteriorSim {
     let p = squeak ? 18 : 3;
     if (this.sneaking) p *= 0.25;
     const radio = this.rt.radio ? this.room.furniture.find((f) => f.id === 'radio') : undefined;
-    if (radio && Math.hypot(this.px - (radio.gx + radio.w / 2), this.py - (radio.gy + radio.h / 2)) <= 2.2) p *= 0.5;
+    if (radio && Math.hypot(this.px - (radio.gx + radio.w / 2), this.py - (radio.gy + radio.h / 2)) <= RADIO_R) p *= 0.5;
     this.sfx(squeak ? 'creak' : 'step', this.sneaking ? 0.25 : 0.55);
     this.noise(this.px, this.py, p);
   }
@@ -407,8 +412,13 @@ export class InteriorSim {
     }
     if (main && !this.has('karimbado')) {
       this.set('karimbado');
-      this.emit({ type: 'karimbado', gold: anyBonus && bonus });
+      // a estrela dourada é decidida agora: todos os bônus "merecidos" neste instante
+      const extras = this.room.pranks.filter((p) => p.bonus);
+      const gold = extras.length > 0 && extras.every((p) => (p.earn ? p.earn(this) : p.done(this)));
+      if (gold) this.set('clean');
+      this.emit({ type: 'karimbado', gold });
     }
+    void anyBonus; void bonus;
   }
 
   /** Karimbo na rede/cadeira/cama: o desenho usa `on` para posicionar. */

@@ -95,6 +95,7 @@ export class InteriorSession {
       const f = r.pickFurniture(e.x, e.y);
       this.hoverFid = f?.id ?? null;
       ui.hoverName = f ? f.name : '';
+      ui.hoverFid = this.hoverFid;
       return;
     }
     if (e.type === 'context') {
@@ -258,6 +259,7 @@ export class InteriorSession {
     if (ctl.next.pressed && reach.length) { const i = reach.findIndex((f) => f.id === this.kbSel); this.kbSel = reach[(i + 1) % reach.length].id; audio.play('uiClick', 0.2); }
     if (ctl.prev.pressed && reach.length) { const i = reach.findIndex((f) => f.id === this.kbSel); this.kbSel = reach[(i - 1 + reach.length) % reach.length].id; audio.play('uiClick', 0.2); }
     this.scene.selFid = ctl.device === 'touch' ? null : (usePointer ? this.hoverFid : this.kbSel);
+    ui.hoverFid = usePointer ? this.hoverFid : (ctl.device === 'touch' ? null : this.kbSel);
     ui.hoverName = usePointer ? ui.hoverName : (ctl.device === 'touch' ? '' : (sim.furnById.get(this.kbSel ?? '')?.name ?? ''));
     if (accept && this.kbSel) { const f = sim.furnById.get(this.kbSel); if (f) this.openMenu(f); }
     else if (ctl.fire.pressed && this.kbSel) { const f = sim.furnById.get(this.kbSel); if (f) this.quickExamine(f); }
@@ -311,6 +313,11 @@ export class InteriorSession {
         r.particles.burst('sparkle', sim.px, sim.py, 6, 30);
         break;
       }
+      case 'grenade': {
+        const p = w.player;
+        if (p.grenades < p.maxGrenades) { p.grenades = Math.min(p.maxGrenades, p.grenades + e.n); audio.play('pickup', 0.7); }
+        break;
+      }
       case 'coins': {
         for (let i = 0; i < e.n; i++) collectCoin();
         w.tokens += e.n; w.score += e.n * 10;
@@ -355,7 +362,7 @@ export class InteriorSession {
     const spot = this.spot, w = this.w;
     const obj = spot.objects.find((o) => o.id === objId);
     if (!obj) return;
-    const text = w.exploration.inspect(w, spot, obj);
+    const text = w.exploration.inspect(w, spot, obj).replace('Investigue novamente para recolher a reserva.', 'Fuce de novo para recolher a reserva.');
     if (!text) return;
     if (text.length > 120) this.sim.read(obj.name, text); else this.sim.say(text, 'karimbo', 4);
     w.hooks.onProgress?.();

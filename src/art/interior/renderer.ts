@@ -114,9 +114,11 @@ export class InteriorRenderer {
       out.push(this.toScreen(a[0], a[1], z0, [0, 0]), this.toScreen(b[0], b[1], z0, [0, 0]), this.toScreen(b[0], b[1], z1, [0, 0]), this.toScreen(a[0], a[1], z1, [0, 0]));
       return out;
     }
-    const x0 = f.gx, x1 = f.gx + f.w, y0 = f.gy, y1 = f.gy + f.h, hz = heightOf(f);
+    // itens pequenos (sobre mesas) ficam com uma área de clique mais justa para não brigar com o vizinho
+    const inset = f.lift ? 0.2 : 0.04;
+    const x0 = f.gx + inset, x1 = f.gx + f.w - inset, y0 = f.gy + inset, y1 = f.gy + f.h - inset, lf = f.lift ?? 0, hz = heightOf(f) + lf;
     out.push(this.toScreen(x0, y1, hz, [0, 0]), this.toScreen(x0, y0, hz, [0, 0]), this.toScreen(x1, y0, hz, [0, 0]),
-      this.toScreen(x1, y0, 0, [0, 0]), this.toScreen(x1, y1, 0, [0, 0]), this.toScreen(x0, y1, 0, [0, 0]));
+      this.toScreen(x1, y0, lf, [0, 0]), this.toScreen(x1, y1, lf, [0, 0]), this.toScreen(x0, y1, lf, [0, 0]));
     return out;
   }
 
@@ -144,7 +146,7 @@ export class InteriorRenderer {
     let best: FurnitureDef | null = null, bd = -1e9;
     for (const f of this.sim.room.furniture) {
       if (!f.verbs(this.sim, f).length) continue;
-      const d = f.wall ? -1 : depthKey(f.gx + f.w / 2, f.gy + f.h / 2);
+      const d = f.wall ? -1 : depthKey(f.gx + f.w / 2, f.gy + f.h / 2) + (f.lift ? 1 : 0);
       if (d > bd && this.inside(this.hull(f), sx, sy)) { best = f; bd = d; }
     }
     return best;
@@ -156,7 +158,7 @@ export class InteriorRenderer {
       const [a, b] = this.wallEnds(f);
       return this.toScreen((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, f.wall.z + f.wall.h, out);
     }
-    return this.toScreen(f.gx + f.w / 2, f.gy + f.h / 2, heightOf(f), out);
+    return this.toScreen(f.gx + f.w / 2, f.gy + f.h / 2, heightOf(f) + (f.lift ?? 0), out);
   }
 
   // ─────────────── móveis assados ───────────────
@@ -222,7 +224,7 @@ export class InteriorRenderer {
     // móveis, NPCs e Karimbo por profundidade
     const items = this.items;
     items.length = 0;
-    for (const f of sim.room.furniture) if (!f.wall) items.push({ depth: depthKey(f.gx + f.w / 2, f.gy + f.h / 2, 0), kind: 0, f });
+    for (const f of sim.room.furniture) if (!f.wall) items.push({ depth: depthKey(f.gx + f.w / 2, f.gy + f.h / 2, 0) + (f.lift ? 1 : 0), kind: 0, f });
     for (const n of sim.npcs) if (!n.away) items.push({ depth: depthKey(n.gx, n.gy, 0.5), kind: 1, n });
     items.push({ depth: depthKey(sim.px, sim.py, 0.4), kind: 2 });
     items.sort((a, b) => a.depth - b.depth);
@@ -300,7 +302,7 @@ export class InteriorRenderer {
     const p = clamp01((asm * 1.7 - 0.45 - ((f.gx + f.gy) / n) * 0.55) / 0.45);
     if (p <= 0) return;
     const e = easeOutBack(p), s = this.s;
-    const c = this.toScreen(f.gx + f.w / 2, f.gy + f.h / 2, 0, [0, 0]);
+    const c = this.toScreen(f.gx + f.w / 2, f.gy + f.h / 2, f.lift ?? 0, [0, 0]);
     const drop = (1 - e) * -90 * s;
     const squash = p < 1 ? 1 - Math.max(0, Math.sin(p * Math.PI)) * 0.0 : 1;
     // raio-X: móvel alto na frente do Karimbo fica translúcido quando o cobre
@@ -366,6 +368,21 @@ export class InteriorRenderer {
       g.strokeStyle = `rgba(255,236,170,${(1 - k) * 0.65})`;
       g.lineWidth = 2.4 * (1 - k) + 0.6;
       g.beginPath(); g.ellipse(c[0], c[1], rad, rad * 0.5, 0, 0, Math.PI * 2); g.stroke();
+    }
+    // manchas: cacos, poças, migalhas
+    for (const d of sim.decals) {
+      const c = this.toScreen(d.gx, d.gy, 0, [0, 0]);
+      if (d.kind === 'glass') {
+        g.fillStyle = 'rgba(190,235,225,.8)';
+        for (let i = 0; i < 7; i++) { const a = i * 2.4, r = 3 + (i % 3) * 3.5; g.beginPath(); g.moveTo(c[0] + Math.cos(a) * r * s, c[1] + Math.sin(a) * r * 0.5 * s); g.lineTo(c[0] + Math.cos(a + 0.5) * (r + 2.4) * s, c[1] + Math.sin(a + 0.5) * (r + 2.4) * 0.5 * s); g.lineTo(c[0] + Math.cos(a + 0.2) * (r + 1) * s, c[1] + Math.sin(a + 0.2) * (r + 3) * 0.5 * s); g.fill(); }
+      } else if (d.kind === 'puddle') {
+        g.fillStyle = 'rgba(150,200,215,.55)'; g.beginPath(); g.ellipse(c[0], c[1], 17 * s, 8 * s, 0, 0, Math.PI * 2); g.fill();
+        g.strokeStyle = 'rgba(255,255,255,.5)'; g.lineWidth = 1; g.beginPath(); g.ellipse(c[0] - 3 * s, c[1] - 1 * s, 8 * s, 3 * s, 0, 0, Math.PI * 2); g.stroke();
+      } else if (d.kind === 'beans') {
+        g.fillStyle = '#6b3a22'; for (let i = 0; i < 9; i++) { g.beginPath(); g.ellipse(c[0] + Math.cos(i * 2.1) * (4 + i) * s, c[1] + Math.sin(i * 2.1) * (2 + i * 0.5) * s, 1.8 * s, 1.1 * s, i, 0, Math.PI * 2); g.fill(); }
+      } else if (d.kind === 'crumbs') {
+        g.fillStyle = '#f0d89a'; for (let i = 0; i < 8; i++) g.fillRect(c[0] + Math.cos(i * 2.3) * (3 + i) * s, c[1] + Math.sin(i * 2.3) * (1.5 + i * 0.4) * s, 1.8 * s, 1.4 * s);
+      }
     }
     // destino do clique
     if (st.dest) {

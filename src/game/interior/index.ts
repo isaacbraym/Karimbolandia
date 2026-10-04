@@ -7,9 +7,16 @@ import type { RoomDef } from './types';
 export { InteriorSession, type SessionInit, type Outcome, type PointerEv } from './session';
 export { InteriorRenderer } from '../../art/interior/renderer';
 
+/** Dados do cômodo + pintores dos móveis (cada um num chunk próprio, baixado só quando preciso). */
 export async function loadRoom(id: RoomId): Promise<RoomDef> {
   switch (id) {
-    case 'palafita': return (await import('./rooms/palafitaVigia')).default;
-    case 'benedita': return (await import('./rooms/casaBenedita')).default;
+    case 'palafita': {
+      const [room] = await Promise.all([import('./rooms/palafitaVigia'), import('../../art/interior/paint/palafita')]);
+      return room.default;
+    }
+    case 'benedita': {
+      const [room] = await Promise.all([import('./rooms/casaBenedita'), import('../../art/interior/paint/benedita')]);
+      return room.default;
+    }
   }
 }

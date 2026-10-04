@@ -91,7 +91,7 @@ export function drawKarimboIso(g: CanvasRenderingContext2D, sim: InteriorSim, x:
   drawKarimbo(g, art, 0, 0, pose);
   g.restore();
   // item em mãos (panela de barro)
-  if (sim.carrying) drawPot(g, x + sim.facing * 9 * s, y - 24 * s - z * s, s * 0.9);
+  if (sim.carrying) drawPot(g, x + sim.facing * 12 * s, y - 15 * s - z * s, s * 0.75);
 }
 
 export function drawPot(g: CanvasRenderingContext2D, x: number, y: number, s: number) {
@@ -136,22 +136,24 @@ export function drawNpc(g: CanvasRenderingContext2D, sim: InteriorSim, n: Npc, x
   g.save();
   g.translate(x, y);
   if (lying) {
-    const hang = n.state === 'tripped' ? 0 : 22 * s;
+    const hang = n.state === 'tripped' ? 0 : 24 * s;
     g.translate(0, -hang);
     g.rotate(n.facing * -Math.PI / 2 * (n.state === 'stirring' ? 0.94 + Math.sin(t * 3) * 0.04 : 0.98));
     g.translate(0, -2);
     P.hipDrop = 1; P.footFX = 3; P.footBX = -1; P.footFY = P.footBY = 0;
   }
-  g.scale(n.facing * sc * 1.0, sc);
+  const big = lying ? 1.65 : 1;
+  g.scale(n.facing * sc * big, sc * big);
   drawFigure(g, L, P);
   g.restore();
   // chapéu sobre o rosto do Cabo dormindo
   if (n.id === 'cabo' && n.state === 'asleep') {
     g.save();
-    g.translate(x + n.facing * 18 * s, y - 26 * s);
+    g.translate(x + n.facing * 27 * s, y - 29 * s);
     g.rotate(n.facing * 0.3);
-    g.fillStyle = '#4a5a34'; g.strokeStyle = OUT; g.lineWidth = 1;
-    g.beginPath(); g.ellipse(0, 0, 10 * s, 5 * s, 0, 0, Math.PI * 2); g.fill(); g.stroke();
+    g.fillStyle = '#4a5a34'; g.strokeStyle = OUT; g.lineWidth = 1.2;
+    g.beginPath(); g.ellipse(0, 0, 14 * s, 6.5 * s, 0, 0, Math.PI * 2); g.fill(); g.stroke();
+    g.fillStyle = '#3a4828'; g.beginPath(); g.ellipse(-1 * s, -3 * s, 8 * s, 3.2 * s, 0, 0, Math.PI * 2); g.fill();
     g.restore();
   }
 }
