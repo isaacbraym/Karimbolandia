@@ -11,6 +11,7 @@ import { getJungle, type FishArt } from './jungle';
 import { glowSprite, makeCanvas, softDot } from './kit';
 import { Rng } from '../core/math';
 import { GROUND_DEPTH } from './perspective';
+import { drawLifeFish, getLifeArt } from './lake/lakeLife';
 
 interface Tex {
   lake: HTMLCanvasElement;
@@ -23,6 +24,8 @@ interface Tex {
   far: HTMLCanvasElement;
   weed: HTMLCanvasElement;
   top: Record<'lake' | 'swamp', HTMLCanvasElement>;
+  /** "neve" em suspensão: duas texturas em mosaico com paralaxe diferente */
+  snow: HTMLCanvasElement[];
 }
 let tex: Tex | null = null;
 
@@ -193,8 +196,27 @@ function textures(): Tex {
     }
   }
   const top = { lake: surfaceTexture('lake'), swamp: surfaceTexture('swamp') };
-  tex = { lake, swamp, caustic, surface, bubble, lily, ray, far, weed, top };
+  const snow = [snowTexture(61, 70, 3.2), snowTexture(62, 46, 5)];
+  tex = { lake, swamp, caustic, surface, bubble, lily, ray, far, weed, top, snow };
   return tex;
+}
+
+/** Partículas em suspensão (matéria orgânica), 256×256 sem emenda: bolinhas suaves de vários tamanhos. */
+function snowTexture(seed: number, count: number, maxR: number) {
+  const c = makeCanvas(256, 256), g = c.getContext('2d')!, r = new Rng(seed);
+  for (let i = 0; i < count; i++) {
+    const x = r.range(0, 256), y = r.range(0, 256), rad = r.range(0.8, maxR), a = r.range(0.25, 0.8);
+    for (const ox of [-256, 0, 256]) for (const oy of [-256, 0, 256]) {
+      const px = x + ox, py = y + oy;
+      if (px < -8 || px > 264 || py < -8 || py > 264) continue;
+      const gr = g.createRadialGradient(px, py, 0, px, py, rad);
+      gr.addColorStop(0, `rgba(225,255,245,${a.toFixed(2)})`);
+      gr.addColorStop(1, 'rgba(225,255,245,0)');
+      g.fillStyle = gr;
+      g.fillRect(px - rad, py - rad, rad * 2, rad * 2);
+    }
+  }
+  return c;
 }
 
 /** Textura periódica assada uma vez; o cisalhamento acompanha a projeção dos tiles. */
@@ -292,15 +314,59 @@ function drawFish(g: CanvasRenderingContext2D, fa: FishArt, f: Fish, k: number, 
   void t;
 }
 
-function fishLayer(g: CanvasRenderingContext2D, w: World, pass: 0 | 1 | 2) {
+/** Cardumes de neon/cardinal em Atlântida brilham no breu: ficam num passe depois da escuridão (3). */
+const glowy = (f: Fish) => (f.species === 'neon' || f.species === 'cardinal') && f.zone.surface !== undefined && f.depth < 0.5;
+const passOf = (f: Fish): 0 | 1 | 2 | 3 => (glowy(f) ? 3 : fishPass(f));
+
+function fishLayer(g: CanvasRenderingContext2D, w: World, pass: 0 | 1 | 2 | 3) {
   const j = getJungle();
   if (!j) return;
   const k = g.getTransform().a;
   const cam = w.camera;
+  const life = getLifeArt();
   for (const f of w.water.fish) {
-    if (fishPass(f) !== pass || !cam.visible(f.x, f.y, f.size)) continue;
-    drawFish(g, j.fish[f.kind], f, k, w.time);
+    if (passOf(f) !== pass || !cam.visible(f.x, f.y, f.size)) continue;
+    if (f.species === 'photo') drawFish(g, j.fish[f.kind], f, k, w.time);
+    else if (life) drawLifeFish(g, life, f, k, w.time);
   }
+}
+
+/**
+ * Matéria em suspensão ("neve"): duas texturas com paralaxe diferente, no máximo 8 `drawImage` por
+ * quadro (o ladrilho cresce com o zoom-out para o total não passar disso).
+ */
+const SNOW_BUDGET = 8;
+function drawSnow(g: CanvasRenderingContext2D, w: World, v: { x0: number; x1: number; y0: number; y1: number }, T: Tex) {
+  const cam = w.camera;
+  const S = Math.max(384, Math.ceil(Math.max(cam.w, cam.h * 1.6) / 2));
+  let budget = SNOW_BUDGET;
+  for (let layer = 0; layer < 2 && budget > 0; layer++) {
+    const ox = cam.x * (layer ? 0.18 : 0.08) + w.time * (layer ? 5 : 3);
+    const oy = cam.y * (layer ? 0.12 : 0.05) - w.time * (layer ? 7 : 4);
+    g.globalAlpha = layer ? 0.38 : 0.26;
+    const x0 = Math.floor((v.x0 - ox) / S) * S + ox;
+    const y0 = Math.floor((v.y0 - oy) / S) * S + oy;
+    for (let y = y0; y < v.y1 && budget > 0; y += S)
+      for (let x = x0; x < v.x1 && budget > 0; x += S, budget--) g.drawImage(T.snow[layer], x, y, S, S);
+  }
+  g.globalAlpha = 1;
+}
+
+/** Brilho dos cardumes de neon/cardinal no breu: um halo por cardume (não por peixe). */
+function drawSchoolGlow(g: CanvasRenderingContext2D, w: World, z: WaterZone) {
+  const la = getLifeArt();
+  if (!la) return;
+  const cam = w.camera;
+  g.globalCompositeOperation = 'lighter';
+  for (const sc of w.water.schools) {
+    if (sc.species !== 'neon' && sc.species !== 'cardinal') continue;
+    const L = w.water.fish[sc.lead];
+    if (L.zone !== z || L.depth > 0.5 || !cam.visible(L.x, L.y, 90)) continue;
+    g.globalAlpha = 0.5 + 0.1 * Math.sin(w.time * 1.6 + sc.lead);
+    g.drawImage(la.glow[sc.species], L.x - L.dir * 38 - 80, L.y - 80, 160, 160);
+  }
+  g.globalAlpha = 1;
+  g.globalCompositeOperation = 'source-over';
 }
 
 // ------------------------------------------------------------------ camadas
@@ -361,6 +427,7 @@ export function drawWaterBack(g: CanvasRenderingContext2D, w: World) {
     }
     g.globalAlpha = 1;
     g.globalCompositeOperation = 'source-over';
+    drawSnow(g, w, v, T);
     fishLayer(g, w, 0);
     // névoa da profundidade sobre os peixes distantes
     g.globalAlpha = 0.38;
@@ -436,6 +503,8 @@ export function drawWaterFront(g: CanvasRenderingContext2D, w: World) {
       // breu do fundo também por cima das ruínas e do Karimbo (os cristais brilham por cima)
       const range = waterDepthRange(z, w.water.zones);
       if (z.surface !== undefined || range.span > z.h) abyss(g, z, v, 0.9, range);
+      fishLayer(g, w, 3);
+      drawSchoolGlow(g, w, z);
       g.restore();
     } else {
       // pântano: água turva cobrindo as pernas
@@ -482,6 +551,18 @@ export function drawWaterFront(g: CanvasRenderingContext2D, w: World) {
     g.drawImage(T.bubble, b.x - r, b.y - r, r * 2, r * 2);
   }
   g.globalAlpha = 1;
+  // areia levantada pelas arraias
+  const la = getLifeArt();
+  if (la) {
+    for (const p of w.water.puffs) {
+      if (p.t >= p.max || !cam.visible(p.x, p.y, 20)) continue;
+      const k = p.t / p.max;
+      const r = 4 + k * 9;
+      g.globalAlpha = (1 - k) * 0.8;
+      g.drawImage(la.sand, p.x - r, p.y - r, r * 2, r * 2);
+    }
+    g.globalAlpha = 1;
+  }
   // ondinhas na superfície
   g.strokeStyle = '#e8fff8';
   for (const r of w.water.ripples) {

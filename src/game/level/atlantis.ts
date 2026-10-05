@@ -9,6 +9,7 @@
  */
 import { T, THEME, TILE } from '../level';
 import type { LevelBuilder } from './builder';
+import { decorateLake } from './lakeFlora';
 
 /** Lago da selva: colunas [LAKE_X0, LAKE_X1) (324..400 + SHIFT 150), superfície LAKE_TOP, fundo antigo LAKE_FLOOR. */
 export const LAKE_X0 = 474;
@@ -168,4 +169,7 @@ export function buildAtlantis(b: LevelBuilder) {
       });
     }
   });
+
+  // ---------------------------------------------------------------- vida de rio (só decoração, sempre por último)
+  decorateLake(b, seabed);
 }

@@ -8,6 +8,7 @@ import { JUNGLE_BOUNDS, jungleVariants, paintJungle, setDecoAt } from './jungleD
 import { STORY_BOUNDS, paintStoryProp } from './storyProps';
 import { VILLAGE_BOUNDS, paintVillageProp } from './village';
 import { ATLANTIS_BOUNDS, paintAtlantis } from './atlantisDecor';
+import { LAKE_BOUNDS, LAKE_EXTENTS, paintLake } from './lake/lakeFlora';
 import { paintBuilding } from './buildings';
 
 const rngCache = new Map<string, Rng>();
@@ -64,6 +65,7 @@ const STATIC_BOUNDS: Record<string, [number, number, number, number]> = {
   ...STORY_BOUNDS,
   ...VILLAGE_BOUNDS,
   ...ATLANTIS_BOUNDS,
+  ...LAKE_BOUNDS,
 };
 let decoDensity = 2;
 const baked = new Map<string, HTMLCanvasElement>();
@@ -105,7 +107,7 @@ export function decoScale(d: DecoSpawn) {
 
 /** Bounds in world coordinates, including flips and the spawn's scale. */
 export function decoExtent(d: DecoSpawn): [number, number, number, number] {
-  const b = STATIC_BOUNDS[d.kind] ?? [-320, -512, 320, 320], s = decoScale(d);
+  const b = STATIC_BOUNDS[d.kind] ?? LAKE_EXTENTS[d.kind] ?? [-320, -512, 320, 320], s = decoScale(d);
   return [d.x + (d.flip ? -b[2] : b[0]) * s, d.y + b[1] * s,
     d.x + (d.flip ? -b[0] : b[2]) * s, d.y + b[3] * s];
 }
@@ -160,6 +162,7 @@ export function drawDeco(g: CanvasRenderingContext2D, d: DecoSpawn, t: number) {
 function paintDeco(g: CanvasRenderingContext2D, kind: string, seed: number, t: number) {
   if (kind === 'jHut') { paintBuilding(g, seed, true); return; }
   if (paintAtlantis(g, kind, seed)) return;
+  if (paintLake(g, kind, seed, t)) return;
   switch (kind) {
     case 'facade': {
       // prédio de fundo: reboco com faixas de andar, janelas emolduradas com vida dentro, sacada,

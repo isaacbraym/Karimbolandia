@@ -22,6 +22,7 @@ function pond() {
 const fishAt = (zone: WaterZone, x: number, y: number, layer: 0 | 1 | 2, tx: number): Fish => ({
   kind: 0, x, y, vx: 0, vy: 0, size: 60, dir: 1, turn: 1, ph: 0, speed: 46, tx, ty: y, layer, lead: -1,
   offX: 0, offY: 0, wait: 0, scared: 0, zone, depth: 0, depthGoal: 0, clearT: 0, rockT: 0,
+  species: 'photo', hug: 0, cool: 0, fx: 0, fy: 0, chaseT: 0, chase: -1, lane: 0, seg: null, rockNear: false,
 });
 
 describe('peixes do lago passam por trás das paredes', () => {
