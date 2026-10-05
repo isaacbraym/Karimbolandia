@@ -41,7 +41,7 @@ export const JUNGLE_BOUNDS: Record<string, [number, number, number, number]> = {
   uStatue: [-28, -96, 28, 3],
   aColumn: [-26, -176, 26, 4],
   aDome: [-150, -150, 150, 4],
-  aTrident: [-30, -132, 30, 4],
+  aTrident: [-30, -140, 30, 4],
   aSign: [-34, -66, 34, 2],
   jTower: [-62, -251, 62, 7],
   jPalisade: [-72, -100, 72, 4],

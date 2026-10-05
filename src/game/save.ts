@@ -32,6 +32,8 @@ export interface SaveState {
   villageRep?: number;
   killed: number[];
   collected: number[];
+  /** IDs of notes collected a second time; absent in older saves. */
+  rhythmRepeats?: number[];
   destroyed: number[];
   nomadUsed: boolean;
   nomadLost: boolean;
@@ -83,6 +85,7 @@ export function captureSave(w: World): SaveState {
     ...(w.interiors.toSave().length || w.interiors.rep ? { interiors: w.interiors.toSave(), villageRep: w.interiors.rep } : {}),
     killed: [...w.killedEnemies],
     collected: [...w.collectedPickups],
+    rhythmRepeats: [...w.rhythmRepeats],
     destroyed: [...w.destroyedProps],
     nomadUsed: w.nomadUsed,
     nomadLost: w.nomadLost,
@@ -131,6 +134,14 @@ export function applySave(w: World, s: SaveState) {
   w.interiors.load(s.interiors, s.villageRep);
   for (const e of s.killed) w.killedEnemies.add(e);
   for (const e of s.collected) w.collectedPickups.add(e);
+  const notes = w.data.pickups.filter(p => p.kind === 'note');
+  const collectedNotes = notes.filter(p => w.collectedPickups.has(p.id));
+  // Legacy saves cannot tell which repeats were collected: credit past notes without
+  // granting rewards on load, keeping the remaining challenge achievable.
+  const repeats = new Set(s.rhythmRepeats ?? collectedNotes.map(p => p.id));
+  for (const p of collectedNotes) if (repeats.has(p.id)) w.rhythmRepeats.add(p.id);
+  w.rhythm.got = collectedNotes.length + w.rhythmRepeats.size;
+  w.rhythm.done = w.rhythm.total > 0 && w.rhythm.got >= w.rhythm.total;
   for (const e of s.destroyed) w.destroyedProps.add(e);
   w.nomadUsed = s.nomadUsed;
   w.nomadLost = s.nomadLost || w.data.stage === 2;

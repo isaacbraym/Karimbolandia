@@ -111,6 +111,15 @@ export function buildAtlantis(b: LevelBuilder) {
   for (const x of [492, 536, 575, 604]) b.deco('uVent', x, seabed(x), 'back');
   b.deco('aDome', 480, seabed(480), 'back', { scale: 0.8 });
   b.deco('aDome', 590, seabed(590), 'back', { scale: 0.9, flip: true });
+  // Monumento da civilização inundada, na praça entre a torre e o palácio.
+  // Apenas decoração: mantém a passagem e todos os IDs persistidos.
+  b.deco('aThinker', 518, seabed(518), 'back');
+  for (const [x, y, scale] of [[494, 88, 2.8], [508, 74, 0.65], [544, 76, 0.9],
+    [573, 90, 2.6], [599, 84, 0.45], [486, 90, 0.35], [500, 90, 0.35],
+    [470, seabed(470) - 5.4, 0.28], [522, seabed(522) - 5.4, 0.28],
+    [584, seabed(584) - 5.4, 0.28]] as [number, number, number][]) {
+    b.deco('aMoss', x, y, 'front', { scale });
+  }
   // placa na margem: sem traje, o ar não chega lá embaixo
   b.deco('aSign', LAKE_X0 - 6, 32, 'back');
   b.trigger('hint:deep', FENDA[0], LAKE_FLOOR - 2, FENDA[1] - FENDA[0], 6);

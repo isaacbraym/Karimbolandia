@@ -20,12 +20,13 @@ export type SfxName =
 
 type LoopName = 'glide' | 'roll' | 'alarm' | 'laser' | 'thrusterLoop';
 
-/** Clipes gravados (vozes e a entrada do Felipão). */
-export type ClipName = 'bossIntro' | 'karimboEncara' | 'karimboNomad';
+/** Clipes gravados (vozes, entrada do Felipão e música da balada). */
+export type ClipName = 'bossIntro' | 'karimboEncara' | 'karimboNomad' | 'balada';
 export const CLIP_FILES: Record<ClipName, string> = {
   bossIntro: 'boss_intro.mp3',
   karimboEncara: 'karimbo_encara.mp3',
   karimboNomad: 'karimbo_nomad.mp3',
+  balada: 'balada.mp3',
 };
 
 /** Controle de um clipe tocando. Sem áudio (testes/sem som) é um controle "vazio" que só mede o tempo. */
@@ -357,19 +358,24 @@ export class AudioEngine {
     return this.clipBuf.has(n);
   }
 
-  /** Toca um clipe gravado no barramento de voz. Nunca falha: sem áudio devolve um controle vazio. */
-  playClip(n: ClipName, o: { vol?: number; fadeIn?: number } = {}): ClipHandle {
+  /** Toca um clipe gravado no barramento de voz ou música. Nunca falha: sem áudio devolve um controle vazio. */
+  playClip(n: ClipName, o: { vol?: number; fadeIn?: number; bus?: 'voice' | 'music'; loop?: boolean } = {}): ClipHandle {
     const buf = this.clipBuf.get(n);
     if (!buf) return NO_CLIP;
     return this.playBuffer(buf, o);
   }
 
-  private playBuffer(buf: AudioBuffer, o: { vol?: number; fadeIn?: number } = {}): ClipHandle {
+  /** Toca um clipe gravado diretamente no barramento de música (ex.: trilha da balada em loop). */
+  playMusicClip(n: ClipName, o: { vol?: number; fadeIn?: number; loop?: boolean } = {}): ClipHandle {
+    return this.playClip(n, { ...o, bus: 'music' });
+  }
+
+  private playBuffer(buf: AudioBuffer, o: { vol?: number; fadeIn?: number; bus?: 'voice' | 'music'; loop?: boolean } = {}): ClipHandle {
     const c = this.ctx;
     if (!c || c.state !== 'running' || this.muted) return NO_CLIP;
     const vol = o.vol ?? 1;
     const gain = c.createGain();
-    gain.connect(this.voiceBus);
+    gain.connect(o.bus === 'music' ? this.musicBus : this.voiceBus);
     const fadeIn = o.fadeIn ?? 0.02;
     gain.gain.setValueAtTime(0.0001, c.currentTime);
     gain.gain.linearRampToValueAtTime(vol, c.currentTime + Math.max(0.005, fadeIn));
@@ -381,9 +387,10 @@ export class AudioEngine {
     const start = () => {
       const s = c.createBufferSource();
       s.buffer = buf;
+      if (o.loop) s.loop = true;
       s.connect(gain);
       s.onended = () => {
-        if (src === s && !paused) ended = true;
+        if (src === s && !paused && !o.loop) ended = true;
       };
       startedAt = c.currentTime;
       s.start(0, Math.min(offset, buf.duration - 0.001));
@@ -410,7 +417,7 @@ export class AudioEngine {
       },
       pause: () => {
         if (ended || paused || !src) return;
-        offset += c.currentTime - startedAt;
+        offset = (offset + (c.currentTime - startedAt)) % buf.duration;
         paused = true;
         try {
           src.stop();
@@ -422,7 +429,7 @@ export class AudioEngine {
       resume: () => {
         if (ended || !paused) return;
         paused = false;
-        if (offset >= buf.duration - 0.01) ended = true;
+        if (!o.loop && offset >= buf.duration - 0.01) ended = true;
         else start();
       },
       setVol: (v: number, rate = 0.08) => {

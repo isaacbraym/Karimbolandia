@@ -5,7 +5,7 @@ import { Rng } from '../core/math';
 
 export const LIFE_BOUNDS: Record<string,[number,number,number,number]> = {
   villageStream:[-245,-46,247,9], villageLaundry:[-112,-102,112,8],
-  villageWorkbench:[-77,-72,86,12], villageOrchard:[-100,-199,102,10], villageDance:[-208,-42,210,14],
+  villageWorkbench:[-77,-72,86,16], villageOrchard:[-100,-199,102,10], villageDance:[-208,-42,210,14],
 };
 export function paintVillageLife(g:CanvasRenderingContext2D,kind:string,seed:number) {
   if(!LIFE_BOUNDS[kind])return false;

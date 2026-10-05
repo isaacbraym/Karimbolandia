@@ -29,7 +29,7 @@ for(const [kind,label,detail,prices] of PERKS)for(let i=0;i<prices.length;i++)GE
 /** Nível comprado de uma melhoria do Karimbo. */
 export const perkLevel=(gear:readonly string[],kind:string)=>gear.filter(x=>x.startsWith(`karimbo.${kind}.`)).length;
 /** Atributos do Karimbo derivados das melhorias (os mesmos números do jogo e da oficina). */
-export const KARIMBO_BASE={hp:119,air:12,nades:2};
+export const KARIMBO_BASE={hp:119,air:13.8,nades:2};
 export const karimboStats=(gear:readonly string[])=>({
   hp:KARIMBO_BASE.hp+20*perkLevel(gear,'vida'),
   air:KARIMBO_BASE.air*(1+.4*perkLevel(gear,'folego')),

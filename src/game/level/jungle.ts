@@ -19,7 +19,7 @@ export { LAKE_X0, LAKE_X1, LAKE_TOP, LAKE_FLOOR } from './atlantis';
 /** Desfiladeiro dos cipós: abismo [GORGE_X0, GORGE_X1) com uma pilastra no meio. */
 export const GORGE_X0 = 181 + SHIFT;
 export const GORGE_X1 = 229 + SHIFT;
-export const GORGE_ISLAND: [number, number] = [202 + SHIFT, 206 + SHIFT];
+export const GORGE_ISLAND: [number, number] = [201 + SHIFT, 207 + SHIFT];
 /** Masmorra do templo (isolada no começo do mapa): colunas [TEMPLE_X0, TEMPLE_X1), 3 andares. */
 export const TEMPLE_X0 = 4;
 export const TEMPLE_X1 = 146;

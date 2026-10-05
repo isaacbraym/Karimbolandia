@@ -24,6 +24,7 @@ export interface FishArt {
 /** Piranha: quadro de boca fechada (a) e mordendo (b), já reduzidos (a foto olha para a ESQUERDA). */
 export interface PiranhaArt { a: HTMLCanvasElement; b: HTMLCanvasElement; aspect: number }
 export interface JungleArt {
+  thinker: HTMLCanvasElement;
   fish: FishArt[];
   piranhas: PiranhaArt[];
   bg: JungleBackground;
@@ -67,6 +68,37 @@ function fishArt(img: HTMLImageElement, tailX: number, tailY: number): FishArt {
 
 const tick = () => new Promise<void>((r) => setTimeout(r, 0));
 
+/** Remove the baked dark checkerboard at load time; keeps source statue pixels intact. */
+function thinkerArt(img: HTMLImageElement) {
+  const c = makeCanvas(img.naturalWidth, img.naturalHeight), g = c.getContext('2d')!;
+  g.drawImage(img, 0, 0);
+  const data = g.getImageData(0, 0, c.width, c.height), pixels = data.data;
+  const seen = new Uint8Array(c.width * c.height), queue = new Int32Array(seen.length);
+  let head = 0, tail = 0;
+  const add = (i: number) => {
+    if (seen[i]) return;
+    seen[i] = 1;
+    const k = i * 4;
+    if (Math.max(pixels[k], pixels[k + 1], pixels[k + 2]) > 85) return;
+    queue[tail++] = i;
+  };
+  for (let x = 0; x < c.width; x++) { add(x); add((c.height - 1) * c.width + x); }
+  for (let y = 0; y < c.height; y++) { add(y * c.width); add(y * c.width + c.width - 1); }
+  while (head < tail) {
+    const i = queue[head++], x = i % c.width;
+    pixels[i * 4 + 3] = 0;
+    if (x) add(i - 1);
+    if (x < c.width - 1) add(i + 1);
+    if (i >= c.width) add(i - c.width);
+    if (i < seen.length - c.width) add(i + c.width);
+  }
+  g.putImageData(data, 0, 0);
+  const small = makeCanvas(320, Math.round(320 * c.height / c.width));
+  const sg = small.getContext('2d')!;
+  sg.imageSmoothingQuality = 'high'; sg.drawImage(c, 0, 0, small.width, small.height);
+  return small;
+}
+
 /** Carrega (uma vez) a arte da selva; chamadas repetidas devolvem a mesma promessa. */
 export function loadJungle(base: string, quality: Quality): Promise<JungleArt> {
   if (jungle) return Promise.resolve(jungle);
@@ -84,6 +116,7 @@ export function loadJungle(base: string, quality: Quality): Promise<JungleArt> {
       g.drawImage(img, 0, 0, c.width, c.height);
       return c;
     };
+    const thinker = thinkerArt(await loadImage(u('karimbo-thinker.jpeg')));
     const piranhas: PiranhaArt[] = [0, 2].map((i) => ({ a: shrink(pir[i]), b: shrink(pir[i + 1]), aspect: pir[i].naturalHeight / pir[i].naturalWidth }));
     await tick();
     const bg = new JungleBackground(quality === 'high' ? 1.5 : quality === 'medium' ? 1.25 : 1);
@@ -109,7 +142,7 @@ export function loadJungle(base: string, quality: Quality): Promise<JungleArt> {
     prepareForestLight();
     await tick();
     bakeVillagers();
-    jungle = { fish, piranhas, bg, bandits, banditVariants };
+    jungle = { fish, piranhas, bg, bandits, banditVariants, thinker };
     return jungle;
   })();
   pending.catch(() => {

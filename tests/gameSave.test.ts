@@ -20,6 +20,24 @@ const saveOnExit = (game: unknown) => (game as { saveGame(): void }).saveGame();
 
 // O primeiro teste importa o jogo inteiro (transformação de todos os módulos): sob carga passa de 5 s.
 describe('Saída preserva o save mais recente', { timeout: 30000 }, () => {
+  it('resultados preservam o callback de pausa e investigação na próxima partida', async () => {
+    vi.useFakeTimers(); vi.stubGlobal('window', { setTimeout });
+    const game = await makeGame(); game.world = makeWorld(); game.state = 'playing';
+    game.touch = { show: vi.fn() } as unknown as typeof game.touch;
+    const handleKey = vi.fn(() => false), showResults = vi.fn();
+    game.menus = { handleKey, showResults } as unknown as typeof game.menus;
+    const api = game as unknown as { onComplete(): void; handleMenuKey(code: string): void; persistRun(): void; investigation: { handleKey(code: string): void } | null };
+    vi.spyOn(api, 'persistRun').mockImplementation(() => {});
+    const callback = (code: string) => api.handleMenuKey(code);
+    game.input.onMenuKey = callback;
+    api.onComplete(); vi.advanceTimersByTime(400);
+    expect(showResults).toHaveBeenCalledOnce(); expect(game.input.onMenuKey).toBe(callback);
+    game.state = 'paused'; const resume = vi.spyOn(game, 'resume').mockImplementation(() => {});
+    game.input.onMenuKey!('Escape'); expect(resume).toHaveBeenCalledOnce();
+    const investigate = vi.fn(); api.investigation = { handleKey: investigate };
+    game.input.onMenuKey!('ArrowRight'); expect(investigate).toHaveBeenCalledWith('ArrowRight');
+    vi.useRealTimers();
+  });
   it('não sobrescreve no menu o progresso atualizado por outra aba', async () => {
     const game = await makeGame();
     const { writeSave, freshSave, loadSave } = await import('../src/game/save');

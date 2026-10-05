@@ -180,6 +180,13 @@ describe('Fase 2 (selva): água', () => {
 });
 
 describe('Fase 2 (selva): cipós', () => {
+  it('apoio central tem 192px, acrescentando um tile seguro em cada lado',()=>{
+    const w=jungleWorld();
+    expect(GORGE_ISLAND).toEqual([351,357]);
+    for(let col=351;col<357;col++)expect(w.level.solidAtPx((col+.5)*TILE,(G-.5)*TILE)).toBe(true);
+    for(const col of [350,357])expect(w.level.solidAtPx((col+.5)*TILE,(G-.5)*TILE)).toBe(false);
+    expect(w.data.vines!.filter(v=>v.x>GORGE_X0*TILE&&v.x<GORGE_X1*TILE)).toHaveLength(4);
+  });
   it('o desfiladeiro NÃO dá para atravessar só pulando/planando', () => {
     const res = analyzeReach(data);
     expect(res.reached.has(res.key(GORGE_ISLAND[0] + 1, G - 1))).toBe(false);

@@ -12,7 +12,7 @@ import { getArt } from '../art';
 import { drawKarimbo, karimboMuzzle, type KState } from '../art/karimbo';
 import { drawNomad } from '../art/nomad';
 import { settings, progress } from '../core/storage';
-import { karimboStats, magazineCapacity, reloadSeconds, tunedWeapon } from '../core/gearCatalog';
+import { KARIMBO_BASE, karimboStats, magazineCapacity, reloadSeconds, tunedWeapon } from '../core/gearCatalog';
 import { breathesUnderwater } from '../core/skinCatalog';
 import { difficulty } from '../core/difficulty';
 import {
@@ -155,8 +155,8 @@ export class Player {
   /** dentro do lago (nadando) */
   swimming = false;
   /** Ar (segundos) para nadar sem traje; a pressão do fundo gasta mais rápido. */
-  oxygen = 12;
-  oxyMax = 12;
+  oxygen = KARIMBO_BASE.air;
+  oxyMax = KARIMBO_BASE.air;
   /** profundidade da cabeça abaixo da superfície (linhas de tile) — HUD e pressão */
   depthRows = 0;
   private drownT = 0;

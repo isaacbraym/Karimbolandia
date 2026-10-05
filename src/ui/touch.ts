@@ -112,6 +112,7 @@ export class TouchUI {
       this.input.touch.held[act] = false;
       return;
     }
+    // Keep short-tap height; Input queues distinct jump edges independently of this grace.
     // Only a completed tap gets the short grace period, never a cancelled gesture.
     this.releaseTimers.set(act, window.setTimeout(() => {
       this.releaseTimers.delete(act);
@@ -121,6 +122,7 @@ export class TouchUI {
 
   private bindButton(el: HTMLElement, act: ActionName) {
     const t = this.input.touch;
+    let jumpPress = 0;
     const down = (e: PointerEvent) => {
       if (el.dataset.pid !== undefined) return;
       this.clearRelease(act);
@@ -133,12 +135,14 @@ export class TouchUI {
       }
       this.markActive();
       this.input.onGesture?.();
+      if (act === 'jump') jumpPress = this.input.beginTouchJump();
       t.held[act] = true;
       el.classList.add('down');
       el.dataset.pid = String(e.pointerId);
     };
     const up = (e: PointerEvent) => {
       if (el.dataset.pid !== String(e.pointerId)) return;
+      if (act === 'jump' && e.type !== 'pointerup') this.input.cancelTouchJump(jumpPress);
       this.finishPress(el, act, e);
     };
     el.addEventListener('pointerdown', down);
@@ -326,6 +330,7 @@ export class TouchUI {
 
   releaseAll() {
     const t = this.input.touch;
+    this.input.clearTouchJump();
     for (const k of Object.keys(t.held) as ActionName[]) {this.clearRelease(k);t.held[k] = false;}
     t.stickX = t.stickY = 0;
     t.aimX = t.aimY = 0;

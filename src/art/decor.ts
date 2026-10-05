@@ -7,6 +7,7 @@ import { getArt } from './index';
 import { JUNGLE_BOUNDS, jungleVariants, paintJungle, setDecoAt } from './jungleDecor';
 import { STORY_BOUNDS, paintStoryProp } from './storyProps';
 import { VILLAGE_BOUNDS, paintVillageProp } from './village';
+import { ATLANTIS_BOUNDS, paintAtlantis } from './atlantisDecor';
 
 const rngCache = new Map<string, Rng>();
 const seedOf = (d: DecoSpawn) => Math.floor(d.x * 7.13 + d.y * 3.1);
@@ -61,6 +62,7 @@ const STATIC_BOUNDS: Record<string, [number, number, number, number]> = {
   ...JUNGLE_BOUNDS,
   ...STORY_BOUNDS,
   ...VILLAGE_BOUNDS,
+  ...ATLANTIS_BOUNDS,
 };
 let decoDensity = 2;
 const baked = new Map<string, HTMLCanvasElement>();
@@ -98,6 +100,13 @@ function bakedDeco(key: string, kind: string, seed: number, s: number, b: [numbe
 /** Escala final da decoração (a do spawn × a do tipo). */
 export function decoScale(d: DecoSpawn) {
   return (d.scale ?? 1) * (DECO_SCALE[d.kind] ?? 1);
+}
+
+/** Bounds in world coordinates, including flips and the spawn's scale. */
+export function decoExtent(d: DecoSpawn): [number, number, number, number] {
+  const b = STATIC_BOUNDS[d.kind] ?? [-320, -512, 320, 320], s = decoScale(d);
+  return [d.x + (d.flip ? -b[2] : b[0]) * s, d.y + b[1] * s,
+    d.x + (d.flip ? -b[0] : b[2]) * s, d.y + b[3] * s];
 }
 
 /**
@@ -148,6 +157,7 @@ export function drawDeco(g: CanvasRenderingContext2D, d: DecoSpawn, t: number) {
 }
 
 function paintDeco(g: CanvasRenderingContext2D, kind: string, seed: number, t: number) {
+  if (paintAtlantis(g, kind, seed)) return;
   switch (kind) {
     case 'facade': {
       // prédio de fundo: reboco com faixas de andar, janelas emolduradas com vida dentro, sacada,

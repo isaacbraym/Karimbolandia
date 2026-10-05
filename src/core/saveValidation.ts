@@ -16,6 +16,8 @@ export function validateSave(v: unknown): SaveState | null {
   if (!number(v.savedAt, 0, Number.MAX_SAFE_INTEGER)) return null;
   for (const k of ['tokens', 'lives', 'bestCombo']) if (!integer(v[k])) return null;
   for (const k of ['emblems', 'secrets', 'killed', 'collected', 'destroyed']) if (!ids(v[k])) return null;
+  if (v.rhythmRepeats !== undefined && (!ids(v.rhythmRepeats)
+    || v.rhythmRepeats.some(id => !(v.collected as number[]).includes(id)))) return null;
   if (!Array.isArray(v.secretRooms) || v.secretRooms.length > 1000 || !v.secretRooms.every(x => typeof x === 'string' && x.length <= 100)) return null;
   if (v.encounters !== undefined && (!Array.isArray(v.encounters) || v.encounters.length > 64 || !v.encounters.every(x => typeof x === 'string' && /^[a-z0-9:-]{1,80}$/.test(x)))) return null;
   if (v.interiors !== undefined) {
@@ -56,6 +58,7 @@ export function validateSave(v: unknown): SaveState | null {
     ...(s.interiors !== undefined ? { interiors: s.interiors.map(([id, m]): [string, number] => [id, m]) } : {}),
     ...(s.villageRep !== undefined ? { villageRep: s.villageRep } : {}),
     killed: [...s.killed], collected: [...s.collected], destroyed: [...s.destroyed],
+    ...(s.rhythmRepeats !== undefined ? { rhythmRepeats: [...new Set(s.rhythmRepeats)] } : {}),
     nomadUsed: s.nomadUsed, nomadLost: s.nomadLost, bossLivesGiven: s.bossLivesGiven,
     weapons: s.weapons.map(([id, n]) => [id, n]), cur: s.cur, grenades: s.grenades, nomad: s.nomad,
     magazines:s.magazines?.map(([id,n])=>[id,n]),

@@ -251,6 +251,14 @@ function visRect(w: World, z: WaterZone, m = 24) {
 }
 
 /** Atrás das decorações e dos tiles: o corpo d'água do lago e o que fica longe dentro dele. */
+export function waterDepthRange(z: WaterZone, zones: readonly WaterZone[]) {
+  const top = z.surface ?? z.y;
+  let bottom = z.y + z.h;
+  for (const other of zones) if (other.kind === 'lake' && (other.surface ?? other.y) === top
+    && other.x <= z.x + z.w && other.x + other.w >= z.x) bottom = Math.max(bottom, other.y + other.h);
+  return { top, span: bottom - top };
+}
+
 export function drawWaterBack(g: CanvasRenderingContext2D, w: World) {
   const T = textures();
   const t = w.time;
@@ -259,12 +267,11 @@ export function drawWaterBack(g: CanvasRenderingContext2D, w: World) {
     const v = visRect(w, z);
     if (!v) continue;
     // câmaras fundas: o degradê é medido da superfície real até o fundo de toda a coluna
-    const top = z.surface ?? z.y;
-    const span = z.y + z.h - top;
+    const { top, span } = waterDepthRange(z, w.water.zones);
     const sy = ((v.y0 - top) / span) * 256;
     const sh = Math.max(0.5, ((v.y1 - v.y0) / span) * 256);
     // câmara funda: fundo opaco (a selva lá de cima não aparece através da água)
-    if (z.surface !== undefined) {
+    if (z.surface !== undefined || span > z.h) {
       g.fillStyle = '#062035';
       g.fillRect(v.x0, v.y0, v.x1 - v.x0, v.y1 - v.y0);
     }
@@ -277,7 +284,7 @@ export function drawWaterBack(g: CanvasRenderingContext2D, w: World) {
     const ox = w.camera.x * 0.35;
     const fw = 512;
     let x = ox + Math.floor((v.x0 - ox) / fw) * fw;
-    for (; x < v.x1; x += fw) g.drawImage(T.far, x, z.y + z.h - 200, fw, 200);
+    for (; x < v.x1; x += fw) g.drawImage(T.far, x, top + span - 200, fw, 200);
     // fachos de luz descendo da superfície (não existem no breu da câmara funda)
     g.globalCompositeOperation = 'lighter';
     const n = z.surface === undefined ? Math.max(3, Math.round(z.w / 260)) : 0;
@@ -296,21 +303,22 @@ export function drawWaterBack(g: CanvasRenderingContext2D, w: World) {
     g.fillRect(v.x0, v.y0, v.x1 - v.x0, v.y1 - v.y0);
     g.globalAlpha = 1;
     fishLayer(g, w, 1);
-    if (z.surface !== undefined) abyss(g, z, v);
+    if (z.surface !== undefined || span > z.h) abyss(g, z, v, 1, { top, span });
     g.restore();
   }
 }
 
 /** Escurece a câmara funda em faixas (sem gradiente por quadro): quanto mais fundo, mais breu. */
-function abyss(g: CanvasRenderingContext2D, z: WaterZone, v: { x0: number; x1: number; y0: number; y1: number }, k0 = 1) {
-  const top = z.surface ?? z.y;
-  const span = z.y + z.h - top;
+export function abyss(g: CanvasRenderingContext2D, z: WaterZone, v: { x0: number; x1: number; y0: number; y1: number }, k0 = 1,
+  range = { top: z.surface ?? z.y, span: z.y + z.h - (z.surface ?? z.y) }) {
+  const { top, span } = range;
   g.fillStyle = '#020c1c';
   const band = 48;
   for (let y = Math.floor(v.y0 / band) * band; y < v.y1; y += band) {
     const k = Math.min(1, Math.max(0, (y - top) / span));
     g.globalAlpha = (0.12 + k * 0.5) * k0;
-    g.fillRect(v.x0, Math.max(y, v.y0), v.x1 - v.x0, Math.min(band, v.y1 - y));
+    const start = Math.max(y, v.y0), end = Math.min(y + band, v.y1);
+    g.fillRect(v.x0, start, v.x1 - v.x0, end - start);
   }
   g.globalAlpha = 1;
 }
@@ -361,7 +369,8 @@ export function drawWaterFront(g: CanvasRenderingContext2D, w: World) {
       g.globalCompositeOperation = 'source-over';
       fishLayer(g, w, 2);
       // breu do fundo também por cima das ruínas e do Karimbo (os cristais brilham por cima)
-      if (z.surface !== undefined) abyss(g, z, v, 0.9);
+      const range = waterDepthRange(z, w.water.zones);
+      if (z.surface !== undefined || range.span > z.h) abyss(g, z, v, 0.9, range);
       g.restore();
     } else {
       // pântano: água turva cobrindo as pernas

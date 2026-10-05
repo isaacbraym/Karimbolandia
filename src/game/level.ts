@@ -75,17 +75,41 @@ export class Level {
 
   /**
    * Raycast em tiles (DDA). Retorna fração t∈[0,1] do primeiro tile SÓLIDO atingido, ou -1.
-   * `oneWayBlocks`: plataformas one-way bloqueiam (usado por granadas quando descem).
    */
   rayHit(x0: number, y0: number, x1: number, y1: number): number {
     const dx = x1 - x0;
     const dy = y1 - y0;
-    const len = Math.hypot(dx, dy);
-    if (len < 0.0001) return this.solidAtPx(x0, y0) ? 0 : -1;
-    const steps = Math.ceil(len / 8);
-    for (let i = 0; i <= steps; i++) {
-      const t = i / steps;
-      if (this.solidAtPx(x0 + dx * t, y0 + dy * t)) return t;
+    if (this.solidAtPx(x0, y0)) return 0;
+    if (dx === 0 && dy === 0) return -1;
+    let col = Math.floor(x0 / TILE), row = Math.floor(y0 / TILE), t = 0;
+    const sx = Math.sign(dx), sy = Math.sign(dy);
+    const stepX = dx === 0 ? Infinity : TILE / Math.abs(dx);
+    const stepY = dy === 0 ? Infinity : TILE / Math.abs(dy);
+    let crossX = dx === 0 ? Infinity : ((col + (sx > 0 ? 1 : 0)) * TILE - x0) / dx;
+    let crossY = dy === 0 ? Infinity : ((row + (sy > 0 ? 1 : 0)) * TILE - y0) / dy;
+    while (t <= 1) {
+      const end = Math.min(1, crossX, crossY);
+      if (this.isSolid(col, row)) return t;
+      // Relevo é uma superfície linear dentro de cada coluna, não um tile retangular.
+      if (row === this.reliefRow - 1 && this.reliefSurface(col * TILE + TILE / 2) !== null) {
+        const slope = (this.relief[col + 1] - this.relief[col]) / TILE;
+        const gap = y0 + dy * t - (this.reliefRow * TILE - this.relief[col] - slope * (x0 + dx * t - col * TILE));
+        const rate = dy + slope * dx;
+        if (gap >= 0) return t;
+        if (rate > 0 && t - gap / rate <= end) return t - gap / rate;
+      }
+      if (end === 1) {
+        if (Math.abs(crossX - 1) < 1e-12 && this.isSolid(col + sx, row)) return 1;
+        if (Math.abs(crossY - 1) < 1e-12 && this.isSolid(col, row + sy)) return 1;
+        return this.solidAtPx(x1, y1) ? 1 : -1;
+      }
+      if (Math.abs(crossX - crossY) < 1e-12) {
+        // Supercover: touching a solid corner blocks the ray in either direction.
+        if (this.isSolid(col + sx, row) || this.isSolid(col, row + sy)) return end;
+        col += sx; row += sy; crossX += stepX; crossY += stepY;
+      } else if (crossX < crossY) { col += sx; crossX += stepX; }
+      else { row += sy; crossY += stepY; }
+      t = end;
     }
     return -1;
   }

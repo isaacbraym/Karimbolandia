@@ -18,6 +18,22 @@ async function jungle() {
 }
 
 describe('Atlântida e o lago fundo', () => {
+  it('o fôlego sem traje dura exatamente 15% mais no raso e sob pressão', async () => {
+    const w=await jungle(),p=w.player;
+    expect(p.oxyMax).toBeCloseTo(12*1.15);expect(p.oxygen).toBe(p.oxyMax);
+    p.swimming=true;p.body.x=520*32+16;
+    for(const depth of [7,16]) {
+      p.body.y=(34+depth)*32+22;p.oxygen=p.oxyMax;
+      const rate=1+Math.max(0,depth-10)*0.45;
+      (p as any).updateOxygen(w,12/rate);
+      expect(p.oxygen).toBeCloseTo(1.8); // The former full breath has elapsed.
+      (p as any).updateOxygen(w,1.79/rate);
+      expect(p.oxygen).toBeGreaterThan(0);
+      (p as any).updateOxygen(w,.02/rate);
+      expect(p.oxygen).toBe(0);
+    }
+    p.reset(p.x,p.body.y);expect(p.oxygen).toBeCloseTo(13.8);
+  });
   it('o lago ficou 2× mais largo e 7× mais fundo, com a superfície real em cima', async () => {
     const { DEEP_X0, DEEP_X1, ABYSS_FLOOR, LAKE_X0, LAKE_X1, LAKE_TOP, LAKE_FLOOR } = await import('../src/game/level/atlantis');
     const w = await jungle();

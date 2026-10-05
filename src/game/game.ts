@@ -100,6 +100,8 @@ export class Game {
   /** narrador: fala tocando agora */
   private narrClip: ClipHandle | null = null;
   private narrId = -1;
+  /** balada da fase 1: música em loop */
+  private clubClip: ClipHandle | null = null;
   private opening = new OpeningOverlay();
   /** a abertura narrada só passa no começo de uma partida nova (não em QA com teleporte) */
   private noOpening = new URLSearchParams(location.search).has('tp');
@@ -189,12 +191,7 @@ export class Game {
       if (this.state === 'comic') this.comicTap = true;
       else if (this.state === 'playing' && (this.world?.director.longIntroActive() || this.world?.director.openingActive())) this.introTap = true;
     };
-    this.input.onMenuKey = (code) => {
-      if (this.state === 'playing') return;
-      if(this.investigation){this.investigation.handleKey(code);return;}
-      if (this.menus.handleKey(code)) return;
-      if (code === 'Escape' && this.state === 'paused') this.resume();
-    };
+    this.input.onMenuKey = (code) => this.handleMenuKey(code);
     this.input.enabled = false;
     this.pickQuality();
     this.resize();
@@ -571,6 +568,13 @@ export class Game {
     };
   }
 
+  private handleMenuKey(code: string) {
+    if (this.state === 'playing') return;
+    if (this.investigation) { this.investigation.handleKey(code); return; }
+    if (this.menus.handleKey(code)) return;
+    if (code === 'Escape' && this.state === 'paused') this.resume();
+  }
+
   pause() {
     if (this.state !== 'playing') return;
     this.saveGame();
@@ -581,6 +585,7 @@ export class Game {
     audio.setUnderwater(0);
     this.introClip?.pause();
     this.narrClip?.pause();
+    this.clubClip?.pause();
     audio.setDuck(0.3);
     audio.loop('glide', false);
     audio.loop('roll', false);
@@ -598,6 +603,7 @@ export class Game {
     this.touch.show(!this.world?.director.longIntroActive() && (this.isTouch || this.input.touch.active));
     this.introClip?.resume();
     this.narrClip?.resume();
+    this.clubClip?.resume();
     audio.setDuck(1);
     this.pacer.reset(this.last = performance.now());
     this.updateRotate();
@@ -738,6 +744,7 @@ export class Game {
     this.introClip = null;
     this.comic?.stopVoice(0.1);
     this.comic = null;
+    this.stopClubMusic(0.2);
     audio.setCineDuck(1, 0.3);
   }
 
@@ -805,6 +812,7 @@ export class Game {
     this.state = 'complete';
     this.input.enabled = false;
     this.touch.show(false);
+    this.stopClubMusic(0.2);
     audio.loop('glide', false);
     audio.loop('roll', false);
     audio.loop('alarm', false);
@@ -827,14 +835,19 @@ export class Game {
     if (w.data.stage === 1) this.persistRun(nextStageSave(w, 2));
     else this.persistRun(null);
     window.setTimeout(() => {
+      if (this.state !== 'complete' || this.world !== w) return;
       this.menus.showResults({
         nextStage: w.data.stage === 1 ? 2 : undefined,
         time: w.time, score: w.score, tokens: w.tokens, emblems: w.emblems.size, secrets: w.secrets.size, kills: w.stats.kills, deaths: w.stats.deaths, rank, newBest, bestCombo: w.bestCombo,
       });
-      this.input.onMenuKey = (code) => {
-        if (this.menus.handleKey(code)) return;
-      };
     }, 400);
+  }
+
+  private stopClubMusic(fade = 0.25) {
+    if (this.clubClip) {
+      this.clubClip.stop(fade);
+      this.clubClip = null;
+    }
   }
 
   // ------------------------------------------------------------------ música
@@ -843,7 +856,39 @@ export class Game {
     this.wasMusic = s;
     // na selva o tema da fase é o tribal (tambores, marimba e flauta)
     const jungle = this.world?.data.stage === 2;
+    const isStage1Club = this.world?.data.stage === 1 && (s === 'club' || s === 'drop' || s === 'rave');
     const m = (theme: ThemeName, mix: Parameters<typeof music.play>[1]) => music.play(jungle && theme === 'stage' ? 'jungle' : theme, mix);
+
+    if (isStage1Club) {
+      // Somente na fase 1 dentro da balada: música do vídeo em loop
+      if (!this.clubClip || !this.clubClip.playing) {
+        this.clubClip = audio.playMusicClip('balada', { loop: true, vol: 1, fadeIn: 0.25 });
+      } else {
+        this.clubClip.setVol(1, 0.08);
+      }
+      if (this.clubClip?.playing) {
+        // Balada tocando: roda o relógio visual (150 BPM) sem instrumentos procedurais
+        music.play('rave', {});
+      } else {
+        // Fallback procedural (áudio ainda baixando ou ambiente sem decodificador)
+        if (s === 'rave') music.play('rave', MIX.rave);
+        else m('stage', s === 'drop' ? MIX.drop : MIX.club);
+      }
+      return;
+    }
+
+    if (s === 'silence') {
+      if (this.clubClip?.playing) {
+        this.clubClip.setVol(0.0001, 0.04);
+      }
+      music.setMix({}, 0.15);
+      return;
+    }
+
+    if (this.clubClip) {
+      this.stopClubMusic(0.25);
+    }
+
     switch (s) {
       case 'menu': m('menu', MIX.menu); break;
       case 'explore': m('stage', MIX.explore); break;
@@ -860,7 +905,6 @@ export class Game {
       case 'boss3': m('boss', MIX.boss3); break;
       case 'victory': m('stage', MIX.victory); break;
       case 'rave': music.play('rave', MIX.rave); break;
-      case 'silence': music.setMix({}, 0.15); break;
     }
   }
 
@@ -918,7 +962,6 @@ export class Game {
     const w = this.world;
 
     const t0 = performance.now();
-    if(this.investigation&&this.state==='paused')this.investigation.updatePad(this.input.state);
     if (this.state === 'playing' && w) {
       if (this.input.state.pause.pressed) {
         this.input.clearEdges();

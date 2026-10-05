@@ -94,6 +94,7 @@ export class Investigation {
   }
   handleKey(code:string) {
     if(code==='Escape'){this.exit();return true;}
+    if(code==='Enter'||code==='Space'){(document.activeElement as HTMLButtonElement)?.click();return true;}
     if(code==='ArrowLeft'||code==='ArrowRight'||code==='ArrowUp'||code==='ArrowDown') {
       this.moveFocus(code==='ArrowLeft'||code==='ArrowUp'?-1:1);return true;
     }

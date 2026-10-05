@@ -12,7 +12,7 @@ import { newNomad } from './player';
 import { NOMAD_W, NOMAD_H, FOOT_H } from './movement';
 import { BASE_ZOOM, EXPLORE_ZOOM, MIN_THREAT_ZOOM, SWING_ZOOM } from './camera';
 import { glowSprite } from '../art/kit';
-import { drawDeco, resetDecoBudget } from '../art/decor';
+import { drawDeco, resetDecoBudget, decoExtent } from '../art/decor';
 import { drawSpr } from '../art/kit';
 import { INTRO_TOTAL, INTRO_DROP, INTRO_COMIC, INTRO_COMIC_LEN, type IntroOverlay } from './bossIntro';
 import type { Felipao } from './enemies/felipao';
@@ -151,6 +151,12 @@ export class Director {
   private parDecos: number[] = [];
   /** Busca espacial das decorações; a ordenação original é preservada ao desenhar. */
   private decoBuckets = { back: new Map<number, number[]>(), front: new Map<number, number[]>() };
+  /** Static spawn bounds and ordered bucket unions are shared across frames. */
+  private decoBounds: ReturnType<typeof decoExtent>[] = [];
+  private decoQueries = {
+    back: { left: NaN, right: NaN, indices: [] as number[], seen: new Set<number>() },
+    front: { left: NaN, right: NaN, indices: [] as number[], seen: new Set<number>() },
+  };
 
   constructor(w: World) {
     this.w = w;
@@ -160,15 +166,18 @@ export class Director {
       .filter((e) => !e.arena && e.type === 'rifle' && e.x >= shootX)
       .reduce<EnemySpawn | null>((best, e) => !best || e.x < best.x ? e : best, null);
     w.data.decos.forEach((d, i) => {
+      const bounds = decoExtent(d);
+      this.decoBounds[i] = bounds;
       if (d.par) {
         this.parDecos.push(i);
         return;
       }
-      const key = Math.floor(d.x / 512);
       const buckets = this.decoBuckets[d.layer];
-      const list = buckets.get(key) ?? [];
-      list.push(i);
-      buckets.set(key, list);
+      for (let key = Math.floor(bounds[0] / 512); key <= Math.floor(bounds[2] / 512); key++) {
+        const list = buckets.get(key) ?? [];
+        list.push(i);
+        buckets.set(key, list);
+      }
     });
     this.gateTile = Math.floor(w.data.nomadSpawn.x / 32) + 36;
     this.hordeFrom = this.gateTile + 4;
@@ -215,6 +224,8 @@ export class Director {
 
   // ------------------------------------------------------------------ respawn
   onRespawn() {
+    this.triggered.delete('dismount');
+    if (this.cine?.kind === 'bossDeath') this.finishBossVictory();
     // arenas ativas (não limpas) voltam ao estado inicial
     for (const a of this.arenas) {
       if (a.status === 'active') {
@@ -255,9 +266,10 @@ export class Director {
   }
   afterPopulate() {
     // reaplica barreiras de arenas limpas: nenhuma (cleared = livre)
+    if (this.w.data.enemies.some(e => e.type === 'boss' && this.w.killedEnemies.has(e.id))) this.finishBossVictory();
   }
   afterRespawn() {
-    this.w.setMusic('explore');
+    this.w.setMusic(this.finishTimer >= 0 ? 'victory' : 'explore');
   }
 
   /** Reembarca no Nômad ao respawnar num checkpoint pós-encontro. */
@@ -344,13 +356,14 @@ export class Director {
     if (e.isBoss) this.onBossDefeated(e);
   }
   onPlayerDied() {
+    if (this.cine?.kind === 'bossDeath') this.finishBossVictory();
     if (this.cine) this.cine = null;
     this.w.camera.focus = null;
   }
   onRevive() {
     this.cine = null;
     this.w.camera.focus = null;
-    this.w.music(this.w.player.mounted ? 'nomad' : 'combat');
+    this.w.music(this.finishTimer >= 0 ? 'victory' : this.w.player.mounted ? 'nomad' : 'combat');
   }
   onPropBroken(p: Prop) {
     void p;
@@ -1348,10 +1361,27 @@ export class Director {
     w.fx.slowmo = 2.6;
     w.fx.slowScale = 0.3;
     for (const en of w.enemies) if (en.alive && en !== e) en.kill(w);
+    for (const b of w.bullets) b.dead = true;
     w.bullets.length = 0;
+    w.interceptableBullets.clear();
     this.bossDeathPos = { x: e.x, y: e.y };
   }
   bossDeathPos = { x: 0, y: 0 };
+
+  /** Victory survives interruption by a fall, Continue or a checkpoint respawn. */
+  private finishBossVictory() {
+    this.cine = null;
+    this.w.player.lockInput = false;
+    this.finishTimer = 3.2;
+    for (const a of this.arenas) if (a.def.id === 'boss') {
+      a.status = 'cleared';
+      for (const barrier of a.barriers) barrier.alive = false;
+      a.barriers = [];
+    }
+    this.w.solidsDirty = true;
+    this.w.camera.lock = this.currentLock();
+    this.w.setMusic('victory');
+  }
 
   private updateBossDeath(dt: number, c: Cine) {
     const w = this.w;
@@ -1471,24 +1501,37 @@ export class Director {
   }
 
   // ------------------------------------------------------------------ desenho
+  private nearbyDecos(layer: 'back' | 'front', left: number, right: number) {
+    const query = this.decoQueries[layer];
+    if (query.left === left && query.right === right) return query.indices;
+    query.left = left;
+    query.right = right;
+    query.indices.length = 0;
+    query.seen.clear();
+    const buckets = this.decoBuckets[layer];
+    for (let key = left; key <= right; key++) {
+      const list = buckets.get(key);
+      if (list) for (const i of list) if (!query.seen.has(i)) {
+        query.seen.add(i);
+        query.indices.push(i);
+      }
+    }
+    query.indices.sort((a, b) => a - b);
+    return query.indices;
+  }
+
   drawDecos(g: CanvasRenderingContext2D, layer: 'back' | 'front') {
     if (layer === 'back') resetDecoBudget(2);
     const cam = this.w.camera;
     const t = this.w.time;
     const decos = this.w.data.decos as DecoSpawn[];
     const smashed = this.w.smash.smashed;
-    const visible: number[] = [];
-    const buckets = this.decoBuckets[layer];
     const left = Math.floor((cam.x - 200) / 512);
     const right = Math.floor((cam.x + cam.w + 200) / 512);
-    for (let key = left; key <= right; key++) {
-      const list = buckets.get(key);
-      if (list) visible.push(...list);
-    }
-    visible.sort((a, b) => a - b);
-    for (const i of visible) {
+    for (const i of this.nearbyDecos(layer, left, right)) {
       const d = decos[i];
-      if (d.x < cam.x - 200 || d.x > cam.x + cam.w + 200) continue;
+      const bounds = this.decoBounds[i];
+      if (bounds[2] < cam.x || bounds[0] > cam.x + cam.w) continue;
       if (smashed.has(i)) continue;
       drawDeco(g, d, t);
     }
@@ -1500,7 +1543,8 @@ export class Director {
         const d = decos[i];
         const par = d.par!;
         const ox = (d.x - cx) * par;
-        if (Math.abs(d.x + ox - cx) > cam.w / 2 + 320) continue;
+        const bounds = this.decoBounds[i];
+        if (bounds[2] + ox < cam.x || bounds[0] + ox > cam.x + cam.w) continue;
         // o que pende do alto fica preso na altura; o que nasce do chão também sobe/desce com a câmera
         const ground = d.kind === 'pPillar' || d.kind === 'pLeaves' || d.kind === 'pcPole' || d.kind === 'pcDebris' || d.kind === 'pReeds' || d.kind === 'puKelp';
         const oy = ground ? (d.y - cy) * par * 0.6 : 0;
@@ -1512,7 +1556,8 @@ export class Director {
     }
     if (layer === 'back') {
       for (const d of this.w.smash.extra) {
-        if (d.x < cam.x - 200 || d.x > cam.x + cam.w + 200) continue;
+        const bounds = decoExtent(d);
+        if (bounds[2] < cam.x || bounds[0] > cam.x + cam.w) continue;
         drawDeco(g, d, t);
       }
     }

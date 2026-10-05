@@ -4,7 +4,7 @@
  * (rostos e corpos dos civis); por quadro só transformações e formas simples (sem gradiente).
  */
 import type { World } from '../game/world';
-import { CLUB_CROWD } from '../game/club';
+import { CLUB_CROWD, CLUB_T } from '../game/club';
 import { bakeCivilians, civArtFor, drawCivilian, type CivPoseSrc } from './civilians';
 import { bakeFace, drawFigure, figureLook, newPose, type FigureLook, type FigurePose } from './figure';
 import { glowSprite, OUT, type Sprite } from './kit';
@@ -125,7 +125,7 @@ export function drawClub(g: CanvasRenderingContext2D, w: World, layer: 'back' | 
       drawCivilian(g, ca, d.x, club.floorY, src, false);
     }
     if (a.siv && Number.isFinite(club.sivX)) drawSivirino(g, a.siv, club.sivX, club.floorY, t, beat, club.active);
-  } else if (club.active && club.t > 1.3 && club.t < 8.6 && beat < 0.12) {
+  } else if (club.active && club.t > CLUB_T.dance && club.t < CLUB_T.turn && beat < 0.12) {
     // estrobo leve no tempo forte (sem piscar a tela inteira)
     g.globalCompositeOperation = 'lighter';
     g.globalAlpha = 0.07;

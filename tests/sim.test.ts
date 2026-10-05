@@ -5,6 +5,7 @@ import { TILE } from '../src/game/level';
 import { pickLoot } from '../src/game/props';
 import type { World } from '../src/game/world';
 import type { ControlState } from '../src/core/input';
+import { decoExtent } from '../src/art/decor';
 
 /** Roda a apresentação e faz o Karimbo cair em cima do Nômad. */
 function mountNomad(w: World, ctl: ControlState) {
@@ -335,12 +336,13 @@ describe('Agachar desvia de tiros retos', () => {
       for (const layer of ['back', 'front'] as const) {
         const lo = camX - 200;
         const hi = camX + 1200;
-        const expected = w.data.decos.flatMap((d, i) => d.layer === layer && !d.par && d.x >= lo && d.x <= hi ? [i] : []);
+        const overlaps = (i: number) => { const b = decoExtent(w.data.decos[i]); return b[2] >= lo && b[0] <= hi; };
+        const expected = w.data.decos.flatMap((d, i) => d.layer === layer && !d.par && overlaps(i) ? [i] : []);
         const actual: number[] = [];
         for (let key = Math.floor(lo / 512); key <= Math.floor(hi / 512); key++) actual.push(...(buckets[layer].get(key) ?? []));
-        actual.sort((a, b) => a - b);
-        expect(actual.filter((i) => w.data.decos[i].x >= lo && w.data.decos[i].x <= hi)).toEqual(expected);
-        expect(actual.length).toBeLessThan(w.data.decos.length);
+        const unique = [...new Set(actual)].sort((a, b) => a - b);
+        expect(unique.filter(overlaps)).toEqual(expected);
+        expect(unique.length).toBeLessThan(w.data.decos.length);
       }
     }
   });

@@ -196,6 +196,7 @@ export class World {
   destroyedProps = new Set<number>();
   killedEnemies = new Set<number>();
   collectedPickups = new Set<number>();
+  rhythmRepeats = new Set<number>();
   stats: Stats = { kills: 0, deaths: 0, damageTaken: 0, dashes: 0, shots: 0, pitFalls: 0, time: 0 };
   hooks: Hooks = {};
   timers: { t: number; fn: () => void }[] = [];
@@ -261,6 +262,7 @@ export class World {
     this.destroyedProps.clear();
     this.killedEnemies.clear();
     this.collectedPickups.clear();
+    this.rhythmRepeats.clear();
     this.interiors?.clear();
     this.interiorLock?.clear();
     this.stats = { kills: 0, deaths: 0, damageTaken: 0, dashes: 0, shots: 0, pitFalls: 0, time: 0 };
@@ -336,7 +338,11 @@ export class World {
       this.props.push(new Prop(p));
     }
     for (const p of this.data.pickups) {
-      if (this.collectedPickups.has(p.id)) continue;
+      if (this.collectedPickups.has(p.id)) {
+        if (p.kind === 'note' && !this.rhythmRepeats.has(p.id) && !this.rhythm.done)
+          this.pickups.push(new Pickup('note', p.x, p.y, p.id, 1));
+        continue;
+      }
       this.pickups.push(new Pickup(p.kind, p.x, p.y, p.id, p.itemId ?? 0));
     }
     this.crowd.reset(this.data.civilians);
@@ -385,6 +391,7 @@ export class World {
   /** Nota musical pega: toca a próxima nota da melodia, encaixada no compasso. */
   private onNote(pk: Pickup) {
     const r = this.rhythm;
+    if (pk.itemId === 1 && pk.id >= 0) this.rhythmRepeats.add(pk.id);
     const idx = r.got++;
     const mel = r.club ? STAGE_MELODY : JUNGLE_MELODY;
     const midi = mel[idx % mel.length];
@@ -400,7 +407,7 @@ export class World {
       const y = pk.y;
       this.after(1.3, () => {
         if (r.done) return;
-        this.pickups.push(new Pickup('note', x, y, -1, 1));
+        this.pickups.push(new Pickup('note', x, y, pk.id, 1));
         this.fx.add(PK.Ring, x, y, 0, 0, 0.35, 4, col, { size1: 30, a0: 0.8, front: true });
       });
     }
@@ -803,6 +810,7 @@ export class World {
     this.bullets.push(new Bullet(x, y, vx, vy, o));
   }
   clearEnemyBullets() {
+    for (const b of this.bullets) if (b.team !== 0) b.dead = true;
     this.bullets = this.bullets.filter(b => b.team === 0);
     this.interceptableBullets.clear();
   }
@@ -1554,8 +1562,8 @@ function pitSprites() {
   return pitSpr;
 }
 
-/** duração das vozes gravadas dos personagens (s) */
-const CLIP_LEN: Record<ClipName, number> = { bossIntro: 15.7, karimboEncara: 3.7, karimboNomad: 1.5 };
+/** duração das vozes/clipes gravados dos personagens (s) */
+const CLIP_LEN: Record<ClipName, number> = { bossIntro: 15.7, karimboEncara: 3.7, karimboNomad: 1.5, balada: 140.2 };
 
 const WEAPON_AMMO_FLOOR: Record<WeaponId, number> = { pistol: Infinity, rifle: 18, shotgun: 4, launcher: 2, energy: 8 };
 

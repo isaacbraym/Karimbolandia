@@ -192,6 +192,7 @@ export class Bullet {
       }
       if (prop) {
         if (this.team === 1) {
+          if (this.explode) { this.impactWorld(w); return; }
           w.fx.sparks(x, y, 3, '#ffd27a', 140, -this.vx, -this.vy, 1.4);
           this.dead = true;return;
         }

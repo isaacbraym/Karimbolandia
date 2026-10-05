@@ -83,6 +83,24 @@ export class Input {
   private down = new Set<string>();
   // A press/release can fit entirely between two rendered frames, especially after pacing.
   private keyTaps=new Set<string>();
+  private touchJumpTaps: number[] = [];
+  private touchJumpSerial = 0;
+  /** Each finger-down is a distinct jump, even if both taps fit between polls. */
+  beginTouchJump() {
+    if (!this.enabled) return 0;
+    this.suppressed.delete('jump');
+    const id = ++this.touchJumpSerial;
+    this.touchJumpTaps.push(id);
+    return id;
+  }
+  cancelTouchJump(id: number) {
+    const i = this.touchJumpTaps.indexOf(id);
+    if (i >= 0) this.touchJumpTaps.splice(i, 1);
+  }
+  clearTouchJump() {
+    this.touchJumpTaps.length = 0;
+    this.touch.held.jump = false;
+  }
   private prevRaw: Record<ActionName, boolean> = { jump: false, fire: false, grenade: false, special: false, next: false, prev: false, pause: false, reload:false, interact:false };
   /** false nos interiores: o mouse vira só ponteiro (não dispara tiro/granada) */
   mouseActions = true;
@@ -102,6 +120,7 @@ export class Input {
   onGesture: (() => void) | null = null;
   /** Tecla de menu (Enter/Espaço/Esc) usada pelos overlays DOM — o jogo usa `state`. */
   onMenuKey: ((code: string) => void) | null = null;
+  private padMenuHeld = new Set<string>();
   private active = true;
   get enabled() { return this.active; }
   set enabled(v: boolean) {
@@ -115,9 +134,10 @@ export class Input {
     // Só descarta apertos pendentes: A/D/setas seguradas continuam andando (ações presas são
     // contidas pela lista `suppressed` abaixo até o botão ser solto).
     this.keyTaps.clear();
+    this.touchJumpTaps.length = 0;
     this.mouseTap = this.mouseRightTap = false;
     for (const action of ACTIONS) {
-      if (this.state[action].held) this.suppressed.add(action);
+      if (this.state[action].held || this.touch.held[action]) this.suppressed.add(action);
       this.state[action].held = this.state[action].pressed = this.state[action].released = false;
     }
   }
@@ -212,6 +232,7 @@ export class Input {
   private releaseAll() {
     this.keys.clear();
     this.keyTaps.clear();
+    this.clearTouchJump();
     this.mouseTap=this.mouseRightTap=false;
     this.mouseDown = false;
     this.mouseRight = false;
@@ -276,7 +297,7 @@ export class Input {
       const padFire = b(2) || b(7);
       const padNade = b(1) || b(6);
       const padSpecial = b(3);
-      const any = Math.abs(padX) > 0 || Math.abs(padY) > 0 || padJump || padFire || padNade || padSpecial || b(11) || b(8);
+      const any = Math.abs(padX) > 0 || Math.abs(padY) > 0 || padJump || padFire || padNade || padSpecial || b(9) || b(11) || b(8);
       if (any) {
         this.padSeen = true;
         s.device = 'pad';
@@ -299,11 +320,15 @@ export class Input {
 
     // ---- toque
     const t = this.touch;
+    const jumpTap = t.active && this.enabled && !this.suppressed.has('jump')
+      ? this.touchJumpTaps.shift() !== undefined : false;
+    if (!t.active || !this.enabled) this.touchJumpTaps.length = 0;
     if (t.active) {
       // (movimentação digital por limiar; mira analógica)
       mx += Math.abs(t.stickX) > 0.3 ? Math.sign(t.stickX) : 0;
       my += t.stickY;
       for (const a of ACTIONS) raw[a] = raw[a] || t.held[a];
+      raw.jump = raw.jump || jumpTap;
       s.device = 'touch';
     }
 
@@ -329,10 +354,28 @@ export class Input {
       const b = s[a];
       const prev = this.prevRaw[a];
       b.held = raw[a];
-      b.pressed = raw[a] && !prev;
+      b.pressed = raw[a] && (!prev || (a === 'jump' && jumpTap));
       b.released = !raw[a] && prev;
       this.prevRaw[a] = raw[a];
     }
+    // Track raw pad edges even during play, so Start opening pause cannot close it too.
+    const menuKeys = new Set<string>();
+    if (gp) {
+      const b = (i: number) => !!gp.buttons[i]?.pressed;
+      if (b(9) || b(1) || b(8)) menuKeys.add('Escape');
+      if (b(0)) menuKeys.add('Enter');
+      if (b(12) || (gp.axes[1] ?? 0) < -0.5) menuKeys.add('ArrowUp');
+      if (b(13) || (gp.axes[1] ?? 0) > 0.5) menuKeys.add('ArrowDown');
+      if (b(14) || (gp.axes[0] ?? 0) < -0.5) menuKeys.add('ArrowLeft');
+      if (b(15) || (gp.axes[0] ?? 0) > 0.5) menuKeys.add('ArrowRight');
+    }
+    const menuOpen = !this.enabled;
+    for (const code of menuKeys) if (menuOpen && !this.padMenuHeld.has(code)) {
+      this.onMenuKey?.(code);
+      this.suppressHeldActions();
+      break;
+    }
+    this.padMenuHeld = menuKeys;
   }
 
   /** Limpa bordas após o primeiro substep de simulação do frame. */

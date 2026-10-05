@@ -14,8 +14,8 @@ import { rollLook, type CivLook } from './civLook';
 import { nullControls } from './player';
 
 export const CLUB_DANCE_ID = 'club:dance';
-/** tempos da cena (s) */
-export const CLUB_T = { walk: 1.1, dance: 1.3, sivirino: 4.6, turn: 8.6, max: 15 } as const;
+/** tempos da cena (s): dança antes do Sivirino estendida em +5 segundos */
+export const CLUB_T = { walk: 1.1, dance: 1.3, sivirino: 9.6, turn: 13.6, max: 20 } as const;
 const BPM = 150;
 
 
