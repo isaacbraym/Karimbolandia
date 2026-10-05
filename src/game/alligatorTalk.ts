@@ -65,6 +65,7 @@ export class AlligatorTalk {
   private koLine = 0;
   private pokeT = 0;
   private requested = false;
+  private regrant = false;
 
   constructor(data: Pick<LevelData, 'decos'>) {
     this.dance = data.decos.find((d) => d.kind === 'villageDance') ?? null;
@@ -85,6 +86,8 @@ export class AlligatorTalk {
     this.poke = -1;
     this.requested = false;
     this.lockT = 0;
+    // partida nova (a roda ainda não foi feita): esquece a derrota anterior
+    if (!w?.encounters.completed.has(DANCE_ID)) this.lost = false;
     // quem já venceu volta a vê-lo dançando de curativo (o nocaute só dura enquanto o Karimbo está por perto)
     this.mode = w?.encounters.completed.has(GATOR_ID) ? 'bandaged' : 'dance';
   }
@@ -224,6 +227,8 @@ export class AlligatorTalk {
     const p = w.player;
     // restaurar um save com a vitória: sempre começa de curativo
     if (this.mode === 'dance' && w.encounters.completed.has(GATOR_ID)) this.mode = 'bandaged';
+    // a vitória está no save mas a skin não (perfil de recompensas perdido ou gravação que falhou): entrega de novo, uma vez
+    if (!this.regrant && w.encounters.completed.has(GATOR_ID)) { this.regrant = true; if (grantSkin('jacare', 'boxing')) w.hooks.onProgress?.(); }
     const far = Math.abs(p.x - d.x);
     if (far > TALK_RESET && !this.busy && !this.ownsLock) this.stage = 0;
     if (this.mode === 'ko' && far > KO_FAR) { this.mode = 'bandaged'; this.poke = -1; }

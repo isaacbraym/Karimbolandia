@@ -19,6 +19,11 @@ export type MiniButton = 'jab' | 'cruzE' | 'ganchoE' | 'direto' | 'cruzD' | 'gan
 export type MiniPad = Record<MiniButton, Btn>;
 export const MINI_BUTTONS: readonly MiniButton[] = ['jab', 'cruzE', 'ganchoE', 'direto', 'cruzD', 'ganchoD', 'esqE', 'esqD', 'guarda', 'especial'];
 export type MiniMode = 'boxing' | 'chase';
+/** Teclas do boxe: 6 golpes (QWE / JKL), esquivas (A/D ou setas), guarda (S/↓) e especial (Espaço/Enter). */
+const MINI_KEYS: Record<MiniButton, string[]> = {
+  jab: ['KeyQ'], cruzE: ['KeyW'], ganchoE: ['KeyE'], direto: ['KeyJ'], cruzD: ['KeyK'], ganchoD: ['KeyL'],
+  esqE: ['KeyA', 'ArrowLeft'], esqD: ['KeyD', 'ArrowRight'], guarda: ['KeyS', 'ArrowDown'], especial: ['Space', 'Enter'],
+};
 const newMiniPad = (): MiniPad => Object.fromEntries(MINI_BUTTONS.map((b) => [b, { held: false, pressed: false, released: false }])) as MiniPad;
 const newMiniHeld = (): Record<MiniButton, boolean> => Object.fromEntries(MINI_BUTTONS.map((b) => [b, false])) as Record<MiniButton, boolean>;
 
@@ -108,7 +113,8 @@ export class Input {
     this.miniPrev = newMiniHeld();
     this.miniSuppressed.clear();
     this.touch.miniTaps.length = 0;
-    if (mode === 'boxing') for (const b of MINI_BUTTONS) if (this.touch.mini[b]) this.miniSuppressed.add(b);
+    // o que já está apertado (toque ou teclado) só vale depois de solto: nada de esquiva/guarda/soco "de graça" na entrada
+    if (mode === 'boxing') for (const b of MINI_BUTTONS) if (this.touch.mini[b] || MINI_KEYS[b].some((c) => this.keys.has(c) || this.down.has(c))) this.miniSuppressed.add(b);
     this.suppressHeldActions();
   }
 
@@ -318,10 +324,7 @@ export class Input {
     // minijogo de boxe: teclas dos 6 golpes, esquivas, guarda e especial (lidas antes de limpar os toques de tecla)
     const mraw = this._miniMode === 'boxing' ? newMiniHeld() : null;
     if (mraw) {
-      mraw.jab = this.k('KeyQ'); mraw.cruzE = this.k('KeyW'); mraw.ganchoE = this.k('KeyE');
-      mraw.direto = this.k('KeyJ'); mraw.cruzD = this.k('KeyK'); mraw.ganchoD = this.k('KeyL');
-      mraw.esqE = this.k('KeyA', 'ArrowLeft'); mraw.esqD = this.k('KeyD', 'ArrowRight');
-      mraw.guarda = this.k('KeyS', 'ArrowDown'); mraw.especial = this.k('Space', 'Enter');
+      for (const b of MINI_BUTTONS) mraw[b] = this.k(...MINI_KEYS[b]);
     }
     this.keyTaps.clear();this.mouseTap=this.mouseRightTap=false;
     this.wheelNext = this.wheelPrev = false;

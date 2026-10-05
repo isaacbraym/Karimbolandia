@@ -452,7 +452,7 @@ export class TouchUI {
     for (const b of MINI_BUTTONS) { this.clearRelease('mini:' + b); t.mini[b] = false; }
     t.miniTaps.length = 0;
     const z = this.zone; // (ausente em controles montados só para teste)
-    if (z) { window.clearTimeout(z.timer); z.id = -1; }
+    if (z) { window.clearTimeout(z.timer); z.id = -1; this.root.querySelector('.mzone')?.classList.remove('down'); }
     t.stickX = t.stickY = 0;
     t.aimX = t.aimY = 0;
     this.stickId = -1;

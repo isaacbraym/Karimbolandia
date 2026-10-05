@@ -106,7 +106,12 @@ export class MinigameFlow {
       if (this.failed.has(id)) this.phase = this.abortLoad(w);
       else if (this.mods.has(id)) this.begin(w);
     } else if (this.phase === 'live' && this.session) {
-      this.session.update(dt, ctl);
+      try { this.session.update(dt, ctl); } catch (e) {
+        console.error('minijogo (quadro)', e);
+        this.finish(w, null);
+        this.host.input.clearEdges();
+        return;
+      }
       if (this.session.done) this.finish(w, this.session.result());
     } else if (this.phase === 'back') {
       this.t += dt;
@@ -166,7 +171,7 @@ export class MinigameFlow {
   private finish(w: World, r: MinigameResult | null) {
     const s = this.session!;
     this.session = null;
-    s.dispose();
+    try { s.dispose(); } catch (e) { console.error('minijogo (descarte)', e); }
     this.restore(w);
     const result = r ?? { id: this.id!, outcome: 'abort' as const, time: 0, mistakes: 0 };
     this.fire(result);

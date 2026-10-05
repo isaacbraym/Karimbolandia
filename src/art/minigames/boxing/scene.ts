@@ -153,7 +153,7 @@ export class BoxingScene {
   private drawCine(g: CanvasRenderingContext2D, m: BoxingMatch, W: number, H: number) {
     const u = H / 360, t = m.cineT;
     if (m.cine === 'orelhada') {
-      if (t < 1.6) txt(g, 'ORELHADA!', W / 2, H * 0.2, 24 * u * (0.9 + 0.1 * Math.sin(this.time * 18)), '#ffe27a', 'center', Math.min(1, t * 3));
+      if (t < 1.6) txt(g, 'ORELHADA!', W / 2, H * 0.2, 24 * u, '#ffe27a', 'center', Math.min(1, t * 3), 0.9 + 0.1 * Math.sin(this.time * 18));
       else {
         // quadro de impacto de HQ: letreiro enorme com retícula
         const k = clamp01((t - 1.6) / 0.25);

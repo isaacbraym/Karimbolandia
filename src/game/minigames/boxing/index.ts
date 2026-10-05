@@ -64,8 +64,8 @@ class BoxingSession implements MinigameSession {
       case 'orelhada': this.ctx.music('silence'); audio.play('laserCharge', 0.8); break;
       case 'impact': audio.play('bigExplosion', 1); audio.play('punchHeavy', 1); break;
       case 'count': audio.play('thump', 0.4); break;
-      case 'win': this.ctx.music('victory'); audio.play('victory', 0.9); break;
-      case 'lose': audio.play('crowdLaugh', 0.9); this.ctx.music('silence'); break;
+      case 'win': audio.play('victory', 0.9); break;
+      case 'lose': audio.play('crowdLaugh', 0.9); break;
       default: break;
     }
   }

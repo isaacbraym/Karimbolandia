@@ -202,7 +202,8 @@ export class BoxingMatch {
     this.k.didHit = true;
     this.hitsLanded++;
     this.streak++;
-    this.recentHits.push(this.time);
+    // só socos na guarda fechada contam para "ele lê o soco repetido": punir o deboche/recuperação não o faz se cobrir depois
+    if (g.mode === 'guard') this.recentHits.push(this.time);
     while (this.recentHits.length && this.time - this.recentHits[0] > COVER_WINDOW) this.recentHits.shift();
     if (g.mode === 'taunt') g.tauntHits++;
     this.emit('hit', { punch: p, amount: dmg });
@@ -263,6 +264,7 @@ export class BoxingMatch {
         g.stanceT -= dt;
         if (g.stanceT <= 0) { g.stance = g.stance === 'alta' ? 'baixa' : 'alta'; g.stanceT = 1.2 + this.rng.next() * 1.0; }
         // soco repetido sem parar: ele lê, se cobre e depois contra-ataca
+        while (this.recentHits.length && this.time - this.recentHits[0] > COVER_WINDOW) this.recentHits.shift();
         if (this.recentHits.length >= COVER_HITS) { g.mode = 'cover'; g.coverT = COVER_TIME; break; }
         g.thinkT -= dt;
         if (g.thinkT <= 0 && k.action !== 'down') this.decide();

@@ -194,3 +194,31 @@ describe('depois do boxe: derrota, vitória, nocaute e curativo', () => {
     expect(w.village.talk.busy).toBe(false);
   });
 });
+
+describe('revisão T5–T8: reinício e skin', () => {
+  it('nova partida depois de vencer: o jacaré volta a dançar (sem curativo) e esquece a derrota', async () => {
+    const { w, d } = await village();
+    w.encounters.completed.add('jungle:alligator-boxing');
+    w.village.talk.lost = true;
+    for (let i = 0; i < 10; i++) w.update(1 / 60, newCtl());
+    expect(w.village.talk.mode).toBe('bandaged');
+    w.restart();
+    for (let i = 0; i < 10; i++) w.update(1 / 60, newCtl());
+    expect(w.encounters.completed.has('jungle:alligator-boxing')).toBe(false);
+    expect(w.village.talk.mode).toBe('dance');
+    expect(w.village.talk.lost).toBe(false);
+    void d;
+  });
+
+  it('vitória no save sem a skin (perfil de recompensas perdido): a skin é entregue de novo, uma vez', async () => {
+    const { w, hooks } = await village();
+    const { progress } = await import('../src/core/storage');
+    expect(progress.ownedSkins).not.toContain('jacare');
+    w.encounters.completed.add('jungle:alligator-boxing');
+    for (let i = 0; i < 10; i++) w.update(1 / 60, newCtl());
+    expect(progress.ownedSkins.filter((s) => s === 'jacare').length).toBe(1);
+    for (let i = 0; i < 10; i++) w.update(1 / 60, newCtl());
+    expect(progress.ownedSkins.filter((s) => s === 'jacare').length).toBe(1);
+    expect(hooks.banners).not.toContain('SKIN DE JACARÉ DESBLOQUEADA!');
+  });
+});

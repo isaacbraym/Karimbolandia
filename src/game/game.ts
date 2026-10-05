@@ -571,7 +571,7 @@ export class Game {
       onProgress: () => this.queueSave(),
       onControlReturned: () => this.input.suppressHeldActions(),
       onBanner: (t, s, d) => this.hud.banner(t, s, d),
-      onMinigame: (id, done) => { this.mini.start(w, id, done); },
+      onMinigame: (id, done) => { if (!this.mini.start(w, id, done)) done({ id, outcome: 'abort', time: 0, mistakes: 0 }); },
       onMinigamePrefetch: (id) => this.mini.prefetch(id),
       onComplete: () => this.onComplete(),
       onMusic: (s) => this.setMusic(s),

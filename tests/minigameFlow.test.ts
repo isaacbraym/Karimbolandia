@@ -302,3 +302,52 @@ describe('toque do boxe: cada dedo é dono do seu botão (Foco 3)', () => {
     expect(input.state.mini!.esqE.pressed).toBe(false);
   });
 });
+
+describe('revisão T5–T8: robustez da entrada e do fluxo', () => {
+  it('teclas já seguradas ao entrar no boxe só valem depois de soltas', () => {
+    const input = new Input();
+    const keys = (input as unknown as { keys: Set<string>; down: Set<string> });
+    keys.keys.add('KeyD'); keys.down.add('KeyD'); keys.keys.add('KeyS'); keys.down.add('KeyS');
+    input.setMiniMode('boxing');
+    input.poll();
+    expect(input.state.mini!.esqD.pressed).toBe(false);
+    expect(input.state.mini!.guarda.held).toBe(false);
+    keys.keys.delete('KeyD'); keys.down.delete('KeyD'); keys.keys.delete('KeyS'); keys.down.delete('KeyS');
+    input.poll();
+    keys.keys.add('KeyD'); keys.down.add('KeyD');
+    input.poll();
+    expect(input.state.mini!.esqD.pressed).toBe(true);
+  });
+
+  it('sessão que lança exceção no quadro: aborta uma vez, descarta e devolve tudo', async () => {
+    const log = { disposed: 0 };
+    const s: MinigameSession = {
+      done: false, update() { throw new Error('boom'); }, draw() {}, resize() {}, result: () => null, dispose() { log.disposed++; },
+    };
+    const { w, flow, input, touchCalls } = await setup(s);
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const done = vi.fn();
+    flow.start(w, 'boxing', done);
+    await run(w, flow, 2);
+    expect(done).toHaveBeenCalledTimes(1);
+    expect(done).toHaveBeenCalledWith(expect.objectContaining({ outcome: 'abort' }));
+    expect(log.disposed).toBe(1);
+    expect(input.miniMode).toBeNull();
+    expect(touchCalls.at(-1)).toBeNull();
+    expect(flow.active).toBe(false);
+  });
+
+  it('descarte que lança exceção não deixa o jogo preso no modo do minijogo', async () => {
+    const s: MinigameSession = {
+      get done() { return true; }, update() {}, draw() {}, resize() {}, result: () => ({ id: 'boxing', outcome: 'win', time: 1, mistakes: 0 }), dispose() { throw new Error('dispose'); },
+    };
+    const { w, flow, input } = await setup(s);
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const done = vi.fn();
+    flow.start(w, 'boxing', done);
+    await run(w, flow, 3);
+    expect(done).toHaveBeenCalledTimes(1);
+    expect(input.miniMode).toBeNull();
+    expect(flow.active).toBe(false);
+  });
+});

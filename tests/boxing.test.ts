@@ -209,3 +209,15 @@ describe('boxe: equilíbrio com bots', () => {
     expect(easy.k.hp).toBeGreaterThanOrEqual(hard.k.hp);
   });
 });
+
+describe('boxe: revisão T5–T8', () => {
+  it('socos dados enquanto ele debocha (guarda aberta) não o fazem se cobrir quando volta à guarda', () => {
+    const m = new BoxingMatch();
+    const hit = (m as unknown as { resolveHit: (p: Punch) => void }).resolveHit.bind(m);
+    for (let i = 0; i < 4; i++) { m.g.mode = 'taunt'; m.g.guard = 'aberta'; hit('cruzD'); }
+    m.g.mode = 'guard';
+    m.g.thinkT = 9;
+    stepN(m, 0.1);
+    expect(m.g.mode).toBe('guard');
+  });
+});

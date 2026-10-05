@@ -330,11 +330,12 @@ export class World {
     this.narrator?.reset();
     this.water?.reset();
     this.wildlife?.reset();
+    // o que já foi feito é apagado ANTES de cada sistema reler `encounters.completed` (o jacaré volta a dançar)
+    this.encounters?.reset(true);
     this.village?.reset(this);
     this.club?.reset(this);
     this.thinker?.reset(this);
     this.letter?.reset(this);
-    this.encounters?.reset(true);
     for (const v of this.vines) {
       v.held = false;
       v.a = 0;
