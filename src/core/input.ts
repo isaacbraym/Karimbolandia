@@ -334,10 +334,15 @@ export class Input {
 
     s.moveX = Math.max(-1, Math.min(1, mx));
     s.moveY = Math.max(-1, Math.min(1, my));
-    // vetor de mira do stick (toque usa analógico bruto p/ mira suave em 8 direções)
+    // Toque e controle: o analógico ESQUERDO só move (e vira o corpo); quem mira é o analógico direito
+    // (arrastar FOGO / stick direito) ou o mouse. Antes, o dedo que escorregava para baixo no joystick
+    // apontava a arma para o chão e gastava munição. Teclado mantém W/↑ para mirar para cima.
     if (t.active) {
       s.aimVecX = t.stickX;
-      s.aimVecY = t.stickY;
+      s.aimVecY = 0;
+    } else if (s.device === 'pad') {
+      s.aimVecX = s.moveX;
+      s.aimVecY = 0;
     } else {
       s.aimVecX = s.moveX;
       s.aimVecY = s.moveY;

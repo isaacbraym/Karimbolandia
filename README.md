@@ -11,7 +11,7 @@ O endereço anterior continua funcionando. A v5 aproveita o progresso já salvo 
 | Ação | Teclado / mouse | Celular | Gamepad |
 |---|---|---|---|
 | Mover | `A` `D` / `←` `→` | joystick (esquerda) | analógico esq. |
-| Mirar | mouse (ou `W` p/ cima) | **arrastar o botão FOGO** (analógico de tiro 360°) ou joystick p/ cima/diagonal | analógico dir. |
+| Mirar | mouse (ou `W` p/ cima) | **arrastar o botão FOGO** (analógico de tiro 360°) — o joystick esquerdo só move | analógico dir. (o esquerdo só move) |
 | Pular | `ESPAÇO` | **PULO** | A |
 | **EAR GLIDE** (planar) | pular de novo no ar e segurar | tocar PULO de novo no ar | idem |
 | Atirar | clique / `J` | **FOGO** (segurar; arraste para mirar) | X / RT |

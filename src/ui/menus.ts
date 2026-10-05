@@ -494,8 +494,8 @@ export class Menus {
       )
     );
     c.append(
-      el('p', '', '<b>Celular:</b> joystick à esquerda (empurre para cima/diagonal para mirar); botões à direita: <b>FOGO</b>, <b>PULO</b> (toque de novo no ar para planar), granada, especial e troca de arma. Dá para mover, pular e atirar ao mesmo tempo.'),
-      el('p', '', '<b>Gamepad:</b> analógico esquerdo mover/mirar • A pular • X/RT atirar • B granada • Y especial • LB/RB trocar arma • Start pausa.')
+      el('p', '', '<b>Celular:</b> joystick à esquerda só para andar, agachar e descer; para mirar, <b>arraste o botão FOGO</b> na direção desejada; botões à direita: <b>FOGO</b>, <b>PULO</b> (toque de novo no ar para planar), granada, especial e troca de arma. Dá para mover, pular e atirar ao mesmo tempo.'),
+      el('p', '', '<b>Gamepad:</b> analógico esquerdo mover • analógico direito mirar • A pular • X/RT atirar • B granada • Y especial • LB/RB trocar arma • Start pausa.')
     );
     const act = el('div', 'actions');
 
