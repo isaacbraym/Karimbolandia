@@ -17,9 +17,9 @@ Se o código real divergir do que o plano cita (linhas mudam), **o código atual
 ## 2. O que será entregue (resumo — detalhes no plano)
 
 - **Lago/Atlântida estilo Hungry Shark:** peixes ambientes deixam de travar nas paredes da cidade submersa; ao cruzar pedra eles **encolhem ~22% e se misturam à água** (afastando-se da câmera), passam por trás e voltam ao tamanho normal (T1). Cardumes de neon/cardinal, acará-bandeira, disco, coridoras, tucunaré, pirarucu, arraia e poraquê; vegetação de rio (vallisnéria, cabomba, aguapé, sagitária, raízes de igapó), bolhas e partículas (T2). **Minimapa**: explorado colorido, a explorar em **cinza**, marcos e % explorado (T3; contador de pérolas entra na T4). **Praça do Pensador épica** (câmera, luz, halo de neon, música), 12 pérolas, cardume fiel, embalo de braçadas (T4).
-- **Skin Jacaré** (fôlego +30%, nado +40%, vida +10%, com o chapeuzinho) (T5).
+- **Skin Jacaré** (fôlego +30%, nado +40%, vida +10%, com o chapéu de caça: a cabeça de jacaré, como fantasia, na cabeça do Karimbo) (T5).
 - **Infra de minijogos sob demanda** + modos de entrada/toque (T6).
-- **Jacaré dançante:** conversa em 3 estágios (educado → aviso → tapa na orelha), chapeuzinho, nocaute caprichado no mundo com crianças preocupadas e uma cutucando com graveto (T7).
+- **Jacaré dançante:** conversa em 3 estágios (educado → aviso → tapa na orelha), nocaute caprichado no mundo com crianças preocupadas e uma cutucando com graveto (T7).
 - **Boxe em 3ª pessoa** com o Karimbo de costas (orelhas para os lados), 3 botões à esquerda + 3 à direita (jab, direto, cruzado, gancho), esquiva/guarda, crianças gritando "BRIGA!", golpe final **ORELHADA**, vitória/derrota com deboche (T8).
 - **Fase 2:** pombo-correio entrega a carta da Júlia, macaco rouba e foge mato adentro (T9); **perseguição pela copa** sem arma, Karimbo 22% mais rápido, galhos que tremem e quebram, bichos engraçados, música tribal de ação, 50–70 s (T10); **filminho da carta** (texto fixo do Apêndice A) e **rebobinar** com o Karimbo andando para trás até o ponto do roubo (T11).
 - Documentação, regra D09, medições e handoff (T12).

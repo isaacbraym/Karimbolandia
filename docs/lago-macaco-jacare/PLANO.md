@@ -54,7 +54,7 @@ Cada item acima tem o teste correspondente dentro da tarefa dona.
 | Atributos base | `src/core/gearCatalog.ts:32` | `KARIMBO_BASE={hp:119, air:13.8, nades:2}`; `karimboStats(gear)`. |
 | Skins | `src/core/skinCatalog.ts`, `src/core/skins.ts`, `src/art/karimbo.ts:87-91` | Paletas por skin em `Record<SkinId,string>`; `chooseSkin`; loja em `src/ui/menus.ts:530-579`. |
 | Validação do perfil | `src/core/storage.ts:114-116` | Skin desconhecida invalida o progresso. |
-| Jacaré da roda | `src/game/village.ts`, `src/art/dancingAlligator.ts`, `src/game/level/community.ts` | `DANCE_TILE=1004`, `DANCE_ID='jungle:alligator-circle'`; hoje ↑ **ou** AGIR entram na roda (`join`). Jacaré não tem chapéu. |
+| Jacaré da roda | `src/game/village.ts`, `src/art/dancingAlligator.ts`, `src/game/level/community.ts` | `DANCE_TILE=1004`, `DANCE_ID='jungle:alligator-circle'`; hoje ↑ **ou** AGIR entram na roda (`join`). Jacaré não tem chapéu (e **não ganha**: o "chapéu" do plano é só o da skin, ver T5). |
 | Macacos | `src/art/wildlife.ts` | Partes `marmoset`/`capuchin` (corpo+cabeça) assadas em `prepareWildlifeArt` (chamada em `src/art/jungle.ts:141`). |
 | Cena roteirizada no mundo | `src/game/club.ts` | Padrão: `control(ctl)`, `camera(w)`, `music(w)`, `reset(w)`, `finish` → `hooks.onControlReturned/onBanner/onProgress`. |
 | Cinemática em tela | `src/game/comic.ts` (`BossComic`) | Desenho em espaço de tela sobre o mundo congelado. |
@@ -81,7 +81,7 @@ Cada item acima tem o teste correspondente dentro da tarefa dona.
 - `src/art/lake/minimap.ts` — bake e desenho do minimapa.
 - `src/art/lake/thinkerFx.ts` — facho de luz, halo, brilho dos cristais.
 - `src/game/alligatorTalk.ts` — máquina da conversa com o jacaré (sim).
-- `src/art/alligatorHat.ts` — chapeuzinho compartilhado (jacaré da roda, boxe, KO, skin).
+- `src/art/alligatorHood.ts` — o **chapéu de caça da skin Jacaré**: a própria cabeça de um jacaré (focinho, olhos saltados, dentes, crista) usada como fantasia na cabeça do Karimbo, entre as orelhas, sem cobrir o rosto. Só a skin usa; o jacaré da roda/boxe/KO **não** usa chapéu.
 - `src/art/alligatorKO.ts` — jacaré nocauteado + crianças preocupadas + graveto.
 - `src/game/letterScene.ts` — cena do pombo e do macaco no mundo (sim).
 - `src/art/letterActors.ts` — pombo-correio, bolsinha, carta dobrada (macaco reaproveita `wildlife.ts`).
@@ -94,7 +94,7 @@ Cada item acima tem o teste correspondente dentro da tarefa dona.
 - `src/game/minigames/chase/index.ts` + `sim/{course,runner,monkey,hazards,match,letterFilm,rewind}.ts`
 - `src/art/minigames/chase/{canopy,branches,animals,monkey,hud,letterPaper,rewindFx}.ts`
 
-**Modificados:** `src/game/water.ts`, `src/art/waterDraw.ts`, `src/game/level/atlantis.ts` (só anexos no fim + exportar marcos), `src/game/world.ts`, `src/game/save.ts`, `src/core/saveValidation.ts`, `src/game/hud.ts`, `src/game/player.ts` (perks por skin, embalo de braçadas), `src/core/skinCatalog.ts`, `src/core/skins.ts`, `src/core/storage.ts` (se a análise de compatibilidade exigir), `src/art/karimbo.ts`, `src/ui/menus.ts`, `src/game/village.ts`, `src/art/dancingAlligator.ts` (chapéu), `src/art/village.ts` (poses de criança), `src/game/game.ts`, `src/ui/touch.ts`, `src/core/input.ts`, `src/core/music.ts`, `src/core/audio.ts` (sfx procedurais novos), `src/art/jungle.ts` (preparar artes novas), `src/game/level/jungle.ts` (gatilho da carta), `src/debug/sprites.ts`/`npcs.ts` (vitrine).
+**Modificados:** `src/game/water.ts`, `src/art/waterDraw.ts`, `src/game/level/atlantis.ts` (só anexos no fim + exportar marcos), `src/game/world.ts`, `src/game/save.ts`, `src/core/saveValidation.ts`, `src/game/hud.ts`, `src/game/player.ts` (perks por skin, embalo de braçadas), `src/core/skinCatalog.ts`, `src/core/skins.ts`, `src/core/storage.ts` (se a análise de compatibilidade exigir), `src/art/karimbo.ts`, `src/ui/menus.ts`, `src/game/village.ts`, `src/art/dancingAlligator.ts` (sem chapéu; só tapa/cabeçada/nocaute), `src/art/village.ts` (poses de criança), `src/game/game.ts`, `src/ui/touch.ts`, `src/core/input.ts`, `src/core/music.ts`, `src/core/audio.ts` (sfx procedurais novos), `src/art/jungle.ts` (preparar artes novas), `src/game/level/jungle.ts` (gatilho da carta), `src/debug/sprites.ts`/`npcs.ts` (vitrine).
 
 **Testes novos:** `tests/lakeFish.test.ts`, `tests/lakeLife.test.ts`, `tests/lakeMap.test.ts`, `tests/thinkerReveal.test.ts`, `tests/skinJacare.test.ts`, `tests/minigameLoading.test.ts`, `tests/minigameFlow.test.ts`, `tests/alligatorTalk.test.ts`, `tests/boxing.test.ts`, `tests/letterScene.test.ts`, `tests/chase.test.ts`, `tests/letterFilm.test.ts`.
 
@@ -385,7 +385,7 @@ Mais três casos no mesmo arquivo:
 ```ts
 { id: 'jacare', name: 'Jacaré', price: 0, color: '#5f8a45', shop: 'boxing',
   perk: 'Fôlego +30%, nado +40% e vida +10%',
-  description: 'Macacão de escamas, barriga listrada, rabo e o chapeuzinho do jacaré da roda. Só veste quem vence o jacaré no boxe.' },
+  description: 'Macacão de escamas, barriga listrada, rabo e o chapéu de caça: uma cabeça de jacaré usada de fantasia. Só veste quem vence o jacaré no boxe.' },
 
 /** Multiplicadores por traje. Fonte única: o Player não testa ids de skin espalhados. */
 export const SKIN_PERKS: Record<SkinId, { air: number; swim: number; hp: number }> = {
@@ -400,7 +400,7 @@ export const SKIN_PERKS: Record<SkinId, { air: number; swim: number; hp: number 
 - Loja (`menus.ts:546-563`): texto bloqueado `VENÇA O JACARÉ NO BOXE`.
 - Preço 0: o saldo (`coinBalance`) não muda ao ganhar. Nunca dar preço > 0 a skin de recompensa.
 
-**Arte (`src/art/karimbo.ts` + `src/art/alligatorHat.ts`):** macacão verde (`#5f8a45`/`#4a7038`) com escamas assadas, barriga creme (`#e2d8a4`) com listras horizontais, luvas com garrinhas, rabo (camada própria atrás das pernas, balançando com a passada), e o **chapeuzinho de palha com fita vermelha** no alto da cabeça, entre as orelhas, sem cobrir o rosto. Entradas nos `Record<SkinId,…>` de l.88–91. Pré-assar como as outras variantes; incluir na vitrine `?debug=sprites`.
+**Arte (`src/art/karimbo.ts` + `src/art/alligatorHood.ts`):** macacão verde (`#5f8a45`/`#4a7038`) com escamas assadas, barriga creme (`#e2d8a4`) com listras horizontais, luvas com garrinhas, rabo (camada própria atrás das pernas, balançando com a passada), e o **chapéu de caça**: a **própria cabeça de um jacaré** (focinho comprido apontando para a frente, dois olhos saltados, fileira de dentes, crista de escamas e boca entreaberta) assentada no alto da cabeça do Karimbo como fantasia de caçador/troféu, entre as orelhas, **sem cobrir o rosto** (a foto continua visível) e sem prender as orelhas. Mesma paleta verde do macacão; aceno cômico: o olho do chapéu acompanha o olhar do Karimbo. **Decisão do usuário (2026-10-05):** não é chapéu de palha; ele só existe na skin. Entradas nos `Record<SkinId,…>` de l.88–91. Pré-assar como as outras variantes; incluir na vitrine `?debug=sprites`.
 
 **Compatibilidade (Foco de revisão 1):** investigar `git log -S "ownedSkins" -- src/core/storage.ts` e os commits `2a6395b`/`8d9ec92`; descobrir o que uma aba antiga faz quando `validateProgress` devolve `null` (sobrescreve? usa o espelho da carteira?). Proteger para que um cliente antigo nunca apague moedas/skins por causa de `jacare`, e registrar a análise no estudo de caso da T12.
 
@@ -461,27 +461,27 @@ export type MiniPad = Record<MiniButton, Btn>;
 
 **Aceite:** nenhum byte dos minijogos no chunk principal (conferir `npm run build`), testes verdes.
 
-## T7 — Jacaré: conversa, chapeuzinho e nocaute (`karim-uer.8`)
+## T7 — Jacaré: conversa e nocaute (`karim-uer.8`)
 
-**Chapeuzinho:** `src/art/alligatorHat.ts` (sprite assado: palha trançada, aba curta, fita vermelha) desenhado em `drawDancingAlligator` (segue a cabeça) e reutilizado no boxe, no KO e na skin.
+**Sem chapéu no jacaré:** o jacaré da roda, do boxe e do nocaute **não usa chapéu** (correção do usuário). O chapéu de caça é só da skin (T5) e o Karimbo o usa no boxe quando a skin estiver equipada.
 
 **Conversa (`src/game/alligatorTalk.ts`, usada por `village.ts`):**
 - Depois da primeira dança (`DANCE_ID` concluído), perto do jacaré (≤ 150 px) e com `canJoin` verdadeiro: **↑ continua batendo palmas** (comportamento atual) e **AGIR (F / botão AGIR / gamepad 8) passa a FALAR**. Antes da primeira dança nada muda. Atualizar os testes que esperavam AGIR = palmas e registrar a mudança no estudo de caso.
 - Prioridade de AGIR (Foco 5): se houver porta/objeto de exploração mais perto que o jacaré, a exploração vence. Prompt sobre o jacaré: `AGIR: FALAR • ↑: PALMAS`.
 - Estágios (sessão; voltam a 0 se o Karimbo se afastar > 1500 px, em `reset`/respawn). Balões curtos, 3,2 s cada, sem travar o controle nos estágios 1 e 2:
-  1. **Karimbo:** "Ô seu jacaré, que palhaçada é essa de ficar dançando aí no meio?" — **Jacaré** (educado, tira o chapeuzinho): "Boa tarde, meu jovem! Isso aqui é a roda das crianças, eu trabalho com isso. Com todo o respeito... você tá atrapalhando o meu esquema."
+  1. **Karimbo:** "Ô seu jacaré, que palhaçada é essa de ficar dançando aí no meio?" — **Jacaré** (educado, para o gingado, endireita a postura e leva a mão ao peito): "Boa tarde, meu jovem! Isso aqui é a roda das crianças, eu trabalho com isso. Com todo o respeito... você tá atrapalhando o meu esquema."
   2. **Karimbo:** "Esquema? Que esquema, rapaz?" — **Jacaré** (para de dançar, rabo batendo no chão): "Ó, orelhudo... vou pedir uma vez só: para de encher o meu saco. Senão o bagulho vai ficar louco."
   3. **Karimbo:** "Louco como?" — **Jacaré** dá um TAPA na orelha (`thump`, orelha gira com impulso grande na mola `earSpr`, tremida de câmera, crianças: "UUUUUH!") — "Assim, ó! Agora é na mão, Parabólica! BORA PRO PAU!" → crianças começam "BRIGA! BRIGA! BRIGA! BRIGA!" → `hooks.onMinigame('boxing', …)`.
 - Depois de perder: AGIR ⇒ "Quer mais, é? Tá bom... a orelha é sua." e vai direto ao boxe.
 - Depois de vencer (`'jungle:alligator-boxing'` concluído): estado `ko` enquanto o Karimbo estiver na aldeia; ao se afastar > 2500 px da praça ou recarregar, estado `bandaged` (curativo no focinho, volta a dançar, roda reativada). Falar com ele `bandaged`: "Seu Karimbo! Tudo certo, patrão? Pode passar, pode passar..."; falar perto dele `ko`: criança "Shhh! Ele tá dormindo!".
 
-**Nocaute no mundo (`src/art/alligatorKO.ts` + poses novas de criança em `src/art/village.ts`):** jacaré de barriga para cima, língua de fora, olhos em espiral, barriga subindo e descendo, rabo tremendo de vez em quando, chapéu caído ao lado, estrelinhas e três passarinhos girando sobre a cabeça, "Zzz" saindo. Crianças da roda em volta com poses preocupadas (mãos na cabeça/boca, inclinadas); uma **agachada cutucando com um graveto** em loop (cutucada 0,6 s a cada 2 s; o jacaré estremece e solta "Zzz" mais forte a cada cutucada). Balões ocasionais (um por vez, 8–12 s entre eles): "Será que ele morreu?", "Cutuca de novo!", "Ele tá respirando!", "Chama a Dona Benedita!". Palmas desativadas durante `ko`. Tudo assado/cacheado como os moradores (`figure.ts`), desenhado só se visível.
+**Nocaute no mundo (`src/art/alligatorKO.ts` + poses novas de criança em `src/art/village.ts`):** jacaré de barriga para cima, língua de fora, olhos em espiral, barriga subindo e descendo, rabo tremendo de vez em quando, uma luva azul caída ao lado, estrelinhas e três passarinhos girando sobre a cabeça, "Zzz" saindo. Crianças da roda em volta com poses preocupadas (mãos na cabeça/boca, inclinadas); uma **agachada cutucando com um graveto** em loop (cutucada 0,6 s a cada 2 s; o jacaré estremece e solta "Zzz" mais forte a cada cutucada). Balões ocasionais (um por vez, 8–12 s entre eles): "Será que ele morreu?", "Cutuca de novo!", "Ele tá respirando!", "Chama a Dona Benedita!". Palmas desativadas durante `ko`. Tudo assado/cacheado como os moradores (`figure.ts`), desenhado só se visível.
 
 **Testes (`tests/alligatorTalk.test.ts`):** três AGIR ⇒ estágios 1, 2, 3 e pedido de `onMinigame('boxing')` exatamente uma vez; ↑ ainda inicia as palmas (rodar também os testes antigos da roda); afastar 1500 px zera; com porta de casa mais perto, AGIR vai para a porta; derrota ⇒ próxima conversa vai direto ao boxe; vitória ⇒ `ko`, palmas bloqueadas; afastar 2500 px ⇒ `bandaged`, palmas de volta; restaurar save com vitória ⇒ `bandaged`.
 
 ## T8 — Boxe em terceira pessoa (`karim-uer.9`)
 
-**Cena:** câmera atrás do Karimbo (estilo Punch-Out!!/Fight Night). Karimbo **de costas** ocupando ~40% da parte de baixo da tela: nuca e cabelo procedurais (não há foto de costas), orelhas **para os lados** usando os sprites de orelha da foto (`earNear/earFar`, espelhados, com tom do verso assado uma vez), ombros, costas com a camiseta/macacão da skin equipada, luvas vermelhas. O jacaré de frente no meio da tela (paleta de `dancingAlligator.ts`, luvas azuis, chapeuzinho). Em volta, a roda das crianças em elipse com ordem de profundidade (as de trás menores; as mais próximas da câmera escuras e desfocadas, primeiro plano estilo Rayman). Fundo: `backdrop` da praça assado uma vez com desfoque no bake. HUD: barras de vida (retratos: `art.karimbo.heads.portrait` via `drawSprShrunk` e cabeça do jacaré), energia (stamina) do Karimbo, medidor de combo, avisos `CONTRA-ATAQUE!`, `ESQUIVA PERFEITA!`.
+**Cena:** câmera atrás do Karimbo (estilo Punch-Out!!/Fight Night). Karimbo **de costas** ocupando ~40% da parte de baixo da tela: nuca e cabelo procedurais (não há foto de costas), orelhas **para os lados** usando os sprites de orelha da foto (`earNear/earFar`, espelhados, com tom do verso assado uma vez), ombros, costas com a camiseta/macacão da skin equipada, luvas vermelhas. O jacaré de frente no meio da tela (paleta de `dancingAlligator.ts`, luvas azuis, sem chapéu). Se o Karimbo estiver com a skin Jacaré, ele aparece de costas com o chapéu de caça. Em volta, a roda das crianças em elipse com ordem de profundidade (as de trás menores; as mais próximas da câmera escuras e desfocadas, primeiro plano estilo Rayman). Fundo: `backdrop` da praça assado uma vez com desfoque no bake. HUD: barras de vida (retratos: `art.karimbo.heads.portrait` via `drawSprShrunk` e cabeça do jacaré), energia (stamina) do Karimbo, medidor de combo, avisos `CONTRA-ATAQUE!`, `ESQUIVA PERFEITA!`.
 
 **Crianças:** ~60% torcem pelo Karimbo ("VAI KARIMBO!", "ORELHADA NELE!"), ~40% pelo jacaré ("VAI JACARÉ!", "ARRANCA A ORELHA DELE!"). Coro "BRIGA! BRIGA! BRIGA! BRIGA!" em balões no tempo da música (palmas/pisadas procedurais no beat). Reações: "UUUH!" em golpe forte, risada em golpe no ar, pulos em combo. Sem gravação de voz inventada: só balões + percussão/palmas procedurais. (Se o usuário fornecer um MP3 do coro depois, há um gancho opcional `clip 'briga'` — abrir bead, não criar áudio falso.)
 
@@ -507,14 +507,14 @@ Defesa do Karimbo: esquiva esq./dir. (invulnerável 0,30 s, recarga 0,25 s), gua
 | Patada | 0,45 s (olho brilha) | 8 | esquiva ou guarda | 0,5 s |
 | Rabada | 0,70 s (rabo recua, poeira) | 14 | só esquiva | 0,8 s |
 | Mordidona | 0,90 s (bocão abre, dentes brilham, "CHOMP" pisca) | 22 | esquiva | 1,2 s |
-| Chapelada (fase 3) | 0,60 s (tira o chapéu) | 10 | guarda | 0,6 s |
+| Cabeçada (fase 3) | 0,60 s (abaixa a cabeça e arranha o chão) | 10 | guarda | 0,6 s |
 | Passinho da roda (provocação) | dança 1,5 s, crianças batem palmas | 0 | — | guarda aberta; se o Karimbo acertar 3+ golpes durante a dança, contrapé (10) |
 
-Fases do jacaré (vida 160 no normal): **1** (100–60%) patadas e provocações; **2** (60–25%) entra mordidona, telegrafias ×0,9, combos de 2; **3** (< 25%) entra chapelada, combos de 3, telegrafias ×0,8, olhos vermelhos ("FÚRIA"). Dificuldade (`src/core/difficulty.ts`): fácil — dano do jacaré ×0,7, telegrafias ×1,25, vida ×0,85; difícil — ×1,25, ×0,85, ×1,15. IA com PRNG de semente fixa por luta.
+Fases do jacaré (vida 160 no normal): **1** (100–60%) patadas e provocações; **2** (60–25%) entra mordidona, telegrafias ×0,9, combos de 2; **3** (< 25%) entra cabeçada, combos de 3, telegrafias ×0,8, olhos vermelhos ("FÚRIA"). Dificuldade (`src/core/difficulty.ts`): fácil — dano do jacaré ×0,7, telegrafias ×1,25, vida ×0,85; difícil — ×1,25, ×0,85, ×1,15. IA com PRNG de semente fixa por luta.
 
-**Final:** vida do jacaré chega a 0 ⇒ estado **GROGUE** (cambaleando, estrelas) e o botão `ORELHADA!` aparece pulsando por 5 s. Se não apertar, ele se recupera com 12% e volta à fase 3. Apertando: cinemática de 2,4 s — câmera lenta, o Karimbo gira 360°, as orelhas crescem para os lados (mesma ideia do `earGlide`), PLAFT com clarão, quadro de impacto estilo HQ (letreiro `ORELHADA!!`, retícula), jacaré gira no ar, chapéu voa, cai nocauteado; uma criança-juíza conta "1... 2... 3... 10! NOCAUTE!" em 1,5 s; crianças comemoram com folhas voando.
+**Final:** vida do jacaré chega a 0 ⇒ estado **GROGUE** (cambaleando, estrelas) e o botão `ORELHADA!` aparece pulsando por 5 s. Se não apertar, ele se recupera com 12% e volta à fase 3. Apertando: cinemática de 2,4 s — câmera lenta, o Karimbo gira 360°, as orelhas crescem para os lados (mesma ideia do `earGlide`), PLAFT com clarão, quadro de impacto estilo HQ (letreiro `ORELHADA!!`, retícula), jacaré gira no ar, um dente voa, cai nocauteado; uma criança-juíza conta "1... 2... 3... 10! NOCAUTE!" em 1,5 s; crianças comemoram com folhas voando.
 
-**Derrota:** vida do Karimbo 0 ⇒ ele cai de costas na direção da câmera (tremida, inclinação), o jacaré dança de deboche com o chapéu: "Volta pro berçário, Parabólica! Essa orelha apanha mais que bandeira em dia de vento!"; crianças riem "HAHAHA, ORELHUDO!". Volta ao mundo: Karimbo sentado tonto 1,5 s ao lado da roda; jacaré dançando de novo. Sem perda de vida/continue.
+**Derrota:** vida do Karimbo 0 ⇒ ele cai de costas na direção da câmera (tremida, inclinação), o jacaré dança de deboche rebolando e batendo palma na própria barriga: "Volta pro berçário, Parabólica! Essa orelha apanha mais que bandeira em dia de vento!"; crianças riem "HAHAHA, ORELHUDO!". Volta ao mundo: Karimbo sentado tonto 1,5 s ao lado da roda; jacaré dançando de novo. Sem perda de vida/continue.
 
 **Vitória:** `grantSkin('jacare','boxing')` (só a primeira vez), `encounters.completed.add('jungle:alligator-boxing')`, banner `SKIN DE JACARÉ DESBLOQUEADA!` / `Fôlego +30% • Nado +40% • Vida +10% — vista na Loja de Skins`, aldeia em estado `ko`, `onProgress`.
 
