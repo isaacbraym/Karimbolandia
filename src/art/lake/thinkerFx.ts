@@ -38,7 +38,7 @@ function bakeHalo() {
 /** Chamado depois das decorações do fundo e antes das da frente (com as luzes dos cristais). */
 export function drawThinkerFx(g: CanvasRenderingContext2D, w: World) {
   const th = w.thinker;
-  if (!th.exists || (th.light <= 0 && th.crystal <= 0) || !w.camera.visible(th.x, th.y - 120, 360)) return;
+  if (!th.exists || (th.light <= 0 && th.crystal <= 0 && !w.water.rings.length) || !w.camera.visible(th.x, th.y - 120, 360)) return;
   shaft ??= bakeShaft();
   halo ??= bakeHalo();
   const breathe = 0.85 + 0.15 * Math.sin(w.time * 0.9);
@@ -52,7 +52,7 @@ export function drawThinkerFx(g: CanvasRenderingContext2D, w: World) {
   g.globalAlpha = 0.5 * th.light * breathe;
   g.drawImage(glow.c, th.x - 120, th.y - 150, 240, 190);
   // halo de neon: os dois anéis (raios 150 e 220 px, achatados)
-  g.globalAlpha = 0.55 * Math.min(1, th.crystal * 1.2);
+  g.globalAlpha = 0.55 * Math.max(th.crystal > 0 ? Math.min(1, th.crystal * 1.2) : 0, th.t >= 0 && !th.active ? 1 : 0.6);
   for (const r of w.water.rings) g.drawImage(halo, r.cx - r.r, r.cy - r.r * 0.42, r.r * 2, r.r * 0.84);
   g.globalAlpha = 1;
   g.globalCompositeOperation = 'source-over';

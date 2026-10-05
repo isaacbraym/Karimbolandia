@@ -1428,7 +1428,7 @@ export class Director {
   // ------------------------------------------------------------------ música dinâmica
   private updateMusic(dt: number) {
     const w = this.w;
-    if (w.club.inside(w)) return;
+    if (w.club.inside(w) || w.thinker.active) return;
     if (this.bossActive || this.cine?.kind === 'bossDeath' || w.finished) return;
     if (this.cine?.kind === 'nomad') return;
     const p = w.player;

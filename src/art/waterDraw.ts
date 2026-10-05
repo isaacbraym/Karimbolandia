@@ -340,9 +340,10 @@ function fishLayer(g: CanvasRenderingContext2D, w: World, pass: 0 | 1 | 2 | 3) {
 const SNOW_BUDGET = 8;
 function drawSnow(g: CanvasRenderingContext2D, w: World, v: { x0: number; x1: number; y0: number; y1: number }, T: Tex) {
   const cam = w.camera;
-  const S = Math.max(384, Math.ceil(Math.max(cam.w, cam.h * 1.6) / 2));
-  let budget = SNOW_BUDGET;
-  for (let layer = 0; layer < 2 && budget > 0; layer++) {
+  // ladrilho ≥ vista: no pior alinhamento são 2×2 por camada (4 + 4 = 8), qualquer que seja o zoom
+  const S = Math.max(384, Math.ceil(Math.max(cam.w, cam.h)));
+  for (let layer = 0; layer < 2; layer++) {
+    let budget = SNOW_BUDGET / 2;
     const ox = cam.x * (layer ? 0.18 : 0.08) + w.time * (layer ? 5 : 3);
     const oy = cam.y * (layer ? 0.12 : 0.05) - w.time * (layer ? 7 : 4);
     g.globalAlpha = layer ? 0.38 : 0.26;

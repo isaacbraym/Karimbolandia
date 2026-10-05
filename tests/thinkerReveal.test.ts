@@ -225,3 +225,43 @@ describe('embalo de braçadas', () => {
     expect(max).toBeGreaterThan(base * 1.1);
   });
 });
+
+describe('correções da revisão (T1–T4)', () => {
+  it('o diretor não sobrescreve a música monument durante a revelação', async () => {
+    const w = await jungle();
+    const ctl = newCtl();
+    w.player.reset(w.thinker.x - 3 * TILE, w.thinker.y - 5 * TILE);
+    w.player.swimming = true;
+    const calls: string[] = [];
+    w.hooks.onMusic = (s) => calls.push(s);
+    for (let i = 0; i < 6 * 60; i++) w.update(1 / 60, ctl);
+    expect(w.thinker.active).toBe(true);
+    expect(calls.filter((s) => s === 'monument').length).toBe(1);
+    expect(calls.filter((s) => s !== 'monument').length).toBe(0);
+  });
+
+  it('o cardume fiel que nasce no lago raso se mexe e acompanha o Karimbo', async () => {
+    const w = await jungle();
+    const { Pickup } = await import('../src/game/pickups');
+    for (const s of w.data.pickups.filter((p) => p.kind === 'pearl')) w.collect(new Pickup('pearl', s.x, s.y, s.id));
+    const ctl = newCtl();
+    w.player.reset(500 * TILE, 37 * TILE); // lago raso (superfície 34, fundo 44)
+    w.player.swimming = true;
+    w.update(1 / 60, ctl);
+    const L = w.water.fish[w.water.loyalLead];
+    const x0 = L.x;
+    w.player.body.x += 300;
+    for (let i = 0; i < 300; i++) { w.player.body.vx = 0; w.update(1 / 60, ctl); }
+    expect(Math.abs(L.x - x0)).toBeGreaterThan(150);
+  });
+
+  it('o poraquê mantém o corpo unido ao passar atrás da pedra (espaçamento acompanha o encolhimento)', async () => {
+    const w = await jungle();
+    const eel = w.water.fish.find((f) => f.species === 'poraque')!;
+    eel.depth = 1;
+    for (let i = 0; i < 120; i++) { eel.depth = 1; w.water.update(1 / 60, -9999, -9999, false, 0, 1e9); }
+    const s = eel.seg!;
+    const gap = Math.hypot(s[2] - s[0], s[3] - s[1]);
+    expect(gap).toBeLessThanOrEqual((eel.size * 0.78) / 6.5 + 1);
+  });
+});

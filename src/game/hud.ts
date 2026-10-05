@@ -134,6 +134,8 @@ function numText<V extends number|string>(
   g.drawImage(e.c, 0, 0, Math.ceil(e.w * textScale), Math.ceil(e.h * textScale), x - e.ax, y - e.ay, e.w, e.h);
 }
 const fmtInt = (v: number) => String(v);
+const fmtLakePct = (v: number) => `EXPLORADO ${v}%`;
+const fmtLakePearls = (v: string) => `PÉROLAS ${v}`;
 const fmtScore = (v: number) => String(v).padStart(7, '0');
 const fmtEmblems = (v: number) => `${v} / 10`;
 const fmtCombo = (v: number) => `${v} COMBO`;
@@ -233,8 +235,8 @@ export class Hud {
     g.globalAlpha = this.lakeAlpha;
     drawLakeMinimap(g, w, m, x, y, mw, mh, textScale, this.time);
     // o texto fica DENTRO da moldura (nada de altura extra: no celular pequeno o botão de granada fica logo abaixo)
-    numText(g, 'lakePct', m.percent(), (v) => `EXPLORADO ${v}%`, x + 5, y + 11, 9, '#e8fbff', 'left');
-    if (w.pearlTotal()) numText(g, 'lakePearls', `${w.pearls()}/${w.pearlTotal()}`, (v) => `PÉROLAS ${v}`, x + 5, y + mh - 4, 9, w.pearls() >= w.pearlTotal() ? '#ffe27a' : '#ffe6f2', 'left');
+    numText(g, 'lakePct', m.percent(), fmtLakePct, x + 5, y + 11, 9, '#e8fbff', 'left');
+    if (w.pearlTotal()) numText(g, 'lakePearls', `${w.pearls()}/${w.pearlTotal()}`, fmtLakePearls, x + 5, y + mh - 4, 9, w.pearls() >= w.pearlTotal() ? '#ffe27a' : '#ffe6f2', 'left');
     g.globalAlpha = 1;
   }
 

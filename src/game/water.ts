@@ -396,8 +396,9 @@ export class Waters {
   spawnRings(cx: number, cy: number, converge: boolean) {
     const specs: [number, number][] = [[150, 0.5], [220, -0.4]];
     const r = this.lifeRnd;
-    const zone = this.zones.find((z) => z.surface !== undefined) ?? this.zones[0];
+    const zone = this.zoneAt(cx, cy) ?? this.zones.find((z) => z.surface !== undefined) ?? this.zones[0];
     for (const [radius, w] of specs) {
+      if (this.fish.length + 20 > MAX_AMBIENT_FISH) return; // nunca deixa um anel sem peixes
       const ri = this.rings.length;
       this.rings.push({ cx, cy, r: radius, w });
       for (let k = 0; k < 20; k++) {
@@ -417,7 +418,8 @@ export class Waters {
   /** Cardume fiel: 20 neons que acompanham o Karimbo (nasce perto dele). */
   spawnLoyal(x: number, y: number) {
     if (this.loyalLead >= 0 || this.fish.length + 21 > MAX_AMBIENT_FISH) return;
-    const zone = this.zones.find((z) => z.surface !== undefined) ?? this.zones[0];
+    // a zona de onde o cardume nasce (o lago raso e Atlântida são zonas diferentes)
+    const zone = this.zoneAt(x, y) ?? this.zones.find((z) => z.surface !== undefined) ?? this.zones[0];
     const r = this.lifeRnd;
     const li = this.fish.length;
     const lead = this.newFish('neon', zone, x - 60, y - 10, 13, 2, r);
@@ -611,7 +613,12 @@ export class Waters {
       // salvaguarda: preso atrás de pedra por muito tempo, escolhe outro alvo em água livre
       f.rockT = rockHere ? f.rockT + dt : 0;
       if (f.rockT > 5 && f.lead < 0) { this.pickTarget(f); f.rockT = 0; }
-      if (!this.inZone(z, nx, ny, pad)) {
+      if (f.loyal) {
+        // cardume fiel: segue o Karimbo por qualquer água do lago (raso e fenda), sem a parede de zona
+        const zz = this.lakeAt(nx, ny);
+        if (zz) f.zone = zz;
+        else { nx = f.x; ny = f.y; f.vx *= 0.5; f.vy *= 0.5; }
+      } else if (!this.inZone(z, nx, ny, pad)) {
         if (this.inZone(z, nx, f.y, pad)) ny = f.y, (f.vy *= -0.4);
         else if (this.inZone(z, f.x, ny, pad)) nx = f.x, (f.vx *= -0.4);
         else {
@@ -698,7 +705,7 @@ export class Waters {
   /** Corpo do poraquê: cada segmento persegue o anterior mantendo o espaçamento (O(segmentos)). */
   private followSegments(f: Fish) {
     const seg = f.seg!;
-    const gap = f.size / (EEL_SEGMENTS + 0.5);
+    const gap = (f.size * fishScale(f)) / (EEL_SEGMENTS + 0.5); // acompanha o encolhimento atrás da pedra
     seg[0] = f.x;
     seg[1] = f.y;
     for (let i = 1; i < EEL_SEGMENTS; i++) {

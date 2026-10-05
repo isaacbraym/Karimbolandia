@@ -21,6 +21,8 @@ interface MiniArt {
   pin: HTMLCanvasElement;
   relic: HTMLCanvasElement;
   epoch: number;
+  /** relíquias (posições) — filtradas uma vez, não por quadro */
+  relics: { id: number; x: number; y: number }[];
 }
 const cache = new WeakMap<LakeMap, MiniArt>();
 const scratch: number[] = [];
@@ -86,7 +88,7 @@ function bake(m: LakeMap, mw: number, mh: number, k: number): MiniArt {
     g.fillStyle = '#7ff9ff';
     g.beginPath(); g.moveTo(5.5, 2); g.lineTo(9, 5.5); g.lineTo(5.5, 9); g.lineTo(2, 5.5); g.closePath(); g.fill();
   }
-  return { pw, ph, terrain, composed, frame, pin, relic, epoch: -1 };
+  return { pw, ph, terrain, composed, frame, pin, relic, epoch: -1, relics: [] };
 }
 
 /** Copia o relevo de uma célula para a imagem composta (substitui o cinza). */
@@ -126,8 +128,9 @@ export function drawLakeMinimap(g: CanvasRenderingContext2D, w: World, m: LakeMa
   const gx = (px: number) => x + ((px / (LAKE_CELL_TILES * TILE) - m.x0) / m.cols) * mw;
   const gy = (py: number) => y + ((py / (LAKE_CELL_TILES * TILE) - m.y0) / m.rows) * mh;
   // relíquias vistas e ainda não coletadas
-  for (const p of w.data.pickups) {
-    if (p.kind !== 'relic' || w.collectedPickups.has(p.id) || !m.isWater(p.x, p.y) || !m.isSeen(p.x, p.y)) continue;
+  if (!a.relics.length) for (const p of w.data.pickups) if (p.kind === 'relic') a.relics.push({ id: p.id, x: p.x, y: p.y });
+  for (const p of a.relics) {
+    if (w.collectedPickups.has(p.id) || !m.isWater(p.x, p.y) || !m.isSeen(p.x, p.y)) continue;
     g.drawImage(a.relic, 0, 0, a.relic.width, a.relic.height, gx(p.x) - 4.5, gy(p.y) - 4.5, 9, 9);
   }
   // marcos descobertos

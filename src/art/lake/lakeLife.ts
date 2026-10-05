@@ -281,8 +281,8 @@ function paintRay(g: CanvasRenderingContext2D, W: number, frame: number) {
 function sheet(paint: (g: CanvasRenderingContext2D, W: number, frame: number) => void, aspect: number, px: number): LifeSheet {
   const mips: HTMLCanvasElement[][] = [];
   let first: HTMLCanvasElement[] = [];
-  for (let level = 0; level < 2; level++) {
-    const W = Math.max(16, Math.round(px / (level + 1)));
+  for (let level = 0; level < 3; level++) {
+    const W = Math.max(16, Math.round(px / 2 ** level));
     const frames: HTMLCanvasElement[] = [];
     for (let fr = 0; fr < 2; fr++) {
       const c = makeCanvas(W, Math.max(2, Math.round(W * aspect)));
@@ -391,8 +391,9 @@ export function prepareLakeLife(): LifeArt {
 }
 
 function pickMip(s: LifeSheet, need: number): HTMLCanvasElement[] {
-  // o maior nível só quando a tela realmente precisa (largura em px da tela > metade do nível 0)
-  return need > s.px * 0.5 ? s.mips[0] : s.mips[1];
+  // o menor nível que ainda tem pixels de sobra para a tela (nunca reduz mais que ~2×: sem cintilação)
+  for (let i = s.mips.length - 1; i > 0; i--) if (s.mips[i][0].width >= need) return s.mips[i];
+  return s.mips[0];
 }
 
 /** Desenha um peixe de espécie (1 drawImage; o poraquê, 1 por segmento). */
