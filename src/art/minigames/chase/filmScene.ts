@@ -48,11 +48,11 @@ export class FilmScene {
     const paper = this.ensure(), u = H / 360, t = this.time;
     paper.draw(g, film.page, film.shown);
     this.drawReader(g, film, W, H, u, t);
-    // dicas
-    const done = film.complete;
-    txt(g, done ? (film.lastPage ? 'PULAR ▶ continuar' : 'PULAR ▶ próxima página') : 'PULAR ▶ ler logo', W - 100 * u, H - 14 * u, 10.5 * u, '#fff1cd', 'center', 0.5 + 0.5 * Math.sin(t * 5));
-    if (film.canSkip) txt(g, 'Segure ↓ para pular tudo', W - 100 * u, H - 28 * u, 9 * u, '#ffd9a0', 'center', clamp01((film.t - SKIP_AFTER) * 2) * 0.9);
-    txt(g, `${film.page + 1}/${LETTER_PAGES.length}`, W - 20 * u, H * 0.8, 10 * u, '#ffe9b0', 'center');
+    // dicas no centro de baixo: os botões de toque (joystick à esquerda, PULO à direita) ficam livres
+    const done = film.complete, cx = W / 2;
+    txt(g, done ? (film.lastPage ? 'PULAR ▶ continuar' : 'PULAR ▶ próxima página') : 'PULAR ▶ ler logo', cx, H - 12 * u, 10.5 * u, '#fff1cd', 'center', 0.55 + 0.45 * Math.sin(t * 5));
+    if (film.canSkip) txt(g, 'Segure ↓ para pular tudo', cx, H - 26 * u, 9 * u, '#ffd9a0', 'center', clamp01((film.t - SKIP_AFTER) * 2) * 0.9);
+    txt(g, `${film.page + 1}/${LETTER_PAGES.length}`, cx + 110 * u, H - 12 * u, 10 * u, '#ffe9b0', 'center');
     // abertura: sai do preto
     if (film.t < 0.6) { g.globalAlpha = 1 - film.t / 0.6; g.fillStyle = '#05030a'; g.fillRect(0, 0, W, H); g.globalAlpha = 1; }
   }

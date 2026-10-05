@@ -15,6 +15,10 @@ O [caso de exploração e profundidade](EXPLORACAO_E_PROFUNDIDADE_2026-10-05.md)
 
 O [caso da água e balada](AGUA_E_BALADA_2026-10-05.md) explica a superfície animada na perspectiva das margens, saídas alinhadas à transição, localização do Pensador em Atlântida e recuperação do MP3 após carregamento tardio.
 
+O [caso do lago vivo](LAGO_VIVO_E_MINIMAPA_2026-10-05.md) documenta por que peixes passam *por trás* das pedras em vez de colidir (profundidade em vez de rebote), o ecossistema com tetos e culling, o minimapa com save opcional e a revelação da Praça do Pensador.
+
+O [caso dos minijogos](MINIJOGOS_PERSEGUICAO_E_BOXE_2026-10-05.md) explica o carregamento sob demanda (regra D09), a entrada/toque por modo, o equilíbrio por bots do boxe e da perseguição (51 / 64 / ≤ 92 s), o filminho da carta e a skin Jacaré gravada numa chave separada para não invalidar clientes antigos.
+
 ## Como este conhecimento é protegido
 
 | Camada | Função |

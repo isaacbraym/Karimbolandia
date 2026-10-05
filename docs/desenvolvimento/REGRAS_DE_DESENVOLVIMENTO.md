@@ -91,6 +91,20 @@ Revisar uma decisão com nova evidência é permitido. A mudança deve incluir o
 
 Antes de concluir uma tarefa neste repositório, cumprir também as instruções de validação e commit da raiz. Documentação não substitui acompanhamento de pendências no Beads.
 
+## D09 — Minijogos e cenas pesadas carregam sob demanda
+
+**Princípio:** o que só roda de vez em quando (minijogo, cena longa, módulo de arte grande) não entra no pacote que todo jogador baixa e parseia. Um fluxo **pequeno** no pacote principal usa apenas `import type` e `import()`; o módulo pesado vira chunk próprio. A tela é entregue a uma *sessão* e o resto do jogo espera, congelado.
+
+**Como fazer:**
+
+- Contrato só de tipos (`src/game/minigames/types.ts`): ninguém o importa por valor. O fluxo (`minigameFlow.ts`) captura o retrato do mundo, fecha a íris, espera o módulo, cria a sessão, reabre a íris e devolve tudo. Pré-busque em silêncio antes do ponto de entrada; trate falha de rede como `abort` com aviso, nunca como tela presa.
+- O mundo **não avança** durante a sessão; a sessão recebe o `dt` protegido (D04). Simulação *headless*, determinística (PRNG com semente) e sem DOM em `sim/**`; a arte só desenha o estado e reage a eventos. Isso permite medir equilíbrio e duração com bots em vez de ajustar "no olho".
+- **Saída sempre limpa:** `reset` em qualquer fase, exceção em `update`/`dispose`/callback, pausa e recusa de `start` entregam `abort` **uma vez só** e devolvem toque, entrada, música e controle. Prêmio só no `win`, concedido por quem pediu.
+- Entrada/toque por modo (D07): o que já estava apertado só vale depois de solto; cada dedo é dono do seu botão; liberar tudo ao trocar de layout.
+- Nada criado por quadro (D01): textos em cache por conteúdo estável (pulsar por escala, não por tamanho), contadores dígito a dígito, bakes na entrada. Teste de custo com contexto falso (teto de `drawImage`, canvases e gradientes não crescem) — e saiba que ele prova um teto, não a cadência.
+
+**Proteção:** `tests/minigameLoading.test.ts` (o pacote principal não importa por valor nada de `minigames/**`), `tests/minigameFlow.test.ts` (ciclo de vida) e os testes de custo por minijogo. Detalhes e histórico em [MINIJOGOS_PERSEGUICAO_E_BOXE_2026-10-05.md](MINIJOGOS_PERSEGUICAO_E_BOXE_2026-10-05.md); o caso do lago em [LAGO_VIVO_E_MINIMAPA_2026-10-05.md](LAGO_VIVO_E_MINIMAPA_2026-10-05.md).
+
 ## Verificação antes de concluir mudanças nessas áreas
 
 - Identificar regras afetadas e comportamento protegido; conferir contextos novos/compartilhados, bakes, variantes e invalidações.

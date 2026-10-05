@@ -631,3 +631,20 @@ Fases do jacaré (vida 160 no normal): **1** (100–60%) patadas e provocações
 - Para capturar imagem quando o screenshot da ferramenta falhar: enviar `canvas.toDataURL()` por POST a um servidor Node local que grava PNG em `tools/_work/` e abrir com Read. Dar `resize_window` antes para o canvas ter tamanho.
 - Importar o storage pela URL com `?t=` ao manipular saves no dev server (senão é outra instância de módulo).
 - Encerrar servidores e abas próprios ao terminar; resetar o viewport com o preset `desktop`.
+
+
+---
+
+## Apêndice D — Desvios e decisões da execução (registrado na T12)
+
+Onde o código real difere do que este plano previu (a lista é exaustiva até o commit da T11):
+
+- **Peixes ambientes:** o teto real é `MAX_AMBIENT_FISH = 1200` (a fase já nascia com 648; o plano previa 300). Os peixes só são simulados a até `FISH_SIM_MARGIN = 700` px da câmera e a sonda de pedra roda a cada 3 quadros (todo quadro só perto de pedra). Dentro da pedra só com `depth ≥ 0,5`: o teste antigo de `jungle.test.ts` foi atualizado.
+- **Minimapa:** o percentual é arredondado com mínimo 1 e máximo 99 até completar; o rótulo fica dentro da moldura (colidia com o botão de toque em 667×320).
+- **Skin Jacaré e save:** as skins de recompensa ficam na chave própria `karimbolandia.rewards.v1`; o perfil principal e a carteira gravam uma *visão legada* para cliente antigo (resolve o risco 1 do foco de revisão). O "chapéu" da skin é a cabeça do jacaré usada como fantasia (correção do usuário).
+- **Boxe:** o jacaré ganhou *cobertura* (reage a socos repetidos na guarda fechada), armadura de 0,5 em golpe comprometido e raciocínio por fase; o combo mede o intervalo de início a início (≤ 0,45 s). Os bots só medem equilíbrio; o resultado exato não é prometido ao jogador real.
+- **Cena do pombo (T9):** a janela de disparo é 205–326 tiles e há uma regra **em tempo de execução** de "momento tranquilo" (sem inimigo a ≤ 900 px, sem areia movediça `p.sink`, sem água a ≤ 192 px), porque a regra estática "nenhum inimigo a 900 px" era impossível na fase.
+- **Perseguição (T10):** `monkey.ts`, `hazards.ts` e `rewind.ts` não existem como arquivos: macaco e bichos vivem em `sim/match.ts`; o rebobinar em `sim/letterFilm.ts`. A arte ficou em `backdrop.ts`, `critters.ts`, `scene.ts`, `filmScene.ts`, `letterPaper.ts` e `rewindFx.ts` (o plano listava `canopy/branches/animals/monkey/hud`; os galhos usam o desenhista de tiles do jogo). Percurso cortado para ≈ 410 tiles (≈ 52 s do bot perfeito: o macaco só é pego depois de 48 s, então um percurso de 450+ tiles nunca era percorrido até o fim). Galho que treme quebra **por tile** `SHAKE_T = 0,28 s` depois de pisado (o plano dizia 0,55 s de uma vez: com 0,55 s ninguém caía). `RESCUE_T`: o macaco escorrega e **volta** até o Karimbo (o plano só dizia "escorrega no próximo galho"). Resultados dos bots: perfeito 51 s, comum 64 s, péssimo ≤ 92 s. Mola g = 5; vão ≥ 5 pede planar. Bots reativos para coati, tucano e coco.
+- **Não implementado na perseguição:** agogô/ganzá como vozes novas e a intensidade de música crescendo com a distância (o tema `chase` usa as camadas existentes, 152 bpm); pássaros no cenário; cartão de resultado dentro do minijogo (a medalha/moedas saem no banner do mundo via `letterScene`).
+- **Filminho (T11):** `@fontsource/caveat` foi instalada; só o chunk da perseguição a referencia. Velocidade de escrita 48 letras/s; sem pauta na folha (o texto corre solto). Rebobinar usa o percurso **gravado** (20 amostras/s) em vez de re-simular.
+- **Revisões independentes:** após a T4 (`0770ed2`), após a T8 e após a T11 (achados e correções no Beads/commits). Os menores não corrigidos estão registrados como pendências no Beads.
