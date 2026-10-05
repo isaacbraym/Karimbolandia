@@ -175,6 +175,8 @@ export class MinigameFlow {
     this.restore(w);
     const result = r ?? { id: this.id!, outcome: 'abort' as const, time: 0, mistakes: 0 };
     this.fire(result);
+    // quem pediu pode ter reposicionado o jogador (volta ao ponto do roubo): íris e câmera abrem nele
+    this.origin = { x: w.player.x, y: w.player.y - 24 };
     this.phase = 'back';
     this.t = 0;
     if (result.outcome === 'win') this.host.saved();

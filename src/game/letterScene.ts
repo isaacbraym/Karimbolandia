@@ -45,6 +45,8 @@ export class LetterScene {
   private ctl: ControlState = { ...nullControls, jump: { held: false, pressed: false, released: false } };
   private done = new Set<string>();
   private requested = false;
+  private prefetched = false;
+  private jumped = false;
 
   constructor(w: { data: World['data'] }) {
     this.exists = w.data.stage === 2;
@@ -55,6 +57,7 @@ export class LetterScene {
   reset(w?: World) {
     if (w && (this.active || this.requested)) { w.player.lockInput = false; w.camera.focus = null; }
     this.t = -1;
+    this.jumped = false;
     this.active = false;
     this.requested = false;
     this.pigeon = 'hidden';
@@ -81,7 +84,8 @@ export class LetterScene {
     const p = w.player;
     if (!this.active) {
       if (!this.requested && this.t < 0) {
-        if (p.x > LETTER_PREFETCH_X && !w.encounters.completed.has(LETTER_ID)) w.hooks.onMinigamePrefetch?.('chase');
+        // uma vez só: se a rede falhar, o fluxo tenta de novo quando o jogador realmente entrar
+        if (!this.prefetched && p.x > LETTER_PREFETCH_X && !w.encounters.completed.has(LETTER_ID)) { this.prefetched = true; w.hooks.onMinigamePrefetch?.('chase'); }
         if (this.canStart(w)) this.begin(w);
       }
       return;
@@ -96,7 +100,8 @@ export class LetterScene {
     c.jump.held = false;
     p.facing = 1;
     if (t >= T.flee) c.moveX = 0.9;
-    if (t >= T.jump && t < T.jump + 0.3) { c.jump.held = true; c.jump.pressed = t < T.jump + 0.02; }
+    // o apertar do pulo é uma borda única (quadros longos não a perdem)
+    if (t >= T.jump && t < T.jump + 0.3) { c.jump.held = true; if (!this.jumped) { this.jumped = true; c.jump.pressed = true; } }
     if (t >= T.chase && !this.requested) this.requestChase(w);
   }
 
@@ -167,9 +172,21 @@ export class LetterScene {
     } else {
       // abandonou ou perdeu: nada é concluído e a cena pode acontecer de novo no mesmo trecho
       this.reset(w);
-      p.lockInput = false;
+      if (p.mode === 'foot') this.backToTheft(w); // sem ficar ~6 tiles adiante: a cena pode recomeçar do mesmo ponto
       w.hooks.onControlReturned?.();
     }
+  }
+
+  /** Devolve o Karimbo ao ponto do roubo (`theftY` é o centro do corpo), virado para a direita, com 1 s de folga. */
+  private backToTheft(w: World) {
+    const p = w.player;
+    p.body.x = this.theftX;
+    p.body.y = this.theftY;
+    p.body.vx = p.body.vy = 0;
+    p.facing = 1;
+    p.invuln = Math.max(p.invuln, 1);
+    p.lockInput = false;
+    w.cameraSnap();
   }
 
   /** Vitória: coloca o Karimbo no ponto do roubo virado para a direita e devolve o controle. */
@@ -180,13 +197,7 @@ export class LetterScene {
     const coins = medal === 'ouro' ? 30 : medal === 'prata' ? 20 : 12;
     w.encounters.grant(w, `${LETTER_ID}:coins`, `CARTA RECUPERADA • medalha de ${medal}`, coins);
     // de volta ao ponto do roubo (sem curar: só reposiciona e dá 1 s de folga)
-    p.body.x = this.theftX;
-    p.body.y = this.theftY - p.body.h / 2;
-    p.body.vx = p.body.vy = 0;
-    p.facing = 1;
-    p.invuln = Math.max(p.invuln, 1);
-    p.lockInput = false;
-    w.cameraSnap();
+    this.backToTheft(w);
     this.t = 99;
     this.pigeon = 'hidden';
     this.letter = 'none';

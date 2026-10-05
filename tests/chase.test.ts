@@ -74,6 +74,20 @@ describe('perseguição: regras', () => {
     expect(m.monkey.x).toBeLessThan(x);
     expect(MONKEY_V).toBeLessThan(CHASE_RUN);
   });
+  it('macaco encurralado no fim do percurso também escorrega e volta depois de RESCUE_T', () => {
+    const m = new ChaseMatch();
+    m.monkey.x = m.course.endX + 50;
+    m.time = 30;
+    m.step(1 / 60, IDLE);
+    expect(m.monkey.mode).toBe('cornered');
+    m.time = RESCUE_T;
+    m.step(1 / 60, IDLE);
+    expect(m.monkey.mode).toBe('slip');
+    const x = m.monkey.x;
+    for (let i = 0; i < 60; i++) m.step(1 / 60, IDLE);
+    expect(m.monkey.mode).toBe('slip');
+    expect(m.monkey.x).toBeLessThan(x);
+  });
   it('galhos que tremem: quem frea cai; quem corre atravessa', () => {
     const sh = new ChaseMatch().course.shaky[0];
     const walk = (brake: boolean) => {

@@ -151,3 +151,40 @@ describe('cena do pombo-correio e do macaco', () => {
     expect(w.camera.focus).toBeNull();
   });
 });
+
+describe('revisão T9–T11', () => {
+  it('a vitória devolve o Karimbo com os pés no mesmo chão do roubo (sem 28 px no ar)', async () => {
+    const { w, hooks, stand, run } = await setup();
+    stand(207);
+    run(10);
+    const feet = w.letter.theftY + w.player.body.h / 2;
+    hooks.chase.mock.calls[0][0]({ id: 'chase', outcome: 'win', time: 52, mistakes: 0 });
+    expect(w.player.feetY).toBeCloseTo(feet, 3);
+  });
+
+  it('abandonar devolve o Karimbo ao ponto do roubo (a cena recomeça do mesmo lugar)', async () => {
+    const { w, hooks, stand, run } = await setup();
+    stand(207);
+    run(10);
+    const x0 = w.letter.theftX;
+    expect(w.player.x).toBeGreaterThan(x0 + 100);
+    hooks.chase.mock.calls[0][0]({ id: 'chase', outcome: 'abort', time: 0, mistakes: 0 });
+    expect(Math.abs(w.player.x - x0)).toBeLessThan(1);
+  });
+
+  it('a pré-busca da perseguição é pedida uma vez só, mesmo que a rede falhe', async () => {
+    const { hooks, stand, run } = await setup();
+    stand(150);
+    run(3);
+    expect(hooks.prefetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('o pulo roteirizado da fuga não se perde em quadros longos', async () => {
+    const { w, stand } = await setup();
+    stand(207);
+    const ctl = (w.letter as unknown as { ctl: { jump: { pressed: boolean } } }).ctl;
+    let edges = 0;
+    for (let i = 0; i < 20 * 12; i++) { w.update(1 / 20, newCtl()); if (ctl.jump.pressed) edges++; }
+    expect(edges).toBe(1);
+  });
+});

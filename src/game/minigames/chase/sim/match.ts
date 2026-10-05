@@ -144,7 +144,7 @@ export class ChaseMatch {
     // encurralado na clareira: o macaco para e é pego quando o Karimbo chega
     const cornerX = this.course.endX;
     let v = MONKEY_V;
-    if (m.mode !== 'slip' && m.mode !== 'cornered' && this.time >= RESCUE_T) { m.mode = 'slip'; m.slipT = 0; this.emit('line', { text: 'Ai! Minha casca de banana!' }); }
+    if (m.mode !== 'slip' && this.time >= RESCUE_T) { m.mode = 'slip'; m.slipT = 0; this.emit('line', { text: 'Ai! Minha casca de banana!' }); }
     // escorregou na própria casca: desliza para trás, de volta ao Karimbo (garante o fim da perseguição)
     if (m.mode === 'slip') { m.slipT += dt; v = -SLIP_V; }
     else if (m.mode === 'cornered') v = 0;
@@ -156,7 +156,7 @@ export class ChaseMatch {
         if (gap < NEAR_GAP) m.mode = this.time >= TIRED_T ? 'tired' : 'run';
       } else if (gap > FAR_GAP && m.x < cornerX - 600) { m.mode = 'taunt'; m.tauntT = 0; this.emit('taunt', { text: 'Corre, orelhudo!' }); v = 0; }
     }
-    if (m.x >= cornerX && m.mode !== 'cornered') { m.mode = 'cornered'; v = 0; this.emit('cornered'); }
+    if (m.x >= cornerX && m.mode !== 'cornered' && m.mode !== 'slip') { m.mode = 'cornered'; v = 0; this.emit('cornered'); }
     m.x += v * dt;
     m.facing = v < 0 ? -1 : 1;
     // vertical: sobre o galho; nos vãos salta em arco
