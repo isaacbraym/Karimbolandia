@@ -2,6 +2,10 @@
 
 This file provides instructions and context for AI coding agents working on this project.
 
+## Regra do usuário: commit ao concluir cada tarefa (obrigatória)
+
+Ao concluir uma tarefa que alterou o projeto, faça o commit antes de encerrar, incluindo todos os arquivos novos que o código usa (assets em `public/`, módulos em `src/`, testes). Rode `git status --short` para não esquecer nenhum `??` necessário; rode `npm run typecheck` e `npm test` antes. Não inclua `docs/`/`plans/` de terceiros nem `tools/_work/`. Esta regra prevalece sobre o perfil "Conservative" do bloco Beads quanto a commits; push/deploy continuam exigindo pedido explícito. Texto completo em `AGENTS.md`.
+
 <!-- BEGIN BEADS INTEGRATION v:1 profile:minimal hash:1105d646 -->
 ## Beads Issue Tracker
 

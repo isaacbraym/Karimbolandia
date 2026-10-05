@@ -1,5 +1,17 @@
 # Agent Instructions
 
+## Regra do usuário: commit ao concluir cada tarefa (obrigatória)
+
+Vale para Codex, Claude e qualquer outro agente. Tem prioridade sobre o perfil "Conservative" do bloco Beads abaixo, no que diz respeito a commits.
+
+- Ao concluir uma tarefa que alterou o projeto, **faça o commit antes de encerrar a sessão**. Nada de deixar trabalho pronto só na árvore local.
+- O commit inclui **todos os arquivos que a tarefa criou ou usa**: código, testes e arquivos novos referenciados pelo código (ex.: `public/assets/audio/*.mp3`, `public/assets/img/*`, novos módulos em `src/`, novos testes em `tests/`). Antes de commitar, rode `git status --short` e confira que nenhum `??` necessário ficou de fora — um arquivo novo esquecido quebra o build publicado.
+- Antes do commit: `npm run typecheck` e `npm test`; se mexeu em assets, config ou entrada, também `npm run build`.
+- Um commit por tarefa, mensagem em português dizendo o que mudou e por quê.
+- Não inclua o que não é da tarefa: anotações de terceiros (`docs/` alheios, `plans/`), `tools/_work/`, `dist/`.
+- Se não for possível commitar (teste falhando, trabalho incompleto), diga isso explicitamente ao encerrar e liste os arquivos pendentes.
+- Push e deploy (GitHub Pages) continuam exigindo pedido explícito do usuário.
+
 This project uses **bd** (beads) for issue tracking. Run `bd prime` for full workflow context.
 
 > **Architecture in one line:** Issues live in a local Dolt database
