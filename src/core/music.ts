@@ -6,7 +6,7 @@ import { audio } from './audio';
 import { clamp } from './math';
 
 export type Layer = 'pad' | 'bass' | 'arp' | 'hat' | 'kick' | 'snare' | 'lead' | 'power' | 'choir' | 'tom';
-export type ThemeName = 'menu' | 'stage' | 'boss' | 'jungle' | 'rave';
+export type ThemeName = 'menu' | 'stage' | 'boss' | 'jungle' | 'rave' | 'monument';
 
 const LAYERS: Layer[] = ['pad', 'bass', 'arp', 'hat', 'kick', 'snare', 'lead', 'power', 'choir', 'tom'];
 const mtof = (m: number) => 440 * Math.pow(2, (m - 69) / 12);
@@ -151,7 +151,31 @@ const RAVE: Theme = {
   tomPat: '..............xx',
 };
 
-const THEMES: Record<ThemeName, Theme> = { menu: MENU, stage: STAGE, boss: BOSS, jungle: JUNGLE, rave: RAVE };
+// -------- Monumento (Praça do Pensador): Ré menor, 66 bpm — épico, lento e solene ------------
+// pad e coro enormes, tímpano marcando a cada dois tempos, arpejo esparso e uma melodia larga
+const MONUMENT: Theme = {
+  bpm: 66,
+  chords: [
+    { root: 38, notes: [50, 53, 57, 62] }, // Dm
+    { root: 34, notes: [46, 50, 53, 58] }, // Bb
+    { root: 43, notes: [55, 58, 62, 67] }, // Gm
+    { root: 33, notes: [45, 49, 52, 57] }, // A
+  ],
+  bassPat: 'x.......o.......',
+  kickPat: 'x.......x.......',
+  snarePat: '................',
+  hatPat: '................',
+  arpPat: [0, -1, -1, -1, 2, -1, -1, -1, 1, -1, -1, -1, 3, -1, -1, -1],
+  tomPat: 'x.......x...x...',
+  lead: [
+    [74, null, null, null, null, null, null, null, 77, null, null, null, 81, null, null, null],
+    [82, null, null, null, null, null, 81, null, 77, null, null, null, null, null, null, null],
+    [79, null, null, null, 82, null, null, null, 86, null, null, null, null, null, 84, null],
+    [85, null, null, null, 81, null, null, null, 76, null, null, null, 81, null, null, null],
+  ],
+};
+
+const THEMES: Record<ThemeName, Theme> = { menu: MENU, stage: STAGE, boss: BOSS, jungle: JUNGLE, rave: RAVE, monument: MONUMENT };
 
 class MusicEngine {
   private layerGain = new Map<Layer, GainNode>();
@@ -703,6 +727,8 @@ export const MIX = {
   /** "drop" da boate: tudo, com a guitarra e o coro */
   drop: { pad: 0.8, bass: 1, arp: 0.9, hat: 1, kick: 1, snare: 1, lead: 1, power: 0.9, choir: 0.8, tom: 0.7 } as Partial<Record<Layer, number>>,
   victory: { pad: 1, lead: 0.8, arp: 0.7, bass: 0.6 } as Partial<Record<Layer, number>>,
+  /** praça do Pensador: pad e coro, tímpano, baixo e melodia larga */
+  monument: { pad: 1, bass: 0.8, arp: 0.55, kick: 0.45, tom: 0.9, choir: 0.95, lead: 0.7 } as Partial<Record<Layer, number>>,
   /** balada com o Karimbo dançando: tudo no máximo */
   rave: { pad: 0.55, bass: 1, arp: 1, hat: 1, kick: 1, snare: 1, lead: 1, power: 0.45, tom: 0.8 } as Partial<Record<Layer, number>>,
 };

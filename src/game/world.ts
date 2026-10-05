@@ -26,6 +26,8 @@ import { Narrator } from './narrator';
 import { music, JUNGLE_MELODY, STAGE_MELODY } from '../core/music';
 import { Waters } from './water';
 import { LakeMap } from './lake/lakeMap';
+import { ThinkerScene } from './lake/thinkerReveal';
+import { piranhasAggro } from './enemies/piranha';
 import { JungleWildlife } from './wildlife';
 import { Village } from './village';
 import { Merchant } from './merchant';
@@ -54,9 +56,11 @@ export interface Stats {
   time: number;
 }
 
-export type MusicState = 'explore' | 'combat' | 'nomad' | 'nomadCombat' | 'boss1' | 'boss2' | 'boss3' | 'silence' | 'calm' | 'victory' | 'rhythm' | 'celebrate' | 'club' | 'drop' | 'rave';
+export type MusicState = 'monument' | 'explore' | 'combat' | 'nomad' | 'nomadCombat' | 'boss1' | 'boss2' | 'boss3' | 'silence' | 'calm' | 'victory' | 'rhythm' | 'celebrate' | 'club' | 'drop' | 'rave';
 
 export const MAX_LIVES = 3;
+/** moedas por pérola do lago */
+export const PEARL_COINS = 5;
 export const COMBO_WINDOW = 3;
 /** multiplicador do combo: x1 → x5 */
 export const comboMult = (n: number) => (n >= 20 ? 5 : n >= 12 ? 4 : n >= 7 ? 3 : n >= 3 ? 2 : 1);
@@ -137,6 +141,32 @@ export class World {
   water!: Waters;
   /** minimapa do lago (fase 2); null nas outras fases */
   lakeMap: LakeMap | null = null;
+  /** revelação da Praça do Pensador (só existe se a fase tem a estátua) */
+  thinker!: ThinkerScene;
+  private pearlIds: number[] = [];
+  /** pérolas do lago já coletadas (derivado dos IDs coletados; sem campo novo no save) */
+  pearls() { let n = 0; for (const id of this.pearlIds) if (this.collectedPickups.has(id)) n++; return n; }
+  pearlTotal() { return this.pearlIds.length; }
+  private fearPt = { x: 0, y: 0 };
+  /** Cardume fiel (12/12 pérolas): nasce perto do Karimbo no lago e foge das piranhas. */
+  private updateLoyal(p: Player) {
+    const wt = this.water;
+    if (!this.pearlIds.length) return;
+    if (wt.loyalLead < 0) {
+      if (this.pearls() < this.pearlIds.length || !this.lakeMap?.contains(p.x, p.y)) return;
+      wt.spawnLoyal(p.x - p.facing * 60, p.y);
+      if (wt.loyalLead < 0) return;
+    }
+    wt.loyalX = p.x;
+    wt.loyalY = p.y;
+    let best = 300 * 300;
+    wt.loyalFear = null;
+    for (const e of this.enemies) {
+      if (e.type !== 'piranha' || e.hp <= 0) continue;
+      const d = (e.x - p.x) * (e.x - p.x) + (e.y - p.y) * (e.y - p.y);
+      if (d < best) { best = d; this.fearPt.x = e.x; this.fearPt.y = e.y; wt.loyalFear = this.fearPt; }
+    }
+  }
   wildlife!: JungleWildlife;
   village!: Village;
   merchant!: Merchant;
@@ -232,6 +262,8 @@ export class World {
     this.baseTheme = data.level.theme.slice();
     this.water = new Waters(data.water ?? [], this.level, data.decos);
     this.lakeMap = LakeMap.create(this.level, data.water ?? []);
+    this.thinker = new ThinkerScene(this);
+    this.pearlIds = data.pickups.filter((p) => p.kind === 'pearl').map((p) => p.id);
     this.wildlife = new JungleWildlife(data);
     this.village = new Village(data);
     this.merchant = new Merchant(data);
@@ -290,6 +322,7 @@ export class World {
     this.wildlife?.reset();
     this.village?.reset(this);
     this.club?.reset(this);
+    this.thinker?.reset(this);
     this.encounters?.reset(true);
     for (const v of this.vines) {
       v.held = false;
@@ -591,6 +624,7 @@ export class World {
     this.director.onRespawn();
     this.village.reset(this);
     this.club.reset(this);
+    this.thinker?.reset(this);
     this.encounters.reset();
     this.narrator.onRespawn();
     this.restoreTiles();
@@ -1037,6 +1071,18 @@ export class World {
         } else this.fx.popup(pk.x, pk.y - 22, 'RELÍQUIA JÁ GUARDADA • +5', '#7ff9e0', 9);
         break;
       }
+      case 'pearl': {
+        if (pk.id >= 0) this.collectedPickups.add(pk.id);
+        this.score += 150;
+        a('coin');
+        this.fx.sparks(pk.x, pk.y, 14, '#ffe6f2', 220);
+        for (let i = 0; i < PEARL_COINS; i++) collectCoin();
+        this.tokens += PEARL_COINS;
+        const got = this.pearls(), total = this.pearlTotal();
+        this.fx.popup(pk.x, pk.y - 22, `PÉROLA ${got}/${total} • +${PEARL_COINS}`, '#ffe6f2', 9);
+        if (got >= total) this.hooks.onBanner?.('CARDUME FIEL!', 'Os neons de Atlântida vão com você', 3);
+        break;
+      }
       case 'chest':
         if (pk.id >= 0) this.collectedPickups.add(pk.id);
         this.score += 800;
@@ -1136,9 +1182,11 @@ export class World {
     this.narrator.update(dt);
     this.village.update(this, dt, ctl);
     this.club.update(this, dt);
-    p.update(this, dt, this.club.control(ctl));
+    this.thinker.update(this, dt);
+    p.update(this, dt, this.thinker.control(this.club.control(ctl)));
     this.encounters.update(this, dt);
     this.wildlife.update(this, dt);
+    this.updateLoyal(p);
     if (this.water.zones.length) this.water.update(dt, p.x, p.y, p.swimming, this.camera.x, this.camera.x + this.camera.w);
     if (this.lakeMap && this.lakeMap.contains(p.x, p.y) && this.lakeMap.reveal(p.x, p.y)) {
       const lm = this.lakeMap.takeLandmark();
@@ -1150,6 +1198,7 @@ export class World {
     if (this.rhythm.room) this.updateRhythm(dt);
     // a cena da balada manda na música até o fim (nada de trilha de combate por cima)
     this.club.music(this);
+    this.thinker.music(this);
     if (this.data.beams?.length) this.updateBeams(dt);
     for (const [id, k] of this.drumHit) {
       const n = k - dt * 4;
@@ -1227,6 +1276,7 @@ export class World {
     this.director.cameraUpdate(dt);
     this.village.camera(this);
     this.club.camera(this);
+    this.thinker.camera(this);
     cam.update(dt, p.x, p.y - (p.mode === 'nomad' ? 6 : 14), p.facing, p.body.vx, p.body.onGround, this.fx.shake, settings.screenShake);
   }
 

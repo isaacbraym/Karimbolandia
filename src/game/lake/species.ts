@@ -8,7 +8,7 @@ export type FishSpecies = 'photo' | 'neon' | 'cardinal' | 'bandeira' | 'disco' |
 export type LifeSpecies = Exclude<FishSpecies, 'photo'>;
 
 /** Teto de peixes ambientes (fotos + espécies). A fase já nascia com 648; as espécies acrescentam ~400. */
-export const MAX_AMBIENT_FISH = 1100;
+export const MAX_AMBIENT_FISH = 1200;
 /** Peixes só são simulados a no máximo esta distância (px) da câmera: o resto fica congelado. */
 export const FISH_SIM_MARGIN = 700;
 

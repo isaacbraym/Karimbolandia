@@ -82,4 +82,27 @@ describe('custo de desenho do lago', () => {
     drawLakeMinimap(g, w, m, 0, 0, mw, mh, 1.5, 0);
     expect(draws).toBeLessThanOrEqual(fresh + 20);
   });
+it('a revelação do Pensador (40 neons em órbita, facho, halo) também cabe no orçamento', async () => {
+    const { World } = await import('../src/game/world');
+    const { buildJungle } = await import('../src/game/level/jungle');
+    const w = new World(buildJungle());
+    vi.stubGlobal('document', { createElement: () => ({ width: 1, height: 1, getContext: ctx }) });
+    const { prepareLakeLife } = await import('../src/art/lake/lakeLife');
+    prepareLakeLife();
+    const { drawWaterBack, drawWaterFront, drawDeepLights } = await import('../src/art/waterDraw');
+    w.thinker.crystal = 1;
+    w.thinker.light = 1;
+    w.water.spawnRings(w.thinker.x, w.thinker.y - 90, false);
+    w.camera.zoom = 640 / 900;
+    w.camera.x = w.thinker.x - w.camera.w / 2;
+    w.camera.y = w.thinker.y - w.camera.h * 0.7;
+    const g = ctx();
+    drawWaterBack(g, w);
+    drawWaterFront(g, w);
+    drawDeepLights(g, w);
+    const visible = w.water.fish.filter((f) => w.camera.visible(f.x, f.y, f.size)).length;
+    expect(visible).toBeGreaterThanOrEqual(40);
+    // Orçamento da revelação: ≤ 1 por peixe visível + neve (8) + halos/facho/cristais (≤ 40) + o resto do lago
+    expect(draws).toBeLessThanOrEqual(visible + 8 + 40 + 120);
+  });
 });

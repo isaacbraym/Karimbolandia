@@ -32,6 +32,14 @@ const hash = (n: number, k: number) => {
   return (h >>> 0) / 4294967296;
 };
 
+/** Algum cardume de piranhas alerta com o território a menos de `r` px do ponto? */
+export function piranhasAggro(w: World, x: number, y: number, r: number): boolean {
+  const map = schools.get(w);
+  if (!map) return false;
+  for (const sc of map.values()) if (sc.aggro && Math.hypot(sc.hx - x, sc.hy - y) < r + sc.radius) return true;
+  return false;
+}
+
 export function schoolFor(w: World, s: EnemySpawn): School {
   let map = schools.get(w);
   if (!map) schools.set(w, (map = new Map()));

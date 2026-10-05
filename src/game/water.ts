@@ -59,7 +59,15 @@ export interface Fish {
   seg: Float32Array | null;
   /** pedra por perto (no corpo ou à frente): sem isso a sondagem só roda a cada 3 passos */
   rockNear: boolean;
+  /** cardume fiel: acompanha o Karimbo (cosmético, nunca assustado por ele) */
+  loyal: boolean;
+  /** anel de neon em volta da estátua: índice em `Waters.rings` (-1 = não) e ângulo atual */
+  ring: number;
+  ang: number;
 }
+
+/** Anel orbital (centro/raio em px; `w` em rad/s, sinal = sentido; elipse achatada em y). */
+export interface Ring { cx: number; cy: number; r: number; w: number }
 
 /** Cardume de espécie (líder + membros em sequência no vetor de peixes). */
 export interface School { lead: number; n: number; species: LifeSpecies }
@@ -118,6 +126,13 @@ export class Waters {
   vents: { x: number; y: number; t: number }[] = [];
   schools: School[] = [];
   puffs: Puff[] = [];
+  rings: Ring[] = [];
+  /** alvo do cardume fiel (o Karimbo) e o susto das piranhas; preenchidos pelo mundo a cada quadro */
+  loyalX = 0;
+  loyalY = 0;
+  loyalFear: { x: number; y: number } | null = null;
+  /** o cardume fiel já nasceu? (índice do líder; -1 = não) */
+  loyalLead = -1;
   private lifeRnd = mulberry(4242);
   private level: Level;
   private rnd = mulberry(9001);
@@ -140,6 +155,8 @@ export class Waters {
     this.ripples.length = 0;
     this.fish.length = 0;
     this.schools.length = 0;
+    this.rings.length = 0;
+    this.loyalLead = -1;
     for (const p of this.puffs) p.t = p.max;
     this.rnd = mulberry(9001);
     this.lifeRnd = mulberry(4242);
@@ -248,7 +265,7 @@ export class Waters {
           kind: r() < 0.5 ? 0 : 1, x, y, vx: 0, vy: 0, size, dir: r() < 0.5 ? -1 : 1, turn: 1, ph: r() * 6.28,
           speed: (size < 44 ? 70 : size < 90 ? 46 : 30) * (0.8 + r() * 0.4), tx: x, ty: y, layer, lead, offX, offY, wait: r() * 2, scared: 0, zone: z,
           depth: 0, depthGoal: 0, clearT: 0, rockT: 0,
-          species: 'photo', hug: 0, cool: 0, fx: 0, fy: 0, chaseT: 0, chase: -1, lane: 0, seg: null, rockNear: false,
+          species: 'photo', hug: 0, cool: 0, fx: 0, fy: 0, chaseT: 0, chase: -1, lane: 0, seg: null, rockNear: false, loyal: false, ring: -1, ang: 0,
         };
         f.turn = f.dir;
         this.fish.push(f);
@@ -292,7 +309,7 @@ export class Waters {
     return {
       species, kind: 0, x, y, vx: 0, vy: 0, size, dir, turn: dir, ph: r() * 6.28, speed: def.speed * (0.85 + r() * 0.3), tx: x, ty: y,
       layer, lead: -1, offX: 0, offY: 0, wait: r() * 2, scared: 0, zone: z, depth: 0, depthGoal: 0, clearT: 0, rockT: 0,
-      hug: def.hug, cool: 0, fx: 0, fy: 0, chaseT: 0, chase: -1, lane: 0, rockNear: false,
+      hug: def.hug, cool: 0, fx: 0, fy: 0, chaseT: 0, chase: -1, lane: 0, rockNear: false, loyal: false, ring: -1, ang: 0,
       seg: species === 'poraque' ? new Float32Array(EEL_SEGMENTS * 2) : null,
     };
   }
@@ -375,6 +392,55 @@ export class Waters {
     }
   }
 
+  /** Anéis de neon (40 peixes) em volta de um ponto: `converge` = nascem longe e voam até a órbita. */
+  spawnRings(cx: number, cy: number, converge: boolean) {
+    const specs: [number, number][] = [[150, 0.5], [220, -0.4]];
+    const r = this.lifeRnd;
+    const zone = this.zones.find((z) => z.surface !== undefined) ?? this.zones[0];
+    for (const [radius, w] of specs) {
+      const ri = this.rings.length;
+      this.rings.push({ cx, cy, r: radius, w });
+      for (let k = 0; k < 20; k++) {
+        if (this.fish.length >= MAX_AMBIENT_FISH) return;
+        const f = this.newFish('neon', zone, cx, cy, SPECIES.neon.size[0] + r() * 3, 2, r);
+        f.ring = ri;
+        f.ang = (k / 20) * Math.PI * 2 + (w < 0 ? 0.3 : 0);
+        const tx = cx + Math.cos(f.ang) * radius, ty = cy + Math.sin(f.ang) * radius * 0.42;
+        f.x = converge ? cx + (r() - 0.5) * 1100 : tx;
+        f.y = converge ? cy + (r() - 0.5) * 420 : ty;
+        f.layer = 2;
+        this.fish.push(f);
+      }
+    }
+  }
+
+  /** Cardume fiel: 20 neons que acompanham o Karimbo (nasce perto dele). */
+  spawnLoyal(x: number, y: number) {
+    if (this.loyalLead >= 0 || this.fish.length + 21 > MAX_AMBIENT_FISH) return;
+    const zone = this.zones.find((z) => z.surface !== undefined) ?? this.zones[0];
+    const r = this.lifeRnd;
+    const li = this.fish.length;
+    const lead = this.newFish('neon', zone, x - 60, y - 10, 13, 2, r);
+    lead.loyal = true;
+    lead.speed = 90;
+    this.fish.push(lead);
+    this.loyalLead = li;
+    this.schools.push({ lead: li, n: 20, species: 'neon' });
+    for (let k = 0; k < 20; k++) {
+      const sz = 11 + r() * 3;
+      const f = this.newFish('neon', zone, lead.x, lead.y, sz, 2, r);
+      f.lead = li;
+      f.loyal = true;
+      const col = k % 4, row = (k >> 2) - 2;
+      f.offX = -(sz * 1.1 + col * sz * 1.25);
+      f.offY = row * sz * 0.95 + (col % 2) * sz * 0.4;
+      f.speed = 90;
+      f.x = lead.x + f.offX;
+      f.y = lead.y + f.offY;
+      this.fish.push(f);
+    }
+  }
+
   private initSegments(f: Fish) {
     const seg = f.seg!;
     const gap = f.size / (EEL_SEGMENTS + 0.5);
@@ -415,7 +481,7 @@ export class Waters {
       const dyp = f.y - py;
       const d2 = dxp * dxp + dyp * dyp;
       const fearR = 60 + f.size * 0.9;
-      if (f.species !== 'pirarucu' && f.species !== 'poraque') {
+      if (f.species !== 'pirarucu' && f.species !== 'poraque' && !f.loyal && f.ring < 0) {
         if (swimming && d2 < fearR * fearR && f.layer === 1) { f.scared = 1.2; f.fx = px; f.fy = py; }
         else if (swimming && d2 < fearR * fearR * 0.5) { f.scared = Math.max(f.scared, 0.6); f.fx = px; f.fy = py; }
       }
@@ -446,6 +512,26 @@ export class Waters {
           mf.fy = f.y;
         }
         if (f.chaseT <= 0) f.cool = TUCUNARE_COOLDOWN[0] + this.lifeRnd() * (TUCUNARE_COOLDOWN[1] - TUCUNARE_COOLDOWN[0]);
+      } else if (f.ring >= 0) {
+        // anel em volta da estátua: segue o ponto da órbita (a metade da frente passa na frente da pedra)
+        const R = this.rings[f.ring];
+        f.ang += R.w * dt;
+        tx = R.cx + Math.cos(f.ang) * R.r;
+        ty = R.cy + Math.sin(f.ang) * R.r * 0.42;
+        f.layer = Math.sin(f.ang) > 0 ? 2 : 1;
+        spd = Math.max(Math.abs(R.w) * R.r * 1.05, Math.hypot(tx - f.x, ty - f.y) * 2.4);
+        spd = Math.min(spd, 420);
+      } else if (f.loyal && f.lead < 0) {
+        // líder do cardume fiel: paira perto do Karimbo e some do perigo
+        const fear = this.loyalFear;
+        if (fear && Math.hypot(f.x - fear.x, f.y - fear.y) < 170) {
+          f.scared = 0.9;
+          f.fx = fear.x;
+          f.fy = fear.y;
+        }
+        tx = this.loyalX - 64;
+        ty = this.loyalY - 14;
+        spd = Math.min(260, Math.max(f.speed, Math.hypot(tx - f.x, ty - f.y) * 1.6));
       } else if (f.lane !== 0) {
         // gigante do evento: cruza o palácio e fica estacionado (à deriva) até a próxima travessia
         if (f.cool > 0) {

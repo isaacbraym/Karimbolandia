@@ -234,6 +234,7 @@ export class Hud {
     drawLakeMinimap(g, w, m, x, y, mw, mh, textScale, this.time);
     // o texto fica DENTRO da moldura (nada de altura extra: no celular pequeno o botão de granada fica logo abaixo)
     numText(g, 'lakePct', m.percent(), (v) => `EXPLORADO ${v}%`, x + 5, y + 11, 9, '#e8fbff', 'left');
+    if (w.pearlTotal()) numText(g, 'lakePearls', `${w.pearls()}/${w.pearlTotal()}`, (v) => `PÉROLAS ${v}`, x + 5, y + mh - 4, 9, w.pearls() >= w.pearlTotal() ? '#ffe27a' : '#ffe6f2', 'left');
     g.globalAlpha = 1;
   }
 

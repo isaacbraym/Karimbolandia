@@ -180,7 +180,7 @@ export interface PropSpawn {
 
 export type PickupKind =
   | 'token' | 'emblem' | 'secret' | 'health' | 'healthBig' | 'ammo' | 'nade' | 'rifle' | 'shotgun' | 'launcher'
-  | 'energy' | 'repair' | 'note' | 'relic' | 'chest';
+  | 'energy' | 'repair' | 'note' | 'relic' | 'chest' | 'pearl';
 
 export interface PickupSpawn {
   id: number;

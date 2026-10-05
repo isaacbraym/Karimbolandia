@@ -919,6 +919,7 @@ export class Game {
       case 'boss3': m('boss', MIX.boss3); break;
       case 'victory': m('stage', MIX.victory); break;
       case 'rave': music.play('rave', MIX.rave); break;
+      case 'monument': music.play('monument', MIX.monument); break;
     }
   }
 

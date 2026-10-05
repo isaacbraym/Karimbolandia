@@ -69,4 +69,30 @@ export function decorateLake(b: LevelBuilder, seabed: (x: number) => number) {
   for (const x of [500, 556, 612]) b.deco('uVentLine', x, seabed(x), 'back');
   // primeiro plano desfocado dentro da caverna
   for (const [x, par] of [[478, 0.25], [566, 0.27], [608, 0.3]] as [number, number][]) b.deco('lkFgWeed', x, seabed(x) + 1, 'front', { par, scale: 0.5, flip: x % 2 === 0 });
+
+  placePearls(b, seabed);
+}
+
+/** Quantas pérolas escondem o lago e Atlântida (o cardume fiel vem com a 12ª). */
+export const LAKE_PEARLS = 12;
+
+/**
+ * 12 pérolas (+5 moedas cada), anexadas por último (IDs depois de todos os tesouros): sob raízes de
+ * aguapé, atrás do primeiro plano desfocado, entre colunas, perto das arraias, na janela da torre,
+ * no fundo da câmara do canto… Cada uma fica num tile de água livre ligado à fenda (teste de alcance).
+ */
+function placePearls(b: LevelBuilder, seabed: (x: number) => number) {
+  const spots: [number, number][] = [
+    [486, 37.5], [508, 37.5], [541, 38.5], // sob as raízes dos aguapés
+    [514, 42.5], // atrás do primeiro plano desfocado do lago raso
+    [479, 50.5], // dentro da fenda
+    [471, 53.5], // nicho alto
+    [509, 86.5], // janela da torre
+    [520, seabed(520) - 1.5], // entre a estátua e a coluna
+    [564, seabed(564) - 1.5], // leito à direita do palácio (onde as arraias descansam)
+    [577, seabed(577) - 1.5], // casa desabada
+    [603, seabed(603) - 2.5], // câmara do canto
+    [598, ABYSS_FLOOR + 3.5], // cofre sob o leito
+  ];
+  for (const [x, y] of spots) b.pickup('pearl', x, y);
 }

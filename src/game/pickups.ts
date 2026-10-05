@@ -7,6 +7,7 @@ import { moveBody, newBody, type Body } from './physics';
 import { music } from '../core/music';
 import { progress } from '../core/storage';
 import { pickupPathClear } from './pickupReach';
+import { drawPearl } from '../art/lake/pearl';
 
 export class Pickup {
   kind: PickupKind;
@@ -41,7 +42,7 @@ export class Pickup {
   }
 
   get radius() {
-    return this.kind === 'relic' || this.kind === 'chest' ? 22 : this.kind === 'token' ? 13 : this.kind === 'note' ? 18 : this.kind === 'emblem' || this.kind === 'secret' ? 18 : this.kind === 'healthBig' ? 22 : 18;
+    return this.kind === 'pearl' ? 16 : this.kind === 'relic' || this.kind === 'chest' ? 22 : this.kind === 'token' ? 13 : this.kind === 'note' ? 18 : this.kind === 'emblem' || this.kind === 'secret' ? 18 : this.kind === 'healthBig' ? 22 : 18;
   }
 
   update(w: World, dt: number) {
@@ -141,6 +142,10 @@ export class Pickup {
       g.fill();
       g.stroke();
       g.restore();
+      return;
+    }
+    if (this.kind === 'pearl') {
+      drawPearl(g, x, y, this.t);
       return;
     }
     if (this.kind === 'relic' || this.kind === 'chest') {

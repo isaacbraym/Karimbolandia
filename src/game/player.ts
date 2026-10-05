@@ -15,6 +15,7 @@ import { settings, progress } from '../core/storage';
 import { KARIMBO_BASE, karimboStats, magazineCapacity, reloadSeconds, tunedWeapon } from '../core/gearCatalog';
 import { breathesUnderwater } from '../core/skinCatalog';
 import { difficulty } from '../core/difficulty';
+import { StrokeRhythm } from './lake/stroke';
 import {
   FOOT_W, FOOT_H, CROUCH_H, NOMAD_W, NOMAD_H, RUN, RUN_ACC, RUN_DEC, AIR_ACC, AIR_DEC, GRAV, JUMP_V, FALL_MAX, COYOTE, JUMP_BUF,
   GLIDE_FALL, GLIDE_FUEL, GLIDE_SPEED, CROUCH_SPEED, N_RUN, N_ACC, N_DEC, N_GRAV, N_JUMP,
@@ -172,6 +173,9 @@ export class Player {
   /** salto para fora d'água: sem o corte de altura do pulo curto */
   private leapT = 0;
   swimPhase = 0;
+  /** embalo de braçadas (lago): ver lake/stroke.ts */
+  readonly rhythm = new StrokeRhythm();
+  private trailT = 0;
   strokeT = 0;
   private bubbleT = 0;
   private wadeStep = 0;
@@ -1063,6 +1067,7 @@ export class Player {
   private enterWater(w: World, z: { y: number }) {
     const b = this.body;
     this.swimming = true;
+    this.rhythm.reset();
     this.glide = false;
     this.slam = false;
     this.earGlide = 0;
@@ -1183,7 +1188,8 @@ export class Player {
     const depth = b.y - z.y;
     const atSurface = depth < 16;
     // horizontal
-    const SW = 150 * karimboStats(progress.gear).swim * (progress.equippedSkin === 'atlante' ? 1.3 : 1);
+    this.rhythm.update(dt);
+    const SW = 150 * karimboStats(progress.gear).swim * (progress.equippedSkin === 'atlante' ? 1.3 : 1) * this.rhythm.speedMul;
     const tx = hurt ? 0 : ctl.moveX * SW;
     b.vx = approach(b.vx, tx, (Math.abs(tx) > 0 ? 540 : 240) * dt);
     if (Math.abs(ctl.moveX) > 0.3) this.facing = ctl.moveX > 0 ? 1 : -1;
@@ -1209,6 +1215,7 @@ export class Player {
         b.vy = Math.min(b.vy, -255);
         b.vx += this.facing * 40;
         this.strokeT = 0.45;
+        this.rhythm.stroke();
         w.audio('swim', 0.8, this.x);
         for (let i = 0; i < 4; i++) w.water.addBubble(this.x - this.facing * 8 + rand.spread(8), this.feetY - 8, rand.range(1, 2.4), z.y);
       }
@@ -1219,6 +1226,14 @@ export class Player {
       b.y = z.y + 10 + Math.sin(w.time * 3) * 1.5;
     }
     if (this.strokeT > 0) this.strokeT -= dt;
+    // embalo ≥ 2: rastro de bolhinhas (taxa limitada; só enfeite)
+    if (this.rhythm.level >= 2) {
+      this.trailT -= dt;
+      if (this.trailT <= 0) {
+        this.trailT = 0.11;
+        w.water.addBubble(this.x - this.facing * 12 + rand.spread(4), this.feetY - 30 + rand.spread(10), rand.range(0.9, 1.8), z.y);
+      }
+    }
     // ---- colisão
     moveBody(b, dt, w.level, w.solidRects, true);
     // ---- mira + armas (atira debaixo d'água também)

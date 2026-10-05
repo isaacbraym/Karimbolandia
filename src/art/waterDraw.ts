@@ -12,6 +12,7 @@ import { glowSprite, makeCanvas, softDot } from './kit';
 import { Rng } from '../core/math';
 import { GROUND_DEPTH } from './perspective';
 import { drawLifeFish, getLifeArt } from './lake/lakeLife';
+import { drawThinkerFx } from './lake/thinkerFx';
 
 interface Tex {
   lake: HTMLCanvasElement;
@@ -315,7 +316,8 @@ function drawFish(g: CanvasRenderingContext2D, fa: FishArt, f: Fish, k: number, 
 }
 
 /** Cardumes de neon/cardinal em Atlântida brilham no breu: ficam num passe depois da escuridão (3). */
-const glowy = (f: Fish) => (f.species === 'neon' || f.species === 'cardinal') && f.zone.surface !== undefined && f.depth < 0.5;
+const glowy = (f: Fish) => (f.species === 'neon' || f.species === 'cardinal') && f.zone.surface !== undefined && f.depth < 0.5
+  && (f.ring < 0 || f.layer === 2); // anel de neon: só a metade da frente brilha por cima da estátua
 const passOf = (f: Fish): 0 | 1 | 2 | 3 => (glowy(f) ? 3 : fishPass(f));
 
 function fishLayer(g: CanvasRenderingContext2D, w: World, pass: 0 | 1 | 2 | 3) {
@@ -591,9 +593,15 @@ export function drawDeepLights(g: CanvasRenderingContext2D, w: World) {
   for (const c of crystals!) {
     if (!w.camera.visible(c.x, c.y - 30, 120)) continue;
     const p = 0.7 + 0.3 * Math.sin(w.time * 1.8 + c.x);
-    g.globalAlpha = 0.35 * p;
+    // na Praça do Pensador os cristais acendem mais forte (revelação e depois dela)
+    const near = Math.abs(c.x - w.thinker.x) < 280 ? 1 + 1.1 * w.thinker.crystal : 1;
+    g.globalAlpha = Math.min(0.9, 0.35 * p * near);
     g.drawImage(glow.c, c.x - 90, c.y - 130, 180, 180);
   }
+  g.globalAlpha = 1;
+  g.globalCompositeOperation = 'source-over';
+  drawThinkerFx(g, w);
+  g.globalCompositeOperation = 'lighter';
   const pl = w.player;
   if (pl.swimming && pl.suitOn && pl.depthRows > 12) {
     const lamp = glowSprite('#fff4d0', 32);
