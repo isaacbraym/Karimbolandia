@@ -110,6 +110,12 @@ python tools/make_icons.py
 
 ## Desenvolvimento
 
+### Guia técnico e lições reutilizáveis
+
+[Comece pelo guia de desenvolvimento](docs/desenvolvimento/README.md). Ele reúne [regras contra regressões](docs/desenvolvimento/REGRAS_DE_DESENVOLVIMENTO.md), as causas dos problemas difíceis já resolvidos e [como adotar esses aprendizados em outro jogo](docs/desenvolvimento/ADOTAR_EM_OUTRO_JOGO.md).
+
+As regras também estão vinculadas em `AGENTS.md` e `CLAUDE.md` para orientar alterações futuras. O estudo da GPU explica por que reduzir a resolução podia piorar a fluidez e como evitar esse custo preservando o visual. Princípios reutilizáveis e escolhas específicas deste jogo estão separados; copiar uma constante não substitui medir no novo projeto.
+
 ### Progresso e backup
 
 Use **SAVE E CONTA** no menu ou na pausa para baixar/restaurar um backup e conferir se o progresso foi gravado. O save local guarda a partida no último checkpoint, fichas, equipamentos e itens, com validação e uma cópia anterior. A partida também é salva periodicamente e ao pausar ou sair. Se o navegador impedir a gravação, o jogo avisa para baixar um backup antes de fechar.

@@ -2,6 +2,17 @@
 
 This file provides instructions and context for AI coding agents working on this project.
 
+## Regras técnicas de desenvolvimento (obrigatórias)
+
+Para Codex, Claude e qualquer outro agente: antes de alterar renderização, arte, HUD, loop, resolução, métricas ou controles, leia [docs/desenvolvimento/REGRAS_DE_DESENVOLVIMENTO.md](docs/desenvolvimento/REGRAS_DE_DESENVOLVIMENTO.md) e o estudo de caso indicado para a área. As regras valem para todo este repositório, inclusive módulos novos.
+
+- Preserve o visual: não trate retirar efeitos ou reduzir qualidade como correção de um desperdício ainda não investigado.
+- No canvas principal durante gameplay, mantenha suavização `low`; alta qualidade de filtro fica nos bakes/pré-reduções cacheados. Preserve `drawSprShrunk`, o piso atual `DRS_MIN = 0.75` e a separação entre intervalo bruto de desenho e tempo protegido da física. Veja regras D01–D04 e testes associados no guia.
+- Ao tocar uma dessas decisões, valide mecanismo, imagem e cadência nas condições afetadas; não apresente testes unitários, FPS médio ou viewport emulado como prova de fluidez física. Uma revisão sustentada por evidência pode mudar a decisão, mas deve atualizar código, testes e documentação juntos.
+- Ao resolver um novo problema difícil, registre sintomas, causa demonstrada, forma correta de desenvolver, limites de aplicação, evidência e proteção contra regressão em um estudo técnico versionado; ligue-o ao índice [docs/desenvolvimento/README.md](docs/desenvolvimento/README.md). Tarefas e pendências continuam no Beads.
+
+Para reutilizar em outro jogo, siga [docs/desenvolvimento/ADOTAR_EM_OUTRO_JOGO.md](docs/desenvolvimento/ADOTAR_EM_OUTRO_JOGO.md). Constantes locais não são regras universais de hardware.
+
 ## Regra do usuário: commit ao concluir cada tarefa (obrigatória)
 
 Ao concluir uma tarefa que alterou o projeto, faça o commit antes de encerrar, incluindo todos os arquivos novos que o código usa (assets em `public/`, módulos em `src/`, testes). Rode `git status --short` para não esquecer nenhum `??` necessário; rode `npm run typecheck` e `npm test` antes. Não inclua `docs/`/`plans/` de terceiros nem `tools/_work/`. Esta regra prevalece sobre o perfil "Conservative" do bloco Beads quanto a commits; push/deploy continuam exigindo pedido explícito. Texto completo em `AGENTS.md`.

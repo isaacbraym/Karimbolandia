@@ -1,5 +1,7 @@
 # Otimização real de fluidez — 05/10/2026
 
+Este é o estudo de caso da correção. Para desenvolver e revisar mudanças futuras, siga as [regras de desenvolvimento](../desenvolvimento/REGRAS_DE_DESENVOLVIMENTO.md). Para outro jogo, use o [modelo de adoção](../desenvolvimento/ADOTAR_EM_OUTRO_JOGO.md); números e parâmetros abaixo descrevem este projeto e o ambiente medido.
+
 Resumo para quem mexer no render depois: **o engasgo principal não era JavaScript nem rede; era trabalho de GPU escondido, causado por uma linha.** Este documento explica o mecanismo, a correção, as regras para não reintroduzi-lo e como medir.
 
 ## 1. O que causava os engasgos
