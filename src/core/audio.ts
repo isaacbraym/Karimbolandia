@@ -50,6 +50,8 @@ const NO_CLIP: ClipHandle = {
 };
 
 export class AudioEngine {
+  /** O contexto voltou ou um clipe acabou de decodificar: retoma pedidos ainda pendentes. */
+  onPlayable: (() => void) | null = null;
   ctx: AudioContext | null = null;
   master!: GainNode;
   private uw: BiquadFilterNode | null = null;
@@ -124,6 +126,7 @@ export class AudioEngine {
     const d = this.noiseBuf.getChannelData(0);
     for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
     this.applyVolumes();
+    c.addEventListener('statechange', () => { if (this.ready) this.onPlayable?.(); });
     if (c.state === 'suspended') void c.resume();
     // clipes baixados na tela de carregamento: decodifica agora que o contexto existe
     for (const n of this.clipData.keys()) this.decodeClip(n);
@@ -344,6 +347,7 @@ export class AudioEngine {
     const ok = (b: AudioBuffer) => {
       this.clipBuf.set(n, b);
       this.clipData.delete(n);
+      if (this.ready) this.onPlayable?.();
     };
     try {
       // forma com callback: funciona também no Safari antigo
@@ -447,6 +451,7 @@ export class AudioEngine {
   setMuted(m: boolean) {
     this.muted = m;
     this.applyVolumes();
+    if (!m && this.ready) this.onPlayable?.();
   }
   suspend() {
     if (this.ctx && this.ctx.state === 'running') void this.ctx.suspend();

@@ -114,6 +114,10 @@ export function buildAtlantis(b: LevelBuilder) {
   // Monumento da civilização inundada, na praça entre a torre e o palácio.
   // Apenas decoração: mantém a passagem e todos os IDs persistidos.
   b.deco('aThinker', 518, seabed(518), 'back');
+  b.deco('aThinkerRoute', 495, seabed(495), 'back');
+  // Luz suave local destaca a imagem exata sem eliminar o breu de Atlântida.
+  b.deco('aCrystal', 514, seabed(514) - 4, 'back', { scale: 0.65 });
+  b.deco('aCrystal', 523, seabed(523) - 4, 'back', { scale: 0.65 });
   for (const [x, y, scale] of [[494, 88, 2.8], [508, 74, 0.65], [544, 76, 0.9],
     [573, 90, 2.6], [599, 84, 0.45], [486, 90, 0.35], [500, 90, 0.35],
     [470, seabed(470) - 5.4, 0.28], [522, seabed(522) - 5.4, 0.28],

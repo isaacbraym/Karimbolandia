@@ -5,6 +5,7 @@ import { prism } from './volume';
 export const ATLANTIS_BOUNDS: Record<string, [number, number, number, number]> = {
   aThinker: [-92, -250, 96, 5],
   aMoss: [-98, -12, 100, 34],
+  aThinkerRoute: [-88, -96, 88, 0],
 };
 
 /** Static stone and vegetation: baked once by the decoration cache. */
@@ -19,6 +20,17 @@ export function paintAtlantis(g: CanvasRenderingContext2D, kind: string, seed: n
       g.drawImage(statue, -80, -250, 160, 226);
     }
     moss(g, seed, -83, -25, 166, 13);
+    g.fillStyle = '#152a2c'; g.fillRect(-63, -43, 126, 15);
+    g.fillStyle = '#e0ede0'; g.textAlign = 'center'; g.font = 'bold 11px sans-serif';
+    g.fillText('O PENSADOR', 0, -31);
+    return true;
+  }
+  if (kind === 'aThinkerRoute') {
+    g.fillStyle = '#57736b'; g.fillRect(-3, -58, 6, 58);
+    prism(g, -84, -94, 164, 43, 6, -2, '#183c40');
+    g.textAlign = 'center'; g.fillStyle = '#cff7db'; g.font = 'bold 15px sans-serif';
+    g.fillText('O PENSADOR →', -2, -76);
+    g.font = '11px sans-serif'; g.fillText('PRAÇA DE ATLÂNTIDA', -2, -60);
     return true;
   }
   if (kind === 'aMoss') { moss(g, seed, -94, -6, 188, 28); return true; }

@@ -13,6 +13,8 @@ O [estudo de interiores](../interiores/ESTUDO_DE_CASO_interiores_isometricos.md)
 
 O [caso de exploração e profundidade](EXPLORACAO_E_PROFUNDIDADE_2026-10-05.md) registra a ampliação para 33 interiores, troca de pavimentos, trilha 2.5D, balada com 65 dançarinos e checkpoints sem barreiras, incluindo regressões e limites da validação.
 
+O [caso da água e balada](AGUA_E_BALADA_2026-10-05.md) explica a superfície animada na perspectiva das margens, saídas alinhadas à transição, localização do Pensador em Atlântida e recuperação do MP3 após carregamento tardio.
+
 ## Como este conhecimento é protegido
 
 | Camada | Função |

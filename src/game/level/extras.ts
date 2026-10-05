@@ -273,7 +273,7 @@ export function addClub(b: LevelBuilder): number {
   b.door(x0 + 2, G, x0 + 3, FLOOR, 'in');
   b.door(x0 + W - 4, FLOOR, x0 + W - 2, G, 'out');
   b.deco('clubDoor', x0 + 2, G, 'back');
-  b.deco('clubExit', x0 + W - 2, G, 'back');
+  // As duas faces da saída são desenhadas sobre os tiles, a partir da porta física.
   b.trigger('hint:door', x0 - 1, 0, 6, G);
   // prédio da balada atravessando a calçada no fim do quarteirão: a única passagem é por dentro
   // (porta da frente com seguranças logo antes do paredão; a saída dos fundos fica depois dele)

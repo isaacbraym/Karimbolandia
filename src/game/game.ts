@@ -189,6 +189,7 @@ export class Game {
         this.menus.toast('Não foi possível salvar no aparelho. Abra SAVE E CONTA e baixe um backup.');
       }
     });
+    audio.onPlayable = () => this.retryClubMusic();
     this.input.onGesture = () => {
       const unlocking = !audio.ctx;
       audio.init();
@@ -614,6 +615,7 @@ export class Game {
     this.introClip?.resume();
     this.narrClip?.resume();
     this.clubClip?.resume();
+    this.retryClubMusic();
     audio.setDuck(1);
     this.pacer.reset(this.last = performance.now());
     this.updateRotate();
@@ -862,7 +864,9 @@ export class Game {
 
   // ------------------------------------------------------------------ música
   private setMusic(s: MusicState | 'menu') {
-    if (this.wasMusic === s) return;
+    const pendingClub = this.world?.data.stage === 1 && (s === 'club' || s === 'drop' || s === 'rave')
+      && !this.clubClip?.playing && audio.ready && !audio.muted && audio.clipReady('balada');
+    if (this.wasMusic === s && !pendingClub) return;
     this.wasMusic = s;
     // na selva o tema da fase é o tribal (tambores, marimba e flauta)
     const jungle = this.world?.data.stage === 2;
@@ -916,6 +920,13 @@ export class Game {
       case 'victory': m('stage', MIX.victory); break;
       case 'rave': music.play('rave', MIX.rave); break;
     }
+  }
+
+  /** Decodificação/retorno do áudio não pode iniciar uma trilha fora da sala ou durante a pausa. */
+  private retryClubMusic() {
+    if (this.state !== 'playing' || !this.world?.club.inside(this.world)) return;
+    const s = this.wasMusic;
+    if (s === 'club' || s === 'drop' || s === 'rave') this.setMusic(s);
   }
 
   // ------------------------------------------------------------------ depuração/QA (via URL)

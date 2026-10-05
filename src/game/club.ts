@@ -168,7 +168,8 @@ export class ClubScene {
 
   /** Fim do quadro: rave durante a dança, silêncio na fala (nenhuma outra trilha por cima). */
   music(w: World) {
-    if (this.active) w.setMusic(this.t >= CLUB_T.turn ? 'silence' : 'rave');
+    if (!this.inside(w) || w.player.mode === 'dead' || w.finished || w.director.bossActive) return;
+    w.setMusic(this.active ? (this.t >= CLUB_T.turn ? 'silence' : 'rave') : w.rhythm.done ? 'drop' : 'club');
   }
 
   /** Durante a cena o Karimbo só obedece ao roteiro (não dá para pular nem cortar). */

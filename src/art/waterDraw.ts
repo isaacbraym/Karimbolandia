@@ -10,6 +10,7 @@ import type { Fish } from '../game/water';
 import { getJungle, type FishArt } from './jungle';
 import { glowSprite, makeCanvas, softDot } from './kit';
 import { Rng } from '../core/math';
+import { GROUND_DEPTH } from './perspective';
 
 interface Tex {
   lake: HTMLCanvasElement;
@@ -21,6 +22,7 @@ interface Tex {
   ray: HTMLCanvasElement;
   far: HTMLCanvasElement;
   weed: HTMLCanvasElement;
+  top: Record<'lake' | 'swamp', HTMLCanvasElement>;
 }
 let tex: Tex | null = null;
 
@@ -190,8 +192,68 @@ function textures(): Tex {
       g.fill();
     }
   }
-  tex = { lake, swamp, caustic, surface, bubble, lily, ray, far, weed };
+  const top = { lake: surfaceTexture('lake'), swamp: surfaceTexture('swamp') };
+  tex = { lake, swamp, caustic, surface, bubble, lily, ray, far, weed, top };
   return tex;
+}
+
+/** Textura periódica assada uma vez; o cisalhamento acompanha a projeção dos tiles. */
+function surfaceTexture(kind: 'lake' | 'swamp') {
+  const c = makeCanvas(256, 64), g = c.getContext('2d')!;
+  const gr = g.createLinearGradient(0, 0, 0, 64);
+  gr.addColorStop(0, kind === 'lake' ? '#3b9693' : '#526b35');
+  gr.addColorStop(1, kind === 'lake' ? '#64b9a8' : '#7b8b47');
+  g.fillStyle = gr; g.fillRect(0, 0, 256, 64);
+  for (let row = 0; row < 5; row++) {
+    g.strokeStyle = row % 2 ? 'rgba(225,255,221,.25)' : 'rgba(15,58,46,.24)';
+    g.lineWidth = 2; g.beginPath();
+    for (let x = 0; x <= 256; x += 4) {
+      const y = 7 + row * 12 + Math.sin(x * Math.PI / 64 + row * 1.7) * 2.5;
+      if (x === 0) g.moveTo(x, y); else g.lineTo(x, y);
+    }
+    g.stroke();
+  }
+  return c;
+}
+
+/** A câmara profunda reutiliza a superfície do lago: não cria um segundo espelho d'água. */
+export function waterSurfaceBounds(z: WaterZone) {
+  return z.surface === undefined ? { x: z.x, y: z.y - GROUND_DEPTH.y,
+    w: z.w + GROUND_DEPTH.x, h: GROUND_DEPTH.y } : null;
+}
+
+function drawSurfacePlane(g: CanvasRenderingContext2D, w: World, z: WaterZone, T: Tex) {
+  const bounds = waterSurfaceBounds(z), cam = w.camera;
+  if (!bounds || bounds.y > cam.y + cam.h + 40 || z.y < cam.y - 40
+    || bounds.x > cam.x + cam.w + 40 || bounds.x + bounds.w < cam.x - 40) return;
+  const { x: dx, y: dy } = GROUND_DEPTH;
+  const x0 = Math.max(z.x, cam.x - dx - 40), x1 = Math.min(z.x + z.w, cam.x + cam.w + 40);
+  g.save(); g.beginPath();
+  g.moveTo(z.x, z.y); g.lineTo(z.x + z.w, z.y);
+  g.lineTo(z.x + z.w + dx, z.y - dy); g.lineTo(z.x + dx, z.y - dy); g.closePath(); g.clip();
+  g.save(); g.transform(1, 0, -dx / dy, 1, 0, z.y);
+  // Fase em coordenadas do mundo: mover a câmera não desloca ondas ou reflexos.
+  const off = (w.time * 13) % 256;
+  for (let x = Math.floor((x0 - off) / 256) * 256 + off; x < x1; x += 256)
+    g.drawImage(T.top[z.kind], x, -dy, 256, dy);
+  g.globalCompositeOperation = 'lighter'; g.globalAlpha = z.kind === 'lake' ? .22 : .12;
+  const reverse = (-w.time * 9) % 128;
+  for (let x = Math.floor((x0 - reverse) / 128) * 128 + reverse; x < x1; x += 128)
+    g.drawImage(T.caustic, x, -dy, 128, dy);
+  g.globalCompositeOperation = 'source-over'; g.globalAlpha = 1;
+  g.restore();
+  if (z.kind === 'swamp') {
+    const n = Math.floor(z.w / 100);
+    for (let i = 0; i < n; i++) {
+      const h = (z.id * 7919 + i * 104729) >>> 0;
+      const x = z.x + 25 + h % Math.max(1, z.w - 50);
+      if (x < x0 - 25 || x > x1 + 25) continue;
+      const depth = .35 + (h % 47) / 100;
+      const y = z.y - dy * depth + Math.sin(w.time * 1.4 + i) * .6;
+      g.drawImage(T.lily[h % 3], x + dx * depth - 17, y - 8, 34, 15.5);
+    }
+  }
+  g.restore();
 }
 
 // ------------------------------------------------------------------ peixes
@@ -263,6 +325,7 @@ export function drawWaterBack(g: CanvasRenderingContext2D, w: World) {
   const T = textures();
   const t = w.time;
   for (const z of w.water.zones) {
+    drawSurfacePlane(g, w, z, T);
     if (z.kind !== 'lake') continue;
     const v = visRect(w, z);
     if (!v) continue;

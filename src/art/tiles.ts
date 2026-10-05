@@ -3,6 +3,7 @@ import { bake, makeCanvas, OUT, shadedRR } from './kit';
 import { PAL } from './palette';
 import { Rng, shade, mixColor } from '../core/math';
 import { Level, T, TILE } from '../game/level';
+import { GROUND_DEPTH } from './perspective';
 
 const CELL = 64; // px do atlas por tile (2x)
 const N_MASK = 16;
@@ -100,8 +101,8 @@ export function bakeTiles(): TileArt {
           g.beginPath(); g.moveTo(x, y); g.lineTo(x, y - h0);
           g.lineTo(x + TILE * k, y - h1); g.lineTo(x + TILE * k, y); g.fill();
         }
-        const d = (below === T.ONEWAY ? 20 : 34) * k;
-        const back = (below === T.ONEWAY ? 12 : 22) * k;
+        const d = (below === T.ONEWAY ? 20 : GROUND_DEPTH.x) * k;
+        const back = (below === T.ONEWAY ? 12 : GROUND_DEPTH.y) * k;
         g.fillStyle = th.light;
         g.beginPath(); g.moveTo(x, y - h0); g.lineTo(x + TILE * k, y - h1);
         g.lineTo(x + TILE * k + d, y - h1 - back); g.lineTo(x + d, y - h0 - back); g.closePath(); g.fill();

@@ -7,7 +7,7 @@ import type { World } from '../game/world';
 import { CLUB_CROWD, CLUB_T, CLUB_FLOOR_DEPTH } from '../game/club';
 import { bakeCivilians, civArtFor } from './civilians';
 import { bakeFace, drawFigure, figureLook, newPose, type FigureLook, type FigurePose } from './figure';
-import { glowSprite, OUT, type Sprite } from './kit';
+import { bake, drawSpr, glowSprite, OUT, type Sprite } from './kit';
 import { sivirinoHead } from './merchant';
 import { SOLDIER_SCALE } from './soldiers';
 import { music } from '../core/music';
@@ -18,10 +18,43 @@ interface ClubArt {
   siv: { look: FigureLook; pose: FigurePose } | null;
 }
 let art: ClubArt | null = null;
+let exitArt: Sprite[] | null = null;
+
+function bakeExitArt() {
+  if (!exitArt) exitArt = [true, false].map((inside) => bake(104, 156, (c) => {
+    c.translate(52, 151);
+    // Soleira e parede lateral deixam a abertura com profundidade.
+    c.fillStyle = '#152c31'; c.beginPath(); c.moveTo(-36, 0); c.lineTo(36, 0);
+    c.lineTo(48, -9); c.lineTo(-24, -9); c.closePath(); c.fill();
+    c.fillStyle = '#354456'; c.fillRect(-34, -116, 68, 116);
+    c.fillStyle = '#080f20'; c.fillRect(-26, -108, 52, 108);
+    c.fillStyle = '#42625c'; c.beginPath(); c.moveTo(26, -108); c.lineTo(37, -116);
+    c.lineTo(37, -9); c.lineTo(26, 0); c.closePath(); c.fill();
+    c.fillStyle = inside ? '#284e42' : '#233144'; c.fillRect(-24, -106, 41, 104);
+    c.strokeStyle = '#9cf5c3'; c.lineWidth = 3; c.strokeRect(-30, -112, 60, 112);
+    c.fillStyle = '#bbffe0'; c.fillRect(-17, -46, 33, 4);
+    c.fillStyle = '#134e3a'; c.fillRect(-45, -146, 90, 27);
+    c.strokeStyle = '#91f5bd'; c.lineWidth = 2; c.strokeRect(-45, -146, 90, 27);
+    c.textAlign = 'center'; c.fillStyle = '#dbffe7'; c.font = 'bold 18px sans-serif';
+    c.fillText('SAÍDA', 0, -126);
+    c.font = 'bold 11px sans-serif'; c.fillText(inside ? '↑ SAIR' : 'BALADA', -3, -76);
+  }, { ox: 52, oy: 151 }));
+  return exitArt;
+}
+
+function drawExits(g: CanvasRenderingContext2D, w: World) {
+  const room = w.club.room!, sprites = exitArt ?? bakeExitArt();
+  for (const d of w.data.doors) {
+    if (d.kind !== 'out' || d.x < room.x || d.x > room.x + room.w) continue;
+    if (w.camera.visible(d.x, d.y - 75, 180)) drawSpr(g, sprites[0], d.x, d.y);
+    if (w.camera.visible(d.tx, d.ty - 75, 180)) drawSpr(g, sprites[1], d.tx, d.ty);
+  }
+}
 
 /** Assa rostos/corpos da multidão e dos seguranças (carregamento da fase 1). */
 export function bakeClubArt() {
   if (art) return art;
+  bakeExitArt();
   bakeCivilians(CLUB_CROWD);
   bakeDancers();
   const face = bakeFace({ skin: '#5e3820', hair: '#1c1424', hairStyle: 'bald', accent: '#111', iris: '#2a1a12', glasses: true, beard: 'stubble' }, 'calm');
@@ -98,7 +131,7 @@ export function drawClub(g: CanvasRenderingContext2D, w: World, layer: 'floor' |
       }
       for (const [bx, face] of [[fx - 46, 1], [fx + 40, -1]] as [number, 1 | -1][]) drawBouncer(g, a, bx, street, face, t);
     }
-    if (!cam.visible(r.x + r.w / 2, r.y + r.h / 2, r.w / 2 + 80)) return;
+    if (!cam.visible(r.x + r.w / 2, r.y + r.h / 2, r.w / 2 + 80)) { drawExits(g, w); return; }
     // ---- dentro: canhões de luz, multidão e o Sivirino
     const raving = w.musicState === 'rave' || w.musicState === 'club' || w.musicState === 'drop';
     g.globalCompositeOperation = 'lighter';
@@ -128,6 +161,7 @@ export function drawClub(g: CanvasRenderingContext2D, w: World, layer: 'floor' |
       drawDancer(g,i,d.x,y-(raving?(1-k)**2*5:0),sc,d.facing,k);
     }
     if (a.siv && Number.isFinite(club.sivX)) drawSivirino(g, a.siv, club.sivX, club.floorY, t, beat, club.active);
+    drawExits(g, w);
   } else if (club.active && club.t > CLUB_T.dance && club.t < CLUB_T.turn && beat < 0.12) {
     // estrobo leve no tempo forte (sem piscar a tela inteira)
     g.globalCompositeOperation = 'lighter';

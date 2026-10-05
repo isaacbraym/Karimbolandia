@@ -490,8 +490,9 @@ export class World {
         this.cameraSnap();
         if (d.kind === 'in' && !this.roomShown) {
           this.roomShown = true;
-          this.director.banner('TEMPLO ESQUECIDO', 'Dois caminhos... ache a saída', 2.6);
-        } else if (d.kind === 'out') this.director.banner('DE VOLTA À SELVA', undefined, 1.6);
+          this.director.banner(this.data.stage === 1 ? 'BALADA' : 'TEMPLO ESQUECIDO',
+            this.data.stage === 1 ? 'Saída sinalizada nos fundos da pista →' : 'Dois caminhos... ache a saída', 2.6);
+        } else if (d.kind === 'out') this.director.banner(this.data.stage === 1 ? 'DE VOLTA À CIDADE' : 'DE VOLTA À SELVA', undefined, 1.6);
       }
       if (this.doorT > T_OUT + 0.4) {
         this.doorT = -1;
