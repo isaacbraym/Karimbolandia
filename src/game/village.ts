@@ -3,6 +3,8 @@ import type { LevelData } from './level';
 import { approach } from '../core/math';
 import { drawResident, type ResidentPose, type ResidentRole } from '../art/village';
 import { drawDancingAlligator } from '../art/dancingAlligator';
+import { drawAlligatorKO } from '../art/alligatorKO';
+import { AlligatorTalk, GATOR_ID, type Balloon } from './alligatorTalk';
 import { DANCE_ID } from './level/community';
 import type { ControlState } from '../core/input';
 import { clapTick, clapTone } from '../core/clapRhythm';
@@ -29,6 +31,10 @@ const MOOD_LINES: Record<'happy'|'angry'|'neutral',string[]> = {
 export class Village {
   readonly residents: (ResidentPose & { home:number; baseY:number; speech:number; cooldown:number; spoke:boolean; line:number; quiet:number })[];
   readonly dance: {x:number;y:number}|null;
+  /** conversa/boxe com o jacaré da roda (ver alligatorTalk.ts) */
+  readonly talk: AlligatorTalk;
+  /** a criança agachada que cutuca o jacaré nocauteado (a mais próxima dele) */
+  private pokeKid: (typeof this.residents)[number] | null = null;
   readonly streams: {x:number;y:number}[];
   active=false;
   sceneTime=0;
@@ -38,8 +44,13 @@ export class Village {
   constructor(data:LevelData) {
     this.dance=data.decos.find(d=>d.kind==='villageDance')??null;
     this.streams=data.decos.filter(d=>d.kind==='villageStream');
+    this.talk=new AlligatorTalk(data);
     this.residents = data.decos.filter(d=>ROLES[d.kind]).map((d,id)=>
       ({x:d.x,y:d.y,baseY:d.y,home:d.x,id,facing:1,walk:0,gesture:0,speech:0,cooldown:0,spoke:false,line:id,quiet:0,role:ROLES[d.kind],work:0}));
+    if(this.dance) {
+      const gx=this.dance.x;
+      for(const r of this.residents)if(r.role==='child'&&(!this.pokeKid||Math.abs(r.home-gx)<Math.abs(this.pokeKid.home-gx)))this.pokeKid=r;
+    }
   }
   /** a moradora da primeira casa está lá dentro (some do lado de fora) */
   private inside = false;
@@ -66,6 +77,7 @@ export class Village {
       if(!w.director.cine){w.player.lockInput=false;w.camera.focus=null;}
       w.player.clapping=false;
     }
+    this.talk?.reset(w);
     this.active=false;this.ownsLock=false;this.sceneTime=0;this.inside=false;this.mood='neutral';
     for (const r of this.residents) { r.x=r.home;r.y=r.baseY;r.walk=r.gesture=r.speech=r.cooldown=r.quiet=0;r.spoke=false; }
   }
@@ -78,10 +90,22 @@ export class Village {
   }
   update(w:World,dt:number,ctl?:ControlState) {
     const p=w.player,d=this.dance;
-    const up=(ctl?.moveY??0)<-.6, join=(up&&!this.upHeld)||!!ctl?.interact?.pressed;
+    const up=(ctl?.moveY??0)<-.6;
+    // ↑ bate palmas (como sempre); AGIR agora FALA com o jacaré, mas só depois da primeira dança
+    const join=up&&!this.upHeld&&!this.talk.busy&&this.talk.mode!=='ko';
     this.upHeld=up;
     if(this.active&&(p.mode!=='foot'||w.director.cine||w.finished))this.reset(w);
     const first=!w.encounters.completed.has(DANCE_ID);
+    if(ctl?.interact?.pressed&&!first&&!this.active&&this.talk.canTalk(w,this.canJoin(w))&&this.talk.preferred(w,w.exploration.nearest(w)?.x))this.talk.press(w);
+    this.talk.update(w,dt);
+    if(this.dance){
+      const ko=this.talk.mode==='ko',laugh=this.talk.balloons.some(bl=>bl.who==='kids'&&bl.text.startsWith('HAHA'));
+      for(const r of this.residents){
+        if(r.role!=='child')continue;
+        r.mood=ko?(r===this.pokeKid?'poke':'worry'):laugh?'laugh':undefined;
+        if(r===this.pokeKid)r.poke=this.talk.poke;
+      }
+    }
     if(d&&!this.active&&this.canJoin(w)&&(first?p.x>=d.x-114&&p.x<=d.x-65:join)) {
       this.active=true;this.sceneTime=0;this.ownsLock=true;
       p.lockInput=true;p.body.vx=p.body.vy=0;p.facing=p.x<=d.x?1:-1;p.clapping=true;
@@ -122,26 +146,54 @@ export class Village {
       r.y=child?r.baseY:w.level.reliefSurface(r.x)??r.baseY;
     }
   }
+  /** balão de uma fala da conversa com o jacaré (Karimbo, jacaré ou as crianças) */
+  private drawTalkBalloon(g:CanvasRenderingContext2D,w:World,b:Balloon) {
+    const d=this.dance!;
+    const x=b.who==='karimbo'?w.player.x:b.who==='gator'?d.x:d.x+(this.pokeKid?this.pokeKid.x-d.x:-54),
+      y=(b.who==='karimbo'?w.player.y-96:b.who==='gator'?d.y-118:d.y-84)-(b.who==='kids'?0:0);
+    if(!w.camera.visible(x,y,200))return;
+    const a=Math.min(1,b.t*6,(b.dur-b.t)*5);
+    g.save();g.globalAlpha=Math.max(0,a);g.textAlign='center';
+    const big=b.text===b.text.toUpperCase()&&b.who==='kids';
+    g.font=(big?'bold 13px':'10px')+' sans-serif';
+    // quebra em até 2 linhas
+    const words=b.text.split(' '),lines:string[]=[];let cur='';
+    for(const wd of words){if(g.measureText(cur+' '+wd).width>(big?170:150)&&cur){lines.push(cur);cur=wd;}else cur=cur?cur+' '+wd:wd;}
+    lines.push(cur);
+    const width=Math.max(...lines.map(l=>g.measureText(l).width))+16,h=lines.length*13+9;
+    const bx=Math.max(w.camera.x+width/2+4,Math.min(w.camera.x+w.camera.w-width/2-4,x));
+    g.fillStyle=b.who==='karimbo'?'#e8f4ff':b.who==='gator'?'#fff1cd':'#ffe9f0';g.strokeStyle='#4a3e37';g.lineWidth=1.2;
+    g.beginPath();g.roundRect(bx-width/2,y-h+4-lines.length*0,width,h,5);g.fill();g.stroke();
+    g.fillStyle=big?'#8a1f3a':'#41322d';
+    lines.forEach((l,i)=>g.fillText(l,bx,y-h+15+i*13));
+    g.restore();
+  }
   /** um morador por vez: ninguém começa a falar por cima do outro */
   private talking() { return this.residents.some(r=>r.speech>0); }
   camera(w:World) {
     if(this.active&&this.dance){w.camera.zoomTarget=Math.min(.92,w.camera.viewW/500);w.camera.focus={x:this.dance.x-20,y:this.dance.y-91,rate:5};}
   }
   draw(g:CanvasRenderingContext2D,w:World,balloons=false) {
-    if(balloons&&!this.active&&w.encounters.completed.has(DANCE_ID)&&this.canJoin(w)) {
-      const x=w.player.x,y=w.player.y-93;
+    if(balloons&&!this.active&&w.encounters.completed.has(DANCE_ID)&&this.canJoin(w)&&!this.talk.busy) {
+      const x=w.player.x,y=w.player.y-93,near=this.talk.canTalk(w,true);
+      const text=near?this.talk.prompt():this.talk.mode==='ko'?'Ele está dormindo...':'↑ Bater palmas',tw=near?196:138;
       g.save();g.font='bold 12px sans-serif';g.textAlign='center';
       g.fillStyle='#253c30ee';g.strokeStyle='#e6ce88';g.lineWidth=1;
-      g.beginPath();g.roundRect(x-69,y-16,138,26,7);g.fill();g.stroke();
-      g.fillStyle='#fff0c6';g.fillText('↑ Bater palmas',x,y+1);g.restore();
+      g.beginPath();g.roundRect(x-tw/2,y-16,tw,26,7);g.fill();g.stroke();
+      g.fillStyle='#fff0c6';g.fillText(text,x,y+1);g.restore();
     }
+    if(balloons&&this.dance)for(const b of this.talk.balloons)this.drawTalkBalloon(g,w,b);
     if(!balloons)for(const s of this.streams)if(w.camera.visible(s.x,s.y,260)) {
       g.save();g.strokeStyle='#d9f3d580';g.lineWidth=1.1;
       for(let i=0;i<10;i++){const x=s.x-215+((i*43+w.time*19)%430),y=s.y-13-i%3*6;
         g.beginPath();g.moveTo(x,y);g.quadraticCurveTo(x+7,y+Math.sin(w.time*2+i)*1.2,x+16,y);g.stroke();}
       g.restore();
     }
-    if(!balloons&&this.dance&&w.camera.visible(this.dance.x,this.dance.y,240))drawDancingAlligator(g,this.dance.x,this.dance.y,w.time);
+    if(!balloons&&this.dance&&w.camera.visible(this.dance.x,this.dance.y,240)) {
+      const t=this.talk;
+      if(t.mode==='ko')drawAlligatorKO(g,this.dance.x,this.dance.y,w.time,t.poke);
+      else drawDancingAlligator(g,this.dance.x,this.dance.y,w.time,{pose:t.pose,bandaged:t.mode==='bandaged',slapT:t.slapT,dir:t.slapDir});
+    }
     let speaker: typeof this.residents[number] | null = null;
     if (balloons) for (const r of this.residents) {
       if (r.speech > 0 && (!speaker || Math.abs(r.x-w.player.x) < Math.abs(speaker.x-w.player.x))) speaker = r;

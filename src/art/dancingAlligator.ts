@@ -7,8 +7,10 @@ import { CLAP_STEP } from '../core/clapRhythm';
  * no ritmo e um giro completo do corpo a cada quatro compassos. Cabeça e tronco são assados uma vez;
  * pernas, braços e cauda são traços contínuos (sem juntas soltas).
  */
-const SCALE = 0.56;
-const GREEN = '#5f8a45';
+export const GATOR_SCALE = 0.56;
+const SCALE = GATOR_SCALE;
+export const GATOR_GREEN = '#5f8a45';
+const GREEN = GATOR_GREEN;
 const GREEN_D = '#4a7038';
 const BELLY = '#e2d8a4';
 
@@ -145,6 +147,12 @@ function parts() {
   return (art = { torso, head, foot });
 }
 
+/** Partes assadas (a arte do nocaute reaproveita o mesmo corpo). */
+export const gatorParts = parts;
+
+/** Como o jacaré está (a conversa/luta): dançando, parado, bravo, dando o tapa; com ou sem curativo no focinho. */
+export interface GatorLook { pose?: 'dance' | 'stand' | 'angry' | 'slap'; bandaged?: boolean; slapT?: number; dir?: -1 | 1 }
+
 const J = { x: 0, y: 0 };
 function knee(ax: number, ay: number, bx: number, by: number, l: number, out: number) {
   const dx = bx - ax;
@@ -179,9 +187,12 @@ function limb(g: CanvasRenderingContext2D, ax: number, ay: number, bx: number, b
 const smooth = (p: number) => p * p * (3 - 2 * p);
 
 /** Pés em (x, y). Compasso = 4 tempos das palmas da aldeia (mesmo relógio do som). */
-export function drawDancingAlligator(g: CanvasRenderingContext2D, x: number, y: number, t: number) {
+export function drawDancingAlligator(g: CanvasRenderingContext2D, x: number, y: number, t: number, look: GatorLook = {}) {
   const a = parts();
   const bar = CLAP_STEP * 4;
+  const pose = look.pose ?? 'dance';
+  // parado/bravo/tapa: congela a dança num quadro neutro (pés no chão, sem deslocamento)
+  if (pose !== 'dance') t = bar * 0.5;
   const barI = Math.floor(t / bar);
   const p = (t - barI * bar) / bar;
   // pisadas: pé esquerdo sobe e bate na metade do compasso; o direito bate no início
@@ -220,7 +231,7 @@ export function drawDancingAlligator(g: CanvasRenderingContext2D, x: number, y: 
   g.scale(sx, 1);
   const hipY = -42 + bob;
   // cauda varrendo do lado oposto ao quadril
-  const wag = -twist * 0.35;
+  const wag = pose === 'angry' ? Math.sin(performance.now() / 1000 * 14) * 0.3 : pose === 'slap' ? 0.5 : -twist * 0.35;
   g.save();
   g.translate(-14, hipY + 6);
   g.rotate(0.25 + wag);
@@ -259,15 +270,61 @@ export function drawDancingAlligator(g: CanvasRenderingContext2D, x: number, y: 
   g.rotate(twist * 0.13 - impact * 0.03);
   const chest = 1 - Math.abs(twist) * 0.14;
   // braços dobrados batendo no ritmo: um sobe enquanto o outro desce
-  const pumpL = Math.sin(p * Math.PI * 2);
+  const pumpL = pose === 'dance' ? Math.sin(p * Math.PI * 2) : 0;
   const shY = -64;
-  limb(g, -16, shY, -48, shY + 4 - pumpL * 18, 18, 1, 11, GREEN_D);
-  drawClaw(g, -48, shY + 4 - pumpL * 18);
+  // tapa: o braço do lado do Karimbo sobe e varre para a frente (dir = para onde está o Karimbo)
+  const dir = look.dir ?? -1;
+  const slap = pose === 'slap' ? Math.min(1, (look.slapT ?? 1) / 0.35) : 0;
+  const slapHand: [number, number] = [-48 + dir * 0 - (slap < 0.5 ? slap * 28 : 14 + (slap - 0.5) * 60), shY + 4 - Math.sin(slap * Math.PI) * 46];
+  const stand = pose === 'stand';
+  if (slap > 0 && dir < 0) {
+    limb(g, -16, shY, slapHand[0], slapHand[1], 18, 1, 11, GREEN_D);
+    drawClaw(g, slapHand[0], slapHand[1]);
+  } else if (stand) {
+    // educado: mão no peito (o outro braço relaxado)
+    limb(g, -16, shY, -6, shY + 22, 18, 1, 11, GREEN_D);
+    drawClaw(g, -6, shY + 22);
+  } else {
+    limb(g, -16, shY, -48, shY + 4 - pumpL * 18, 18, 1, 11, GREEN_D);
+    drawClaw(g, -48, shY + 4 - pumpL * 18);
+  }
   drawSpr(g, a.torso, 0, 0, { sx: chest });
-  limb(g, 16, shY, 50 + twist * 4, shY + 2 + pumpL * 18, 18, -1, 11, GREEN);
-  drawClaw(g, 50 + twist * 4, shY + 2 + pumpL * 18);
-  // cabeça balança no tempo e responde à pisada
-  drawSpr(g, a.head, 2, -70, { rot: -twist * 0.12 + impact * 0.06 });
+  if (slap > 0 && dir > 0) {
+    const hx = 48 + (slap < 0.5 ? slap * 28 : 14 + (slap - 0.5) * 60), hy = shY + 2 - Math.sin(slap * Math.PI) * 46;
+    limb(g, 16, shY, hx, hy, 18, -1, 11, GREEN);
+    drawClaw(g, hx, hy);
+  } else if (stand) {
+    limb(g, 16, shY, 10, shY + 30, 18, -1, 11, GREEN);
+    drawClaw(g, 10, shY + 30);
+  } else {
+    limb(g, 16, shY, 50 + twist * 4, shY + 2 + pumpL * 18, 18, -1, 11, GREEN);
+    drawClaw(g, 50 + twist * 4, shY + 2 + pumpL * 18);
+  }
+  // cabeça balança no tempo e responde à pisada (parado educado: leve reverência)
+  const headRot = pose === 'dance' ? -twist * 0.12 + impact * 0.06 : stand ? 0.1 : pose === 'angry' ? -0.05 : look.dir ? -look.dir * 0.18 : 0;
+  drawSpr(g, a.head, 2, -70, { rot: headRot });
+  if (look.bandaged) {
+    // curativo no focinho (a cabeça aponta para o alto: faixa atravessada com uma cruz)
+    g.save();
+    g.translate(2, -70);
+    g.rotate(headRot);
+    g.fillStyle = '#f6f1e2';
+    g.strokeStyle = OUT;
+    g.lineWidth = 0.9;
+    g.beginPath();
+    g.rect(8, -50, 16, 7);
+    g.fill();
+    g.stroke();
+    g.strokeStyle = '#d9503a';
+    g.lineWidth = 1.2;
+    g.beginPath();
+    g.moveTo(16, -49);
+    g.lineTo(16, -44);
+    g.moveTo(13.5, -46.5);
+    g.lineTo(18.5, -46.5);
+    g.stroke();
+    g.restore();
+  }
   g.restore();
   g.restore();
 }

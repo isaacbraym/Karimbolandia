@@ -1065,14 +1065,16 @@ export class Game {
     this.flowPrefetchT -= dt;
     if (this.flowPrefetchT <= 0) { this.flowPrefetchT = 0.4; this.flow.prefetch(w.exploration.nearInterior(w)); }
     const spot=w.exploration.nearest(w);
-    if(this.input.state.interact.pressed&&spot&&w.exploration.safe(w,spot)) {
+    // o jacaré da roda vence uma porta/objeto só quando está mais perto (nunca entrar na casa querendo falar com ele)
+    const gatorWins=w.village.talk.canTalk(w,w.village.canJoin(w))&&w.village.talk.preferred(w,spot?.x);
+    if(this.input.state.interact.pressed&&spot&&!gatorWins&&w.exploration.safe(w,spot)) {
       if (spot.interior) {
         this.input.clearEdges(); this.input.suppressHeldActions();
         if (this.flow.tryEnter(w, spot)) return;
       }
       this.openInvestigation(w,spot);return;
     }
-    if(this.input.state.interact.pressed&&w.merchant.near(w)) {
+    if(this.input.state.interact.pressed&&!gatorWins&&w.merchant.near(w)) {
       this.input.clearEdges();this.pause();
       this.menus.showMerchant(w,()=>{w.checkpointSnap=w.player.snapshot();this.saveGame();});return;
     }
@@ -1202,7 +1204,8 @@ export class Game {
     let dash01 = 1;
     if (n) dash01 = n.window > 0 ? 1 : n.cooldown > 0 ? clamp(1 - n.cooldown / 3.4, 0, 1) : 1;
     const spot=w.exploration.nearest(w),explore=!!spot&&w.exploration.safe(w,spot);
-    this.touch.sync({ weaponIcon: icon, ammo: p.mounted?(ammo===Infinity?'∞':String(ammo)):p.ammoLabel, lowAmmo: !p.mounted&&p.loadedAmmo===0, grenades: p.grenades, dash01,merchant:w.merchant.near(w),interaction:explore?(spot.cabin?'ENTRAR':'INVESTIGAR'):undefined,canReload:p.canReload,reloading:p.reloadT>0,reload01:p.reload01 });
+    const talk=w.village.talk.canTalk(w,w.village.canJoin(w))&&w.village.talk.preferred(w,spot?.x);
+    this.touch.sync({ weaponIcon: icon, ammo: p.mounted?(ammo===Infinity?'∞':String(ammo)):p.ammoLabel, lowAmmo: !p.mounted&&p.loadedAmmo===0, grenades: p.grenades, dash01,merchant:w.merchant.near(w),interaction:talk?'FALAR':explore?(spot.cabin?'ENTRAR':'INVESTIGAR'):undefined,canReload:p.canReload,reloading:p.reloadT>0,reload01:p.reload01 });
   }
 
   /**

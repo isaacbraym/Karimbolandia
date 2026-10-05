@@ -35,7 +35,9 @@ export function paintVillageProp(g: CanvasRenderingContext2D, kind: string, seed
 }
 
 export type ResidentRole = 'resident'|'farmer'|'washer'|'weaver'|'carrier'|'carpenter'|'child';
-export interface ResidentPose { x:number; y:number; id:number; facing:number; walk:number; gesture:number; role?:ResidentRole; work?:number }
+/** humor da criança da roda: preocupada (mãos na cabeça), agachada cutucando com um graveto, ou rindo */
+export type KidMood = 'worry' | 'poke' | 'laugh';
+export interface ResidentPose { x:number; y:number; id:number; facing:number; walk:number; gesture:number; role?:ResidentRole; work?:number; mood?:KidMood; poke?:number }
 
 // ------------------------------------------------------------------ moradores (figura contínua)
 const V_SKINS = ['#8a5634','#a86c43','#6e4026','#c18a5c','#5a3320','#9a6440'];
@@ -120,6 +122,27 @@ export function drawResident(g: CanvasRenderingContext2D, p: ResidentPose, t:num
   let tool = 0;
   switch (role) {
     case 'child': {
+      if (p.mood === 'worry') {
+        // mãos na cabeça, boca aberta, balançando de aflição
+        P.handFX = 3.6; P.handFY = -reach * 0.5; P.handBX = -3.2; P.handBY = -reach * 0.46;
+        P.lean = -0.1 + Math.sin(t * 5 + p.id) * 0.03; P.hipDrop = 0.6; P.headTilt = Math.sin(t * 6 + p.id) * 0.07;
+        P.footFY = P.footBY = 0; P.footFX = 2.6; P.footBX = -2.4; P.head = a.talk;
+        break;
+      }
+      if (p.mood === 'poke') {
+        // agachada: o braço estica o graveto para o jacaré a cada cutucada
+        const k = Math.max(0, p.poke ?? 0);
+        P.hipDrop = 4; P.lean = 0.45; P.handFX = 8.5 + Math.sin(k * Math.PI) * 5; P.handFY = reach * 0.5;
+        P.handBX = 3.4; P.handBY = reach * 0.45; P.headTilt = 0.1; P.footFY = P.footBY = 0; P.head = a.talk;
+        tool = 6;
+        break;
+      }
+      if (p.mood === 'laugh') {
+        const b = Math.abs(Math.sin(t * 9 + p.id));
+        P.handFX = 3; P.handFY = reach * 0.28; P.handBX = -2.4; P.handBY = reach * 0.3; P.hipDrop = -b * 1.4; P.lean = -0.06 + Math.sin(t * 9 + p.id) * 0.05;
+        P.headTilt = Math.sin(t * 9 + p.id) * 0.1; P.head = a.joy;
+        break;
+      }
       // palmas no ritmo da roda: mãos se encontram à frente do peito, pulinho no estalo
       const open = clapOpen(t);
       P.handFX = 3.2 + open * 4.5; P.handFY = reach * 0.42 - open * 2;
@@ -179,6 +202,11 @@ export function drawResident(g: CanvasRenderingContext2D, p: ResidentPose, t:num
       g.fillStyle = '#a9b4ad'; g.strokeStyle = OUT; g.lineWidth = .7;
       g.beginPath(); if (tool === 1) g.rect(-1.5, 15, 7, 3); else g.rect(-3.5, -12, 7, 3.2); g.fill(); g.stroke();
       g.restore();
+    } else if (tool === 6) {
+      // graveto: da mão para a frente e para baixo; a ponta avança na cutucada
+      const k = Math.max(0, p.poke ?? 0), len = 12 + Math.sin(k * Math.PI) * 7;
+      g.strokeStyle = OUT; g.lineWidth = 2.4; g.beginPath(); g.moveTo(h.x - 2, h.y - 1); g.lineTo(h.x + len, h.y + len * 0.45); g.stroke();
+      g.strokeStyle = '#8a6440'; g.lineWidth = 1.2; g.stroke();
     } else if (tool === 2 || tool === 3) {
       g.fillStyle = tool === 2 ? '#d9e4ea' : '#c4553a'; g.strokeStyle = OUT; g.lineWidth = .7;
       g.beginPath(); g.moveTo(h.x - 3, h.y - 1); g.quadraticCurveTo(h.x + 2, h.y + 4 + work * 2, h.x + 1, h.y + 8); g.lineTo(h.x - 4, h.y + 7); g.closePath(); g.fill(); g.stroke();
