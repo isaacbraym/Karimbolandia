@@ -6,7 +6,7 @@ import { audio } from './audio';
 import { clamp } from './math';
 
 export type Layer = 'pad' | 'bass' | 'arp' | 'hat' | 'kick' | 'snare' | 'lead' | 'power' | 'choir' | 'tom';
-export type ThemeName = 'menu' | 'stage' | 'boss' | 'jungle' | 'rave' | 'monument' | 'fight';
+export type ThemeName = 'menu' | 'stage' | 'boss' | 'jungle' | 'rave' | 'monument' | 'fight' | 'chase';
 
 const LAYERS: Layer[] = ['pad', 'bass', 'arp', 'hat', 'kick', 'snare', 'lead', 'power', 'choir', 'tom'];
 const mtof = (m: number) => 440 * Math.pow(2, (m - 69) / 12);
@@ -200,7 +200,32 @@ const FIGHT: Theme = {
   ],
 };
 
-const THEMES: Record<ThemeName, Theme> = { menu: MENU, stage: STAGE, boss: BOSS, jungle: JUNGLE, rave: RAVE, monument: MONUMENT, fight: FIGHT };
+// -------- Perseguição pela copa (macaco da carta): Lá menor, 152 bpm — galope, riso e riff de desenho animado --------
+const CHASE: Theme = {
+  bpm: 152,
+  tribal: true,
+  chords: [
+    { root: 45, notes: [57, 60, 64, 69] }, // Am
+    { root: 41, notes: [53, 57, 60, 65] }, // F
+    { root: 43, notes: [55, 59, 62, 67] }, // G
+    { root: 40, notes: [52, 56, 59, 64] }, // E
+  ],
+  bassPat: 'x.xxo.x.x.xxo.xx',
+  kickPat: 'x...x...x...x.x.',
+  snarePat: '....x.......x..x',
+  hatPat: 'x.x.x.x.x.x.x.xx',
+  arpPat: [0, 2, 1, 3, 0, 2, 1, 3, 0, 2, 1, 3, 2, 1, 3, 2],
+  congaPat: 'l.hhm.h.l.hhm.xh',
+  tomPat: '..x...x...x...xx',
+  lead: [
+    [81, null, 84, null, 81, null, 76, null, 81, null, 84, null, 88, null, 84, null],
+    [81, null, 77, null, 81, null, 84, null, 89, null, 84, null, 81, null, 77, null],
+    [79, null, 83, null, 86, null, 83, null, 79, null, 83, null, 86, null, 91, null],
+    [88, 87, 88, 87, 88, 83, 86, 84, 81, null, null, null, 76, null, 81, null],
+  ],
+};
+
+const THEMES: Record<ThemeName, Theme> = { menu: MENU, stage: STAGE, boss: BOSS, jungle: JUNGLE, rave: RAVE, monument: MONUMENT, fight: FIGHT, chase: CHASE };
 
 class MusicEngine {
   private layerGain = new Map<Layer, GainNode>();
@@ -754,6 +779,8 @@ export const MIX = {
   victory: { pad: 1, lead: 0.8, arp: 0.7, bass: 0.6 } as Partial<Record<Layer, number>>,
   /** luta de rua do boxe: tambor tribal, baixo e coro nas viradas */
   fight: { pad: 0.5, bass: 1, arp: 0.7, hat: 0.9, kick: 1, snare: 0.9, tom: 1, lead: 0.8, choir: 0.7 } as Partial<Record<Layer, number>>,
+  /** perseguição do macaco: galope de tambor, baixo, arpejo e o riff do desenho animado */
+  chase: { pad: 0.4, bass: 1, arp: 0.8, hat: 0.9, kick: 1, snare: 0.9, tom: 0.9, lead: 0.9 } as Partial<Record<Layer, number>>,
   /** praça do Pensador: pad e coro, tímpano, baixo e melodia larga */
   monument: { pad: 1, bass: 0.8, arp: 0.55, kick: 0.45, tom: 0.9, choir: 0.95, lead: 0.7 } as Partial<Record<Layer, number>>,
   /** balada com o Karimbo dançando: tudo no máximo */

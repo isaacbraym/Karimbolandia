@@ -59,7 +59,7 @@ export interface Stats {
   time: number;
 }
 
-export type MusicState = 'fight' | 'monument' | 'explore' | 'combat' | 'nomad' | 'nomadCombat' | 'boss1' | 'boss2' | 'boss3' | 'silence' | 'calm' | 'victory' | 'rhythm' | 'celebrate' | 'club' | 'drop' | 'rave';
+export type MusicState = 'fight' | 'chase' | 'monument' | 'explore' | 'combat' | 'nomad' | 'nomadCombat' | 'boss1' | 'boss2' | 'boss3' | 'silence' | 'calm' | 'victory' | 'rhythm' | 'celebrate' | 'club' | 'drop' | 'rave';
 
 export const MAX_LIVES = 3;
 /** moedas por pérola do lago */
