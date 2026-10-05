@@ -25,6 +25,7 @@ import { Crowd } from './civilians';
 import { Narrator } from './narrator';
 import { music, JUNGLE_MELODY, STAGE_MELODY } from '../core/music';
 import { Waters } from './water';
+import { LakeMap } from './lake/lakeMap';
 import { JungleWildlife } from './wildlife';
 import { Village } from './village';
 import { Merchant } from './merchant';
@@ -134,6 +135,8 @@ export class World {
   crowd = new Crowd();
   /** pântanos e lagos (fase 2): nado, peixes, bolhas */
   water!: Waters;
+  /** minimapa do lago (fase 2); null nas outras fases */
+  lakeMap: LakeMap | null = null;
   wildlife!: JungleWildlife;
   village!: Village;
   merchant!: Merchant;
@@ -228,6 +231,7 @@ export class World {
     this.baseTiles = data.level.tiles.slice();
     this.baseTheme = data.level.theme.slice();
     this.water = new Waters(data.water ?? [], this.level, data.decos);
+    this.lakeMap = LakeMap.create(this.level, data.water ?? []);
     this.wildlife = new JungleWildlife(data);
     this.village = new Village(data);
     this.merchant = new Merchant(data);
@@ -264,6 +268,7 @@ export class World {
     this.collectedPickups.clear();
     this.rhythmRepeats.clear();
     this.interiors?.clear();
+    this.lakeMap?.reset();
     this.interiorLock?.clear();
     this.stats = { kills: 0, deaths: 0, damageTaken: 0, dashes: 0, shots: 0, pitFalls: 0, time: 0 };
     this.checkpointIdx = -1;
@@ -1135,6 +1140,10 @@ export class World {
     this.encounters.update(this, dt);
     this.wildlife.update(this, dt);
     if (this.water.zones.length) this.water.update(dt, p.x, p.y, p.swimming, this.camera.x, this.camera.x + this.camera.w);
+    if (this.lakeMap && this.lakeMap.contains(p.x, p.y) && this.lakeMap.reveal(p.x, p.y)) {
+      const lm = this.lakeMap.takeLandmark();
+      if (lm) this.hooks.onBanner?.('DESCOBERTO!', lm.name, 2.2);
+    }
     for (const v of this.vines) if (Math.abs(v.x - p.x) < 1400) v.update(dt, this.time);
     if (this.blockAnimT >= 0) this.updateCollapse(dt);
     if (this.data.doors?.length) this.updateDoors(dt, ctl);

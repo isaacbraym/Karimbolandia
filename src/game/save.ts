@@ -41,6 +41,8 @@ export interface SaveState {
   /** inventário no checkpoint (munição infinita gravada como -1) */
   weapons: [string, number][];
   magazines?: [string,number][];
+  /** minimapa do lago: bitset (base64) das células exploradas; ausente se nada foi visto */
+  lakeMap?: string;
   cur: string;
   grenades: number;
   nomad: number;
@@ -82,6 +84,7 @@ export function captureSave(w: World): SaveState {
     secrets: [...w.secrets],
     secretRooms: [...w.secretRooms],
     encounters: [...w.encounters.completed],
+    ...(w.lakeMap?.toSave() ? { lakeMap: w.lakeMap.toSave() } : {}),
     ...(w.interiors.toSave().length || w.interiors.rep ? { interiors: w.interiors.toSave(), villageRep: w.interiors.rep } : {}),
     killed: [...w.killedEnemies],
     collected: [...w.collectedPickups],
@@ -132,6 +135,7 @@ export function applySave(w: World, s: SaveState) {
   for (const e of s.secretRooms) w.secretRooms.add(e);
   for (const e of s.encounters ?? []) w.encounters.completed.add(e);
   w.interiors.load(s.interiors, s.villageRep);
+  w.lakeMap?.load(s.lakeMap);
   for (const e of s.killed) w.killedEnemies.add(e);
   for (const e of s.collected) w.collectedPickups.add(e);
   const notes = w.data.pickups.filter(p => p.kind === 'note');

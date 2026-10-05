@@ -173,3 +173,16 @@ export function buildAtlantis(b: LevelBuilder) {
   // ---------------------------------------------------------------- vida de rio (só decoração, sempre por último)
   decorateLake(b, seabed);
 }
+
+/** Marcos de Atlântida para o minimapa: só dados (tx/ty em tiles, num trecho de água livre perto do lugar). */
+export const ATLANTIS_LANDMARKS: readonly { id: string; name: string; tx: number; ty: number }[] = [
+  { id: 'fenda', name: 'A Fenda', tx: (FENDA[0] + FENDA[1]) >> 1, ty: LAKE_FLOOR + 2 },
+  { id: 'portal', name: 'Portal de Atlântida', tx: 493, ty: 95 },
+  { id: 'torre', name: 'Torre da Janela', tx: 508, ty: 86 },
+  { id: 'praca', name: 'Praça do Pensador', tx: 518, ty: 96 },
+  { id: 'palacio', name: 'Palácio de Netuno', tx: 544, ty: 92 },
+  { id: 'casa', name: 'Casa Desabada', tx: 573, ty: 96 },
+  { id: 'camara', name: 'Câmara do Canto', tx: 606, ty: 98 },
+  { id: 'cofre', name: 'Cofre sob o Leito', tx: 595, ty: ABYSS_FLOOR + 4 },
+  { id: 'nicho', name: 'Nicho Alto', tx: 467, ty: 54 },
+];

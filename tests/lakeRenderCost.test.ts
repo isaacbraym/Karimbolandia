@@ -57,4 +57,29 @@ describe('custo de desenho do lago', () => {
     expect(draws).toBeLessThanOrEqual(360);
     expect(draws - visible).toBeLessThanOrEqual(110); // além dos peixes: neve, halos, superfície, bolhas e areia
   });
+
+  it('o minimapa não recompõe nem cria canvas por quadro: revelar copia só as células novas', async () => {
+    const { World } = await import('../src/game/world');
+    const { buildJungle } = await import('../src/game/level/jungle');
+    const w = new World(buildJungle());
+    let canvases = 0;
+    vi.stubGlobal('document', { createElement: () => { canvases++; return { width: 1, height: 1, getContext: ctx }; } });
+    const { drawLakeMinimap, minimapSize } = await import('../src/art/lake/minimap');
+    const m = w.lakeMap!;
+    const { mw, mh } = minimapSize(m, 1280);
+    const g = ctx();
+    m.reveal(518 * 32, 95 * 32);
+    drawLakeMinimap(g, w, m, 0, 0, mw, mh, 1.5, 0);
+    const made = canvases;
+    expect(made).toBeLessThanOrEqual(8); // terreno, composta, moldura e pinos: uma vez só
+    draws = 0;
+    for (let i = 0; i < 120; i++) drawLakeMinimap(g, w, m, 0, 0, mw, mh, 1.5, i / 60);
+    expect(canvases).toBe(made); // nenhum canvas novo em 120 quadros
+    expect(draws / 120).toBeLessThanOrEqual(20); // moldura + composta + pinos (≤ 9) + relíquias (≤ 5)
+    // revelar uma região nova custa só as células novas (não a grade inteira)
+    draws = 0;
+    const fresh = m.reveal(560 * 32, 92 * 32);
+    drawLakeMinimap(g, w, m, 0, 0, mw, mh, 1.5, 0);
+    expect(draws).toBeLessThanOrEqual(fresh + 20);
+  });
 });

@@ -1,3 +1,4 @@
+import { drawLakeMinimap, minimapSize } from '../art/lake/minimap';
 import { MAX_LIVES, COMBO_WINDOW, comboMult, type World } from './world';
 import { getArt } from '../art';
 import { WEAPON_ORDER, WEAPONS } from './weapons';
@@ -193,6 +194,8 @@ function text(g: CanvasRenderingContext2D, s: string, x: number, y: number, size
 }
 
 export class Hud {
+  /** 0..1: o minimapa do lago some e aparece suavemente */
+  private lakeAlpha = 0;
   banners: Banner[] = [];
   hint: { text: string; t: number } | null = null;
   time = 0;
@@ -216,6 +219,23 @@ export class Hud {
   safeT = 0;
   safeR = 0;
   compact = false;
+
+  /** Minimapa do lago (canto superior direito, abaixo da profundidade); some fora do lago e nas cenas. */
+  private drawLakeMap(g: CanvasRenderingContext2D, w: World, W: number, T: number, R: number) {
+    const m = w.lakeMap;
+    if (!m) return;
+    const p = w.player;
+    const on = m.contains(p.x, p.y) && !w.director.cine && !w.club.active;
+    this.lakeAlpha += ((on ? 1 : 0) - this.lakeAlpha) * 0.14;
+    if (this.lakeAlpha < 0.02) return;
+    const { mw, mh } = minimapSize(m, W);
+    const x = R - mw, y = T + 78;
+    g.globalAlpha = this.lakeAlpha;
+    drawLakeMinimap(g, w, m, x, y, mw, mh, textScale, this.time);
+    // o texto fica DENTRO da moldura (nada de altura extra: no celular pequeno o botão de granada fica logo abaixo)
+    numText(g, 'lakePct', m.percent(), (v) => `EXPLORADO ${v}%`, x + 5, y + 11, 9, '#e8fbff', 'left');
+    g.globalAlpha = 1;
+  }
 
   banner(title: string, sub?: string, dur = 2.4) {
     this.banners.push({ title, sub, t: 0, dur });
@@ -410,6 +430,7 @@ export class Hud {
       numText(g, 'depth', Math.round(p.depthRows), (v) => `↓ ${v} m`, W - 16, T + 46, 12, deep ? '#ff8a8a' : '#bff4ff', 'right');
       if (deep && Math.floor(this.time * 3) % 2 === 0) text(g, 'PRESSÃO', W - 16, T + 62, 10, '#ff8a8a', 'right');
     }
+    this.drawLakeMap(g, w, W, T, R);
     // inventário: armas que o Karimbo tem (vazias ficam apagadas até achar munição)
     if (p.weapons.size > 1) {
       let ix = bx + 100;

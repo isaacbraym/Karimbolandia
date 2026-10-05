@@ -29,6 +29,7 @@ export function validateSave(v: unknown): SaveState | null {
       rooms.add(pair[0]);
     }
   }
+  if (v.lakeMap !== undefined && (typeof v.lakeMap !== 'string' || v.lakeMap.length > 1024 || !/^[A-Za-z0-9+/]*={0,2}$/.test(v.lakeMap))) return null;
   if (v.villageRep !== undefined && !integer(v.villageRep, REP_MIN, REP_MAX)) return null;
   for (const k of ['nomadUsed', 'nomadLost', 'bossLivesGiven']) if (typeof v[k] !== 'boolean') return null;
   if (!Array.isArray(v.weapons) || v.weapons.length > WEAPON_ORDER.length) return null;
@@ -57,6 +58,7 @@ export function validateSave(v: unknown): SaveState | null {
     encounters: [...new Set(s.encounters ?? [])],
     ...(s.interiors !== undefined ? { interiors: s.interiors.map(([id, m]): [string, number] => [id, m]) } : {}),
     ...(s.villageRep !== undefined ? { villageRep: s.villageRep } : {}),
+    ...(s.lakeMap !== undefined ? { lakeMap: s.lakeMap } : {}),
     killed: [...s.killed], collected: [...s.collected], destroyed: [...s.destroyed],
     ...(s.rhythmRepeats !== undefined ? { rhythmRepeats: [...new Set(s.rhythmRepeats)] } : {}),
     nomadUsed: s.nomadUsed, nomadLost: s.nomadLost, bossLivesGiven: s.bossLivesGiven,
