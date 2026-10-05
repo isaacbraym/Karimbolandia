@@ -13,7 +13,7 @@ import { drawKarimbo, karimboMuzzle, type KState } from '../art/karimbo';
 import { drawNomad } from '../art/nomad';
 import { settings, progress } from '../core/storage';
 import { KARIMBO_BASE, karimboStats, magazineCapacity, reloadSeconds, tunedWeapon } from '../core/gearCatalog';
-import { breathesUnderwater } from '../core/skinCatalog';
+import { breathesUnderwater, SKIN_PERKS } from '../core/skinCatalog';
 import { difficulty } from '../core/difficulty';
 import { StrokeRhythm } from './lake/stroke';
 import {
@@ -175,6 +175,8 @@ export class Player {
   swimPhase = 0;
   /** embalo de braçadas (lago): ver lake/stroke.ts */
   readonly rhythm = new StrokeRhythm();
+  /** traje cujas vantagens (vida/fôlego) estão aplicadas; trocar na pausa reaplica */
+  private perkSkin = progress.equippedSkin;
   private trailT = 0;
   strokeT = 0;
   private bubbleT = 0;
@@ -335,11 +337,14 @@ export class Player {
   /** Melhorias do Karimbo compradas com o Sivirino (vida e ar). `heal` cura a diferença na hora. */
   applyPerks(heal: boolean) {
     const st = karimboStats(progress.gear);
-    if (heal && st.hp > this.maxHp) this.hp += st.hp - this.maxHp;
-    this.maxHp = st.hp;
+    const perk = SKIN_PERKS[progress.equippedSkin] ?? SKIN_PERKS.classic;
+    this.perkSkin = progress.equippedSkin;
+    const hp = Math.round(st.hp * perk.hp);
+    if (heal && hp > this.maxHp) this.hp += hp - this.maxHp;
+    this.maxHp = hp;
     if (this.hp > this.maxHp) this.hp = this.maxHp;
     const full = this.oxygen >= this.oxyMax - 0.01;
-    this.oxyMax = st.air;
+    this.oxyMax = st.air * perk.air;
     if (full || heal) this.oxygen = this.oxyMax;
   }
   /** Traje que respira debaixo d'água está vestido. */
@@ -594,6 +599,8 @@ export class Player {
 
   // ------------------------------------------------------------------ atualização
   update(w: World, dt: number, ctl: ControlState) {
+    // trocar de traje na pausa reaplica as vantagens (vida e fôlego) sem recomeçar a fase
+    if (this.perkSkin !== progress.equippedSkin) this.applyPerks(false);
     this.animT += dt;
     this.scarfT += dt * (8 + Math.abs(this.body.vx) * 0.03);
     if (this.invuln > 0) this.invuln -= dt;
@@ -1189,7 +1196,7 @@ export class Player {
     const atSurface = depth < 16;
     // horizontal
     this.rhythm.update(dt);
-    const SW = 150 * karimboStats(progress.gear).swim * (progress.equippedSkin === 'atlante' ? 1.3 : 1) * this.rhythm.speedMul;
+    const SW = 150 * karimboStats(progress.gear).swim * (SKIN_PERKS[progress.equippedSkin] ?? SKIN_PERKS.classic).swim * this.rhythm.speedMul;
     const tx = hurt ? 0 : ctl.moveX * SW;
     b.vx = approach(b.vx, tx, (Math.abs(tx) > 0 ? 540 : 240) * dt);
     if (Math.abs(ctl.moveX) > 0.3) this.facing = ctl.moveX > 0 ? 1 : -1;

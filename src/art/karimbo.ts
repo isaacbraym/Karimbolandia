@@ -8,6 +8,7 @@ import { PAL } from './palette';
 import { shade } from '../core/math';
 import { clapOpen } from '../core/clapRhythm';
 import type { KarimboHeads } from './photo';
+import { bakeGatorHood, bakeGatorTail } from './alligatorHood';
 import { WEAPONS, type WeaponId } from '../game/weapons';
 import { progress } from '../core/storage';
 import type { SkinId } from '../core/skinCatalog';
@@ -26,6 +27,9 @@ export interface KarimboArt {
   knife: Sprite;
   heads: KarimboHeads;
   variants?: Partial<Record<SkinId, KarimboArt>>;
+  /** skin Jacaré: rabo (atrás das pernas) e o chapéu de caça (cabeça de jacaré, por cima da cabeça) */
+  tail?: Sprite;
+  hood?: Sprite;
 }
 
 const S = 3;
@@ -85,10 +89,10 @@ function bakeKnife(): Sprite {
 }
 
 export function bakeKarimbo(heads: KarimboHeads, skin: SkinId = 'classic', equipment?: Pick<KarimboArt, 'weapons' | 'knife'>): KarimboArt {
-  const SHIRT = ({ classic: '#d2b892', explorer: '#728848', neon: '#25243f', diver: '#1d3f63', atlante: '#178a80' } as Record<SkinId, string>)[skin];
-  const SHORTS = ({ classic: '#3b4763', explorer: '#685137', neon: '#252d46', diver: '#152c46', atlante: '#a07a22' } as Record<SkinId, string>)[skin];
-  const BOOT = ({ classic: '#373152', explorer: '#493628', neon: '#373152', diver: '#0e1622', atlante: '#7a5a12' } as Record<SkinId, string>)[skin];
-  const STRIPE = ({ classic: '#39f0ff', explorer: '#c2a675', neon: '#39f0ff', diver: '#ffb52e', atlante: '#ffe27a' } as Record<SkinId, string>)[skin];
+  const SHIRT = ({ classic: '#d2b892', explorer: '#728848', neon: '#25243f', diver: '#1d3f63', atlante: '#178a80', jacare: '#5f8a45' } as Record<SkinId, string>)[skin];
+  const SHORTS = ({ classic: '#3b4763', explorer: '#685137', neon: '#252d46', diver: '#152c46', atlante: '#a07a22', jacare: '#4a7038' } as Record<SkinId, string>)[skin];
+  const BOOT = ({ classic: '#373152', explorer: '#493628', neon: '#373152', diver: '#0e1622', atlante: '#7a5a12', jacare: '#3d5a2a' } as Record<SkinId, string>)[skin];
+  const STRIPE = ({ classic: '#39f0ff', explorer: '#c2a675', neon: '#39f0ff', diver: '#ffb52e', atlante: '#ffe27a', jacare: '#e2d8a4' } as Record<SkinId, string>)[skin];
   // ---------------------------------------------------------------- tronco (camiseta + barriguinha)
   const torso = bake(
     28,
@@ -178,6 +182,24 @@ export function bakeKarimbo(heads: KarimboHeads, skin: SkinId = 'classic', equip
         g.beginPath();
         g.arc(14, 9.5, 1.6, 0, Math.PI * 2);
         g.fill();
+      } else if (skin === 'jacare') {
+        // macacão de escamas: fileiras de escamas escuras e a barriga creme listrada
+        g.strokeStyle = 'rgba(25,55,20,0.55)';
+        g.lineWidth = 0.65;
+        for (let row = 0; row < 7; row++) {
+          for (let col = 0; col < 8; col++) {
+            g.beginPath();
+            g.arc(3 + col * 3.3 + (row % 2) * 1.6, 3.4 + row * 2.4, 1.6, 0, Math.PI);
+            g.stroke();
+          }
+        }
+        shadedRR(g, 8.2, 4.6, 11.6, 14.6, 4.4, '#e2d8a4', { lw: 0.7 });
+        g.strokeStyle = '#b3a569';
+        g.lineWidth = 0.85;
+        for (let y = 7; y < 19; y += 2.4) { g.beginPath(); g.moveTo(8.8, y); g.lineTo(19.2, y); g.stroke(); }
+        g.fillStyle = '#3f6430';
+        g.fillRect(4, 1.4, 20, 1.6);
+        for (let i = 0; i < 5; i++) { g.beginPath(); g.moveTo(5.5 + i * 4, 1.6); g.lineTo(7.1 + i * 4, -0.6); g.lineTo(8.7 + i * 4, 1.6); g.fill(); }
       } else if (skin === 'neon') {
         g.strokeStyle = '#39f0ff';
         g.lineWidth = 1.5;
@@ -267,6 +289,13 @@ export function bakeKarimbo(heads: KarimboHeads, skin: SkinId = 'classic', equip
           g.fillStyle = STRIPE;
           g.fillRect(2.5, skin === 'explorer' ? 13.4 : 16, 6.2, 1);
           if (skin === 'neon' || skin === 'diver' || skin === 'atlante') g.fillRect(6.8, 1, 1, 10);
+          if (skin === 'jacare') {
+            // garrinhas nos dedos do pé
+            g.fillStyle = '#fbf6e4';
+            g.strokeStyle = OUT;
+            g.lineWidth = 0.6;
+            for (const dy of [14.2, 15.8, 17.4]) { g.beginPath(); g.moveTo(10.2, dy - 0.7); g.lineTo(12.4, dy); g.lineTo(10.2, dy + 0.7); g.closePath(); g.fill(); g.stroke(); }
+          }
           if (skin === 'diver') {
             // nadadeira amarela
             g.fillStyle = '#ffb52e';
@@ -310,13 +339,21 @@ export function bakeKarimbo(heads: KarimboHeads, skin: SkinId = 'classic', equip
         if (skin !== 'classic') {
           g.fillStyle = skin === 'explorer' ? '#d6bf72' : STRIPE;
           g.fillRect(1.8, 2, 2, 3.6);
-          if (skin === 'diver' || skin === 'atlante') {
+          if (skin === 'diver' || skin === 'atlante' || skin === 'jacare') {
             // manga longa até o punho
             g.fillStyle = dark ? shade(SHIRT, -0.22) : SHIRT;
             g.fillRect(6.6, 1.6, 5.4, 4.8);
             g.fillStyle = STRIPE;
             g.fillRect(10.6, 1.6, 1.2, 4.8);
           }
+        }
+        if (skin === 'jacare') {
+          // luva de escamas com garrinhas
+          g.fillStyle = '#4a7038';
+          g.beginPath(); g.arc(14.6, 4.1, 2.8, 0, Math.PI * 2); g.fill();
+          g.strokeStyle = OUT; g.lineWidth = 0.7; g.stroke();
+          g.fillStyle = '#fbf6e4';
+          for (const dy of [-2.2, 0, 2.2]) { g.beginPath(); g.moveTo(16.6, 4.1 + dy - 0.8); g.lineTo(19, 4.1 + dy); g.lineTo(16.6, 4.1 + dy + 0.8); g.closePath(); g.fill(); g.stroke(); }
         }
         g.fillStyle = shade(sk, .22); g.fillRect(13.3, 2.4, 2.2, .7);
         g.strokeStyle = shade(sk, -.28); g.lineWidth = .45;
@@ -325,7 +362,10 @@ export function bakeKarimbo(heads: KarimboHeads, skin: SkinId = 'classic', equip
       { scale: S, ox: 3, oy: 4 }
     );
 
-  return { torso, shorts, legFront, legBack, armFront: mkArm(false), armBack: mkArm(true), weapons: equipment?.weapons ?? bakeWeapons(), knife: equipment?.knife ?? bakeKnife(), heads };
+  return {
+    torso, shorts, legFront, legBack, armFront: mkArm(false), armBack: mkArm(true), weapons: equipment?.weapons ?? bakeWeapons(), knife: equipment?.knife ?? bakeKnife(), heads,
+    ...(skin === 'jacare' ? { tail: bakeGatorTail(), hood: bakeGatorHood() } : {}),
+  };
 }
 
 export function bakeWeapons(): Record<WeaponId, Sprite> {
@@ -614,6 +654,7 @@ export function drawKarimbo(g: CanvasRenderingContext2D, art: KarimboArt, x: num
     drawSpr(g, dg.tank, -6.5, shY + 3, { sx: s, sy: s, white: w });
   }
   // pernas + shorts + tronco (barriga por cima do shorts)
+  if (art.tail) drawSpr(g, art.tail, -5.5, hipY - 3 + bob * 0.5, { rot: -0.28 + Math.sin(c) * (running ? 0.2 : 0.03) + (idle ? Math.sin(p.t * 1.7) * 0.07 : 0), white: w });
   drawSpr(g, art.legBack, -2.6, hipY + bob * 0.5, { rot: legB, sy: legSy, white: w });
   drawSpr(g, art.legFront, 2.6, hipY + bob * 0.5, { rot: legF, sy: legSy, white: w });
   drawSpr(g, art.shorts, 0, hipY - 1 + bob * 0.5, { white: w, sy: legSy > 0.9 ? 1 : 0.85 });
@@ -698,6 +739,8 @@ export function drawKarimbo(g: CanvasRenderingContext2D, art: KarimboArt, x: num
   } else {
     drawEars(g, art, p, w);
     drawSpr(g, hd.right, 0, 0, { white: w });
+    // chapéu de caça (skin Jacaré): a cabeça de jacaré assenta no alto da cabeça, sem cobrir o rosto
+    if (art.hood) drawSpr(g, art.hood, 0.6 + lagX * 0.1, -30.4, { white: w });
     if (dancing) drawWhistle(g, db);
   }
   g.restore();

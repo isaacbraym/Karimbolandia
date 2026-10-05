@@ -531,7 +531,7 @@ export class Menus {
     panel.append(el('h2', '', from === 'pause' ? 'PERSONAGEM • TRAJES' : 'TRAJES DO KARIMBO'));
     const balance = el('p', 'shop-balance');
     balance.setAttribute('role', 'status');
-    const note = el('p', 'shop-note', 'Junte moedas na cidade e na selva. Saldo e trajes ficam guardados entre partidas. O traje de mergulho (Sivirino) e o Atlante (relíquias de Atlântida) têm poderes.');
+    const note = el('p', 'shop-note', 'Junte moedas na cidade e na selva. Saldo e trajes ficam guardados entre partidas. O traje de mergulho (Sivirino), o Atlante (relíquias de Atlântida) e o Jacaré (vença o jacaré no boxe) têm poderes.');
     const cards = el('div', 'skin-cards');
     panel.append(balance, note, cards);
     const update = () => {
@@ -543,8 +543,8 @@ export class Menus {
         const equipped = progress.equippedSkin === skin.id;
         const card = el('article', 'skin-card' + (equipped ? ' equipped' : ''));
         card.style.setProperty('--skin-color', skin.color);
-        const viaSivirino = skin.shop === 'sivirino', viaRelics = skin.shop === 'relics';
-        card.append(el('span', 'skin-tag', equipped ? 'EQUIPADO' : owned ? 'SEU TRAJE' : viaRelics ? 'EXCLUSIVO' : viaSivirino ? `SIVIRINO • ${skin.price}` : `${skin.price} MOEDAS`));
+        const viaSivirino = skin.shop === 'sivirino', viaRelics = skin.shop === 'relics', viaBoxing = skin.shop === 'boxing';
+        card.append(el('span', 'skin-tag', equipped ? 'EQUIPADO' : owned ? 'SEU TRAJE' : viaRelics || viaBoxing ? 'EXCLUSIVO' : viaSivirino ? `SIVIRINO • ${skin.price}` : `${skin.price} MOEDAS`));
         const canvas = el('canvas', 'skin-preview');
         canvas.width = 320; canvas.height = 330;
         canvas.setAttribute('role', 'img');
@@ -560,20 +560,20 @@ export class Menus {
         const description = el('p', 'skin-description');
         description.textContent = skin.description;
         const affordable = coinBalance() >= skin.price;
-        const lockedText = viaRelics ? `RELÍQUIAS ${progress.relics.length}/5` : 'COMPRE COM O SIVIRINO';
-        const action = this.btn(equipped ? 'EQUIPADO' : owned ? `USAR ${skin.name.toUpperCase()}` : viaRelics || viaSivirino ? lockedText : `COMPRAR • ${skin.price}`, owned ? 'alt small' : 'primary small', () => {
+        const lockedText = viaRelics ? `RELÍQUIAS ${progress.relics.length}/5` : viaBoxing ? 'VENÇA O JACARÉ NO BOXE' : 'COMPRE COM O SIVIRINO';
+        const action = this.btn(equipped ? 'EQUIPADO' : owned ? `USAR ${skin.name.toUpperCase()}` : viaRelics || viaBoxing || viaSivirino ? lockedText : `COMPRAR • ${skin.price}`, owned ? 'alt small' : 'primary small', () => {
           void withWalletLock(()=>chooseSkin(skin.id)).then(result=>{
-          if (result === 'locked') this.toast(viaRelics ? 'Ache as 5 relíquias de Atlântida para vestir o Atlante.' : 'O traje de mergulho só se compra com o Sivirino, na oficina.');
+          if (result === 'locked') this.toast(viaBoxing ? 'Vença o jacaré dançante no boxe, na aldeia da selva, para vestir o Jacaré.' : viaRelics ? 'Ache as 5 relíquias de Atlântida para vestir o Atlante.' : 'O traje de mergulho só se compra com o Sivirino, na oficina.');
           else if (result === 'insufficient') this.toast('Ainda faltam moedas para este traje.');
           else if (result === 'volatile') this.toast('Traje disponível nesta sessão. Baixe um backup: não foi possível gravar no aparelho.');
           else this.toast(result === 'bought' ? `${skin.name} comprado e equipado!` : `${skin.name} equipado!`);
           update();
           }).catch(()=>this.toast('A conta mudou. Abra a loja novamente antes de comprar.'));
         });
-        action.disabled = equipped || (!owned && (!affordable || viaRelics || viaSivirino));
+        action.disabled = equipped || (!owned && (!affordable || viaRelics || viaBoxing || viaSivirino));
         action.setAttribute('aria-label', equipped ? `${skin.name} equipado` : owned ? `Usar ${skin.name}` : `Comprar ${skin.name} por ${skin.price} moedas`);
         card.append(description, action);
-        if (!owned && !affordable && !viaRelics && !viaSivirino) card.append(el('small', 'skin-shortfall', `Faltam ${skin.price - coinBalance()} moedas`));
+        if (!owned && !affordable && !viaRelics && !viaBoxing && !viaSivirino) card.append(el('small', 'skin-shortfall', `Faltam ${skin.price - coinBalance()} moedas`));
         cards.append(card);
       }
       this.shopBtn.textContent = `LOJA DE SKINS • ${coinBalance()} MOEDAS`;

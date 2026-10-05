@@ -3,7 +3,7 @@ import { currentProfile } from './persistence';
 export type StorageUsage = { available: true; totalBytes: number; profileBytes: number } | { available: false };
 // Dados de conta; configurações, seleção de perfil e atualização são globais.
 const profileRoots = [
-  'progress.v1', 'wallet.v1', 'save.v1', 'before-restore.v1', 'cloud-base.v1',
+  'progress.v1', 'wallet.v1', 'rewards.v1', 'save.v1', 'before-restore.v1', 'cloud-base.v1',
 ];
 const profilePrefixes = ['partidas.v1.', 'coin-writers.v2.', 'gear.v1.'];
 const root = 'karimbolandia.';

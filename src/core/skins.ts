@@ -24,6 +24,18 @@ export function collectCoin() {
 }
 export type SkinResult = 'bought' | 'equipped' | 'insufficient' | 'invalid' | 'volatile' | 'locked';
 /**
+ * Entrega um traje de recompensa (preço 0, o saldo de moedas nunca muda). Devolve false se já era seu.
+ * `source`: onde veio ('boxing' = venceu o jacaré; 'relics' = as 5 relíquias de Atlântida).
+ */
+export function grantSkin(id: SkinId, source: 'boxing' | 'relics'): boolean {
+  if (!isSkinId(id) || skinInfo(id).shop !== source) return false;
+  ensureWallet();
+  if (id === 'classic' || progress.ownedSkins.includes(id)) return false;
+  progress.ownedSkins.push(id);
+  saveProgress();
+  return true;
+}
+/**
  * Equipa (ou compra e equipa) um traje. O traje de mergulho só se compra com o Sivirino
  * (`from = 'sivirino'`); o Atlante não se compra: é liberado pelas relíquias de Atlântida.
  */
@@ -32,7 +44,7 @@ export function chooseSkin(id: SkinId, from: 'skins' | 'sivirino' = 'skins'): Sk
   ensureWallet();
   const owned = id === 'classic' || progress.ownedSkins.includes(id);
   const shop = skinInfo(id).shop;
-  if (!owned && (shop === 'relics' || shop === 'sivirino' && from !== 'sivirino')) return 'locked';
+  if (!owned && (shop === 'relics' || shop === 'boxing' || shop === 'sivirino' && from !== 'sivirino')) return 'locked';
   if (!owned && coinBalance() < skinPrice(id)) return 'insufficient';
   if (!owned) progress.ownedSkins.push(id);
   progress.equippedSkin = id;

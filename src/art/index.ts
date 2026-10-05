@@ -78,7 +78,8 @@ export async function buildArt(base: string, quality: Quality, onProgress: (p: n
   steps.push(['Preparando os trajes...', () => {
     const classic = out.karimbo!;
     classic.variants = { classic, explorer: bakeKarimbo(classic.heads, 'explorer', classic), neon: bakeKarimbo(classic.heads, 'neon', classic),
-      diver: bakeKarimbo(classic.heads, 'diver', classic), atlante: bakeKarimbo(classic.heads, 'atlante', classic) };
+      diver: bakeKarimbo(classic.heads, 'diver', classic), atlante: bakeKarimbo(classic.heads, 'atlante', classic),
+      jacare: bakeKarimbo(classic.heads, 'jacare', classic) };
     for (const variant of Object.values(classic.variants)) warmWhites(variant);
     warmWhites(classic.heads);
     warmWhites(classic.weapons);

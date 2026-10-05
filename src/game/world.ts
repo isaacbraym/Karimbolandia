@@ -16,7 +16,7 @@ import { clamp, rand, type Rect } from '../core/math';
 import type { ControlState } from '../core/input';
 import { WEAPON_ORDER, type WeaponId } from './weapons';
 import { progress, saveProgress, settings } from '../core/storage';
-import { collectCoin } from '../core/skins';
+import { collectCoin, grantSkin } from '../core/skins';
 import { getArt } from '../art';
 import { drawNomadIdle } from '../art/nomad';
 import { softDot, drawSpr } from '../art/kit';
@@ -1062,11 +1062,8 @@ export class World {
           progress.relics.push(pk.itemId);
           const n = progress.relics.length;
           let sub = `+${coins} moedas • ${n}/5 relíquias`;
-          if (n >= 5 && !progress.ownedSkins.includes('atlante')) {
-            progress.ownedSkins.push('atlante');
-            sub = 'TRAJE ATLANTE LIBERADO • vista no menu PERSONAGEM';
-          }
-          saveProgress();
+          if (n >= 5 && grantSkin('atlante', 'relics')) sub = 'TRAJE ATLANTE LIBERADO • vista no menu PERSONAGEM';
+          else saveProgress();
           this.hooks.onBanner?.(`RELÍQUIA DE ATLÂNTIDA ${n}/5`, sub, 3);
         } else this.fx.popup(pk.x, pk.y - 22, 'RELÍQUIA JÁ GUARDADA • +5', '#7ff9e0', 9);
         break;

@@ -1,7 +1,7 @@
 /** Configurações do aparelho; progresso separado por conta, com recuperação local. */
 import { profileKey, readStored, writeStored } from './persistence';
 import { record, number, integer, ids } from './saveValidation';
-import { isSkinId, SKINS, type SkinId } from './skinCatalog';
+import { isSkinId, isLegacySkin, SKINS, type SkinId } from './skinCatalog';
 import { validGear } from './gearCatalog';
 import { isDifficulty, type DifficultyId } from './difficulty';
 import { readGearReceipts, storeGearReceipts } from './gearReceipts';
@@ -49,6 +49,35 @@ const KEY_S = 'karimbolandia.settings.v1';
 const KEY_P = 'karimbolandia.progress.v1';
 // Clientes anteriores à loja ainda gravam KEY_P; não podem apagar compras novas.
 const KEY_W = 'karimbolandia.wallet.v1';
+// Trajes de recompensa (jacaré...) que clientes antigos em cache não conhecem: um cliente antigo
+// invalida o perfil INTEIRO se ownedSkins/equippedSkin tiver um id desconhecido (ver validateProgress),
+// recai no backup e sobrescreve o perfil. Por isso eles ficam só nesta chave, que nenhum cliente
+// antigo lê nem escreve; o perfil principal e o espelho da carteira nunca os contêm.
+const KEY_R = 'karimbolandia.rewards.v1';
+/** `over` = traje "legado" gravado no perfil principal junto com `equipped` (se mudou depois, o principal vence). */
+export interface Rewards { skins: SkinId[]; equipped?: SkinId; over?: SkinId }
+export function validateRewards(v: unknown): Rewards | null {
+  if (!record(v) || !Array.isArray(v.skins) || v.skins.length > SKINS.length) return null;
+  if (!v.skins.every((s) => isSkinId(s) && !isLegacySkin(s)) || new Set(v.skins).size !== v.skins.length) return null;
+  if (v.equipped !== undefined && (!isSkinId(v.equipped) || !v.skins.includes(v.equipped))) return null;
+  if (v.over !== undefined && (!isSkinId(v.over) || !isLegacySkin(v.over))) return null;
+  return { skins: [...v.skins] as SkinId[], ...(v.equipped !== undefined ? { equipped: v.equipped as SkinId } : {}), ...(v.over !== undefined ? { over: v.over as SkinId } : {}) };
+}
+/** Última skin "legada" vestida (vai para o perfil principal enquanto uma skin de recompensa estiver equipada). */
+let lastLegacyEquipped: SkinId = 'classic';
+/** Cópia do progresso sem nenhuma skin de recompensa: é o que vai para o perfil principal e para a carteira. */
+export function legacyView(p: Progress): Progress {
+  const equippedIsLegacy = isLegacySkin(p.equippedSkin);
+  if (equippedIsLegacy) lastLegacyEquipped = p.equippedSkin;
+  const owned = p.ownedSkins.filter(isLegacySkin);
+  const equippedSkin = equippedIsLegacy ? p.equippedSkin : (owned.includes(lastLegacyEquipped) || lastLegacyEquipped === 'classic') ? lastLegacyEquipped : 'classic';
+  return { ...p, ownedSkins: owned, equippedSkin };
+}
+export function rewardsOf(p: Progress): Rewards {
+  const view = legacyView(p);
+  const skins = p.ownedSkins.filter((s) => !isLegacySkin(s));
+  return { skins, ...(!isLegacySkin(p.equippedSkin) ? { equipped: p.equippedSkin } : {}), over: view.equippedSkin };
+}
 
 export const defaultSettings = (): Settings => ({
   music: 0.7,
@@ -140,13 +169,19 @@ function readProfileProgress(): Progress | null {
   const p = readStored(profileKey(KEY_P), validateProgress);
   const wallet = readStored(profileKey(KEY_W), validateWallet);
   const records = p ?? defaultProgress();
+  const rewards = readStored(profileKey(KEY_R), validateRewards);
   const combined=wallet?mergeProgress(records,{...records,...wallet}):records;
+  if (rewards) {
+    combined.ownedSkins = [...new Set([...combined.ownedSkins, ...rewards.skins])];
+    // vale o traje de recompensa vestido, a menos que o perfil principal tenha mudado de traje depois
+    if (rewards.equipped && combined.ownedSkins.includes(rewards.equipped) && combined.equippedSkin === rewards.over) combined.equippedSkin = rewards.equipped;
+  }
   const writers=readCoinWriters();
   const receipts=readGearReceipts();
   combined.gear=[...new Set([...combined.gear,...receipts])];
   if(writers)combined.coinsLedger=mergeCoinLedgers(combined.coinsLedger,writers);
   if(combined.coinsLedger)combined.coinsEarned=Math.max(combined.coinsEarned,coinTotal(combined.coinsLedger));
-  return p||wallet||writers||receipts.length?combined:null;
+  return p||wallet||writers||receipts.length||rewards?combined:null;
 }
 export const hasStoredWallet = () => readStored(profileKey(KEY_W), validateWallet) !== null;
 export const progress: Progress = readProfileProgress() ?? defaultProgress();
@@ -185,7 +220,11 @@ export const saveProgress = () => {
   const previous = readProfileProgress();
   if (previous) Object.assign(progress, mergeProgress(previous, progress));
   const gear=storeGearReceipts(progress.gear);
-  const wallet = writeStored(profileKey(KEY_W), validateWallet(progress)!, validateWallet);
-  const records = writeStored(profileKey(KEY_P), progress, validateProgress);
-  return coins && gear && wallet && records;
+  const view = legacyView(progress);
+  const wallet = writeStored(profileKey(KEY_W), validateWallet(view)!, validateWallet);
+  const records = writeStored(profileKey(KEY_P), view, validateProgress);
+  // só grava a chave de recompensas quando há algo a guardar (ou já existe): perfis sem o traje ficam idênticos aos de antes
+  const rw = rewardsOf(progress);
+  const rewards = rw.skins.length || readStored(profileKey(KEY_R), validateRewards) ? writeStored(profileKey(KEY_R), rw, validateRewards) : true;
+  return coins && gear && wallet && records && rewards;
 };
