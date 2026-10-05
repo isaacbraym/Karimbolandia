@@ -16,7 +16,8 @@ export type SfxName =
   | 'enemyShot' | 'sniperShot' | 'turretShot' | 'stomp' | 'bossRoar' | 'bossHit' | 'bossPhase' | 'bossDie' | 'thruster'
   | 'victory' | 'servo' | 'spark' | 'slam' | 'burp' | 'burpBig' | 'crush' | 'extraLife' | 'thunder' | 'knife'
   | 'splash' | 'bigSplash' | 'wade' | 'swim' | 'bubble' | 'suitOn' | 'bird' | 'bird2' | 'insect' | 'frog' | 'creak' | 'rumble' | 'crocBite'
-  | 'snore' | 'cluck' | 'tvStatic' | 'thump' | 'crunch';
+  | 'snore' | 'cluck' | 'tvStatic' | 'thump' | 'crunch'
+  | 'punchLight' | 'punchHeavy' | 'whoosh' | 'bell' | 'crowdGasp' | 'crowdLaugh' | 'chomp';
 
 type LoopName = 'glide' | 'roll' | 'alarm' | 'laser' | 'thrusterLoop';
 
@@ -947,6 +948,39 @@ export class AudioEngine {
         break;
       case 'tvStatic':
         this.noise({ dur: 0.4, vol: 0.05 * v, type: 'bandpass', f0: 3200, f1: 2400, q: 0.6, pan });
+        break;
+      case 'punchLight':
+        this.noise({ dur: 0.06, vol: 0.3 * v, type: 'bandpass', f0: 1900, f1: 600, q: 1.2, pan });
+        this.tone({ type: 'sine', f0: 230 * r, f1: 90, dur: 0.07, vol: 0.24 * v, pan });
+        break;
+      case 'punchHeavy':
+        this.noise({ dur: 0.18, vol: 0.5 * v, type: 'lowpass', f0: 1500, f1: 120, pan });
+        this.tone({ type: 'sine', f0: 130 * r, f1: 36, dur: 0.24, vol: 0.55 * v, pan });
+        this.noise({ dur: 0.05, vol: 0.3 * v, type: 'highpass', f0: 2800, pan });
+        break;
+      case 'whoosh':
+        this.noise({ dur: 0.16, vol: 0.2 * v, type: 'bandpass', f0: 700, f1: 2600, q: 0.8, att: 0.05, pan });
+        break;
+      case 'bell':
+        this.tone({ type: 'triangle', f0: 1568, dur: 0.9, vol: 0.28 * v, lp: 5000 });
+        this.tone({ type: 'triangle', f0: 2349, dur: 0.7, vol: 0.14 * v, delay: 0.01 });
+        this.tone({ type: 'sine', f0: 784, dur: 1, vol: 0.12 * v });
+        break;
+      case 'crowdGasp':
+        this.noise({ dur: 0.55, vol: 0.2 * v, type: 'bandpass', f0: 1300, f1: 800, q: 0.7, att: 0.12, pan });
+        this.tone({ type: 'sawtooth', f0: 360, f1: 300, dur: 0.5, vol: 0.05 * v, lp: 900, att: 0.1 });
+        break;
+      case 'crowdLaugh':
+        for (let i = 0; i < 5; i++) {
+          this.noise({ dur: 0.08, vol: 0.18 * v, type: 'bandpass', f0: 1100 + i * 40, f1: 800, q: 1.4, delay: i * 0.12, pan });
+          this.tone({ type: 'sawtooth', f0: 420 - i * 20, f1: 330, dur: 0.07, vol: 0.05 * v, lp: 1200, delay: i * 0.12 });
+        }
+        break;
+      case 'chomp':
+        for (let i = 0; i < 2; i++) {
+          this.noise({ dur: 0.05, vol: 0.32 * v, type: 'highpass', f0: 2500, delay: i * 0.1, pan });
+          this.tone({ type: 'square', f0: 190, f1: 70, dur: 0.07, vol: 0.2 * v, lp: 1400, delay: i * 0.1, pan });
+        }
         break;
       case 'thump':
         this.tone({ type: 'sine', f0: 110, f1: 38, dur: 0.28, vol: 0.4 * v, pan });

@@ -6,7 +6,7 @@ import { audio } from './audio';
 import { clamp } from './math';
 
 export type Layer = 'pad' | 'bass' | 'arp' | 'hat' | 'kick' | 'snare' | 'lead' | 'power' | 'choir' | 'tom';
-export type ThemeName = 'menu' | 'stage' | 'boss' | 'jungle' | 'rave' | 'monument';
+export type ThemeName = 'menu' | 'stage' | 'boss' | 'jungle' | 'rave' | 'monument' | 'fight';
 
 const LAYERS: Layer[] = ['pad', 'bass', 'arp', 'hat', 'kick', 'snare', 'lead', 'power', 'choir', 'tom'];
 const mtof = (m: number) => 440 * Math.pow(2, (m - 69) / 12);
@@ -175,7 +175,32 @@ const MONUMENT: Theme = {
   ],
 };
 
-const THEMES: Record<ThemeName, Theme> = { menu: MENU, stage: STAGE, boss: BOSS, jungle: JUNGLE, rave: RAVE, monument: MONUMENT };
+// -------- Luta de rua (boxe do jacaré): Mi menor, 132 bpm — tambor tribal, palmas no "BRI-GA!" --------
+const FIGHT: Theme = {
+  bpm: 132,
+  tribal: true,
+  chords: [
+    { root: 40, notes: [52, 55, 59, 64] }, // Em
+    { root: 40, notes: [52, 55, 59, 64] }, // Em
+    { root: 36, notes: [48, 52, 55, 60] }, // C
+    { root: 43, notes: [55, 59, 62, 67] }, // G
+  ],
+  bassPat: 'x..xo.x.x..xo.x.',
+  kickPat: 'x...x...x...x...',
+  snarePat: '....x.......x...',
+  hatPat: 'x.x.x.x.x.x.x.x.',
+  arpPat: [0, -1, 2, -1, 1, -1, 3, -1, 0, -1, 2, -1, 3, -1, 1, 2],
+  congaPat: 'l.hhm.h.l.hhm.xh',
+  tomPat: '..x...x...x...xx',
+  lead: [
+    [76, null, null, 79, null, 83, null, null, 81, null, 79, null, 76, null, null, null],
+    [76, null, null, 79, null, 83, null, null, 86, null, 83, null, 81, null, null, null],
+    [79, null, null, 84, null, 88, null, null, 86, null, 84, null, 79, null, null, null],
+    [81, null, 83, null, 86, null, 83, null, 79, null, 76, null, 79, null, null, null],
+  ],
+};
+
+const THEMES: Record<ThemeName, Theme> = { menu: MENU, stage: STAGE, boss: BOSS, jungle: JUNGLE, rave: RAVE, monument: MONUMENT, fight: FIGHT };
 
 class MusicEngine {
   private layerGain = new Map<Layer, GainNode>();
@@ -727,6 +752,8 @@ export const MIX = {
   /** "drop" da boate: tudo, com a guitarra e o coro */
   drop: { pad: 0.8, bass: 1, arp: 0.9, hat: 1, kick: 1, snare: 1, lead: 1, power: 0.9, choir: 0.8, tom: 0.7 } as Partial<Record<Layer, number>>,
   victory: { pad: 1, lead: 0.8, arp: 0.7, bass: 0.6 } as Partial<Record<Layer, number>>,
+  /** luta de rua do boxe: tambor tribal, baixo e coro nas viradas */
+  fight: { pad: 0.5, bass: 1, arp: 0.7, hat: 0.9, kick: 1, snare: 0.9, tom: 1, lead: 0.8, choir: 0.7 } as Partial<Record<Layer, number>>,
   /** praça do Pensador: pad e coro, tímpano, baixo e melodia larga */
   monument: { pad: 1, bass: 0.8, arp: 0.55, kick: 0.45, tom: 0.9, choir: 0.95, lead: 0.7 } as Partial<Record<Layer, number>>,
   /** balada com o Karimbo dançando: tudo no máximo */
