@@ -3,7 +3,8 @@
  * Multitouch real: cada controle usa seu próprio pointerId (com captura), então um dedo
  * nunca cancela o outro.
  */
-import type { Input, ActionName } from '../core/input';
+import type { Input, ActionName, MiniButton, MiniMode } from '../core/input';
+import { MINI_BUTTONS } from '../core/input';
 import { settings } from '../core/storage';
 import { toLocal, localRect } from '../core/orient';
 
@@ -23,7 +24,9 @@ export class TouchUI {
   private knob: HTMLElement;
   private ghost: HTMLElement;
   private buttons = new Map<ActionName, HTMLElement>();
-  private releaseTimers = new Map<ActionName, number>();
+  private releaseTimers = new Map<string, number>();
+  /** gesto do boxe: dono do ponteiro, origem, instante, temporizador da guarda e se já virou esquiva */
+  private zone = { id: -1, x: 0, t: 0, timer: 0, swiped: false };
   private stickId = -1;
   private ox = 0;
   private oy = 0;
@@ -48,6 +51,14 @@ export class TouchUI {
       <button class="tbtn ibtn t-isneak" data-act="special" aria-label="Andar na ponta dos pés (segurar)">PONTA</button>
       <button class="tbtn ibtn t-ileave" data-act="grenade" aria-label="Sair pela porta">SAIR</button>
       <button class="tbtn ibtn t-ilist" data-act="reload" aria-label="Lista de travessuras">LISTA</button>
+      <div class="mzone" aria-hidden="true"></div>
+      <button class="tbtn mbtn m-l1" data-m="jab" aria-label="Jab esquerdo">JAB</button>
+      <button class="tbtn mbtn m-l2" data-m="cruzE" aria-label="Cruzado esquerdo">CRUZADO</button>
+      <button class="tbtn mbtn m-l3" data-m="ganchoE" aria-label="Gancho esquerdo">GANCHO</button>
+      <button class="tbtn mbtn m-r1" data-m="direto" aria-label="Direto direito">DIRETO</button>
+      <button class="tbtn mbtn m-r2" data-m="cruzD" aria-label="Cruzado direito">CRUZADO</button>
+      <button class="tbtn mbtn m-r3" data-m="ganchoD" aria-label="Gancho direito">GANCHO</button>
+      <button class="tbtn mbtn m-sp hidden" data-m="especial" aria-label="Orelhada">ORELHADA!</button>
     `;
     parent.appendChild(this.root);
     this.stickZone = this.root.querySelector('.stick-zone') as HTMLElement;
@@ -55,12 +66,15 @@ export class TouchUI {
     this.knob = this.root.querySelector('.stick-knob') as HTMLElement;
     this.ghost = this.root.querySelector('.stick-ghost') as HTMLElement;
     this.root.querySelectorAll<HTMLElement>('.tbtn').forEach((el) => {
+      if (el.classList.contains('mbtn')) { this.bindMini(el, el.dataset.m as MiniButton); return; }
       if (el.classList.contains('ibtn')) { this.bindButton(el, el.dataset.act as ActionName); return; }
       this.buttons.set(el.dataset.act as ActionName, el);
       if (el.dataset.act === 'fire') this.bindFireStick(el);
       else this.bindButton(el, el.dataset.act as ActionName);
     });
     this.bindStick();
+    const mz = this.root.querySelector<HTMLElement>('.mzone');
+    if (mz) this.bindMiniZone(mz);
     // bloqueia gestos/menus nativos
     for (const ev of ['touchstart', 'touchmove', 'touchend', 'gesturestart', 'gesturechange', 'contextmenu', 'selectstart']) {
       this.root.addEventListener(ev, (e) => e.preventDefault(), { passive: false });
@@ -91,6 +105,26 @@ export class TouchUI {
     this.releaseAll();
   }
 
+  /**
+   * Minijogo: 'chase' mostra joystick + PULO (esconde FOGO, granada, recarga, troca e AGIR); 'boxing' esconde
+   * joystick e botões normais e mostra 3 botões de cada lado + a zona de gestos (esquiva/guarda).
+   * `null` restaura o layout anterior. Soltar tudo antes de trocar: nenhum dedo "herda" o botão novo.
+   */
+  setMinigame(mode: MiniMode | null) {
+    this.root.classList.toggle('mini-boxing', mode === 'boxing');
+    this.root.classList.toggle('mini-chase', mode === 'chase');
+    this.root.querySelector('.m-sp')?.classList.add('hidden');
+    this.releaseAll();
+  }
+
+  /** O botão ORELHADA! só aparece quando o jacaré está grogue. */
+  showSpecial(on: boolean) {
+    const b = this.root.querySelector<HTMLElement>('.m-sp');
+    if (!b) return;
+    b.classList.toggle('hidden', !on);
+    if (!on) { this.clearRelease('mini:especial'); this.input.touch.mini.especial = false; b.classList.remove('down'); delete b.dataset.pid; }
+  }
+
   /** O botão ESPECIAL só aparece quando o Nômad é pilotado. */
   setMounted(m: boolean) {
     this.root.classList.toggle('mounted', m);
@@ -101,10 +135,84 @@ export class TouchUI {
     this.input.state.device = 'touch';
   }
 
-  private clearRelease(act: ActionName) {
+  private clearRelease(act: string) {
     const timer = this.releaseTimers.get(act);
     if (timer !== undefined) window.clearTimeout(timer);
     this.releaseTimers.delete(act);
+  }
+
+  /** Botão do boxe: cada dedo é dono do seu botão; soltar um nunca solta o outro. */
+  private bindMini(el: HTMLElement, btn: MiniButton) {
+    const t = this.input.touch;
+    const key = 'mini:' + btn;
+    const down = (e: PointerEvent) => {
+      if (el.dataset.pid !== undefined) return;
+      this.clearRelease(key);
+      e.preventDefault();
+      this.input.haptic(0.25, 10);
+      try { el.setPointerCapture(e.pointerId); } catch { /* ok */ }
+      this.markActive();
+      this.input.onGesture?.();
+      t.mini[btn] = true;
+      el.classList.add('down');
+      el.dataset.pid = String(e.pointerId);
+    };
+    const up = (e: PointerEvent) => {
+      if (el.dataset.pid !== String(e.pointerId)) return;
+      e.preventDefault();
+      this.clearRelease(key);
+      delete el.dataset.pid;
+      el.classList.remove('down');
+      if (e.type !== 'pointerup') { t.mini[btn] = false; return; }
+      // um toque que cabe entre dois quadros ainda vale um golpe: pequena tolerância (só em toque concluído)
+      this.releaseTimers.set(key, window.setTimeout(() => {
+        this.releaseTimers.delete(key);
+        if (el.dataset.pid === undefined) t.mini[btn] = false;
+      }, 45));
+    };
+    el.addEventListener('pointerdown', down);
+    el.addEventListener('pointerup', up);
+    el.addEventListener('pointercancel', up);
+    el.addEventListener('lostpointercapture', up);
+  }
+
+  /** Zona central do boxe: deslizar ←/→ (≥ 40 px em ≤ 250 ms) = esquiva; segurar parado ≥ 180 ms = guarda. */
+  private bindMiniZone(el: HTMLElement) {
+    const t = this.input.touch, z = this.zone;
+    const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
+    const end = (e: PointerEvent) => {
+      if (e.pointerId !== z.id) return;
+      window.clearTimeout(z.timer);
+      z.id = -1;
+      t.mini.guarda = false;
+      el.classList.remove('down');
+    };
+    el.addEventListener('pointerdown', (e) => {
+      if (z.id !== -1) return;
+      e.preventDefault();
+      try { el.setPointerCapture(e.pointerId); } catch { /* ok */ }
+      this.markActive();
+      this.input.onGesture?.();
+      z.id = e.pointerId; z.x = e.clientX; z.t = now(); z.swiped = false;
+      z.timer = window.setTimeout(() => {
+        if (z.id !== -1 && !z.swiped) { t.mini.guarda = true; el.classList.add('down'); }
+      }, 180);
+    });
+    el.addEventListener('pointermove', (e) => {
+      if (e.pointerId !== z.id || z.swiped) return;
+      e.preventDefault();
+      const dx = e.clientX - z.x;
+      if (Math.abs(dx) >= 40 && now() - z.t <= 250) {
+        z.swiped = true;
+        window.clearTimeout(z.timer);
+        t.mini.guarda = false;
+        t.miniTaps.push(dx < 0 ? 'esqE' : 'esqD');
+        this.input.haptic(0.3, 12);
+      }
+    });
+    el.addEventListener('pointerup', end);
+    el.addEventListener('pointercancel', end);
+    el.addEventListener('lostpointercapture', end);
   }
 
   private finishPress(el: HTMLElement, act: ActionName, e: PointerEvent) {
@@ -341,6 +449,10 @@ export class TouchUI {
     const t = this.input.touch;
     this.input.clearTouchJump();
     for (const k of Object.keys(t.held) as ActionName[]) {this.clearRelease(k);t.held[k] = false;}
+    for (const b of MINI_BUTTONS) { this.clearRelease('mini:' + b); t.mini[b] = false; }
+    t.miniTaps.length = 0;
+    const z = this.zone; // (ausente em controles montados só para teste)
+    if (z) { window.clearTimeout(z.timer); z.id = -1; }
     t.stickX = t.stickY = 0;
     t.aimX = t.aimY = 0;
     this.stickId = -1;

@@ -14,6 +14,14 @@ export interface Btn {
   released: boolean;
 }
 
+/** Botões do boxe em 3ª pessoa (minijogo): 4 golpes de cada lado, esquivas, guarda e a ORELHADA. */
+export type MiniButton = 'jab' | 'cruzE' | 'ganchoE' | 'direto' | 'cruzD' | 'ganchoD' | 'esqE' | 'esqD' | 'guarda' | 'especial';
+export type MiniPad = Record<MiniButton, Btn>;
+export const MINI_BUTTONS: readonly MiniButton[] = ['jab', 'cruzE', 'ganchoE', 'direto', 'cruzD', 'ganchoD', 'esqE', 'esqD', 'guarda', 'especial'];
+export type MiniMode = 'boxing' | 'chase';
+const newMiniPad = (): MiniPad => Object.fromEntries(MINI_BUTTONS.map((b) => [b, { held: false, pressed: false, released: false }])) as MiniPad;
+const newMiniHeld = (): Record<MiniButton, boolean> => Object.fromEntries(MINI_BUTTONS.map((b) => [b, false])) as Record<MiniButton, boolean>;
+
 export interface TouchState {
   active: boolean; // controles de toque visíveis/em uso
   stickX: number;
@@ -22,6 +30,10 @@ export interface TouchState {
   aimX: number;
   aimY: number;
   held: Record<ActionName, boolean>;
+  /** minijogo de boxe: botões segurados pelo toque (cada dedo é dono do seu botão) */
+  mini: Record<MiniButton, boolean>;
+  /** esquivas por gesto (deslizar ←/→): bordas de um quadro, consumidas pelo poll */
+  miniTaps: MiniButton[];
 }
 
 export const newTouchState = (): TouchState => ({
@@ -31,6 +43,8 @@ export const newTouchState = (): TouchState => ({
   aimX: 0,
   aimY: 0,
   held: { jump: false, fire: false, grenade: false, special: false, next: false, prev: false, pause: false, reload:false, interact:false },
+  mini: newMiniHeld(),
+  miniTaps: [],
 });
 
 export interface ControlState {
@@ -51,6 +65,8 @@ export interface ControlState {
   pause: Btn;
   reload?: Btn;
   interact?: Btn;
+  /** Preenchido só quando `input.miniMode === 'boxing'`. */
+  mini?: MiniPad;
   device: 'kb' | 'touch' | 'pad';
 }
 
@@ -77,6 +93,24 @@ export class Input {
     device: 'kb',
   };
   readonly touch: TouchState = newTouchState();
+  /** Modo de minijogo ativo (muda o mapeamento de teclas/gamepad/toque); null = jogo normal. */
+  private _miniMode: MiniMode | null = null;
+  private miniPrev = newMiniHeld();
+  private miniSuppressed = new Set<MiniButton>();
+  get miniMode() { return this._miniMode; }
+  /**
+   * Entrar/sair de um minijogo: o que estava apertado precisa ser solto antes de valer (nada de golpe
+   * ou tiro "fantasma" ao trocar de modo) e as bordas pendentes são descartadas.
+   */
+  setMiniMode(mode: MiniMode | null) {
+    this._miniMode = mode;
+    this.state.mini = mode === 'boxing' ? newMiniPad() : undefined;
+    this.miniPrev = newMiniHeld();
+    this.miniSuppressed.clear();
+    this.touch.miniTaps.length = 0;
+    if (mode === 'boxing') for (const b of MINI_BUTTONS) if (this.touch.mini[b]) this.miniSuppressed.add(b);
+    this.suppressHeldActions();
+  }
 
   private keys = new Set<string>();
   /** Teclas fisicamente seguradas (sempre atualizado, mesmo com o jogo desligado ou depois de um reset). */
@@ -140,6 +174,13 @@ export class Input {
       if (this.state[action].held || this.touch.held[action]) this.suppressed.add(action);
       this.state[action].held = this.state[action].pressed = this.state[action].released = false;
     }
+    const mini = this.state.mini;
+    if (mini) for (const b of MINI_BUTTONS) {
+      if (mini[b].held || this.touch.mini[b]) this.miniSuppressed.add(b);
+      mini[b].held = mini[b].pressed = mini[b].released = false;
+      this.miniPrev[b] = false;
+    }
+    this.touch.miniTaps.length = 0;
   }
 
   private restoreHeldMovement() {
@@ -274,6 +315,14 @@ export class Input {
     raw.prev = this.k('KeyQ') || this.wheelPrev;
     raw.pause = this.k('Escape', 'KeyP');
     raw.reload=this.k('KeyR');raw.interact=this.k('KeyF');
+    // minijogo de boxe: teclas dos 6 golpes, esquivas, guarda e especial (lidas antes de limpar os toques de tecla)
+    const mraw = this._miniMode === 'boxing' ? newMiniHeld() : null;
+    if (mraw) {
+      mraw.jab = this.k('KeyQ'); mraw.cruzE = this.k('KeyW'); mraw.ganchoE = this.k('KeyE');
+      mraw.direto = this.k('KeyJ'); mraw.cruzD = this.k('KeyK'); mraw.ganchoD = this.k('KeyL');
+      mraw.esqE = this.k('KeyA', 'ArrowLeft'); mraw.esqD = this.k('KeyD', 'ArrowRight');
+      mraw.guarda = this.k('KeyS', 'ArrowDown'); mraw.especial = this.k('Space', 'Enter');
+    }
     this.keyTaps.clear();this.mouseTap=this.mouseRightTap=false;
     this.wheelNext = this.wheelPrev = false;
 
@@ -313,6 +362,14 @@ export class Input {
       raw.next = raw.next || b(5);
       raw.pause = raw.pause || b(9);
       raw.reload=raw.reload||b(11);raw.interact=raw.interact||b(8);
+      if (mraw) {
+        mraw.jab = mraw.jab || b(2); mraw.direto = mraw.direto || b(3);
+        mraw.cruzE = mraw.cruzE || b(4); mraw.cruzD = mraw.cruzD || b(5);
+        mraw.ganchoE = mraw.ganchoE || b(6); mraw.ganchoD = mraw.ganchoD || b(7);
+        mraw.esqE = mraw.esqE || dpadL || ax < -0.55; mraw.esqD = mraw.esqD || dpadR || ax > 0.55;
+        mraw.guarda = mraw.guarda || dpadD || ay > 0.55;
+        mraw.especial = mraw.especial || b(0);
+      }
       const rx = gp.axes[2] ?? 0;
       const ry = gp.axes[3] ?? 0;
       if (Math.hypot(rx, ry) > 0.45) padAim = { x: rx, y: ry };
@@ -330,7 +387,10 @@ export class Input {
       for (const a of ACTIONS) raw[a] = raw[a] || t.held[a];
       raw.jump = raw.jump || jumpTap;
       s.device = 'touch';
+      if (mraw) for (const b of MINI_BUTTONS) mraw[b] = mraw[b] || t.mini[b];
     }
+    // esquivas por gesto: a borda de um quadro (cada gesto vira um aperto, mesmo que caiba entre dois polls)
+    const gestures = mraw ? t.miniTaps.splice(0) : (t.miniTaps.length = 0, null);
 
     s.moveX = Math.max(-1, Math.min(1, mx));
     s.moveY = Math.max(-1, Math.min(1, my));
@@ -381,6 +441,22 @@ export class Input {
       break;
     }
     this.padMenuHeld = menuKeys;
+    // ---- minijogo: bordas dos botões (cada um com a sua supressão)
+    const mini = s.mini;
+    if (mini && mraw) {
+      for (const b of this.miniSuppressed) {
+        if (!mraw[b]) this.miniSuppressed.delete(b);
+        else mraw[b] = false;
+      }
+      for (const b of MINI_BUTTONS) {
+        const tap = !!gestures && gestures.includes(b);
+        const now = mraw[b] || tap;
+        mini[b].held = now;
+        mini[b].pressed = now && (!this.miniPrev[b] || tap);
+        mini[b].released = !now && this.miniPrev[b];
+        this.miniPrev[b] = now;
+      }
+    }
   }
 
   /** Limpa bordas após o primeiro substep de simulação do frame. */
@@ -389,6 +465,8 @@ export class Input {
       this.state[a].pressed = false;
       this.state[a].released = false;
     }
+    const mini = this.state.mini;
+    if (mini) for (const b of MINI_BUTTONS) { mini[b].pressed = false; mini[b].released = false; }
   }
 
   /** Vibração curta: celular (navigator.vibrate) e gamepad (rumble). */

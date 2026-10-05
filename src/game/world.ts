@@ -26,6 +26,7 @@ import { Narrator } from './narrator';
 import { music, JUNGLE_MELODY, STAGE_MELODY } from '../core/music';
 import { Waters } from './water';
 import { LakeMap } from './lake/lakeMap';
+import type { MinigameId, MinigameResult } from './minigames/types';
 import { ThinkerScene } from './lake/thinkerReveal';
 import { piranhasAggro } from './enemies/piranha';
 import { JungleWildlife } from './wildlife';
@@ -69,6 +70,10 @@ export interface Hooks {
   onWeaponAcquired?: (id: WeaponId) => void;
   onRespawn?: () => void;
   onBanner?: (title: string, sub?: string, dur?: number) => void;
+  /** o mundo pede um minijogo (o Game atende: íris, carregamento sob demanda, sessão); `done` recebe o resultado */
+  onMinigame?: (id: MinigameId, done: (r: MinigameResult) => void) => void;
+  /** pré-busca silenciosa do módulo do minijogo (jogador chegando perto do gatilho) */
+  onMinigamePrefetch?: (id: MinigameId) => void;
   onComplete?: () => void;
   onMusic?: (s: MusicState) => void;
   onHint?: (key: string) => void;
