@@ -104,6 +104,36 @@ export function drawSpr(g: CanvasRenderingContext2D, spr: Sprite, x: number, y: 
   if (o.alpha !== undefined) g.globalAlpha = prevA;
 }
 
+/**
+ * Sprite MUITO reduzido (ícones do HUD): usa uma cópia reduzida uma única vez com filtro de alta
+ * qualidade e a desenha ~1:1 no canvas principal, que usa suavização 'low' (sem mipmaps por quadro).
+ * `deviceScale` = px de tela por unidade lógica na escala alvo.
+ */
+const shrunkCache = new WeakMap<HTMLCanvasElement, Map<number, HTMLCanvasElement>>();
+export function drawSprShrunk(g: CanvasRenderingContext2D, spr: Sprite, x: number, y: number, s: number, deviceScale: number) {
+  const w = spr.w * s;
+  const h = spr.h * s;
+  const pw = Math.max(1, Math.round(w * deviceScale));
+  const ph = Math.max(1, Math.round(h * deviceScale));
+  let src = spr.c;
+  if (pw < spr.c.width * 0.8) {
+    let m = shrunkCache.get(spr.c);
+    if (!m) shrunkCache.set(spr.c, (m = new Map()));
+    const key = pw * 65536 + ph;
+    let c = m.get(key);
+    if (!c) {
+      c = makeCanvas(pw, ph);
+      const cg = c.getContext('2d')!;
+      cg.imageSmoothingEnabled = true;
+      cg.imageSmoothingQuality = 'high';
+      cg.drawImage(spr.c, 0, 0, pw, ph);
+      m.set(key, c);
+    }
+    src = c;
+  }
+  g.drawImage(src, x - spr.ox * s, y - spr.oy * s, w, h);
+}
+
 // ------------------------------------------------------------------ paths e estilo
 export function rrPath(g: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
   const rr = Math.min(r, w / 2, h / 2);

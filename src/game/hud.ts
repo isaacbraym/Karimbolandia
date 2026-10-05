@@ -2,7 +2,7 @@ import { MAX_LIVES, COMBO_WINDOW, comboMult, type World } from './world';
 import { getArt } from '../art';
 import { WEAPON_ORDER, WEAPONS } from './weapons';
 import { clamp, easeOutBack, formatTime } from '../core/math';
-import { drawSpr } from '../art/kit';
+import { drawSpr, drawSprShrunk } from '../art/kit';
 import type { Felipao } from './enemies/felipao';
 import { coinBalance } from '../core/skins';
 
@@ -331,7 +331,7 @@ export class Hud {
     for (let i = 0; i < nLives; i++) {
       const on = i < w.lives;
       g.globalAlpha = on ? 1 : 0.22;
-      drawSpr(g, pr, L + 68 + i * 19, T + 62, { sx: 0.32, sy: 0.32 });
+      drawSprShrunk(g, pr, L + 68 + i * 19, T + 62, 0.32, textScale);
     }
     g.globalAlpha = 1;
     // barra de vida (5 segmentos de 20)
@@ -422,11 +422,7 @@ export class Hud {
         pill(g, ix, by + 14, 24, 22, 5, cur ? 'rgba(255,210,58,0.28)' : 'rgba(23,15,46,0.6)', cur ? '#ffd23a' : 'rgba(255,255,255,0.12)');
         const k = Math.min(0.9, 20 / spr.w);
         g.globalAlpha = empty ? 0.28 : 1;
-        g.save();
-        g.translate(ix + 12 - (spr.w / 2 - spr.ox) * k, by + 25);
-        g.scale(k, k);
-        g.drawImage(spr.c, -spr.ox, -spr.oy, spr.w, spr.h);
-        g.restore();
+        drawSprShrunk(g, spr, ix + 12 - (spr.w / 2 - spr.ox) * k, by + 25, k, textScale);
         g.globalAlpha = 1;
         if (empty) {
           g.strokeStyle = '#ff6a6a';
@@ -517,12 +513,12 @@ export class Hud {
     pill(g, cx - cw / 2, T, cw, 26, 8, 'rgba(23,15,46,0.72)', 'rgba(255,255,255,0.16)');
     drawSpr(g, art.pickups.token, cx - cw / 2 + 14, T + 13, { sx: 0.85, sy: 0.85 });
     numText(g, 'tokens', coinBalance(), fmtInt, cx - cw / 2 + 26, T + 19, 15, '#ffe27a');
-    drawSpr(g, art.pickups.emblem, cx + 2, T + 13, { sx: 0.55, sy: 0.55 });
+    drawSprShrunk(g, art.pickups.emblem, cx + 2, T + 13, 0.55, textScale);
     numText(g, 'emblems', w.emblems.size, fmtEmblems, cx + 14, T + 19, 15, '#ffffff');
     for (let i = 0; i < 3; i++) {
       const got = w.secrets.has(i);
       g.globalAlpha = got ? 1 : 0.28;
-      drawSpr(g, art.pickups.secret, cx + 62 + i * 13, T + 13, { sx: 0.34, sy: 0.34 });
+      drawSprShrunk(g, art.pickups.secret, cx + 62 + i * 13, T + 13, 0.34, textScale);
     }
     g.globalAlpha = 1;
     // pontuação e tempo (lado direito, abaixo do botão de pausa)

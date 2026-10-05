@@ -40,6 +40,11 @@ import { InteriorFlow } from './interiorFlow';
 type State = 'loading' | 'menu' | 'playing' | 'paused' | 'complete' | 'continue' | 'gameover' | 'comic';
 
 const CONTINUE_SECS = 10;
+/**
+ * Piso da resolução dinâmica. A arte é assada em 3× e o canvas usa suavização 'low' (sem mipmaps):
+ * abaixo de ~0,75 os sprites ficariam reduzidos a menos de 0,5× e serrilhariam.
+ */
+const DRS_MIN = 0.75;
 
 /** resolução do fundo distante (fração da tela) por qualidade */
 const BG_RES: Record<Quality, number> = { low: 0.55, medium: 0.65, high: 1 };
@@ -105,7 +110,7 @@ export class Game {
   private opening = new OpeningOverlay();
   /** a abertura narrada só passa no começo de uma partida nova (não em QA com teleporte) */
   private noOpening = new URLSearchParams(location.search).has('tp');
-  /** resolução dinâmica: fração da resolução alvo (0.6..1) — cai antes de qualquer efeito ser cortado */
+  /** resolução dinâmica: fração da resolução alvo (DRS_MIN..1) — cai antes de qualquer efeito ser cortado */
   renderScale = 1;
   private drsAcc = 0;
   private drsN = 0;
@@ -955,8 +960,10 @@ export class Game {
       this.frames = 0;
       this.lastFpsUpdate = now;
     }
+    // Intervalo real desde o quadro anterior, inclusive pausas >250 ms (a física usa o dt protegido).
+    const rawMs = Number.isFinite(this.pacer.raw) ? this.pacer.raw : frameMs;
     const focused = document.hasFocus();
-    if (focused) this.autoQuality(dt, now);
+    if (focused) this.autoQuality(rawMs / 1000, now);
     else { this.drsAcc = this.drsN = 0; this.frameTimes.length = 0; this.metrics?.inactive(); }
     this.input.poll();
     const w = this.world;
@@ -1009,7 +1016,7 @@ export class Game {
     this.prof.update += (t1 - t0 - this.prof.update) * 0.05;
     this.prof.render += (t2 - t1 - this.prof.render) * 0.05;
     if (focused && this.state === 'playing' && w && !this.orientationBlocked) {
-      this.metrics?.sample(frameMs, t1 - t0, t2 - t1, now, `Fase ${w.data.stage} • ${this.quality} • ${this.canvas.width}×${this.canvas.height}\nalvo 60 • DPR ${window.devicePixelRatio||1} • resolução ${(this.renderScale * 100).toFixed(0)}%`);
+      this.metrics?.sample(rawMs, t1 - t0, t2 - t1, now, `Fase ${w.data.stage} • ${this.quality} • ${this.canvas.width}×${this.canvas.height}\nalvo 60 • DPR ${window.devicePixelRatio||1} • resolução ${(this.renderScale * 100).toFixed(0)}%`);
     }
   }
 
@@ -1160,7 +1167,7 @@ export class Game {
 
   /**
    * Resolução dinâmica (como nos consoles): se o quadro passa de ~21 ms, reduz a resolução interna
-   * em passos de 10% (até 60%); quando sobra folga por alguns segundos, sobe de novo. Todos os
+   * em passos de 10% (até DRS_MIN); quando sobra folga por alguns segundos, sobe de novo. Todos os
    * efeitos continuam ligados — só a nitidez varia, e pouco.
    */
   private dynamicResolution(dt: number) {
@@ -1173,7 +1180,7 @@ export class Game {
     if (this.drsAcc < 0.75) return;
     const avg = this.drsAcc / this.drsN;
     this.drsAcc = this.drsN = 0;
-    const minScale = 0.5;
+    const minScale = DRS_MIN;
     if (avg > 1 / 47 && this.renderScale > minScale + 0.01) {
       // lentidão clara (abaixo de ~40 fps) baixa já na primeira janela e em passo maior
       if (++this.drsBad >= (avg > 1 / 40 ? 1 : 2)) {
@@ -1198,11 +1205,11 @@ export class Game {
   private autoQuality(dt: number, now: number) {
     this.dynamicResolution(dt);
     // só troca a qualidade se nem a resolução mínima der conta
-    if (settings.quality !== 'auto' || this.state !== 'playing' || this.renderScale > 0.51) {
+    if (settings.quality !== 'auto' || this.state !== 'playing' || this.renderScale > DRS_MIN + 0.01) {
       this.frameTimes.length = 0;
       return;
     }
-    this.frameTimes.push(dt);
+    this.frameTimes.push(Math.min(dt, 0.1));
     if (this.frameTimes.length > 120) this.frameTimes.shift();
     if (now - this.lastQualityCheck < 2000 || this.frameTimes.length < 60) return;
     this.lastQualityCheck = now;
@@ -1223,7 +1230,11 @@ export class Game {
     const k = this.pxScale;
     g.setTransform(k, 0, 0, k, 0, 0);
     g.imageSmoothingEnabled = true;
-    g.imageSmoothingQuality = 'medium';
+    // 'low' = bilinear sem mipmaps. Com 'medium', cada canvas desenhado reduzido exige mipmaps: o Skia
+    // copia a textura inteira e regenera os níveis A CADA QUADRO (GrGpu::copySurface +
+    // regenerateMipMapLevels no processo de GPU). A arte é assada em 3× e desenhada a ~0,55–1×, onde
+    // o bilinear é visualmente igual; ícones muito reduzidos do HUD usam drawSprShrunk (kit.ts).
+    g.imageSmoothingQuality = 'low';
     const W = this.viewW;
     const H = this.viewH;
     if (!artReady()) {
