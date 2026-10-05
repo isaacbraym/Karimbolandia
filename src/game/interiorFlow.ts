@@ -232,12 +232,22 @@ export class InteriorFlow {
   }
 
   // ─────────────── ponteiro ───────────────
+  /** Tela (clientX/Y) → coordenadas lógicas do quadro. */
+  private toView(clientX: number, clientY: number) {
+    const r = localRect(this.host.canvas), p = toLocal(clientX, clientY), { W, H } = this.host.view();
+    return { x: ((p.x - r.left) / r.width) * W, y: ((p.y - r.top) / r.height) * H };
+  }
+
+  /** Toque curto vindo da zona do joystick (que fica por cima do canvas): age como toque no cômodo. */
+  tapAt(clientX: number, clientY: number) {
+    if (!this.session || this.phase !== 'live') return;
+    const q = this.toView(clientX, clientY);
+    this.session.pointer({ type: 'tap', x: q.x, y: q.y, touch: true });
+  }
+
   private attachPointer(): () => void {
     const c = this.host.canvas;
-    const conv = (e: PointerEvent | MouseEvent) => {
-      const r = localRect(c), p = toLocal(e.clientX, e.clientY), { W, H } = this.host.view();
-      return { x: ((p.x - r.left) / r.width) * W, y: ((p.y - r.top) / r.height) * H };
-    };
+    const conv = (e: PointerEvent | MouseEvent) => this.toView(e.clientX, e.clientY);
     const send = (type: PointerEv['type'], e: PointerEvent | MouseEvent, touch: boolean) => {
       if (!this.session) return;
       const q = conv(e);

@@ -139,7 +139,12 @@ export class Game {
     this.base = base;
     const app = document.getElementById('app') as HTMLElement;
     this.input.attach(app);
+    // Toques que chegam ao canvas (fora dos controles) não podem virar clique de mouse "fantasma":
+    // o navegador gera mousedown/click depois do toque, e isso era lido como tiro. Os eventos de
+    // ponteiro do toque (usados no interior) continuam chegando normalmente.
+    for (const ev of ['touchstart', 'touchend'] as const) this.canvas.addEventListener(ev, (e) => e.preventDefault(), { passive: false });
     this.touch = new TouchUI(this.ui, this.input);
+    this.touch.onInteriorTap = (x, y) => this.flow.tapAt(x, y);
     this.flow = new InteriorFlow({
       canvas: this.canvas, input: this.input, quality: () => this.quality, view: () => ({ W: this.viewW, H: this.viewH }),
       touchMode: (on) => this.touch.setInterior(on),

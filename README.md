@@ -65,7 +65,7 @@ O endereço anterior continua funcionando. A v5 aproveita o progresso já salvo 
 
 ### Dentro das casas (interiores isométricos)
 
-Na fase 2, a **Palafita do vigia** (primeira cabana mercenária) e a **Casa da Dona Benedita** (primeira casa da aldeia) abrem um modo próprio: o Karimbo anda por uma grade isométrica 2:1 (sem pular, voar nem atirar), usa os móveis, come, pega ou rouba, derruba e fuça. Chegue na porta com a área livre de inimigos e aperte `F` (ou **ENTRAR**).
+Na fase 2, a **Palafita do vigia** (primeira cabana mercenária) e a **Casa da Dona Benedita** (primeira casa da aldeia) abrem um modo próprio: o Karimbo anda livre pelo cômodo isométrico 2:1 com o mesmo analógico esquerdo do jogo (sem pular, voar nem atirar), usa os móveis, come, pega ou rouba, derruba e fuça. Chegue na porta com a área livre de inimigos e aperte `F` (ou **ENTRAR**). O cômodo ocupa a tela toda; quando ele é mais alto que a tela, a câmera acompanha o Karimbo.
 
 * **Ruído e olhares:** cada ação mostra ondas de ruído e um olho se alguém vai ver; vermelho irrita o morador. O mercenário dorme (sono 0–100) e a moradora volta da roça no meio da visita, com uma suspeita 0–100 que a reputação na aldeia multiplica.
 * **Travessuras:** cada casa tem uma lista (papel no canto). Completar tudo dá o carimbo **KARIMBADO!**; a estrela dourada exige não acordar o Cabo / não ser expulso.
@@ -74,9 +74,9 @@ Na fase 2, a **Palafita do vigia** (primeira cabana mercenária) e a **Casa da D
 
 | Ação no interior | Teclado / mouse | Celular | Gamepad |
 |---|---|---|---|
-| Andar | clicar no chão · `WASD`/setas (relativas à tela) | tocar no chão | analógico esq. |
-| Escolher objeto / verbo | passar o mouse · `E` `Q` / roda | tocar no objeto | LB / RB |
-| Abrir o menu / confirmar | clique · `ESPAÇO` ou `F` | tocar na fatia | A / Select |
+| Andar | `WASD`/setas (relativas à tela) · clicar no chão | **joystick** (livre, em qualquer direção) · tocar no chão | analógico esq. |
+| Escolher objeto / verbo | passar o mouse · `E` `Q` / roda | o mais perto fica destacado · tocar no objeto | LB / RB |
+| Abrir o menu / confirmar | clique · `ESPAÇO` ou `F` | **AGIR** · tocar na fatia | A / Select |
 | Examinar rápido | botão direito · `J` | toque longo | X |
 | Ponta dos pés (segurar) | `SHIFT` | **PONTA** | Y |
 | Fechar menu / sair pela porta | `G` | **SAIR** | B |

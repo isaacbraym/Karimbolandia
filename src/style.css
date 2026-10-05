@@ -692,6 +692,11 @@ kbd {
 .touch > * {
   pointer-events: auto;
 }
+/* A camada de toque cobre a tela inteira: só os controles recebem toques; o resto vai para o canvas
+   (no interior, tocar no chão/objetos). Sem isto, `#ui > *` deixava a camada inteira engolir os toques. */
+#ui > .touch {
+  pointer-events: none;
+}
 .stick-zone {
   position: absolute;
   left: 0;
@@ -855,9 +860,10 @@ kbd {
 .t-reload.reloading::after {content:'';position:absolute;inset:-4px;border-radius:50%;pointer-events:none;background:conic-gradient(#85e1d1 calc(var(--reload,0) * 360deg),rgba(255,255,255,.12) 0);-webkit-mask:radial-gradient(circle,transparent 60%,#000 63%);mask:radial-gradient(circle,transparent 60%,#000 63%);}
 .touch.mounted .t-reload {display:none;}
 .touch .ibtn { display: none; }
-.touch.interior > *:not(.ibtn):not(.t-pause) { display: none !important; }
+.touch.interior > *:not(.ibtn):not(.t-pause):not(.stick-zone) { display: none !important; }
 .touch.interior .ibtn { display: flex; }
-.t-isneak { right: calc(var(--sar) + 20px * var(--ts)); bottom: calc(var(--sab) + 26px * var(--ts)); width: calc(78px * var(--ts)); height: calc(78px * var(--ts)); font-size: calc(12px * var(--ts)); background: radial-gradient(circle at 35% 30%, rgba(255,255,255,calc(var(--to) * .4)), rgba(90,200,170,calc(var(--to) * .7)) 72%); }
+.t-iact { right: calc(var(--sar) + 20px * var(--ts)); bottom: calc(var(--sab) + 26px * var(--ts)); width: calc(82px * var(--ts)); height: calc(82px * var(--ts)); font-size: calc(14px * var(--ts)); background: radial-gradient(circle at 35% 30%, rgba(255,255,255,calc(var(--to) * .45)), rgba(255,196,80,calc(var(--to) * .75)) 72%); }
+.t-isneak { right: calc(var(--sar) + 32px * var(--ts)); bottom: calc(var(--sab) + 122px * var(--ts)); width: calc(60px * var(--ts)); height: calc(60px * var(--ts)); font-size: calc(11px * var(--ts)); background: radial-gradient(circle at 35% 30%, rgba(255,255,255,calc(var(--to) * .4)), rgba(90,200,170,calc(var(--to) * .7)) 72%); }
 .t-ileave { right: calc(var(--sar) + 112px * var(--ts)); bottom: calc(var(--sab) + 18px * var(--ts)); width: calc(58px * var(--ts)); height: calc(58px * var(--ts)); font-size: calc(11px * var(--ts)); }
 .t-ilist { right: calc(var(--sar) + 62px); top: calc(var(--sat) + 8px); width: 46px; height: 38px; border-radius: 12px; font-size: 10px; }
 .t-merchant {left:50%;bottom:calc(var(--sab) + 8px);transform:translateX(-50%);width:102px;height:40px;border-radius:12px;font-size:12px;}

@@ -32,7 +32,7 @@ const easeOutBack = (t: number) => { const c1 = 1.70158, c3 = c1 + 1; return 1 +
 const clamp01 = (x: number) => (x < 0 ? 0 : x > 1 ? 1 : x);
 
 export class InteriorRenderer {
-  readonly shell: Shell;
+  shell: Shell;
   readonly w: number;
   readonly h: number;
   readonly particles = new Particles();
@@ -41,6 +41,10 @@ export class InteriorRenderer {
   private backdrop: HTMLCanvasElement | null;
   private lw = 0; private lh = 0;
   s = 1; ox = 0; oy = 0;
+  /** faixa vertical da câmera (a sala pode ser mais alta que a tela) e posição suavizada */
+  private oyMin = 0; private oyMax = 0; private camOy = NaN; private lastT = -1;
+  /** escala de assar móveis/casca: acompanha s × pxScale para a sala ampliada não borrar */
+  private bake = BAKE;
   private items: Item[] = [];
   private tmp: [number, number] = [0, 0];
   readonly quality: Quality;
@@ -76,10 +80,17 @@ export class InteriorRenderer {
     this.lw = W; this.lh = H;
     const bw = (this.w + this.h) * TW / 2 + 28, bh = WALL_H + (this.w + this.h) * TH / 2 + SLAB + 14;
     const top = 24, bottom = 34;
-    this.s = Math.max(0.5, Math.min((W - 24) / bw, (H - top - bottom) / bh, 1.6));
-    const cx = W / 2 + (this.w - this.h) * TW / 4 * this.s * 0.0;
-    this.ox = cx - ((this.w - this.h) * TW / 4) * this.s;
-    this.oy = top + (H - top - bottom - bh * this.s) / 2 + (WALL_H + 10) * this.s;
+    // Tela cheia: a sala ocupa quase toda a largura e o piso ocupa a altura; o alto das paredes pode
+    // passar da borda (até 80% delas) e a câmera acompanha o Karimbo na vertical, dentro da sala.
+    const contain = Math.min((W - 24) / bw, (H - top - bottom) / bh);
+    const fill = Math.min((W - 16) / bw, (H - 12) / (bh - WALL_H * 0.8));
+    this.s = Math.max(0.5, Math.min(Math.max(contain, fill), 2.4));
+    this.ox = W / 2 - ((this.w - this.h) * TW / 4) * this.s;
+    const head = (WALL_H + 10) * this.s, ch = bh * this.s;
+    if (ch <= H - top - bottom) this.oyMin = this.oyMax = top + (H - top - bottom - ch) / 2 + head;
+    else { this.oyMin = H - 6 - ch + head; this.oyMax = 6 + head; }
+    this.camOy = NaN;
+    this.oy = (this.oyMin + this.oyMax) / 2;
     if (!this.vignette) {
       this.vignette = makeCanvas(Math.max(2, Math.round(W)), Math.max(2, Math.round(H)));
       InteriorRenderer.alive++;
@@ -170,18 +181,18 @@ export class InteriorRenderer {
     let spr: Spr;
     if (f.wall) {
       const w = f.wall.w + 8, h = f.wall.h + 8;
-      const c = makeCanvas(Math.ceil(w * BAKE), Math.ceil(h * BAKE));
+      const c = makeCanvas(Math.ceil(w * this.bake), Math.ceil(h * this.bake));
       const g = c.getContext('2d')!;
-      g.scale(BAKE, BAKE); g.translate(w / 2, h - 4);
+      g.scale(this.bake, this.bake); g.translate(w / 2, h - 4);
       g.lineJoin = 'round'; g.lineCap = 'round';
       painterOf(f.paint).base(g, f, key);
       spr = { key, c, ox: w / 2, oy: h - 4, w, h };
     } else {
       const span = f.w + f.h, hz = heightOf(f);
       const hw = span * TW / 4 + 16, up = hz + span * TH / 4 + 22, down = span * TH / 4 + 14;
-      const c = makeCanvas(Math.ceil(hw * 2 * BAKE), Math.ceil((up + down) * BAKE));
+      const c = makeCanvas(Math.ceil(hw * 2 * this.bake), Math.ceil((up + down) * this.bake));
       const g = c.getContext('2d')!;
-      g.scale(BAKE, BAKE); g.translate(hw, up);
+      g.scale(this.bake, this.bake); g.translate(hw, up);
       g.lineJoin = 'round'; g.lineCap = 'round';
       painterOf(f.paint).base(g, f, key);
       spr = { key, c, ox: hw, oy: up, w: hw * 2, h: up + down };
@@ -195,6 +206,8 @@ export class InteriorRenderer {
   draw(g: CanvasRenderingContext2D, W: number, H: number, t: number, st: SceneState) {
     if (this.disposed) return;
     this.fit(W, H);
+    this.ensureBake(g);
+    this.follow(t);
     const sim = this.sim, s = this.s, sh = this.shell;
     // fundo: memória desfocada do mundo, escurecida
     g.fillStyle = '#0d0a16';
@@ -211,7 +224,7 @@ export class InteriorRenderer {
     if (asm <= 0.001) return;
     // origem da casca na tela
     const bx = this.ox - sh.ox * s, by = this.oy - sh.oy * s;
-    const bw = sh.floor.width / BAKE * s, bh = sh.floor.height / BAKE * s;
+    const bw = sh.w * s, bh = sh.h * s;
     g.imageSmoothingEnabled = true;
     // piso (cascata diagonal na montagem)
     if (asm >= 0.999) g.drawImage(sh.floor, bx, by, bw, bh);
@@ -242,6 +255,29 @@ export class InteriorRenderer {
     this.lights(g, t);
     for (const p of st.pops) drawPop(g, p);
     if (this.vignette) g.drawImage(this.vignette, 0, 0, W, H);
+  }
+
+  /** Câmera vertical: mantém o Karimbo um pouco abaixo do centro, sem mostrar além da sala. */
+  private follow(t: number) {
+    const dt = this.lastT < 0 ? 0 : Math.min(0.1, Math.max(0, t - this.lastT));
+    this.lastT = t;
+    if (this.oyMin >= this.oyMax) { this.oy = this.oyMax; this.camOy = this.oy; return; }
+    const target = Math.min(this.oyMax, Math.max(this.oyMin, this.lh * 0.56 - (this.sim.px + this.sim.py) * TH / 2 * this.s));
+    this.camOy = Number.isFinite(this.camOy) && dt > 0 ? this.camOy + (target - this.camOy) * (1 - Math.exp(-dt * 5)) : target;
+    this.oy = this.camOy;
+  }
+
+  /** Reassa casca e móveis quando a escala real da tela pede mais (ou menos) resolução. */
+  private ensureBake(g: CanvasRenderingContext2D) {
+    const dev = Math.abs(g.getTransform?.().a ?? 1) || 1;
+    const want = Math.max(BAKE, Math.min(4, Math.ceil(this.s * dev - 0.2)));
+    if (want === this.bake) return;
+    this.bake = want;
+    this.shell.floor.width = this.shell.floor.height = 0;
+    this.shell.walls.width = this.shell.walls.height = 0;
+    this.shell = bakeShell(this.sim.room, want);
+    for (const sp of this.sprites.values()) { sp.c.width = 0; sp.c.height = 0; InteriorRenderer.alive--; }
+    this.sprites.clear();
   }
 
   private floorCascade(g: CanvasRenderingContext2D, bx: number, by: number, bw: number, bh: number, asm: number) {

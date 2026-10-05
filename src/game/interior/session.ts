@@ -174,7 +174,7 @@ export class InteriorSession {
   private setHint(text: string, secs: number, nextStep?: number) { this.ui.hint = text; this.ui.hintT = secs; if (nextStep) this.tutorialStep = nextStep; }
 
   private hintText(step: number, device: string): string {
-    if (step === 1) return device === 'touch' ? 'Toque no chão para andar e num objeto para ver o que dá para fazer.'
+    if (step === 1) return device === 'touch' ? 'Joystick anda livre pela casa · AGIR mexe no objeto destacado · tocar no chão ou num objeto também vale.'
       : device === 'pad' ? 'Analógico anda · LB/RB escolhe objeto · A age · B sai pela porta.'
       : 'Clique no chão para andar e num objeto para agir. Setas/WASD também andam · Espaço age · G sai.';
     if (step === 3) return device === 'touch' ? 'Segure PONTA para andar sem fazer barulho.' : 'Segure SHIFT para andar na ponta dos pés: bem menos barulho.';
@@ -261,15 +261,17 @@ export class InteriorSession {
     }
     this.padHeld.x = this.padHeld.y = 0;
     if (ctl.reload?.pressed) { ui.list = !ui.list; audio.play('uiClick', 0.4); }
-    this.moveX = ctl.moveX; this.moveY = ctl.moveY;
+    // toque: vetor bruto do joystick (no jogo lateral o eixo X do toque é digital); o joystick já tem zona morta
+    this.moveX = ctl.device === 'touch' ? ctl.aimVecX : ctl.moveX; this.moveY = ctl.moveY;
     const reach = sim.reachable();
     const usePointer = this.pointerAge < 2.5 && this.dev(ctl) === 'kb';
     if (!reach.some((f) => f.id === this.kbSel)) this.kbSel = reach[0]?.id ?? null;
     if (ctl.next.pressed && reach.length) { const i = reach.findIndex((f) => f.id === this.kbSel); this.kbSel = reach[(i + 1) % reach.length].id; audio.play('uiClick', 0.2); }
     if (ctl.prev.pressed && reach.length) { const i = reach.findIndex((f) => f.id === this.kbSel); this.kbSel = reach[(i - 1 + reach.length) % reach.length].id; audio.play('uiClick', 0.2); }
-    this.scene.selFid = this.dev(ctl) === 'touch' ? null : (usePointer ? this.hoverFid : this.kbSel);
-    ui.hoverFid = usePointer ? this.hoverFid : (this.dev(ctl) === 'touch' ? null : this.kbSel);
-    ui.hoverName = usePointer ? ui.hoverName : (this.dev(ctl) === 'touch' ? '' : (sim.furnById.get(this.kbSel ?? '')?.name ?? ''));
+    // no celular também destaca o objeto mais perto: é nele que o botão AGIR mexe
+    this.scene.selFid = usePointer ? this.hoverFid : this.kbSel;
+    ui.hoverFid = usePointer ? this.hoverFid : this.kbSel;
+    ui.hoverName = usePointer ? ui.hoverName : (sim.furnById.get(this.kbSel ?? '')?.name ?? '');
     if (accept && this.kbSel) { const f = sim.furnById.get(this.kbSel); if (f) this.openMenu(f); }
     else if (ctl.fire.pressed && this.kbSel) { const f = sim.furnById.get(this.kbSel); if (f) this.quickExamine(f); }
     else if (ctl.grenade.pressed) { if (!sim.leave()) sim.say('Daqui não dá para sair.', 'karimbo', 1.6); else this.scene.dest = sim.room.door; }

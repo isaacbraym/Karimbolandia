@@ -44,6 +44,7 @@ export class TouchUI {
       <button class="tbtn t-pause" data-act="pause" aria-label="Pausar">${ICONS.pause}</button>
       <button class="tbtn t-reload" data-act="reload" aria-label="Recarregar arma">↻</button>
       <button class="tbtn t-merchant hidden" data-act="interact" aria-label="Conversar com o mercador">OFICINA</button>
+      <button class="tbtn ibtn t-iact" data-act="interact" aria-label="Mexer no objeto destacado">AGIR</button>
       <button class="tbtn ibtn t-isneak" data-act="special" aria-label="Andar na ponta dos pés (segurar)">PONTA</button>
       <button class="tbtn ibtn t-ileave" data-act="grenade" aria-label="Sair pela porta">SAIR</button>
       <button class="tbtn ibtn t-ilist" data-act="reload" aria-label="Lista de travessuras">LISTA</button>
@@ -81,7 +82,10 @@ export class TouchUI {
     if (!v) this.releaseAll();
   }
 
-  /** Interior isométrico: some o joystick/tiro e aparecem PONTA, SAIR e LISTA. */
+  /** Toque curto na zona do joystick dentro do interior: vira toque no cômodo (objeto/chão). */
+  onInteriorTap: ((clientX: number, clientY: number) => void) | null = null;
+
+  /** Interior isométrico: o joystick continua andando; tiro e pulo dão lugar a AGIR, PONTA, SAIR e LISTA. */
   setInterior(on: boolean) {
     this.root.classList.toggle('interior', on);
     this.releaseAll();
@@ -211,9 +215,12 @@ export class TouchUI {
 
   private bindStick() {
     const z = this.stickZone;
+    // toque curto e parado (no interior) não é joystick: é um toque no cômodo por baixo da zona
+    let downAt = 0, downX = 0, downY = 0, travel = 0;
     z.addEventListener('pointerdown', (e) => {
       if (this.stickId !== -1) return;
       e.preventDefault();
+      downAt = performance.now(); downX = e.clientX; downY = e.clientY; travel = 0;
       this.markActive();
       this.input.onGesture?.();
       try {
@@ -238,12 +245,14 @@ export class TouchUI {
     z.addEventListener('pointermove', (e) => {
       if (e.pointerId !== this.stickId) return;
       e.preventDefault();
+      travel = Math.max(travel, Math.hypot(e.clientX - downX, e.clientY - downY));
       const p1 = toLocal(e.clientX, e.clientY);
       this.move(p1.x, p1.y);
     });
     const end = (e: PointerEvent) => {
       if (e.pointerId !== this.stickId) return;
       this.stickId = -1;
+      if (e.type === 'pointerup' && travel < 14 && performance.now() - downAt < 350 && this.root.classList.contains('interior')) this.onInteriorTap?.(e.clientX, e.clientY);
       this.input.touch.stickX = 0;
       this.input.touch.stickY = 0;
       this.base.classList.remove('on');

@@ -21,6 +21,8 @@ export interface Shell {
   /** tamanho lógico das imagens */
   w: number;
   h: number;
+  /** px de imagem por px lógico (acompanha a escala real da tela) */
+  bake: number;
 }
 
 export const iso = (gx: number, gy: number, z = 0): [number, number] => [(gx - gy) * TW / 2, (gx + gy) * TH / 2 - z];
@@ -54,16 +56,16 @@ const THEMES: Record<string, Theme> = {
   house: { floorA: '#b4553f', floorB: '#9a4635', gap: '#5a2a22', slabL: '#6a4b36', slabR: '#533a2a', wallL: '#e8dcc2', wallR: '#f3e9d2', trim: '#4a3a2c', base: '#3d6fa0' },
 };
 
-export function bakeShell(room: RoomDef): Shell {
+export function bakeShell(room: RoomDef, bake = BAKE): Shell {
   const w = room.rows.reduce((m, r) => Math.max(m, r.length), 0), h = room.rows.length;
   const th = THEMES[room.theme];
   const W = (w + h) * TW / 2 + PAD * 2, ox = h * TW / 2 + PAD;
   const oy = WALL_H + PAD + 6;
   const H = oy + (w + h) * TH / 2 + SLAB + DEEP + PAD;
   const mk = () => {
-    const c = makeCanvas(Math.ceil(W * BAKE), Math.ceil(H * BAKE));
+    const c = makeCanvas(Math.ceil(W * bake), Math.ceil(H * bake));
     const g = c.getContext('2d')!;
-    g.scale(BAKE, BAKE);
+    g.scale(bake, bake);
     g.translate(ox, oy);
     g.lineJoin = 'round';
     g.lineCap = 'round';
@@ -72,7 +74,7 @@ export function bakeShell(room: RoomDef): Shell {
   const F = mk(), Wl = mk();
   paintFloor(F.g, room, th, w, h);
   paintWalls(Wl.g, room, th, w, h);
-  return { floor: F.c, walls: Wl.c, ox, oy, w: W, h: H };
+  return { floor: F.c, walls: Wl.c, ox, oy, w: W, h: H, bake };
 }
 
 function paintFloor(g: CanvasRenderingContext2D, room: RoomDef, th: Theme, w: number, h: number) {
