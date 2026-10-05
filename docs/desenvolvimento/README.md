@@ -11,6 +11,8 @@ Este é o ponto de entrada técnico para quem mantém Karimbolandia ou usa seus 
 
 O [estudo de interiores](../interiores/ESTUDO_DE_CASO_interiores_isometricos.md) também fornece referências de arquitetura/design. Ele é um documento histórico de planejamento; confira código e notas atuais antes de interpretar seu “estado atual” como implementação vigente.
 
+O [caso de exploração e profundidade](EXPLORACAO_E_PROFUNDIDADE_2026-10-05.md) registra a ampliação para 33 interiores, troca de pavimentos, trilha 2.5D, balada com 65 dançarinos e checkpoints sem barreiras, incluindo regressões e limites da validação.
+
 ## Como este conhecimento é protegido
 
 | Camada | Função |

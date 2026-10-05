@@ -3,18 +3,21 @@
  * importam estaticamente (é minúsculo), enquanto todo o resto do interior só carrega sob demanda.
  * Cada cômodo guarda um bitmask de flags (≤ 31 bits); a reputação da aldeia vai de −100 a +100.
  */
-export type RoomId = 'palafita' | 'benedita';
-export const ROOM_IDS: readonly RoomId[] = ['palafita', 'benedita'];
+export type RoomId = 'palafita' | 'benedita' | `home:${number}` | `hut:${number}`;
+export const ROOM_IDS: readonly RoomId[] = ['palafita', 'benedita',
+  ...Array.from({ length: 29 }, (_, i): RoomId => `home:${i + 1}`), 'hut:1', 'hut:2'];
+const VISIT_FLAGS = ['visited', 'keepsake', 'meal', 'water', 'plant', 'rest', 'gift', 'drawer', 'chest', 'karimbado', 'clean'];
 
 /** Ordem = posição do bit. Nunca reordenar: o save grava só o número. */
 export const ROOM_FLAGS: Record<RoomId, readonly string[]> = {
+  ...Object.fromEntries(ROOM_IDS.filter(id => id.includes(':')).map(id => [id, VISIT_FLAGS])),
   palafita: ['visited', 'panela', 'laces', 'mustache', 'bottle', 'cofre', 'caixa', 'revista', 'karimbado', 'clean', 'caboGone'],
   benedita: ['visited', 'panela', 'bean1', 'bean2', 'bean3', 'cake', 'filter', 'tv', 'tin', 'plant', 'cat', 'nap',
     'piggyStolen', 'piggyBroken', 'dresser', 'chest', 'karimbado', 'clean', 'cabinet', 'hen', 'mirror', 'photos'],
 };
 
 export const REP_MIN = -100, REP_MAX = 100;
-export const MAX_ROOM_ENTRIES = 16;
+export const MAX_ROOM_ENTRIES = 64;
 
 const bit = (room: RoomId, flag: string) => {
   const i = ROOM_FLAGS[room].indexOf(flag);

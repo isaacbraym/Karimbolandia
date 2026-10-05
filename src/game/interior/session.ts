@@ -36,8 +36,8 @@ const ASSEMBLE_S = 1.1, DISASSEMBLE_S = 0.4;
 const SFX_OK = new Set<string>(['step', 'creak', 'secret', 'coin', 'heal', 'pickup', 'crateBreak', 'debris', 'burp', 'whistle', 'clap', 'uiClick', 'uiBack', 'lock', 'unlock', 'splash', 'crush', 'knife', 'servo', 'spark', 'wade', 'bird', 'bird2', 'insect', 'frog', 'hurt', 'slam', 'warning', 'snore', 'cluck', 'tvStatic', 'thump', 'crunch']);
 
 export class InteriorSession {
-  readonly sim: InteriorSim;
-  readonly renderer: InteriorRenderer;
+  sim: InteriorSim;
+  renderer: InteriorRenderer;
   readonly ui: UiState = newUi();
   readonly scene: SceneState = { assemble: 0, hover: null, selFid: null, dest: null, pops: [], pulseFid: null, time: 0 };
   phase: 'in' | 'live' | 'out' | 'done' = 'in';
@@ -55,9 +55,11 @@ export class InteriorSession {
   private viewW: number; private viewH: number;
   private pendingExit: { reason: ExitReason; alerted: boolean; mood: 'happy' | 'angry' | 'neutral' } | null = null;
   private asked = false;
+  private quality: Quality;
 
   constructor(init: SessionInit) {
     this.w = init.w; this.spot = init.spot;
+    this.quality = init.quality;
     this.viewW = init.viewW; this.viewH = init.viewH;
     const host: InteriorHost = {
       legacy: (obj, kind) => {
@@ -375,6 +377,25 @@ export class InteriorSession {
       case 'banner': this.toast(e.title, e.sub, 'info'); break;
       case 'alert': audio.play('warning', 0.4); break;
       case 'hurt': break;
+      case 'floor': {
+        const next = sim.room.floors?.[e.index];
+        if (!next || next === sim.room || this.phase !== 'live') break;
+        sim.commit();
+        this.renderer.dispose();
+        this.sim = new InteriorSim(next, w.interiors, sim.host, Math.floor(w.time * 1000) + 1);
+        // Chega no patamar da escada; o próximo comando decide subir/descer, sem loop automático.
+        const stairs = next.furniture.find(f => f.id === 'stairs');
+        if (stairs) { this.sim.px = stairs.gx - .5; this.sim.py = stairs.gy + .5; }
+        this.renderer = new InteriorRenderer(this.sim, null, this.quality);
+        this.renderer.fit(this.viewW, this.viewH);
+        warmActors(this.sim);
+        ui.menu = null; ui.reader = null; ui.captions = []; ui.title = next.title;
+        this.scene.hover = this.scene.dest = null;
+        this.scene.selFid = this.kbSel = this.hoverFid = null;
+        this.scene.pops = []; this.scene.assemble = 0; this.phase = 'in';
+        this.refreshLists(); audio.play('creak', .5);
+        break;
+      }
       case 'exit': {
         this.pendingExit = { reason: e.reason, alerted: e.alerted, mood: sim.room.mood?.(sim) ?? 'neutral' };
         this.phase = 'out';

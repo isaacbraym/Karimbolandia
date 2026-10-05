@@ -18,5 +18,10 @@ export async function loadRoom(id: RoomId): Promise<RoomDef> {
       const [room] = await Promise.all([import('./rooms/casaBenedita'), import('../../art/interior/paint/benedita')]);
       return room.default;
     }
+    default: {
+      const [rooms] = await Promise.all([import('./rooms/community'), import('../../art/interior/paint/community'),
+        import('../../art/interior/paint/benedita'), import('../../art/interior/paint/palafita')]);
+      return rooms.makeCommunityRoom(id);
+    }
   }
 }

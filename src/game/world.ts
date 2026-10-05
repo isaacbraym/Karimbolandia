@@ -516,43 +516,13 @@ export class World {
     }
   }
 
-  /** Passou o checkpoint `idx`: fecha o caminho de volta (num trecho de chão firme, fora de arenas). */
+  /** Checkpoints salvam progresso sem fechar a exploração nem apagar entidades atrás do jogador. */
   blockBehind(idx: number, fx = true) {
-    const cps = this.data.checkpoints;
-    if (idx < 1 || idx >= cps.length || idx !== this.checkpointIdx) return;
-    const cp = cps[idx];
-    const L = this.level;
-    // perto do checkpoint (o desmoronamento acontece à vista), procurando para trás um chão firme
-    const previousX = cps.reduce((x, c) => c.x < cp.x ? Math.max(x, c.x) : x, this.data.playerStart.x);
-    if (previousX >= cp.x) return;
-    const xMin = Math.max(previousX + 4 * TILE, cp.x - 30 * TILE);
-    const inArena = (x: number) => this.data.arenas.some((a) => x > a.rect.x - 3 * TILE && x < a.rect.x + a.rect.w + 3 * TILE);
-    const inWater = (x: number) => this.data.water.some((z) => x > z.x - 2 * TILE && x < z.x + z.w + 2 * TILE);
-    for (let k = 0; k < 12; k++) {
-      const x = Math.floor((cp.x - (5 + k) * TILE) / TILE) * TILE + TILE / 2;
-      if (x < xMin || x <= this.blockX + TILE) return;
-      if (inArena(x) || inWater(x)) continue;
-      const gy = L.groundBelow(x, cp.y - 260, 640);
-      if (gy === null) continue;
-      // chão sólido largo o bastante, sem teto/obstáculo e sem buraco embaixo
-      let ok = true;
-      for (const ox of [-TILE, 0, TILE]) {
-        const g2 = L.groundBelow(x + ox, gy - 40, 80);
-        if (g2 === null || Math.abs(g2 - gy) > 1 || !L.isSolid(Math.floor((x + ox) / TILE), Math.floor(gy / TILE))) ok = false;
-        for (const oy of [16, 60, 110]) if (L.solidAtPx(x + ox, gy - oy)) ok = false;
-      }
-      if (!ok) continue;
-      this.blockX = x;
-      this.blockY = gy;
-      this.applyBlock();
-      if (fx) {
-        // começa o desmoronamento: treme, range/estala... e desaba fechando a volta
-        this.blockAnimT = 0;
-        this.blockImpact = false;
-        this.audio(this.data.stage === 2 ? 'creak' : 'rumble', 1, x);
-      }
-      return;
-    }
+    void idx; void fx;
+    this.blockX = -Infinity;
+    this.blockAnimT = -1;
+    this.props = this.props.filter(p => p.spawn.id !== -950);
+    this.solidsDirty = true;
   }
 
   /** Desmoronamento: poeira/fagulhas tremendo, queda e impacto (tremor, estrondo, destroços). */

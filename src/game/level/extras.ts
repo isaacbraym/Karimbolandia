@@ -233,8 +233,8 @@ export function addForeground(b: LevelBuilder) {
 /**
  * PISTA DE NEON (fase 1): uma boate secreta embaixo da rua, num trecho plano e repetitivo, para
  * quebrar o ritmo. Entra-se por uma porta de neon na calçada (↑) e sai-se mais adiante.
- * O desafio é musical e eletrônico: lasers que acendem em tempos alternados da batida (é preciso
- * "dançar" entre eles), caixas de som que viram trampolim (wub!) e notas de sintetizador que
+ * A exploração é musical: pista livre com holofotes decorativos, caixas de som que viram
+ * trampolim (wub!) e notas de sintetizador que
  * tocam a melodia da fase — cada uma aparece duas vezes. Completando: o DROP.
  * Retorna o x (tile) da entrada, ou -1 se não achou lugar.
  */
@@ -287,9 +287,7 @@ export function addClub(b: LevelBuilder): number {
   // ---- dentro: aquecimento com uma caixa de som e uma plataforma
   b.drum(x0 + 7, FLOOR - 1, 2, 'speaker');
   b.plat(x0 + 10, FLOOR - 5, 4, THEME.HANGAR);
-  // corredor de lasers (tempos alternados) com caixas de som entre eles
-  const lasers: [number, 0 | 1][] = [[16, 0], [20, 1], [25, 0], [29, 1], [34, 0], [38, 1]];
-  for (const [i, ph] of lasers) b.beam(x0 + i, TOP, FLOOR, ph);
+  // Pista livre: os canhões da arte são luzes decorativas, sem colisão ou dano.
   for (const i of [22, 31, 40]) b.drum(x0 + i, FLOOR - 1, 2, 'speaker');
   // plataformas de neon no alto (rota de cima, mais notas)
   b.plat(x0 + 17, FLOOR - 6, 2, THEME.HANGAR);

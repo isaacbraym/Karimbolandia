@@ -75,7 +75,7 @@ export class InteriorFlow {
     this.t = 0;
     this.backdrop = null;
     this.room = null;
-    this.seenAny = (['palafita', 'benedita'] as const).some((id) => w.interiors.has(id, 'visited'));
+    this.seenAny = w.interiors.toSave().length > 0;
     this.load(spot.interior).then((room) => { this.room = room; }, () => { this.failed = true; });
     const p = w.player;
     w.camera.focus = { x: spot.x, y: spot.y - 48, rate: 7 };

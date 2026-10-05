@@ -3,6 +3,7 @@ import type { World } from './world';
 import { WEAPONS, WEAPON_ORDER } from './weapons';
 import { segHitsRect } from './bullets';
 import type { RoomId } from './interiorStore';
+import { buildingStyle, HOME_NAMES, HOME_TRADES } from './buildings';
 
 export interface Clue { id: string; title: string; text: string; }
 export interface InvestigationObject {
@@ -19,10 +20,11 @@ export interface ExplorationSpot {
 }
 
 /**
- * Centro da porta de uma `villageHome` em px de mundo. Espelha o desenho em art/village.ts
- * (porta em x = −17 + 8·v + 15, com v = variação da semente) sem importar arte.
+ * Centro da porta em px de mundo, compartilhado com a fachada por buildingStyle.
+ * Sem variante autorada, mantém o cálculo antigo para dados legados.
  */
-export function villageHomeDoorX(d:{x:number;y:number;scale?:number;flip?:boolean}):number {
+export function villageHomeDoorX(d:{x:number;y:number;scale?:number;flip?:boolean;variant?:number}):number {
+  if (d.variant !== undefined) return d.x + (d.flip ? -1 : 1) * buildingStyle(d.variant).door * (d.scale ?? 1);
   const seed=Math.floor(d.x*7.13+d.y*3.1),v=((Math.abs(seed)%8)*977+13)%3;
   return d.x+(d.flip?-1:1)*(8*v-2)*(d.scale??1);
 }
@@ -53,16 +55,16 @@ export class Exploration {
   readonly spots: ExplorationSpot[];
   constructor(data:LevelData) {
     this.spots=data.stage!==2?[]:data.decos.filter(d=>d.kind==='jHut').map((d,i)=>({
-      id:`cabin:${Math.round(d.x/32)}`,x:d.x,y:d.y,cabin:true,
+      id:`cabin:${Math.round(d.x/32)}`,x:d.x+(d.flip?-1:1)*buildingStyle(i,true).door*(d.scale??1),y:d.y,cabin:true,
       title:['Palafita do vigia','Cabana do comando','Cabana da retaguarda'][i]??'Cabana mercenária',
-      ...(i===0?{interior:'palafita' as const}:{}),
+      interior: (i === 0 ? 'palafita' : `hut:${i}`) as RoomId,
       subtitle:['O brejo guarda mais que pegadas.','A burocracia chegou antes da paz.','Há uma ordem que ninguém quis cumprir.'][i%3],objects:cabinObjects(i),
     }));
-    const home=data.stage===2?data.decos.filter(d=>d.kind==='villageHome').sort((a,b)=>a.x-b.x)[0]:undefined;
-    if(home) {
+    const homes=data.stage===2?data.decos.filter(d=>d.kind==='villageHome').sort((a,b)=>a.x-b.x):[];
+    for(const [i,home] of homes.entries()) {
       const x=villageHomeDoorX(home);
-      this.spots.push({id:`house:${Math.round(x/32)}`,x,y:data.level.reliefSurface(x)??home.y,cabin:true,home:true,interior:'benedita',
-        title:'Casa da Dona Benedita',subtitle:'A porta está encostada. Alguém tece lá dentro... ou saiu para a roça.',objects:[]});
+      this.spots.push({id:`house:${Math.round(x/32)}`,x,y:data.level.reliefSurface(x)??home.y,cabin:true,home:true,interior:i === 0 ? 'benedita' : `home:${i}`,
+        title:`Casa de ${HOME_NAMES[i]}`,subtitle:i === 0 ? 'A porta está encostada. Alguém tece lá dentro... ou saiu para a roça.' : `${HOME_TRADES[i % 6]} · ${buildingStyle(i).floors === 2 ? 'Sala e andar superior' : 'Casa térrea'} · Entre e conheça.`,objects:[]});
     }
     if(data.stage===2) for(const [i,x] of [774,936,1024].entries()) {
       const y=data.level.reliefSurface(x*32)??1024;

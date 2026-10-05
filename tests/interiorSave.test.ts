@@ -56,7 +56,7 @@ describe('save dos interiores', () => {
     expect(bad({ interiors: [['palafita', 2 ** 31]] })).toBeNull();
     expect(bad({ interiors: [['palafita', 1.5]] })).toBeNull();
     expect(bad({ interiors: [['palafita', 1], ['palafita', 2]] })).toBeNull();
-    expect(bad({ interiors: Array.from({ length: 17 }, (_, i) => [`r${i}`, 1]) })).toBeNull();
+    expect(bad({ interiors: Array.from({ length: 65 }, (_, i) => [`r${i}`, 1]) })).toBeNull();
     expect(bad({ villageRep: 101 })).toBeNull();
     expect(bad({ villageRep: -101 })).toBeNull();
     expect(bad({ villageRep: 12.5 })).toBeNull();

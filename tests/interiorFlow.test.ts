@@ -71,7 +71,7 @@ describe('consequências da saída do interior no mundo lateral', () => {
 
   it('o fluxo só entra em pontos com interior e não entra duas vezes', () => {
     const { w, flow } = setup();
-    const cabin = w.exploration.spots.find((s) => s.cabin && !s.interior)!;
+    const cabin = w.exploration.spots.find((s) => !s.interior)!;
     expect(flow.tryEnter(w, cabin)).toBe(false);
     expect(flow.active).toBe(false);
     const spot = w.exploration.spots.find((s) => s.interior)!;

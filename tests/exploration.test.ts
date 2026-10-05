@@ -11,11 +11,10 @@ import {moveBody} from '../src/game/physics';
 
 function setup(){const w=new World(buildJungle());const spot=w.exploration.spots.find(s=>s.cabin)!;w.player.reset(spot.x,spot.y);moveBody(w.player.body,0,w.level,w.solidRects);return {w,spot};}
 describe('Exploração opcional em primeira pessoa',()=>{
-  it('tem três cabanas, uma casa de morador com interior e três pistas autoradas, IDs estáveis e nenhum ponto na cidade',()=>{
+  it('todas as 30 casas e três cabanas têm interiores próprios, IDs estáveis e nenhum ponto na cidade',()=>{
     const {w}=setup();expect(w.exploration.spots.filter(s=>s.cabin&&!s.home)).toHaveLength(3);
-    // a primeira casa da aldeia ganhou porta (interior isométrico); a primeira cabana mercenária também
-    expect(w.exploration.spots.filter(s=>s.home)).toHaveLength(1);
-    expect(w.exploration.spots.filter(s=>s.interior).map(s=>s.interior).sort()).toEqual(['benedita','palafita']);
+    expect(w.exploration.spots.filter(s=>s.home)).toHaveLength(30);
+    expect(new Set(w.exploration.spots.filter(s=>s.interior).map(s=>s.interior)).size).toBe(33);
     expect(w.exploration.spots.find(s=>s.interior==='palafita')!.title).toBe('Palafita do vigia');
     expect(w.exploration.spots.filter(s=>!s.cabin)).toHaveLength(3);
     expect(new World(buildLevel()).exploration.spots).toEqual([]);

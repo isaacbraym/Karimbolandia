@@ -9,6 +9,8 @@ import { OUT, type Sprite } from '../kit';
 import type { InteriorSim } from '../../game/interior/sim';
 import type { Npc } from '../../game/interior/types';
 import { heightOf } from './furniture';
+import { civSpecs } from '../civilians';
+import { rollLook } from '../../game/civLook';
 
 const K_SCALE = 0.62;
 
@@ -40,7 +42,10 @@ export function clearActorCache() { npcArt.clear(); }
 function artOf(id: string): NpcArt | null {
   let a = npcArt.get(id);
   if (a) return a;
-  const spec = SPECS[id];
+  const spec = SPECS[id] ?? (id.startsWith('neighbor:') ? (() => {
+    const civ = civSpecs(rollLook(18700 + Number(id.split(':')[1]) * 47));
+    return { face: civ.face, look: civ.body, scale: 1.42 };
+  })() : undefined);
   if (!spec) return null;
   const faces = { calm: bakeFace(spec.face, 'calm'), talk: bakeFace(spec.face, 'talk'), fear: bakeFace(spec.face, 'fear'), joy: bakeFace(spec.face, 'joy') };
   a = { look: figureLook(spec.look), faces, pose: newPose(faces.calm), scale: spec.scale };

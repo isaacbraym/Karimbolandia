@@ -228,6 +228,8 @@ export interface DecoSpawn {
   layer: 'back' | 'front';
   flip?: boolean;
   scale?: number;
+  /** Identidade estável de construções exploráveis; compartilhada com a planta interna. */
+  variant?: number;
   /** paralaxe de primeiro plano (0 = parado no mundo; 0.3 = passa 30% mais rápido, "perto da câmera") */
   par?: number;
 }

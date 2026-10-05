@@ -21,9 +21,10 @@ const BPM = 150;
 
 
 /** Aparências da multidão (dados; a arte é assada no carregamento junto com os civis). */
-export const CLUB_CROWD: CivLook[] = Array.from({ length: 14 }, (_, i) => rollLook(9100 + i * 37));
+// A pista anterior instanciava 13 pessoas (14 aparências, uma posição reservada ao Karimbo).
+export const CLUB_CROWD: CivLook[] = Array.from({ length: 13 * 5 }, (_, i) => rollLook(9100 + i * 37));
 
-export interface Dancer { x: number; look: CivLook; phase: number; facing: -1 | 1 }
+export interface Dancer { x: number; depth: number; scale: number; style: number; look: CivLook; phase: number; facing: -1 | 1 }
 
 export class ClubScene {
   readonly room: Rect | null;
@@ -45,11 +46,12 @@ export class ClubScene {
     this.floorY = r ? r.rect.y + r.rect.h : 0;
     this.spotX = r ? r.rect.x + 12 * TILE : 0;
     if (r) {
-      // multidão espalhada pela pista (fora do caminho dos lasers do meio)
+      // Cinco fileiras; o corredor do Karimbo permanece legível no plano mais próximo.
       for (let i = 0; i < CLUB_CROWD.length; i++) {
-        const x = r.rect.x + (5 + i * 3.2 + (i % 3) * 0.6) * TILE;
-        if (Math.abs(x - this.spotX) < 2 * TILE) continue;
-        this.crowd.push({ x, look: CLUB_CROWD[i], phase: (i * 0.37) % 1, facing: i % 2 ? -1 : 1 });
+        const row = Math.floor(i / 13), depth = 122 - row * 23;
+        const x = r.rect.x + (3.5 + i % 13 * 3.4) * TILE + depth * .55;
+        this.crowd.push({ x, depth, scale: .64 + row * .065, style: i % 4,
+          look: CLUB_CROWD[i], phase: (i * 0.37) % 1, facing: i % 2 ? -1 : 1 });
       }
     }
   }

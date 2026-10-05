@@ -8,6 +8,7 @@ import { JUNGLE_BOUNDS, jungleVariants, paintJungle, setDecoAt } from './jungleD
 import { STORY_BOUNDS, paintStoryProp } from './storyProps';
 import { VILLAGE_BOUNDS, paintVillageProp } from './village';
 import { ATLANTIS_BOUNDS, paintAtlantis } from './atlantisDecor';
+import { paintBuilding } from './buildings';
 
 const rngCache = new Map<string, Rng>();
 const seedOf = (d: DecoSpawn) => Math.floor(d.x * 7.13 + d.y * 3.1);
@@ -139,7 +140,7 @@ export function drawDeco(g: CanvasRenderingContext2D, d: DecoSpawn, t: number) {
   const kd = d as KeyedDeco;
   // chave da imagem pronta calculada uma vez por decoração (nada de strings novas por quadro)
   if (b && kd._bk === undefined) {
-    kd._bs = bakeSeed(d.kind, seedOf(d));
+    kd._bs = d.variant ?? bakeSeed(d.kind, seedOf(d));
     kd._bk = d.kind + '|' + kd._bs + '|' + s;
   }
   const seed = b ? kd._bs! : seedOf(d);
@@ -157,6 +158,7 @@ export function drawDeco(g: CanvasRenderingContext2D, d: DecoSpawn, t: number) {
 }
 
 function paintDeco(g: CanvasRenderingContext2D, kind: string, seed: number, t: number) {
+  if (kind === 'jHut') { paintBuilding(g, seed, true); return; }
   if (paintAtlantis(g, kind, seed)) return;
   switch (kind) {
     case 'facade': {

@@ -631,6 +631,9 @@ export function buildJungle(): LevelData {
 
   b.atmosphere.sort((a, c) => a.x - c.x);
   rollingGround(b);
+  for (const kind of ['villageHome', 'jHut']) {
+    b.decos.filter(d => d.kind === kind).sort((a, z) => a.x - z.x).forEach((d, i) => { d.variant = i; });
+  }
   addPatrolStories(b);
   // Atlântida por último: só acrescenta (IDs antigos de inimigos e itens continuam os mesmos)
   buildAtlantis(b);

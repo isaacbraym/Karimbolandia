@@ -5,24 +5,25 @@
  */
 import type { World } from '../game/world';
 import { CLUB_CROWD, CLUB_T } from '../game/club';
-import { bakeCivilians, civArtFor, drawCivilian, type CivPoseSrc } from './civilians';
+import { bakeCivilians, civArtFor } from './civilians';
 import { bakeFace, drawFigure, figureLook, newPose, type FigureLook, type FigurePose } from './figure';
 import { glowSprite, OUT, type Sprite } from './kit';
 import { sivirinoHead } from './merchant';
 import { SOLDIER_SCALE } from './soldiers';
 import { music } from '../core/music';
+import { bakeDancers, drawDancer } from './clubDancers';
 
 interface ClubArt {
   bouncer: { look: FigureLook; pose: FigurePose };
   siv: { look: FigureLook; pose: FigurePose } | null;
 }
 let art: ClubArt | null = null;
-const src: CivPoseSrc = { facing: 1, act: 'cheer', t: 0, hop: 0, crouch: 0, runPhase: 0, phase: 0 };
 
 /** Assa rostos/corpos da multidão e dos seguranças (carregamento da fase 1). */
 export function bakeClubArt() {
   if (art) return art;
   bakeCivilians(CLUB_CROWD);
+  bakeDancers();
   const face = bakeFace({ skin: '#5e3820', hair: '#1c1424', hairStyle: 'bald', accent: '#111', iris: '#2a1a12', glasses: true, beard: 'stubble' }, 'calm');
   const bouncer = {
     look: figureLook({ skin: '#5e3820', top: '#15151c', top2: '#e8e8f0', sleeve: 0.5, bottom: '#22232c', bottomKind: 'pants', shoe: '#0c0c10',
@@ -111,18 +112,24 @@ export function drawClub(g: CanvasRenderingContext2D, w: World, layer: 'back' | 
     }
     g.globalAlpha = 1;
     g.globalCompositeOperation = 'source-over';
+    // Piso profundo, juntas diagonais e reflexos no mesmo plano dos pés.
+    g.fillStyle = '#252139';
+    g.beginPath();g.moveTo(r.x,club.floorY);g.lineTo(r.x+r.w,club.floorY);
+    g.lineTo(r.x+r.w-16,club.floorY-156);g.lineTo(r.x+86,club.floorY-156);g.closePath();g.fill();
+    g.save();g.clip();
+    g.strokeStyle='#555074';g.lineWidth=1;
+    for(let x=r.x-120;x<r.x+r.w+120;x+=64){g.beginPath();g.moveTo(x,club.floorY);g.lineTo(x+86,club.floorY-156);g.stroke();}
+    for(let z=0;z<=156;z+=26){g.beginPath();g.moveTo(r.x,club.floorY-z);g.lineTo(r.x+r.w,club.floorY-z);g.stroke();}
+    g.globalAlpha=.18;for(let i=0;i<6;i++){g.fillStyle=cols[i%4];g.beginPath();g.ellipse(r.x+(i+.5)*r.w/6,club.floorY-70,85,20,-.1,0,Math.PI*2);g.fill();}g.restore();
     for (let i = 0; i < club.crowd.length; i++) {
       const d = club.crowd[i];
-      if (!cam.visible(d.x, club.floorY - 40, 60)) continue;
+      if (!cam.visible(d.x, club.floorY - d.depth - 40, 80)) continue;
       const ca = civArtFor(d.look);
       if (!ca) continue;
       const k = (beat + d.phase) % 1;
-      src.facing = d.facing;
-      src.act = raving ? 'cheer' : 'idle';
-      src.t = t + d.phase * 3;
-      src.hop = raving ? (1 - k) * (1 - k) * (club.active ? 9 : 5) : 0;
-      src.phase = d.phase;
-      drawCivilian(g, ca, d.x, club.floorY, src, false);
+      const y=club.floorY-d.depth,sc=ca.scale*d.scale;
+      g.fillStyle='rgba(8,5,18,.35)';g.beginPath();g.ellipse(d.x,y+1,17*d.scale,5*d.scale,0,0,Math.PI*2);g.fill();
+      drawDancer(g,i,d.x,y-(raving?(1-k)**2*5:0),sc,d.facing,k);
     }
     if (a.siv && Number.isFinite(club.sivX)) drawSivirino(g, a.siv, club.sivX, club.floorY, t, beat, club.active);
   } else if (club.active && club.t > CLUB_T.dance && club.t < CLUB_T.turn && beat < 0.12) {

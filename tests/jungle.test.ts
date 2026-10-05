@@ -345,7 +345,7 @@ describe('Fase 2 (selva): areia movediça', () => {
 });
 
 describe('Queda perto dos cipós', () => {
-  it('recupera um ponto antigo e restaura o save do lado livre do checkpoint', () => {
+  it('preserva um ponto seguro anterior e restaura o checkpoint sem fechar o retorno', () => {
     const w = jungleWorld();
     const ctl = newCtl();
     const idx = w.data.checkpoints.findIndex(c => c.name === 'Desfiladeiro');
@@ -353,14 +353,14 @@ describe('Queda perto dos cipós', () => {
     w.checkpointIdx = idx;
     w.blockBehind(idx, false);
     const old = { x: cp.x - 8 * TILE, y: cp.y };
-    expect(w.isSafeSpot(old.x, old.y)).toBe(false);
+    expect(w.isSafeSpot(old.x, old.y)).toBe(true);
     const recovered = w.findSafeSpot(old.x, old.y)!;
     expect(recovered).not.toBeNull();
     expect(recovered.x - w.player.body.w / 2).toBeGreaterThan(w.blockX + 30);
     w.player.lastSafe = old;
     w.player.body.y = w.deathY() + 100;
     w.player.update(w, 1 / 60, ctl);
-    expect(w.player.x).toBe(cp.x);
+    expect(w.player.x).toBe(old.x);
     const loaded = jungleWorld();
     applySave(loaded, JSON.parse(JSON.stringify(captureSave(w))));
     expect(loaded.checkpointIdx).toBe(idx);
@@ -372,19 +372,19 @@ describe('Queda perto dos cipós', () => {
     expect(loaded.player.x - loaded.player.body.w / 2).toBeGreaterThan(loaded.blockX + 30);
   });
 
-  it('não devolve o jogador para trás da barreira quando atravessou o checkpoint no ar', () => {
+  it('atualiza a recuperação de queda ao atravessar o checkpoint no ar, mantendo retorno livre', () => {
     const w = jungleWorld();
     const ctl = newCtl();
     const idx = w.data.checkpoints.findIndex(c => c.name === 'Desfiladeiro');
     const cp = w.data.checkpoints[idx];
     w.checkpointIdx = idx - 1;
     w.player.reset(cp.x - 6 * TILE, cp.y);
-    const previousSafe = { ...w.player.lastSafe };
     w.player.body.x = cp.x + 16;
     w.player.body.y = cp.y - 100;
     w.director.update(1 / 60, ctl);
     expect(w.checkpointIdx).toBe(idx);
-    expect(w.blockX).toBeGreaterThan(previousSafe.x);
+    expect(w.blockX).toBe(-Infinity);
+    expect(w.player.lastSafe.x).toBeGreaterThanOrEqual(cp.x);
     w.player.body.x = (GORGE_X0 + 4) * TILE;
     w.player.body.y = w.deathY() + 100;
     w.player.update(w, 1 / 60, ctl);
@@ -465,12 +465,12 @@ describe('Fase 2 (selva): sala do ritmo', () => {
 });
 
 describe('Fase 1: pista de neon (boate secreta)', () => {
-  it('existe, tem porta na calçada, lasers que alternam na batida e notas duplas', async () => {
+  it('existe, tem porta na calçada, pista sem lasers de dano e notas duplas', async () => {
     const { buildLevel } = await import('../src/game/level/index');
     const d = buildLevel();
     const room = d.rooms.find((r) => r.kind === 'club')!;
     expect(room).toBeTruthy();
-    expect(d.beams.length).toBeGreaterThanOrEqual(4);
+    expect(d.beams).toEqual([]);
     expect(d.drums.filter((x) => x.style === 'speaker').length).toBeGreaterThanOrEqual(3);
     const w = new World(d);
     w.invulnerable = true;
@@ -485,14 +485,8 @@ describe('Fase 1: pista de neon (boate secreta)', () => {
     for (let f = 0; f < 5; f++) w.update(1 / 60, ctl);
     expect(w.rhythm.active).toBe(true);
     expect(w.rhythm.club).toBe(true);
-    // os lasers acendem em tempos alternados: em algum momento uns acesos e outros apagados
-    let mixed = false;
-    for (let f = 0; f < 120 && !mixed; f++) {
-      w.update(1 / 60, ctl);
-      const on = d.beams.map((b) => w.beamOn[b.id]);
-      if (on.some((x) => x) && on.some((x) => !x)) mixed = true;
-    }
-    expect(mixed).toBe(true);
+    for (let f = 0; f < 120; f++) w.update(1 / 60, ctl);
+    expect(w.beamOn.every(x => !x)).toBe(true);
     // a saída leva de volta para a rua, mais adiante
     const out = d.doors.find((x) => x.kind === 'out' && x.x > room.x && x.x < room.x + room.w)!;
     expect(out.tx).toBeGreaterThan(inn.x);

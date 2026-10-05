@@ -443,6 +443,8 @@ export class InteriorSim {
   }
 
   private checkPranks() {
+    // Casas de visita sem lista de travessuras não concedem conclusão automática ao entrar.
+    if (!this.room.pranks.some(p => !p.bonus)) return;
     let main = true, bonus = true, anyBonus = false;
     for (const p of this.room.pranks) {
       const d = p.done(this);

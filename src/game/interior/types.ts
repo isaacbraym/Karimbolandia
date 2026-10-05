@@ -134,13 +134,18 @@ export type InteriorEvent =
   | { type: 'banner'; title: string; sub: string }
   | { type: 'alert'; npc: string }
   | { type: 'hurt'; dmg: number }
-  | { type: 'exit'; reason: ExitReason; alerted: boolean };
+  | { type: 'exit'; reason: ExitReason; alerted: boolean }
+  | { type: 'floor'; index: number };
 
 export interface RoomDef {
   id: RoomId;
   title: string;
   subtitle: string;
   theme: 'stilt' | 'house';
+  /** Pavimentos da mesma casa compartilham flags, mas têm plantas e móveis próprios. */
+  floor?: number;
+  floors?: readonly RoomDef[];
+  palette?: { floorA: string; floorB: string; wallL: string; wallR: string; base: string };
   rows: readonly string[];
   /** célula de piso diante da porta: pisar aqui sai do cômodo */
   door: Cell;

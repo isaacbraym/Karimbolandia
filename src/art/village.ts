@@ -3,49 +3,18 @@ import { bakeFace, drawFigure, figureLook, handPos, newPose, type FaceHair, type
 import { prism } from './volume';
 import { LIFE_BOUNDS, paintVillageLife } from './villageLife';
 import { clapOpen } from '../core/clapRhythm';
+import { paintBuilding } from './buildings';
 export const VILLAGE_BOUNDS: Record<string, [number,number,number,number]> = {
   ...LIFE_BOUNDS,
-  villageHome: [-108,-181,120,11], villageGarden: [-72,-38,80,11], villagePottery: [-50,-44,57,12],
+  villageHome: [-116,-254,162,24], villageGarden: [-72,-38,80,11], villagePottery: [-50,-44,57,12],
 };
 export function paintVillageProp(g: CanvasRenderingContext2D, kind: string, seed: number) {
   if (!VILLAGE_BOUNDS[kind]) return false;
   if (paintVillageLife(g,kind,seed)) return true;
+  if (kind === 'villageHome') { paintBuilding(g, seed); return true; }
   g.fillStyle = 'rgba(12,28,15,.2)';
-  g.beginPath(); g.ellipse(4,3,kind==='villageHome'?104:50,6,0,0,Math.PI*2); g.fill();
-  if (kind === 'villageHome') {
-    const v = Math.abs(seed) % 3;
-    prism(g, -88, 0, 164, 6, 31, -18, '#99794d');
-    poly(g,[[76,0],[107,-18],[107,-96],[76,-83]],'#5d573a');
-    shadedRR(g,-79,-84,155,83,3,['#a88858','#90744d','#b39d67'][v]);
-    g.strokeStyle = '#6e563a'; g.lineWidth = 1.4;
-    for (let x = -70; x < 75; x += 10) { g.beginPath(); g.moveTo(x,-81); g.lineTo(x,-2); g.stroke(); }
-    poly(g,[[-102,-77],[-5,-163],[98,-91],[116,-110],[14,-177]],'#a89255');
-    // telhado de palha: gradiente do sol, fios de palha em camadas e franja irregular no beiral
-    const roof = g.createLinearGradient(-60,-160,40,-70);
-    roof.addColorStop(0,'#e2c886'); roof.addColorStop(.55,'#c8af68'); roof.addColorStop(1,'#9c8448');
-    poly(g,[[-102,-77],[-5,-163],[98,-91],[81,-76],[-80,-68]],roof);
-    g.lineWidth = .8;
-    for (let layer = 0; layer < 4; layer++) {
-      const k = layer / 4;
-      g.strokeStyle = layer % 2 ? 'rgba(120,96,48,.55)' : 'rgba(250,230,170,.35)';
-      for (let i = -86; i < 88; i += 3.5) {
-        const x0 = -5 + i * (0.12 + k * 0.5), y0 = -156 + k * 70;
-        g.beginPath(); g.moveTo(x0, y0); g.lineTo(x0 + (i - x0 + 5) * 0.3, y0 + 22 + (i * 7 % 5)); g.stroke();
-      }
-    }
-    g.strokeStyle = '#7d6634'; g.lineWidth = 1.1;
-    g.beginPath();
-    for (let i = -100; i < 96; i += 4) { const y = -76 - i * 0.07 + (i * 13 % 7) * 0.6; g.moveTo(i, y - 4); g.lineTo(i + 1.5, y + 3); }
-    g.stroke();
-    shadedRR(g,-17+v*8,-63,30,62,3,'#362c26');
-    shadedRR(g,-61,-57,22,21,2,'#3c372a');
-    g.strokeStyle = '#ad9060'; g.lineWidth = 2;
-    g.beginPath(); g.moveTo(-50,-57); g.lineTo(-50,-36); g.stroke();
-    // Tecidos e cestos de uso cotidiano, sem insígnia de mercenário.
-    poly(g,[[29,-56],[62,-56],[60,-19],[31,-19]],['#536f78','#925347','#547158'][v]);
-    g.strokeStyle = '#d2bd81'; g.lineWidth = 1.4;
-    for (let y = -49; y < -20; y += 10) { g.beginPath(); g.moveTo(31,y); g.lineTo(45,y-4); g.lineTo(60,y); g.stroke(); }
-  } else if (kind === 'villageGarden') {
+  g.beginPath(); g.ellipse(4,3,50,6,0,0,Math.PI*2); g.fill();
+  if (kind === 'villageGarden') {
     prism(g, -66, 2, 106, 5, 31, -21, '#614931');
     g.strokeStyle = '#977850'; g.lineWidth = 1.2;
     for (let x = -54; x < 51; x += 13) {

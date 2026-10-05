@@ -58,7 +58,7 @@ const THEMES: Record<string, Theme> = {
 
 export function bakeShell(room: RoomDef, bake = BAKE): Shell {
   const w = room.rows.reduce((m, r) => Math.max(m, r.length), 0), h = room.rows.length;
-  const th = THEMES[room.theme];
+  const th = { ...THEMES[room.theme], ...room.palette };
   const W = (w + h) * TW / 2 + PAD * 2, ox = h * TW / 2 + PAD;
   const oy = WALL_H + PAD + 6;
   const H = oy + (w + h) * TH / 2 + SLAB + DEEP + PAD;

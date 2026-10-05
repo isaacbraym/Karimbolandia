@@ -74,7 +74,7 @@ export function bakeTiles(): TileArt {
   // ---- cache de blocos: 8×8 tiles viram UMA imagem (≈300 drawImage/quadro → ≈12–24)
   const CH = 8;
   const CPX = CH * CELL; // 512 px (2x, igual ao atlas)
-  const OVERHANG = 12 * (CELL / TILE); // projeção + contorno fora da última coluna
+  const OVERHANG = 38 * (CELL / TILE); // largura do caminho em perspectiva + contorno
   const DOWNHANG = CELL + 2; // face lateral pode nascer na borda inferior do bloco
   interface Chunk { c: HTMLCanvasElement | null; empty: boolean; hazards: number[]; used: number }
   const chunks = new Map<number, Chunk>();
@@ -100,23 +100,28 @@ export function bakeTiles(): TileArt {
           g.beginPath(); g.moveTo(x, y); g.lineTo(x, y - h0);
           g.lineTo(x + TILE * k, y - h1); g.lineTo(x + TILE * k, y); g.fill();
         }
-        const d = 10 * k;
+        const d = (below === T.ONEWAY ? 20 : 34) * k;
+        const back = (below === T.ONEWAY ? 12 : 22) * k;
         g.fillStyle = th.light;
         g.beginPath(); g.moveTo(x, y - h0); g.lineTo(x + TILE * k, y - h1);
-        g.lineTo(x + TILE * k + d, y - h1 - 8 * k); g.lineTo(x + d, y - h0 - 8 * k); g.closePath(); g.fill();
+        g.lineTo(x + TILE * k + d, y - h1 - back); g.lineTo(x + d, y - h0 - back); g.closePath(); g.fill();
         if (level.get(tx + 1, ty + 1) === T.EMPTY) {
           const height = (below === T.ONEWAY ? 7 : TILE) * k;
           g.fillStyle = th.dark;
           g.beginPath(); g.moveTo(x + TILE * k, y - h1);
-          g.lineTo(x + TILE * k + d, y - h1 - 8 * k);
-          g.lineTo(x + TILE * k + d, y + height - 8 * k); g.lineTo(x + TILE * k, y + height); g.closePath(); g.fill();
+          g.lineTo(x + TILE * k + d, y - h1 - back);
+          g.lineTo(x + TILE * k + d, y + height - back); g.lineTo(x + TILE * k, y + height); g.closePath(); g.fill();
           g.strokeStyle = th.edge; g.lineWidth = .8 * k; g.stroke();
         }
         g.strokeStyle = th.edge; g.lineWidth = 1.4 * k;
         g.beginPath(); g.moveTo(x, y - h0); g.lineTo(x + TILE * k, y - h1); g.stroke();
         // Juntas diagonais, folhas e pedrinhas pequenas no plano de cima.
         g.strokeStyle = th.dark; g.lineWidth = 0.65 * k;
-        g.beginPath(); g.moveTo(x, y - h0); g.lineTo(x + d, y - h0 - 8 * k); g.stroke();
+        g.beginPath(); g.moveTo(x, y - h0); g.lineTo(x + d, y - h0 - back); g.stroke();
+        g.strokeStyle = 'rgba(255,245,214,.25)'; g.lineWidth = .8 * k;
+        g.beginPath(); g.moveTo(x+d, y-h0-back); g.lineTo(x+TILE*k+d,y-h1-back); g.stroke();
+        g.strokeStyle = 'rgba(35,30,22,.13)';
+        g.beginPath();g.moveTo(x+d*.48,y-h0-back*.48);g.lineTo(x+TILE*k+d*.48,y-h1-back*.48);g.stroke();
         if (th === THEMES[4] || th === THEMES[7]) {
           g.fillStyle = tx % 3 ? '#91a24e' : '#a89060';
           g.beginPath(); g.ellipse(x + 18 * k, y - (h0 + h1) / 2 - 4 * k, 3 * k, 1.2 * k, -0.35, 0, Math.PI * 2); g.fill();
