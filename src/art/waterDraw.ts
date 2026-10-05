@@ -6,7 +6,7 @@
  */
 import type { World } from '../game/world';
 import type { WaterZone } from '../game/level';
-import type { Fish } from '../game/water';
+import { fishPass, fishScale, FISH_BACK_FADE, type Fish } from '../game/water';
 import { getJungle, type FishArt } from './jungle';
 import { glowSprite, makeCanvas, softDot } from './kit';
 import { Rng } from '../core/math';
@@ -258,7 +258,8 @@ function drawSurfacePlane(g: CanvasRenderingContext2D, w: World, z: WaterZone, T
 
 // ------------------------------------------------------------------ peixes
 function drawFish(g: CanvasRenderingContext2D, fa: FishArt, f: Fish, k: number, t: number) {
-  const w = f.size;
+  // ao passar atrás da pedra o peixe se afasta: menor e mais misturado à água (sem filtro, só escala e alfa)
+  const w = f.size * fishScale(f);
   const h = (w * fa.h) / fa.w;
   // cópia reduzida mais próxima (nunca menor que o necessário na tela)
   const need = w * k;
@@ -272,6 +273,7 @@ function drawFish(g: CanvasRenderingContext2D, fa: FishArt, f: Fish, k: number, 
   const tilt = Math.max(-0.42, Math.min(0.42, f.vy / 150)) * f.dir;
   const sc = w / fa.w;
   g.save();
+  if (f.depth > 0.001) g.globalAlpha *= 1 - FISH_BACK_FADE * f.depth;
   g.translate(f.x, f.y + Math.sin(f.ph * 0.35) * 1.2);
   g.rotate(tilt);
   g.scale(sx * sc, sc);
@@ -290,13 +292,13 @@ function drawFish(g: CanvasRenderingContext2D, fa: FishArt, f: Fish, k: number, 
   void t;
 }
 
-function fishLayer(g: CanvasRenderingContext2D, w: World, layer: 0 | 1 | 2) {
+function fishLayer(g: CanvasRenderingContext2D, w: World, pass: 0 | 1 | 2) {
   const j = getJungle();
   if (!j) return;
   const k = g.getTransform().a;
   const cam = w.camera;
   for (const f of w.water.fish) {
-    if (f.layer !== layer || !cam.visible(f.x, f.y, f.size)) continue;
+    if (fishPass(f) !== pass || !cam.visible(f.x, f.y, f.size)) continue;
     drawFish(g, j.fish[f.kind], f, k, w.time);
   }
 }

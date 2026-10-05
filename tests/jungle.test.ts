@@ -161,7 +161,7 @@ describe('Fase 2 (selva): água', () => {
     expect(Math.abs(w.player.body.vx)).toBeLessThan(RUN * 0.8);
   });
 
-  it('peixes nunca saem da água nem entram nas pedras', () => {
+  it('peixes nunca saem da água e só ficam em pedra quando passam por trás dela', () => {
     const w = jungleWorld();
     const ctl = newCtl();
     expect(w.water.fish.length).toBeGreaterThan(20);
@@ -173,7 +173,7 @@ describe('Fase 2 (selva): água', () => {
     }
     const bad = w.water.fish.filter((f) => {
       const z = f.zone;
-      return f.x < z.x || f.x > z.x + z.w || f.y < z.y || f.y > z.y + z.h || w.level.solidAtPx(f.x, f.y);
+      return f.x < z.x || f.x > z.x + z.w || f.y < z.y || f.y > z.y + z.h || (w.level.solidAtPx(f.x, f.y) && f.depth < 0.5); // pedra só atrás (afastado da câmera)
     });
     expect(bad.length).toBe(0);
   });

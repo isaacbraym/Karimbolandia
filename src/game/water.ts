@@ -31,7 +31,25 @@ export interface Fish {
   wait: number;
   scared: number;
   zone: WaterZone;
+  /** 0 = no plano de origem; 1 = afastado da câmera (passando atrás de pedra). Contínuo. */
+  depth: number;
+  depthGoal: 0 | 1;
+  /** segundos seguidos sem pedra no corpo e à frente (histerese da volta) */
+  clearT: number;
+  /** segundos seguidos dentro de pedra (salvaguarda) */
+  rockT: number;
 }
+
+export const FISH_BACK_SCALE = 0.78; // −22% ao passar atrás da pedra
+export const FISH_BACK_FADE = 0.35; // quanto se mistura à água lá atrás
+export const FISH_DIVE_RATE = 2.2; // 1/s: ~0,45 s para afastar
+export const FISH_RISE_RATE = 1.4; // 1/s: ~0,7 s para voltar
+export const FISH_CLEAR_HOLD = 0.3; // s livres antes de voltar
+export const FISH_LOOKAHEAD = 0.8; // s de antecipação da pedra
+/** escala de desenho: diminui um pouco quando o peixe se afasta da câmera */
+export const fishScale = (f: Fish) => 1 - (1 - FISH_BACK_SCALE) * f.depth;
+/** passe de desenho: 0 = fundo (antes da névoa), 1 = meio (antes dos tiles), 2 = frente (depois do Karimbo) */
+export const fishPass = (f: Fish): 0 | 1 | 2 => (f.layer === 0 ? 0 : f.layer === 2 && f.depth < 0.5 ? 2 : 1);
 
 export interface Bubble {
   x: number;
@@ -109,11 +127,20 @@ export class Waters {
   }
 
   // ------------------------------------------------------------------ peixes
-  private freeAt(z: WaterZone, x: number, y: number, pad: number) {
+  /** Só os limites da zona (o peixe nunca sai da água). */
+  private inZone(z: WaterZone, x: number, y: number, pad: number) {
     // margem vertical ~ meia altura do peixe: antes os grandes subiam até a superfície e o recorte do
     // lago cortava o alto da cabeça
-    if (x < z.x + pad || x > z.x + z.w - pad || y < z.y + pad * 1.3 + 6 || y > z.y + z.h - pad * 1.1) return false;
-    return !this.level.solidAtPx(x, y) && !this.level.solidAtPx(x - pad * 0.6, y) && !this.level.solidAtPx(x + pad * 0.6, y) && !this.level.solidAtPx(x, y + pad * 0.4);
+    return !(x < z.x + pad || x > z.x + z.w - pad || y < z.y + pad * 1.3 + 6 || y > z.y + z.h - pad * 1.1);
+  }
+  /** Corpo do peixe encosta em pedra? */
+  private rockAt(x: number, y: number, pad: number) {
+    const L = this.level;
+    return L.solidAtPx(x, y) || L.solidAtPx(x - pad * 0.6, y) || L.solidAtPx(x + pad * 0.6, y) || L.solidAtPx(x, y + pad * 0.4);
+  }
+  /** Água livre: alvos e nascimento só em pontos assim, então o peixe nunca "mora" dentro da pedra. */
+  private freeAt(z: WaterZone, x: number, y: number, pad: number) {
+    return this.inZone(z, x, y, pad) && !this.rockAt(x, y, pad);
   }
 
   private pickTarget(f: Fish) {
@@ -151,6 +178,7 @@ export class Waters {
         const f: Fish = {
           kind: r() < 0.5 ? 0 : 1, x, y, vx: 0, vy: 0, size, dir: r() < 0.5 ? -1 : 1, turn: 1, ph: r() * 6.28,
           speed: (size < 44 ? 70 : size < 90 ? 46 : 30) * (0.8 + r() * 0.4), tx: x, ty: y, layer, lead, offX, offY, wait: r() * 2, scared: 0, zone: z,
+          depth: 0, depthGoal: 0, clearT: 0, rockT: 0,
         };
         f.turn = f.dir;
         this.fish.push(f);
@@ -241,11 +269,24 @@ export class Waters {
       f.vy += ay * k;
       let nx = f.x + f.vx * dt;
       let ny = f.y + f.vy * dt;
-      // nunca atravessa pedra nem sai da água
+      // pedra: em vez de travar, o peixe se afasta da câmera (encolhe, mistura-se à água), passa por
+      // trás e volta; só a borda da zona d'água limita
       const pad = Math.max(10, f.size * 0.35);
-      if (!this.freeAt(z, nx, ny, pad)) {
-        if (this.freeAt(z, nx, f.y, pad)) ny = f.y, (f.vy *= -0.4);
-        else if (this.freeAt(z, f.x, ny, pad)) nx = f.x, (f.vx *= -0.4);
+      const lead = f.lead >= 0 ? this.fish[f.lead] : null;
+      const rockHere = this.rockAt(nx, ny, pad);
+      const rockAhead = this.rockAt(f.x + f.vx * FISH_LOOKAHEAD, f.y + f.vy * FISH_LOOKAHEAD, pad)
+        || this.rockAt(f.x + f.vx * FISH_LOOKAHEAD * 0.5, f.y + f.vy * FISH_LOOKAHEAD * 0.5, pad);
+      if (rockHere || rockAhead || (lead !== null && lead.depthGoal === 1)) { f.depthGoal = 1; f.clearT = 0; }
+      else if ((f.clearT += dt) >= FISH_CLEAR_HOLD) f.depthGoal = 0;
+      f.depth = f.depthGoal === 1 ? Math.min(1, f.depth + dt * FISH_DIVE_RATE) : Math.max(0, f.depth - dt * FISH_RISE_RATE);
+      // ainda no plano e prestes a entrar na pedra: espera afastar (sem estalo de camada, sem rebote)
+      if (rockHere && f.depth < 0.5) { nx = f.x; ny = f.y; f.vx *= 0.5; f.vy *= 0.5; }
+      // salvaguarda: preso atrás de pedra por muito tempo, escolhe outro alvo em água livre
+      f.rockT = rockHere ? f.rockT + dt : 0;
+      if (f.rockT > 5 && f.lead < 0) { this.pickTarget(f); f.rockT = 0; }
+      if (!this.inZone(z, nx, ny, pad)) {
+        if (this.inZone(z, nx, f.y, pad)) ny = f.y, (f.vy *= -0.4);
+        else if (this.inZone(z, f.x, ny, pad)) nx = f.x, (f.vx *= -0.4);
         else {
           nx = f.x;
           ny = f.y;
