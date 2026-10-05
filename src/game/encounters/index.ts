@@ -56,6 +56,8 @@ export class Encounters {
       if (flags & ESCORT.COMPLETE) this.reward(w, e.def.id, 'CARGA DEVOLVIDA!', e.def.coins);
     }
   }
+  /** Prêmio único de um encontro: moedas (uma vez), pontos e aviso. Público para os minijogos reaproveitarem. */
+  grant(w: World, id: string, title: string, coins: number) { this.reward(w, id, title, coins); }
   private reward(w: World, id: string, title: string, coins: number) {
     if (this.completed.has(id)) return;
     this.completed.add(id);

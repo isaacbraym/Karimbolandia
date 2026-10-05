@@ -11,6 +11,7 @@ import type { Quality } from './index';
 import { prepareWildlifeArt } from './wildlife';
 import { prepareForestLight } from './forestLight';
 import { prepareLakeLife } from './lake/lakeLife';
+import { prepareLetterActors } from './letterActors';
 
 export interface FishArt {
   /** cópias reduzidas (maior → menor) para desenhar nítido e barato em qualquer tamanho */
@@ -142,6 +143,7 @@ export function loadJungle(base: string, quality: Quality): Promise<JungleArt> {
     prepareWildlifeArt();
     prepareForestLight();
     prepareLakeLife();
+    prepareLetterActors();
     await tick();
     bakeVillagers();
     jungle = { fish, piranhas, bg, bandits, banditVariants, thinker };

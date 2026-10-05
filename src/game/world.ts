@@ -28,6 +28,8 @@ import { Waters } from './water';
 import { LakeMap } from './lake/lakeMap';
 import type { MinigameId, MinigameResult } from './minigames/types';
 import { ThinkerScene } from './lake/thinkerReveal';
+import { LetterScene } from './letterScene';
+import { drawLetterScene } from '../art/letterActors';
 import { piranhasAggro } from './enemies/piranha';
 import { JungleWildlife } from './wildlife';
 import { Village } from './village';
@@ -148,6 +150,8 @@ export class World {
   lakeMap: LakeMap | null = null;
   /** revelação da Praça do Pensador (só existe se a fase tem a estátua) */
   thinker!: ThinkerScene;
+  /** pombo-correio e macaco que rouba a carta da Júlia (fase 2) */
+  letter!: LetterScene;
   private pearlIds: number[] = [];
   /** pérolas do lago já coletadas (derivado dos IDs coletados; sem campo novo no save) */
   pearls() { let n = 0; for (const id of this.pearlIds) if (this.collectedPickups.has(id)) n++; return n; }
@@ -268,6 +272,7 @@ export class World {
     this.water = new Waters(data.water ?? [], this.level, data.decos);
     this.lakeMap = LakeMap.create(this.level, data.water ?? []);
     this.thinker = new ThinkerScene(this);
+    this.letter = new LetterScene(this);
     this.pearlIds = data.pickups.filter((p) => p.kind === 'pearl').map((p) => p.id);
     this.wildlife = new JungleWildlife(data);
     this.village = new Village(data);
@@ -328,6 +333,7 @@ export class World {
     this.village?.reset(this);
     this.club?.reset(this);
     this.thinker?.reset(this);
+    this.letter?.reset(this);
     this.encounters?.reset(true);
     for (const v of this.vines) {
       v.held = false;
@@ -630,6 +636,7 @@ export class World {
     this.village.reset(this);
     this.club.reset(this);
     this.thinker?.reset(this);
+    this.letter?.reset(this);
     this.encounters.reset();
     this.narrator.onRespawn();
     this.restoreTiles();
@@ -1185,7 +1192,8 @@ export class World {
     this.village.update(this, dt, ctl);
     this.club.update(this, dt);
     this.thinker.update(this, dt);
-    p.update(this, dt, this.thinker.control(this.club.control(ctl)));
+    this.letter.update(this, dt);
+    p.update(this, dt, this.letter.control(this.thinker.control(this.club.control(ctl))));
     this.encounters.update(this, dt);
     this.wildlife.update(this, dt);
     this.updateLoyal(p);
@@ -1279,6 +1287,7 @@ export class World {
     this.village.camera(this);
     this.club.camera(this);
     this.thinker.camera(this);
+    this.letter.camera(this);
     cam.update(dt, p.x, p.y - (p.mode === 'nomad' ? 6 : 14), p.facing, p.body.vx, p.body.onGround, this.fx.shake, settings.screenShake);
   }
 
@@ -1336,6 +1345,7 @@ export class World {
     this.drawShadows(g);
     this.crowd.draw(g, this);
     this.village.draw(g, this);
+    drawLetterScene(g, this, this.letter);
     drawExploration(g,this);
     this.merchant.draw(g,this);
     this.encounters.draw(g,this);
@@ -1376,6 +1386,7 @@ export class World {
     this.encounters.drawPrompts(g, this);
     this.crowd.drawBalloon(g, this);
     this.village.draw(g, this, true);
+    drawLetterScene(g, this, this.letter, true);
     this.fx.drawPopups(g);
     void art.props;
   }

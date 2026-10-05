@@ -143,6 +143,58 @@ function createArt() {
   return { crocBody, lowerJaw, upperJaw, birdBody, birdHead, snakeHead, monkeys };
 }
 
+/** Pose do macaco-prego solto (a cena da carta e a perseguição desenham o MESMO macaco da fauna). */
+export interface MonkeyPose {
+  /** 1 = olha para a direita */
+  facing: 1 | -1;
+  /** −1..1: passada das pernas */
+  stride: number;
+  /** braços: 'rest' pendurados, 'up' erguidos (dança/careta), 'hold' segurando algo à frente */
+  arms: 'rest' | 'up' | 'hold';
+  /** rotação da cabeça (rad) e do corpo inteiro */
+  headRot?: number;
+  bodyRot?: number;
+  /** cansado: língua de fora e suor */
+  tired?: boolean;
+  alpha?: number;
+}
+/** Desenha o macaco-prego com os pés em (x, y); `s` = escala. */
+export function drawMonkey(g: CanvasRenderingContext2D, x: number, y: number, s: number, t: number, p: MonkeyPose) {
+  if (!art) return;
+  const m = art.monkeys[1];
+  const prev = g.globalAlpha;
+  if (p.alpha !== undefined) g.globalAlpha = prev * p.alpha;
+  g.save();
+  g.translate(x, y - 24 * s);
+  g.rotate(p.bodyRot ?? 0);
+  g.scale(p.facing * s, s);
+  const stride = p.stride;
+  // rabo
+  g.strokeStyle = OUT; g.lineWidth = 9; g.beginPath(); g.moveTo(-8, 9);
+  g.bezierCurveTo(-35, 26, -45, -8 + Math.sin(t * 5) * 9, -31, -18); g.stroke();
+  g.strokeStyle = m.fur; g.lineWidth = 7; g.stroke();
+  for (const k of [-1, 1]) {
+    line(g, [k * 7, 2, k * 11 + stride * k * 6, 12, k * 12 - stride * k * 8, 24], OUT, 7);
+    line(g, [k * 7, 2, k * 11 + stride * k * 6, 12, k * 12 - stride * k * 8, 24], m.fur, 4.5);
+    oval(g, k * 12 - stride * k * 8 + 3, 24, 6, 2.8, m.light);
+  }
+  drawSpr(g, m.body, 0, 0, { rot: stride * 0.07 });
+  // braço da frente
+  const hand: [number, number] = p.arms === 'up' ? [20 + Math.sin(t * 9) * 4, -34] : p.arms === 'hold' ? [26, -6] : [13 - stride * 6, 18];
+  const mid: [number, number] = p.arms === 'up' ? [18, -14] : p.arms === 'hold' ? [20, -2] : [18 + stride * 4, 3];
+  line(g, [9, -10, mid[0], mid[1], hand[0], hand[1]], OUT, 6);
+  line(g, [9, -10, mid[0], mid[1], hand[0], hand[1]], m.fur, 4);
+  if (p.arms !== 'rest') { oval(g, hand[0], hand[1], 4.2, 3.6, m.light); }
+  drawSpr(g, m.head, 5, -22, { rot: p.headRot ?? 0 });
+  if (p.tired) {
+    // língua de fora e gota de suor
+    oval(g, 11, -14, 2.4, 4, '#e8657a');
+    oval(g, -4, -36, 2, 3.2, '#bfe8ff');
+  }
+  g.restore();
+  g.globalAlpha = prev;
+}
+
 /** Called while the jungle loading screen is active, never on the first gameplay frame. */
 export function prepareWildlifeArt() {
   if (!art) art = createArt();
