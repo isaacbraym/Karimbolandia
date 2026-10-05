@@ -76,9 +76,20 @@ describe('Casas distintas e exploração livre', () => {
     }
   });
 
-  it('a balada tem exatamente cinco vezes os 13 dançarinos anteriores em cinco planos',()=>{
+  it('a balada mantém 65 dançarinos espaçados em profundidades variadas e na ordem de oclusão',()=>{
     const w=new World(buildLevel());expect(w.club.crowd).toHaveLength(65);
-    expect(new Set(w.club.crowd.map(d=>d.depth)).size).toBe(5);
+    const crowd=w.club.crowd,room=w.club.room!;
+    expect(new Set(crowd.map(d=>Math.round(d.depth))).size).toBeGreaterThan(40);
+    expect(crowd[0].depth-crowd.at(-1)!.depth).toBeGreaterThan(140);
+    for(const [i,d] of crowd.entries()){
+      expect(d.x).toBeGreaterThan(room.x+24);
+      expect(d.x).toBeLessThan(room.x+room.w-24);
+      expect(d.depth).toBeGreaterThan(30); // o plano do Karimbo fica livre
+      if(i>0)expect(d.depth).toBeLessThanOrEqual(crowd[i-1].depth);
+      for(const other of crowd.slice(0,i)){
+        expect(Math.hypot(d.x-other.x,(d.depth-other.depth)*2)).toBeGreaterThan(48);
+      }
+    }
     expect(new Set(w.club.crowd.map(d=>d.style)).size).toBe(4);
     expect(w.data.beams).toEqual([]);
   });

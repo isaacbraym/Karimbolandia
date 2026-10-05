@@ -1243,6 +1243,7 @@ export class World {
     if (this.water.zones.length) drawWaterBack(g, this);
     if (this.data.rooms?.length) drawRoomBack(g, this);
     this.director.drawDecos(g, 'back');
+    drawClub(g, this, 'floor');
     // tiles
     art.tiles.render(g, L, cam.x, cam.y, cam.w, cam.h, this.time);
     this.drawWet(g);

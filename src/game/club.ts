@@ -8,7 +8,7 @@
  */
 import type { World } from './world';
 import type { ControlState } from '../core/input';
-import type { Rect } from '../core/math';
+import { Rng, type Rect } from '../core/math';
 import { TILE } from './level';
 import { rollLook, type CivLook } from './civLook';
 import { nullControls } from './player';
@@ -17,6 +17,7 @@ export const CLUB_DANCE_ID = 'club:dance';
 /** tempos da cena (s): dança antes do Sivirino estendida em +5 segundos */
 export const CLUB_T = { walk: 1.1, dance: 1.3, sivirino: 9.6, turn: 13.6, max: 20 } as const;
 const BPM = 150;
+export const CLUB_FLOOR_DEPTH = 224;
 
 
 
@@ -46,12 +47,30 @@ export class ClubScene {
     this.floorY = r ? r.rect.y + r.rect.h : 0;
     this.spotX = r ? r.rect.x + 12 * TILE : 0;
     if (r) {
-      // Cinco fileiras; o corredor do Karimbo permanece legível no plano mais próximo.
+      // Pontos contínuos: escolhe espaços livres, sem fileiras ou colunas visíveis.
+      // Apenas na criação da cena; não há busca, sorteio ou ordenação por quadro.
+      const rng = new Rng(9237);
+      const spots: { x: number; depth: number }[] = [];
       for (let i = 0; i < CLUB_CROWD.length; i++) {
-        const row = Math.floor(i / 13), depth = 122 - row * 23;
-        const x = r.rect.x + (3.5 + i % 13 * 3.4) * TILE + depth * .55;
-        this.crowd.push({ x, depth, scale: .64 + row * .065, style: i % 4,
-          look: CLUB_CROWD[i], phase: (i * 0.37) % 1, facing: i % 2 ? -1 : 1 });
+        let best = { x: 0, depth: 0 }, bestSpace = -1;
+        for (let c = 0; c < 64; c++) {
+          const depth = rng.range(32, CLUB_FLOOR_DEPTH - 28);
+          const x = rng.range(r.rect.x + 48 + depth * .55, r.rect.x + r.rect.w - 48 - depth * .1);
+          let space = Infinity;
+          for (const other of spots) {
+            // Dá mais peso à separação em profundidade para preservar silhuetas e rostos.
+            const dx = x - other.x, dy = (depth - other.depth) * 2;
+            space = Math.min(space, dx * dx + dy * dy);
+          }
+          if (space > bestSpace) { best = { x, depth }; bestSpace = space; }
+        }
+        spots.push(best);
+      }
+      // Ordena os pontos antes de atribuir identidades; índices continuam iguais aos sprites assados.
+      spots.sort((a, b) => b.depth - a.depth);
+      for (const [i, { x, depth }] of spots.entries()) {
+        this.crowd.push({ x, depth, scale: .95 - depth / 650, style: i % 4,
+          look: CLUB_CROWD[i], phase: rng.next(), facing: rng.chance(.5) ? -1 : 1 });
       }
     }
   }
