@@ -54,7 +54,7 @@ A revisão independente após a T4 (commit `0770ed2`) achou, entre outras: a mú
 
 ## Evidência de desempenho (e o que ela não prova)
 
-Rota única da T0 (`?fase=2&qa=1&god=1&tp=520`: lago raso → fenda → praça → palácio, 240 quadros por parada, Chromium embutido 1440×900, quadros avançados manualmente — painel oculto): ver a tabela registrada no estudo de minijogos (mesma metodologia). Isso é custo de CPU/JS por quadro numa máquina de desenvolvimento, **não** fluidez em celular. A validação física (g54 / Edge 30 Neo) está aberta no Beads (ver `bd show karim-uer`).
+Rota única da T0 (`?fase=2&qa=1&god=1&tp=520`: lago raso → fenda → praça → palácio, 240 quadros por parada, Chromium embutido 1440×900, quadros avançados manualmente — painel oculto): comparação com a linha de base no estudo de minijogos (seção "Medições finais"): P95 4,5 → 5,6 ms, P99 5,7 → 7,2 ms e nenhum quadro acima de 20,8 ms, com 648 → 1067 peixes. Isso é custo de CPU/JS por quadro numa máquina de desenvolvimento, **não** fluidez em celular. A validação física (g54 / Edge 30 Neo) está aberta no Beads (ver `bd show karim-uer`).
 
 ## Limites
 

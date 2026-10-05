@@ -66,6 +66,33 @@ Perk da skin: fôlego +30%, nado +40%, vida +10% (`SKIN_PERKS`, reaplicado em `P
 
 Os testes de custo usam um contexto falso que só conta chamadas: provam um **teto de chamadas e ausência de criação por quadro**, não a cadência de um aparelho.
 
+## Medições finais (2026-10-05) e o que elas não provam
+
+Ambiente: Chromium embutido do app, 1440×900, DPR 1, **painel oculto** (os quadros são avançados à mão com `step` + `render`; `tools/_work/qa.js`, não versionado). É custo de CPU/JS numa máquina de desenvolvimento, **não** fluidez em celular.
+
+| Cena | Linha de base (T0, `e37992d`) | Final (`6e2d04b`+) |
+|---|---|---|
+| Lago, rota única (7 paradas × 240 quadros), 2ª passada | p50 1,9 · p95 4,5 · p99 5,7 · máx 8,8 ms · 0 quadros > 20,8 ms · 648 peixes | p50 2,7 · p95 5,6 · p99 7,2 · máx 11 ms · 0 quadros > 20,8 ms · 1067 peixes |
+| Lago, 1ª passada (frio, servidor de desenvolvimento) | p95 5,0 · máx 78,6 ms | p95 6,5 · p99 13,8 · máx 143 ms (10 quadros > 20,8 ms: bakes) |
+| Perseguição (900 quadros) | — | p50 0,1 · p95 0,3 · p99 1,1 · máx 4,3 ms |
+| Boxe (900 quadros) | — | p50 1,2–1,5 · p95 2,1–3,7 ms; **travadas de ~130 ms em ~5% dos quadros** (ver abaixo) |
+
+O lago ficou ~1 ms mais caro no P95 com 65% mais peixes, vegetação e pérolas; nenhum quadro passou do orçamento de 20,8 ms na 2ª passada. Não foi cortado nenhum efeito (D05).
+
+**Achado não resolvido (boxe):** nos estados de ataque do jacaré (`tele`/`recover`) alguns quadros levam 100–190 ms, todos dentro de `drawKidsFront` (a cópia da camada intermediária das crianças da frente para o canvas principal; cronometrado: `blit` 109/192/172 ms). Com essa camada desligada: p99 5,7 ms e máximo 7 ms. Remover `source-atop` não mudou; desenhar as crianças direto no canvas principal deu resultados inconsistentes entre rodadas, então pode ser artefato do raster por software com painel oculto. **Não foi tratado como defeito de aparelho nem como resolvido**; está aberto no Beads para repetir em Chrome visível/aparelho real e, se persistir, trocar a camada por sprites pré-assados escurecidos.
+
+Build de produção (`npm run build`), brutos / gzip:
+
+| Chunk | Linha de base | Final |
+|---|---|---|
+| `index-*.js` (principal) | 759,67 kB / 252,32 kB | 840,05 kB / 277,89 kB |
+| `boxing-*.js` | — | 30,17 kB / 11,11 kB |
+| `chase-*.js` | — | 47,79 kB / 17,64 kB |
+| `firebaseCloud-*.js`, `interior-*.js` | 529,26 / 68,26 kB | iguais |
+| Letra Caveat (`woff2`) | — | asset separado, só pedido pela perseguição |
+
+O principal cresceu ~80 kB (+25 kB gzip) por causa de lago/skin/cenas do mundo (espécies, vegetação, minimapa, revelação, conversa do jacaré, cena do pombo), não dos minijogos. Testes: 598 em 66 arquivos → 733 em 81.
+
 ## Limites
 
 - Os tempos 51/64/≤ 92 s são de bots determinísticos em 1/60 s; jogador real varia. As constantes (`MONKEY_V`, `SHAKE_T`, dicas) foram calibradas **com esses bots**; mexer no percurso ou na física obriga a rodar `tests/chase.test.ts` e reavaliar.
