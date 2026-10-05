@@ -49,6 +49,9 @@ export interface Thrown { kind: 'banana' | 'coconut'; x: number; y: number; vx: 
 export interface ShakyState { def: Course['shaky'][number]; tiles?: number[]; gone?: boolean[] }
 export interface SpringState { press: number }
 
+/** Amostra do percurso (20 por segundo) para rebobinar a fita depois da captura. */
+export interface TrailPoint { x: number; y: number; air: boolean; mx: number; my: number }
+
 export interface ChaseResult { outcome: 'win'; time: number; falls: number; stumbles: number }
 
 const RUNNER_EV = (m: ChaseMatch): RunnerEvents => ({
@@ -63,6 +66,8 @@ export class ChaseMatch {
   readonly thrown: Thrown[] = [];
   readonly shaky: ShakyState[] = [];
   readonly springs: SpringState[] = [];
+  readonly trail: TrailPoint[] = [];
+  private lastRec = -1;
   time = 0;
   falls = 0;
   stumbles = 0;
@@ -126,6 +131,10 @@ export class ChaseMatch {
     this.thrownStep(dt);
     this.monkeyStep(dt);
     this.talk();
+    if (this.time - this.lastRec >= 0.05 && this.trail.length < 4000) {
+      this.lastRec = this.time;
+      this.trail.push({ x: this.runner.x, y: this.runner.feetY, air: !this.runner.body.onGround, mx: this.monkey.x, my: this.monkey.y - this.monkey.hop });
+    }
   }
 
   // ───────────────────────── macaco ─────────────────────────

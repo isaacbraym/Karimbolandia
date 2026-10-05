@@ -15,6 +15,8 @@ import { drawBanana, drawBromeliad, drawCoati, drawCoconut, drawEnvelope, drawHi
 import type { ChaseEvent, ChaseMatch } from '../../../game/minigames/chase/sim/match';
 import { CATCH_GAP, MIN_CATCH_T } from '../../../game/minigames/chase/sim/match';
 import { CHASE_RUN } from '../../../game/minigames/chase/sim/runner';
+import type { Rewind } from '../../../game/minigames/chase/sim/letterFilm';
+import { RewindFx } from './rewindFx';
 
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
 const damp = (a: number, b: number, k: number, dt: number) => a + (b - a) * (1 - Math.exp(-k * dt));
@@ -40,12 +42,14 @@ export class ChaseScene {
   private sinceLand = 9;
   private hiveAngry = new Map<object, number>();
   private slothBounce = new Map<object, number>();
+  private vhs: RewindFx | null = null;
 
   constructor(W: number, H: number) { this.resize(W, H); }
 
   resize(W: number, H: number) {
     this.W = W; this.H = H;
     this.bg = bakeBackdrop(W, H);
+    this.vhs = null;
   }
 
   /** Reage a um evento da simulação com letreiros, poeira e folhas. */
@@ -287,6 +291,47 @@ export class ChaseScene {
     for (let i = 0; i < 14; i++) { const y = ((i * 97 + this.time * 900) % H), x = ((i * 211 - this.time * 1800) % (W + 160) + W + 160) % (W + 160) - 80; g.moveTo(x, y); g.lineTo(x + 70, y); }
     g.stroke();
     g.restore();
+  }
+
+
+  // ───────────────────────── rebobinar ─────────────────────────
+  /** Câmera do rebobinar: segue o ponto gravado (a altura suaviza, o resto acompanha rápido). */
+  updateRewind(dt: number, rw: Rewind) {
+    this.time += dt;
+    this.runPhase -= dt * 16;
+    this.speedLines = 0.7;
+    const sm = rw.sample(), viewW = this.W / this.zoom, viewH = this.H / this.zoom;
+    this.anchorY = this.time < 0.05 || rw.t < 0.05 ? sm.y : damp(this.anchorY, sm.y, 5, dt);
+    this.camX = Math.max(0, sm.x - viewW * 0.34);
+    this.camY = this.anchorY - viewH * 0.62;
+  }
+
+  /** O percurso gravado rola ao contrário: o Karimbo anda de costas segurando a carta e o macaco corre de costas. */
+  drawRewind(g: CanvasRenderingContext2D, m: ChaseMatch, rw: Rewind, W: number, H: number) {
+    if (W !== this.W || H !== this.H) this.resize(W, H);
+    const bg = this.bg!, s = this.zoom, t = this.time, sm = rw.sample();
+    g.drawImage(bg.sky, 0, 0, W, H);
+    drawLayer(g, bg.far, W, H, this.camX, 0.12, H * 0.06 - this.camY * 0.04);
+    drawLayer(g, bg.mid, W, H, this.camX, 0.3, H * 0.1 - this.camY * 0.08);
+    drawLayer(g, bg.near, W, H, this.camX, 0.55, H * 0.12 - this.camY * 0.16);
+    g.save();
+    g.scale(s, s);
+    g.translate(-Math.round(this.camX * s) / s, -Math.round(this.camY * s) / s);
+    getArt().tiles.render(g, m.course.level, this.camX, this.camY, W / s, H / s, t);
+    // macaco correndo de costas (aparece quando entra na tela)
+    if (sm.mx > this.camX - 60 && sm.mx < this.camX + W / s + 60) {
+      drawMonkey(g, sm.mx, sm.my, 1.2, t, { facing: 1, stride: Math.sin(-t * 17), arms: 'hold', headRot: 0.1 });
+      drawEnvelope(g, sm.mx + 32, sm.my - 38, Math.sin(t * 8) * 0.25, 1.15);
+    }
+    const pose: KPose = {
+      facing: 1, state: sm.air ? 'fall' : 'run', t, runPhase: this.runPhase, speed01: 1, aim: 0, weapon: 'rifle', kick: 0, flash: false,
+      earGlide: 0, vy: 0, alpha: 1, hasGun: false, lean: -0.12, earSpring: 0.4, idleT: t,
+    };
+    drawKarimbo(g, getArt().karimbo, sm.x, sm.y, pose, progress.equippedSkin);
+    drawEnvelope(g, sm.x + 18, sm.y - 30, -0.4, 1.1);
+    g.restore();
+    this.drawSpeed(g, W, H);
+    (this.vhs ??= new RewindFx(W, H)).draw(g, rw.t, rw.clock);
   }
 
   // ───────────────────────── HUD ─────────────────────────

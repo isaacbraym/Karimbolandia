@@ -57,3 +57,31 @@ describe('custo de desenho da perseguição', () => {
     expect(canvases - afterWarm).toBeLessThan(120);
   });
 });
+
+describe('custo de desenho do filminho e do rebobinar', () => {
+  it('a carta revela linhas copiando imagens (poucas) e não cria canvas durante a leitura', async () => {
+    const { LetterPaper } = await import('../src/art/minigames/chase/letterPaper');
+    const { LETTER_PAGES, pageChars } = await import('../src/game/minigames/chase/sim/letterFilm');
+    const g = ctx();
+    const paper = new LetterPaper(667, 320, 2);
+    const warm = canvases;
+    let worst = 0;
+    for (let page = 0; page < LETTER_PAGES.length; page++) {
+      for (let shown = 0; shown <= pageChars(page); shown += 7) { draws = 0; paper.draw(g, page, shown); worst = Math.max(worst, draws); }
+    }
+    expect(worst).toBeLessThanOrEqual(40);
+    expect(canvases).toBe(warm);
+  });
+
+  it('o efeito de fita só copia imagens assadas (≤ 12 por quadro com os textos, sem canvas novo)', async () => {
+    const { RewindFx } = await import('../src/art/minigames/chase/rewindFx');
+    const g = ctx();
+    const fx = new RewindFx(667, 320);
+    const warm = canvases;
+    let worst = 0;
+    for (let i = 0; i < 240; i++) { draws = 0; fx.draw(g, i / 60, 52 * (1 - i / 240)); worst = Math.max(worst, draws); }
+    expect(worst).toBeLessThanOrEqual(12);
+    // só os dígitos novos do cronômetro viram texto em cache
+    expect(canvases - warm).toBeLessThan(60);
+  });
+});
