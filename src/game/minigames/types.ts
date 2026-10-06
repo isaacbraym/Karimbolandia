@@ -24,6 +24,8 @@ export interface MinigameContext {
   touch: (mode: TouchMinigameMode | null) => void;
   /** mostra/esconde o botão ORELHADA! do toque */
   special: (on: boolean) => void;
+  /** vibração curta (celular) / rumble (controle), respeitando a configuração do jogador */
+  haptic?: (strength: number, ms: number) => void;
 }
 
 export interface MinigameSession {

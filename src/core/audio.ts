@@ -17,7 +17,8 @@ export type SfxName =
   | 'victory' | 'servo' | 'spark' | 'slam' | 'burp' | 'burpBig' | 'crush' | 'extraLife' | 'thunder' | 'knife'
   | 'splash' | 'bigSplash' | 'wade' | 'swim' | 'bubble' | 'suitOn' | 'bird' | 'bird2' | 'insect' | 'frog' | 'creak' | 'rumble' | 'crocBite'
   | 'snore' | 'cluck' | 'tvStatic' | 'thump' | 'crunch'
-  | 'punchLight' | 'punchHeavy' | 'whoosh' | 'bell' | 'crowdGasp' | 'crowdLaugh' | 'chomp';
+  | 'punchLight' | 'punchHeavy' | 'whoosh' | 'bell' | 'crowdGasp' | 'crowdLaugh' | 'chomp'
+  | 'jabHit' | 'hookHit' | 'upperHit' | 'blockThud' | 'dodgeSwish' | 'perfectChime' | 'starGet' | 'furyRoar' | 'tick';
 
 type LoopName = 'glide' | 'roll' | 'alarm' | 'laser' | 'thrusterLoop';
 
@@ -957,6 +958,47 @@ export class AudioEngine {
         this.noise({ dur: 0.18, vol: 0.5 * v, type: 'lowpass', f0: 1500, f1: 120, pan });
         this.tone({ type: 'sine', f0: 130 * r, f1: 36, dur: 0.24, vol: 0.55 * v, pan });
         this.noise({ dur: 0.05, vol: 0.3 * v, type: 'highpass', f0: 2800, pan });
+        break;
+      // ---- boxe 2.0: cada golpe tem estalo (alto), corpo (médio) e baque (grave); o peso cresce com o tipo
+      case 'jabHit':
+        this.noise({ dur: 0.045, vol: 0.34 * v, type: 'highpass', f0: 2600, pan });
+        this.tone({ type: 'sine', f0: 320 * r, f1: 130, dur: 0.06, vol: 0.28 * v, pan });
+        break;
+      case 'hookHit':
+        this.noise({ dur: 0.1, vol: 0.42 * v, type: 'bandpass', f0: 1700, f1: 500, q: 1, pan });
+        this.tone({ type: 'sine', f0: 190 * r, f1: 62, dur: 0.14, vol: 0.5 * v, pan });
+        this.noise({ dur: 0.04, vol: 0.3 * v, type: 'highpass', f0: 3200, pan });
+        break;
+      case 'upperHit':
+        this.tone({ type: 'sine', f0: 110 * r, f1: 44, dur: 0.22, vol: 0.62 * v, pan });
+        this.noise({ dur: 0.16, vol: 0.46 * v, type: 'lowpass', f0: 1800, f1: 160, pan });
+        this.tone({ type: 'triangle', f0: 260 * r, f1: 620, dur: 0.1, vol: 0.18 * v, delay: 0.02, pan });
+        this.noise({ dur: 0.05, vol: 0.34 * v, type: 'highpass', f0: 3000, pan });
+        break;
+      case 'blockThud':
+        this.noise({ dur: 0.09, vol: 0.3 * v, type: 'lowpass', f0: 700, f1: 140, pan });
+        this.tone({ type: 'sine', f0: 150 * r, f1: 70, dur: 0.1, vol: 0.34 * v, pan });
+        break;
+      case 'dodgeSwish':
+        this.noise({ dur: 0.2, vol: 0.2 * v, type: 'bandpass', f0: 900, f1: 3200, q: 0.9, att: 0.07, pan });
+        this.noise({ dur: 0.14, vol: 0.1 * v, type: 'highpass', f0: 3600, att: 0.05, delay: 0.04, pan });
+        break;
+      case 'perfectChime':
+        this.tone({ type: 'triangle', f0: 1318, dur: 0.22, vol: 0.2 * v, lp: 6000 });
+        this.tone({ type: 'triangle', f0: 1760, dur: 0.34, vol: 0.22 * v, delay: 0.07, lp: 6000 });
+        this.tone({ type: 'sine', f0: 2637, dur: 0.3, vol: 0.1 * v, delay: 0.07 });
+        break;
+      case 'starGet':
+        for (let i = 0; i < 3; i++) this.tone({ type: 'triangle', f0: (784 * r) * (1 + i * 0.26), dur: 0.12, vol: 0.18 * v, delay: i * 0.06, lp: 5200 });
+        break;
+      case 'furyRoar':
+        this.tone({ type: 'sawtooth', f0: 90 * r, f1: 55, dur: 0.7, vol: 0.2 * v, lp: 520, att: 0.1, vib: 12, vibHz: 22, pan });
+        this.noise({ dur: 0.7, vol: 0.2 * v, type: 'lowpass', f0: 900, f1: 220, q: 1, att: 0.08, pan });
+        this.tone({ type: 'square', f0: 220, f1: 330, dur: 0.5, vol: 0.06 * v, lp: 1200, delay: 0.1 });
+        break;
+      case 'tick':
+        this.tone({ type: 'square', f0: 880 * r, f1: 660, dur: 0.05, vol: 0.14 * v, lp: 2400 });
+        this.noise({ dur: 0.03, vol: 0.1 * v, type: 'highpass', f0: 3000 });
         break;
       case 'whoosh':
         this.noise({ dur: 0.16, vol: 0.2 * v, type: 'bandpass', f0: 700, f1: 2600, q: 0.8, att: 0.05, pan });

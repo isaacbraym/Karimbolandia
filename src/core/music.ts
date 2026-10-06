@@ -777,8 +777,14 @@ export const MIX = {
   /** "drop" da boate: tudo, com a guitarra e o coro */
   drop: { pad: 0.8, bass: 1, arp: 0.9, hat: 1, kick: 1, snare: 1, lead: 1, power: 0.9, choir: 0.8, tom: 0.7 } as Partial<Record<Layer, number>>,
   victory: { pad: 1, lead: 0.8, arp: 0.7, bass: 0.6 } as Partial<Record<Layer, number>>,
-  /** luta de rua do boxe: tambor tribal, baixo e coro nas viradas */
-  fight: { pad: 0.5, bass: 1, arp: 0.7, hat: 0.9, kick: 1, snare: 0.9, tom: 1, lead: 0.8, choir: 0.7 } as Partial<Record<Layer, number>>,
+  /** luta do boxe, round 1: tambor e baixo; o resto entra com os rounds (a música cresce junto com a luta) */
+  fight1: { pad: 0.45, bass: 1, arp: 0.35, hat: 0.7, kick: 1, snare: 0.6, tom: 1 } as Partial<Record<Layer, number>>,
+  /** round 2: entram o arpejo, a melodia e a caixa cheia */
+  fight2: { pad: 0.5, bass: 1, arp: 0.7, hat: 0.9, kick: 1, snare: 0.9, tom: 1, lead: 0.7, choir: 0.35 } as Partial<Record<Layer, number>>,
+  /** round 3 (Jacaré Furioso): tudo, com a guitarra e o coro */
+  fight3: { pad: 0.6, bass: 1, arp: 0.95, hat: 1, kick: 1, snare: 1, tom: 1, lead: 1, power: 0.55, choir: 0.95 } as Partial<Record<Layer, number>>,
+  /** intervalo e contagem: pad, baixo leve e tambor baixo */
+  fightBreak: { pad: 0.75, bass: 0.45, arp: 0.4, tom: 0.4, choir: 0.25 } as Partial<Record<Layer, number>>,
   /** perseguição do macaco: galope de tambor, baixo, arpejo e o riff do desenho animado */
   chase: { pad: 0.4, bass: 1, arp: 0.8, hat: 0.9, kick: 1, snare: 0.9, tom: 0.9, lead: 0.9 } as Partial<Record<Layer, number>>,
   /** praça do Pensador: pad e coro, tímpano, baixo e melodia larga */

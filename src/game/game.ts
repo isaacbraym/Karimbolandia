@@ -936,7 +936,10 @@ export class Game {
       case 'victory': m('stage', MIX.victory); break;
       case 'rave': music.play('rave', MIX.rave); break;
       case 'monument': music.play('monument', MIX.monument); break;
-      case 'fight': music.play('fight', MIX.fight); break;
+      case 'fight': case 'fight1': music.play('fight', MIX.fight1); break;
+      case 'fight2': music.play('fight', MIX.fight2); break;
+      case 'fight3': music.play('fight', MIX.fight3); break;
+      case 'fightBreak': music.play('fight', MIX.fightBreak); break;
       case 'chase': music.play('chase', MIX.chase); break;
     }
   }

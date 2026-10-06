@@ -129,6 +129,7 @@ export class MinigameFlow {
         music: (s) => w.setMusic(s),
         touch: (m) => this.host.touchMode(m),
         special: (on) => this.host.touchSpecial(on),
+        haptic: (strength, ms) => this.host.input.haptic(strength, ms),
       });
     } catch (e) {
       console.error('minijogo', e);

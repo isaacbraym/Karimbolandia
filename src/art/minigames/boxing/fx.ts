@@ -5,7 +5,7 @@
  */
 import { makeCanvas } from '../../kit';
 
-interface Particle { x: number; y: number; vx: number; vy: number; life: number; max: number; kind: 0 | 1 | 2 | 3; rot: number; vr: number; size: number; color: string; g: number }
+interface Particle { x: number; y: number; vx: number; vy: number; life: number; max: number; kind: 0 | 1 | 2 | 3 | 4; rot: number; vr: number; size: number; color: string; g: number }
 export interface Pop { text: string; x: number; y: number; t: number; dur: number; color: string; size: number; vy: number; rot: number }
 
 const MAX_PARTICLES = 90;
@@ -64,9 +64,14 @@ export class BoxFx {
   flashColor = '#ffffff';
   /** 0..1: linhas de velocidade (golpe final) */
   lines = 0;
-  /** deslocamento atual da tremida (px lógicos) */
+  /** deslocamento atual da tremida (px lógicos): o chute direcional + o tremor aleatório */
   sx = 0;
   sy = 0;
+  /** chute direcional da câmera (a direção do golpe) e pulso de zoom: decaem rápido, como no estudo de game feel */
+  private kx = 0;
+  private ky = 0;
+  /** fração de ampliação da cena (0 = nenhuma) */
+  zoom = 0;
 
   constructor() {
     for (let i = 0; i < MAX_PARTICLES; i++) this.p.push({ x: 0, y: 0, vx: 0, vy: 0, life: 0, max: 1, kind: 0, rot: 0, vr: 0, size: 1, color: '#fff', g: 0 });
@@ -76,13 +81,18 @@ export class BoxFx {
     for (const q of this.p) q.life = 0;
     this.pops.length = 0;
     this.shake = this.flash = this.lines = 0;
+    this.kx = this.ky = this.zoom = this.sx = this.sy = 0;
   }
 
   addShake(a: number, dur = 0.25) { if (a > this.shake) { this.shake = a; this.shakeT = dur; } }
+  /** Empurra a câmera na direção do impacto (px lógicos) e a deixa voltar sozinha. */
+  kick(dx: number, dy: number) { this.kx = Math.max(-40, Math.min(40, this.kx + dx)); this.ky = Math.max(-40, Math.min(40, this.ky + dy)); }
+  /** Pulso de zoom no impacto (0,02 = 2%). */
+  punch(z: number) { if (z > this.zoom) this.zoom = z; }
   addFlash(a: number, color = '#ffffff') { this.flash = Math.max(this.flash, a); this.flashColor = color; }
 
   /** Rajada de partículas num ponto (kind: 0 faísca, 1 estrela, 2 folha, 3 dente). */
-  burst(x: number, y: number, n: number, kind: 0 | 1 | 2 | 3, color: string, speed = 220, size = 3, grav = 600) {
+  burst(x: number, y: number, n: number, kind: 0 | 1 | 2 | 3 | 4, color: string, speed = 220, size = 3, grav = 600) {
     for (let i = 0; i < n; i++) {
       const q = this.p.find((a) => a.life <= 0);
       if (!q) return;
@@ -97,20 +107,27 @@ export class BoxFx {
     this.pops.push({ text, x, y, t: 0, dur, color, size, vy: -26, rot: (Math.random() - 0.5) * 0.25 });
   }
 
-  update(dt: number) {
-    for (const q of this.p) {
-      if (q.life <= 0) continue;
-      q.life -= dt;
-      q.vy += q.g * dt;
-      q.x += q.vx * dt; q.y += q.vy * dt; q.rot += q.vr * dt;
+  /** `freeze`: parada de impacto: as partículas e os letreiros esperam; só a câmera (chute e tremor) segue, que é o que vende o golpe. */
+  update(dt: number, freeze = false) {
+    if (!freeze) {
+      for (const q of this.p) {
+        if (q.life <= 0) continue;
+        q.life -= dt;
+        q.vy += q.g * dt;
+        q.x += q.vx * dt; q.y += q.vy * dt; q.rot += q.vr * dt;
+      }
+      for (let i = this.pops.length - 1; i >= 0; i--) { const o = this.pops[i]; o.t += dt; o.y += o.vy * dt; if (o.t >= o.dur) this.pops.splice(i, 1); }
     }
-    for (let i = this.pops.length - 1; i >= 0; i--) { const o = this.pops[i]; o.t += dt; o.y += o.vy * dt; if (o.t >= o.dur) this.pops.splice(i, 1); }
+    const dk = Math.exp(-dt * 13);
+    this.kx *= dk; this.ky *= dk; this.zoom *= Math.exp(-dt * 9);
+    let jx = 0, jy = 0;
     if (this.shakeT > 0) {
       this.shakeT -= dt;
-      this.sx = (Math.random() - 0.5) * 2 * this.shake;
-      this.sy = (Math.random() - 0.5) * 2 * this.shake;
-      if (this.shakeT <= 0) { this.shake = 0; this.sx = this.sy = 0; }
+      jx = (Math.random() - 0.5) * 2 * this.shake;
+      jy = (Math.random() - 0.5) * 2 * this.shake;
+      if (this.shakeT <= 0) { this.shake = 0; jx = jy = 0; }
     }
+    this.sx = jx + this.kx; this.sy = jy + this.ky;
     this.flash = Math.max(0, this.flash - dt * 3);
     this.lines = Math.max(0, this.lines - dt * 1.4);
   }
@@ -127,6 +144,7 @@ export class BoxFx {
       if (q.kind === 0) g.fillRect(-q.size, -q.size * 0.4, q.size * 2, q.size * 0.8);
       else if (q.kind === 1) { g.beginPath(); for (let i = 0; i < 10; i++) { const an = -Math.PI / 2 + (i * Math.PI) / 5, r = i % 2 ? q.size * 0.5 : q.size * 1.3; g.lineTo(Math.cos(an) * r, Math.sin(an) * r); } g.closePath(); g.fill(); }
       else if (q.kind === 2) { g.beginPath(); g.ellipse(0, 0, q.size * 1.6, q.size * 0.8, 0, 0, Math.PI * 2); g.fill(); }
+      else if (q.kind === 4) { g.beginPath(); g.arc(0, 0, q.size, 0, Math.PI * 2); g.fill(); g.fillStyle = 'rgba(255,255,255,.7)'; g.beginPath(); g.arc(-q.size * 0.3, -q.size * 0.3, q.size * 0.35, 0, Math.PI * 2); g.fill(); }
       else { g.fillStyle = '#fbf6e4'; g.beginPath(); g.moveTo(-q.size, q.size); g.lineTo(0, -q.size * 1.4); g.lineTo(q.size, q.size); g.closePath(); g.fill(); }
       g.restore();
     }
