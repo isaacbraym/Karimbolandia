@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { newCtl } from './helpers/bot';
 import { Input } from '../src/core/input';
+import { BoxGestures } from '../src/ui/boxGestures';
 import { TouchUI } from '../src/ui/touch';
 import type { MinigameLoaders } from '../src/game/minigameFlow';
 import type { MinigameResult, MinigameSession } from '../src/game/minigames/types';
@@ -176,13 +177,13 @@ describe('modo de entrada do boxe', () => {
     expect(input.miniMode).toBeNull();
   });
 
-  it('o teclado do boxe: Q/W/E e J/K/L, A/D esquivam, S guarda, Espaço = especial', () => {
+  it('o teclado do boxe: a direita soca (J K U I N M), a esquerda defende (A/D esquivam, S abaixa, W guarda), Espaço = especial', () => {
     const input = new Input();
     input.setMiniMode('boxing');
     const keys = (input as unknown as { keys: Set<string> }).keys;
     const map: [string, keyof NonNullable<typeof input.state.mini>][] = [
-      ['KeyQ', 'jab'], ['KeyW', 'cruzE'], ['KeyE', 'ganchoE'], ['KeyJ', 'direto'], ['KeyK', 'cruzD'], ['KeyL', 'ganchoD'],
-      ['KeyA', 'esqE'], ['KeyD', 'esqD'], ['KeyS', 'guarda'], ['Space', 'especial'],
+      ['KeyJ', 'jab'], ['KeyK', 'direto'], ['KeyU', 'cruzE'], ['KeyI', 'cruzD'], ['KeyN', 'ganchoE'], ['KeyM', 'ganchoD'],
+      ['KeyA', 'esqE'], ['KeyD', 'esqD'], ['ArrowLeft', 'esqE'], ['ArrowRight', 'esqD'], ['KeyS', 'abaixar'], ['ArrowDown', 'abaixar'], ['KeyW', 'guarda'], ['ArrowUp', 'guarda'], ['Space', 'especial'], ['Enter', 'especial'],
     ];
     for (const [code, btn] of map) {
       keys.add(code);
@@ -203,24 +204,28 @@ function element() {
     classList: { add: (c: string) => classes.add(c), remove: (c: string) => classes.delete(c), contains: (c: string) => classes.has(c), toggle: (c: string, on: boolean) => (on ? classes.add(c) : classes.delete(c)) },
     setPointerCapture: vi.fn(), getBoundingClientRect: () => ({ left: 0, top: 0, right: 100, bottom: 100 }),
     querySelector: () => element(), addEventListener: (type: string, fn: (e: PointerEvent) => void) => listeners.set(type, fn),
-    emit(type: string, pointerId = 1, clientX = 50) { listeners.get(type)!({ type, pointerId, clientX, clientY: 50, preventDefault() {} } as PointerEvent); },
+    className: '', textContent: '', offsetWidth: 0, setAttribute() {}, appendChild() {},
+    emit(type: string, pointerId = 1, clientX = 50, clientY = 50) { listeners.get(type)!({ type, pointerId, clientX, clientY, preventDefault() {} } as PointerEvent); },
   };
 }
 
 describe('toque do boxe: cada dedo é dono do seu botão (Foco 3)', () => {
   function touchSetup() {
     vi.useFakeTimers();
-    vi.stubGlobal('window', { setTimeout: globalThis.setTimeout, clearTimeout: globalThis.clearTimeout });
+    vi.stubGlobal('window', { setTimeout: globalThis.setTimeout, clearTimeout: globalThis.clearTimeout, setInterval: globalThis.setInterval, clearInterval: globalThis.clearInterval });
+    vi.stubGlobal('document', { createElement: () => element() });
     const input = new Input();
     vi.spyOn(input, 'haptic').mockImplementation(() => {});
-    const els = { jab: element(), direto: element(), ganchoE: element(), zone: element() };
+    const els = { jab: element(), direto: element(), ganchoE: element(), dodgeL: element(), zoneL: element(), zoneR: element() };
     const ui = Object.assign(Object.create(TouchUI.prototype), {
-      input, releaseTimers: new Map(), zone: { id: -1, x: 0, t: 0, timer: 0, swiped: false },
+      input, releaseTimers: new Map(), gestures: new BoxGestures(), guardTimer: 0, fxPool: [], fxNext: 0, root: element(),
     }) as TouchUI;
     (ui as any).bindMini(els.jab, 'jab');
     (ui as any).bindMini(els.direto, 'direto');
     (ui as any).bindMini(els.ganchoE, 'ganchoE');
-    (ui as any).bindMiniZone(els.zone);
+    (ui as any).bindMini(els.dodgeL, 'esqE');
+    (ui as any).bindHandZone(els.zoneL, -1);
+    (ui as any).bindHandZone(els.zoneR, 1);
     input.setMiniMode('boxing');
     return { input, els, ui };
   }
@@ -267,39 +272,75 @@ describe('toque do boxe: cada dedo é dono do seu botão (Foco 3)', () => {
     expect(input.state.mini!.jab.released).toBe(true);
   });
 
-  it('esquiva por gesto com o outro dedo segurando GANCHO', () => {
+  it('metade da tela = uma mão: toque na esquerda dá jab e na direita dá direto, mesmo entre dois quadros', () => {
     const { input, els } = touchSetup();
-    els.ganchoE.emit('pointerdown', 1);
-    els.zone.emit('pointerdown', 2, 100);
-    vi.advanceTimersByTime(100);
-    els.zone.emit('pointermove', 2, 40); // −60 px em 100 ms
+    els.zoneL.emit('pointerdown', 1, 100, 200);
+    vi.advanceTimersByTime(60);
+    els.zoneL.emit('pointerup', 1, 100, 200);
+    els.zoneR.emit('pointerdown', 2, 500, 200);
+    vi.advanceTimersByTime(60);
+    els.zoneR.emit('pointerup', 2, 500, 200);
     input.poll();
-    expect(input.state.mini!.esqE.pressed).toBe(true);
-    expect(input.state.mini!.ganchoE.held).toBe(true); // o outro dedo continua no gancho
-    els.zone.emit('pointerup', 2);
-    expect(input.state.mini!.ganchoE.held).toBe(true);
+    expect(input.state.mini!.jab.pressed).toBe(true);
+    expect(input.state.mini!.direto.pressed).toBe(true);
   });
 
-  it('segurar parado ≥ 180 ms vira guarda enquanto segurar; soltar desliga', () => {
+  it('deslizar para cima na direita dá GANCHO mesmo com o outro dedo segurando a esquiva', () => {
     const { input, els } = touchSetup();
-    els.zone.emit('pointerdown', 1, 50);
+    els.dodgeL.emit('pointerdown', 1);
+    els.zoneR.emit('pointerdown', 2, 500, 300);
+    vi.advanceTimersByTime(50);
+    els.zoneR.emit('pointermove', 2, 502, 250); // −50 px para cima
+    input.poll();
+    expect(input.state.mini!.ganchoD.pressed).toBe(true);
+    expect(input.state.mini!.esqE.held).toBe(true); // o outro dedo continua na esquiva
+    els.zoneR.emit('pointerup', 2, 502, 250);
+    expect(input.state.mini!.jab.pressed).toBe(false);
+    input.poll();
+    expect(input.state.mini!.direto.pressed).toBe(false); // soltar o deslize não vira também um toque
+    expect(input.touch.mini.esqE).toBe(true);
+  });
+
+  it('deslizar para baixo abaixa; deslizar para o lado dá cruzado do lado da mão', () => {
+    const { input, els } = touchSetup();
+    els.zoneL.emit('pointerdown', 1, 100, 200);
+    els.zoneL.emit('pointermove', 1, 100, 250);
+    input.poll();
+    expect(input.state.mini!.abaixar.pressed).toBe(true);
+    els.zoneL.emit('pointerup', 1, 100, 250);
+    els.zoneR.emit('pointerdown', 2, 500, 200);
+    els.zoneR.emit('pointermove', 2, 450, 200);
+    input.poll();
+    expect(input.state.mini!.cruzD.pressed).toBe(true);
+  });
+
+  it('dois polegares parados ≥ 150 ms (um em cada metade) fazem a guarda; soltar um desliga', () => {
+    const { input, els } = touchSetup();
+    els.zoneL.emit('pointerdown', 1, 100, 250);
+    els.zoneR.emit('pointerdown', 2, 500, 250);
     input.poll();
     expect(input.state.mini!.guarda.held).toBe(false);
     vi.advanceTimersByTime(190);
     input.poll();
     expect(input.state.mini!.guarda.held).toBe(true);
-    els.zone.emit('pointerup', 1);
+    els.zoneL.emit('pointerup', 1, 100, 250);
     input.poll();
     expect(input.state.mini!.guarda.held).toBe(false);
+    expect(input.state.mini!.jab.pressed).toBe(false); // soltar na guarda não dá soco
   });
 
-  it('deslizar devagar demais (> 250 ms) não esquiva', () => {
+  it('deslizar curto demais ou segurar um dedo só não dispara golpe; pointercancel descarta', () => {
     const { input, els } = touchSetup();
-    els.zone.emit('pointerdown', 1, 100);
-    vi.advanceTimersByTime(300);
-    els.zone.emit('pointermove', 1, 20);
+    els.zoneL.emit('pointerdown', 1, 100, 200);
+    els.zoneL.emit('pointermove', 1, 100, 185); // 15 px: ainda não é deslize
+    vi.advanceTimersByTime(400);
+    els.zoneL.emit('pointerup', 1, 100, 185); // longo demais para ser toque
     input.poll();
-    expect(input.state.mini!.esqE.pressed).toBe(false);
+    expect(input.state.mini!.jab.pressed).toBe(false);
+    els.zoneR.emit('pointerdown', 2, 500, 200);
+    els.zoneR.emit('pointercancel', 2, 500, 200);
+    input.poll();
+    expect(input.state.mini!.direto.pressed).toBe(false);
   });
 });
 

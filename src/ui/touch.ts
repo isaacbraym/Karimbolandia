@@ -7,6 +7,7 @@ import type { Input, ActionName, MiniButton, MiniMode } from '../core/input';
 import { MINI_BUTTONS } from '../core/input';
 import { settings } from '../core/storage';
 import { toLocal, localRect } from '../core/orient';
+import { BoxGestures, type GestureOut } from './boxGestures';
 
 const ICONS: Record<string, string> = {
   fire: '<svg viewBox="0 0 48 48"><circle cx="24" cy="24" r="9" fill="none" stroke="currentColor" stroke-width="3.4"/><path d="M24 4v10M24 34v10M4 24h10M34 24h10" stroke="currentColor" stroke-width="3.6" stroke-linecap="round"/><circle cx="24" cy="24" r="2.6" fill="currentColor"/></svg>',
@@ -15,7 +16,16 @@ const ICONS: Record<string, string> = {
   special: '<svg viewBox="0 0 48 48"><path d="M27 4L11 27h11l-3 17 18-25H26z" fill="currentColor"/></svg>',
   switch: '<svg viewBox="0 0 48 48"><path d="M10 18h22l-6-6M38 30H16l6 6" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/></svg>',
   pause: '<svg viewBox="0 0 48 48"><rect x="12" y="10" width="8" height="28" rx="2.5" fill="currentColor"/><rect x="28" y="10" width="8" height="28" rx="2.5" fill="currentColor"/></svg>',
+  // boxe: trajetórias dos golpes e das defesas
+  jab: '<svg viewBox="0 0 48 48"><path d="M12 36L34 14M34 14H21M34 14v13" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  hook: '<svg viewBox="0 0 48 48"><path d="M9 36C8 16 30 8 38 24M38 24l-12-1M38 24l-1 12" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  upper: '<svg viewBox="0 0 48 48"><path d="M16 40C14 26 34 26 32 10M32 10l-8 9M32 10l8 8" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  dodgeL: '<svg viewBox="0 0 48 48"><path d="M26 11L13 24l13 13M40 11L27 24l13 13" fill="none" stroke="currentColor" stroke-width="5.4" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  dodgeR: '<svg viewBox="0 0 48 48"><path d="M22 11l13 13-13 13M8 11l13 13L8 37" fill="none" stroke="currentColor" stroke-width="5.4" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  duck: '<svg viewBox="0 0 48 48"><path d="M11 15l13 14 13-14M11 28l13 14 13-14" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  guard: '<svg viewBox="0 0 48 48"><path d="M24 7l15 6v13c0 9-7 15-15 18-8-3-15-9-15-18V13z" fill="currentColor" opacity=".9"/><path d="M24 14v22" stroke="#0d0724" stroke-width="2.4" opacity=".5"/></svg>',
 };
+const GESTURE_LABEL: Record<GestureOut, string> = { jab: 'JAB', direto: 'DIRETO', cruzE: 'CRUZADO', cruzD: 'CRUZADO', ganchoE: 'GANCHO', ganchoD: 'GANCHO', abaixar: 'ABAIXAR' };
 
 export class TouchUI {
   root: HTMLElement;
@@ -25,8 +35,11 @@ export class TouchUI {
   private ghost: HTMLElement;
   private buttons = new Map<ActionName, HTMLElement>();
   private releaseTimers = new Map<string, number>();
-  /** gesto do boxe: dono do ponteiro, origem, instante, temporizador da guarda e se já virou esquiva */
-  private zone = { id: -1, x: 0, t: 0, timer: 0, swiped: false };
+  /** gestos do boxe (metade esquerda = mão esquerda, metade direita = mão direita) */
+  private gestures = new BoxGestures();
+  private guardTimer = 0;
+  private fxPool: HTMLElement[] = [];
+  private fxNext = 0;
   private stickId = -1;
   private ox = 0;
   private oy = 0;
@@ -51,13 +64,18 @@ export class TouchUI {
       <button class="tbtn ibtn t-isneak" data-act="special" aria-label="Andar na ponta dos pés (segurar)">PONTA</button>
       <button class="tbtn ibtn t-ileave" data-act="grenade" aria-label="Sair pela porta">SAIR</button>
       <button class="tbtn ibtn t-ilist" data-act="reload" aria-label="Lista de travessuras">LISTA</button>
-      <div class="mzone" aria-hidden="true"></div>
-      <button class="tbtn mbtn m-l1" data-m="jab" aria-label="Jab esquerdo">JAB</button>
-      <button class="tbtn mbtn m-l2" data-m="cruzE" aria-label="Cruzado esquerdo">CRUZADO</button>
-      <button class="tbtn mbtn m-l3" data-m="ganchoE" aria-label="Gancho esquerdo">GANCHO</button>
-      <button class="tbtn mbtn m-r1" data-m="direto" aria-label="Direto direito">DIRETO</button>
-      <button class="tbtn mbtn m-r2" data-m="cruzD" aria-label="Cruzado direito">CRUZADO</button>
-      <button class="tbtn mbtn m-r3" data-m="ganchoD" aria-label="Gancho direito">GANCHO</button>
+      <div class="mhz mhz-l" aria-hidden="true"></div>
+      <div class="mhz mhz-r" aria-hidden="true"></div>
+      <button class="tbtn mbtn m-dl" data-m="esqE" aria-label="Esquivar para a esquerda">${ICONS.dodgeL}</button>
+      <button class="tbtn mbtn m-dr" data-m="esqD" aria-label="Esquivar para a direita">${ICONS.dodgeR}</button>
+      <button class="tbtn mbtn mbtns m-du" data-m="abaixar" aria-label="Abaixar">${ICONS.duck}</button>
+      <button class="tbtn mbtn mbtns m-gu" data-m="guarda" aria-label="Guarda (segurar)">${ICONS.guard}</button>
+      <button class="tbtn mbtn mbtns m-l1" data-m="jab" aria-label="Jab esquerdo">${ICONS.jab}<span>JAB</span></button>
+      <button class="tbtn mbtn mbtns m-l2" data-m="cruzE" aria-label="Cruzado esquerdo">${ICONS.hook}<span>CRUZ.</span></button>
+      <button class="tbtn mbtn mbtns m-l3" data-m="ganchoE" aria-label="Gancho esquerdo">${ICONS.upper}<span>GANCHO</span></button>
+      <button class="tbtn mbtn mbtns m-r1" data-m="direto" aria-label="Direto direito">${ICONS.jab}<span>DIRETO</span></button>
+      <button class="tbtn mbtn mbtns m-r2" data-m="cruzD" aria-label="Cruzado direito">${ICONS.hook}<span>CRUZ.</span></button>
+      <button class="tbtn mbtn mbtns m-r3" data-m="ganchoD" aria-label="Gancho direito">${ICONS.upper}<span>GANCHO</span></button>
       <button class="tbtn mbtn m-sp hidden" data-m="especial" aria-label="Orelhada">ORELHADA!</button>
     `;
     parent.appendChild(this.root);
@@ -73,8 +91,7 @@ export class TouchUI {
       else this.bindButton(el, el.dataset.act as ActionName);
     });
     this.bindStick();
-    const mz = this.root.querySelector<HTMLElement>('.mzone');
-    if (mz) this.bindMiniZone(mz);
+    this.root.querySelectorAll<HTMLElement>('.mhz').forEach((z) => this.bindHandZone(z, z.classList.contains('mhz-l') ? -1 : 1));
     // bloqueia gestos/menus nativos
     for (const ev of ['touchstart', 'touchmove', 'touchend', 'gesturestart', 'gesturechange', 'contextmenu', 'selectstart']) {
       this.root.addEventListener(ev, (e) => e.preventDefault(), { passive: false });
@@ -87,6 +104,7 @@ export class TouchUI {
     s.setProperty('--ts', String(settings.touchScale));
     s.setProperty('--to', String(settings.touchOpacity));
     this.root.classList.toggle('lefty', settings.leftHanded);
+    this.root.classList.toggle('box-botoes', settings.boxControls === 'botoes');
     this.radius = 58 * settings.touchScale;
   }
 
@@ -113,6 +131,7 @@ export class TouchUI {
   setMinigame(mode: MiniMode | null) {
     this.root.classList.toggle('mini-boxing', mode === 'boxing');
     this.root.classList.toggle('mini-chase', mode === 'chase');
+    this.root.classList.toggle('box-botoes', settings.boxControls === 'botoes');
     this.root.querySelector('.m-sp')?.classList.add('hidden');
     this.releaseAll();
   }
@@ -176,43 +195,67 @@ export class TouchUI {
     el.addEventListener('lostpointercapture', up);
   }
 
-  /** Zona central do boxe: deslizar ←/→ (≥ 40 px em ≤ 250 ms) = esquiva; segurar parado ≥ 180 ms = guarda. */
-  private bindMiniZone(el: HTMLElement) {
-    const t = this.input.touch, z = this.zone;
+  /** Cada metade da tela é uma mão. Toque = reto, deslizar = cruzado/gancho/abaixar, dois polegares parados = guarda. */
+  private bindHandZone(el: HTMLElement, side: -1 | 1) {
+    const t = this.input.touch;
     const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
+    const guardTick = () => {
+      const on = this.gestures.updateGuard(now());
+      if (t.mini.guarda !== on) { t.mini.guarda = on; this.root.classList.toggle('boxguard', on); if (on) this.input.haptic(0.2, 10); }
+      if (!this.gestures.active) { window.clearInterval(this.guardTimer); this.guardTimer = 0; }
+    };
+    const fire = (out: GestureOut | null, x: number, y: number) => {
+      if (!out) return;
+      t.miniTaps.push(out);
+      this.input.haptic(out === 'ganchoE' || out === 'ganchoD' ? 0.4 : 0.25, out === 'jab' || out === 'direto' ? 8 : 14);
+      this.gestureFx(out, x, y);
+    };
     const end = (e: PointerEvent) => {
-      if (e.pointerId !== z.id) return;
-      window.clearTimeout(z.timer);
-      z.id = -1;
-      t.mini.guarda = false;
-      el.classList.remove('down');
+      const pt = toLocal(e.clientX, e.clientY);
+      let out: GestureOut | null = null;
+      if (e.type === 'pointerup') out = this.gestures.up(e.pointerId, now());
+      else this.gestures.cancel(e.pointerId);
+      fire(out, pt.x, pt.y);
+      if (t.mini.guarda && !this.gestures.guarding) { t.mini.guarda = false; this.root.classList.remove('boxguard'); }
+      if (!this.gestures.active) el.classList.remove('down');
     };
     el.addEventListener('pointerdown', (e) => {
-      if (z.id !== -1) return;
       e.preventDefault();
       try { el.setPointerCapture(e.pointerId); } catch { /* ok */ }
       this.markActive();
       this.input.onGesture?.();
-      z.id = e.pointerId; z.x = e.clientX; z.t = now(); z.swiped = false;
-      z.timer = window.setTimeout(() => {
-        if (z.id !== -1 && !z.swiped) { t.mini.guarda = true; el.classList.add('down'); }
-      }, 180);
+      const pt = toLocal(e.clientX, e.clientY);
+      this.gestures.down(e.pointerId, side, pt.x, pt.y, now());
+      el.classList.add('down');
+      if (!this.guardTimer) this.guardTimer = window.setInterval(guardTick, 30);
     });
     el.addEventListener('pointermove', (e) => {
-      if (e.pointerId !== z.id || z.swiped) return;
       e.preventDefault();
-      const dx = e.clientX - z.x;
-      if (Math.abs(dx) >= 40 && now() - z.t <= 250) {
-        z.swiped = true;
-        window.clearTimeout(z.timer);
-        t.mini.guarda = false;
-        t.miniTaps.push(dx < 0 ? 'esqE' : 'esqD');
-        this.input.haptic(0.3, 12);
-      }
+      const pt = toLocal(e.clientX, e.clientY);
+      fire(this.gestures.move(e.pointerId, pt.x, pt.y, now()), pt.x, pt.y);
     });
     el.addEventListener('pointerup', end);
     el.addEventListener('pointercancel', end);
     el.addEventListener('lostpointercapture', end);
+  }
+
+  /** Rótulo do golpe que o gesto acabou de dar (ensina jogando): uma pequena reserva de elementos reaproveitados. */
+  private gestureFx(out: GestureOut, x: number, y: number) {
+    if (this.fxPool.length < 4) {
+      const d = document.createElement('div');
+      d.className = 'mfx';
+      d.setAttribute('aria-hidden', 'true');
+      this.root.appendChild(d);
+      this.fxPool.push(d);
+    }
+    const d = this.fxPool[this.fxNext++ % this.fxPool.length];
+    const r = localRect(this.root);
+    d.textContent = GESTURE_LABEL[out];
+    d.style.left = `${x - r.left}px`;
+    d.style.top = `${y - r.top - 26}px`;
+    d.classList.remove('go');
+    void d.offsetWidth;
+    d.classList.add('go');
   }
 
   private finishPress(el: HTMLElement, act: ActionName, e: PointerEvent) {
@@ -451,8 +494,10 @@ export class TouchUI {
     for (const k of Object.keys(t.held) as ActionName[]) {this.clearRelease(k);t.held[k] = false;}
     for (const b of MINI_BUTTONS) { this.clearRelease('mini:' + b); t.mini[b] = false; }
     t.miniTaps.length = 0;
-    const z = this.zone; // (ausente em controles montados só para teste)
-    if (z) { window.clearTimeout(z.timer); z.id = -1; this.root.querySelector('.mzone')?.classList.remove('down'); }
+    this.gestures?.reset(); // (ausente em controles montados só para teste)
+    if (this.guardTimer) { window.clearInterval(this.guardTimer); this.guardTimer = 0; }
+    this.root.classList?.remove('boxguard');
+    this.root.querySelectorAll?.('.mhz')?.forEach((z) => z.classList.remove('down'));
     t.stickX = t.stickY = 0;
     t.aimX = t.aimY = 0;
     this.stickId = -1;

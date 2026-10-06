@@ -459,7 +459,8 @@ export class Menus {
     touch.append(
       this.slider('Tamanho dos botões (toque)', () => settings.touchScale, (v) => (settings.touchScale = v), 0.7, 1.4, 0.05),
       this.slider('Opacidade dos botões (toque)', () => settings.touchOpacity, (v) => (settings.touchOpacity = v), 0.2, 0.9, 0.05),
-      this.toggle('Modo canhoto (inverte os botões)', () => settings.leftHanded, (v) => (settings.leftHanded = v))
+      this.toggle('Modo canhoto (inverte os botões)', () => settings.leftHanded, (v) => (settings.leftHanded = v)),
+      this.toggle('Boxe no celular: botões em vez de gestos', () => settings.boxControls === 'botoes', (v) => (settings.boxControls = v ? 'botoes' : 'gestos'))
     );
     game.append(
       this.toggle('Assistência de mira (toque/teclado)', () => settings.aimAssist, (v) => (settings.aimAssist = v)),

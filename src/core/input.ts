@@ -19,10 +19,14 @@ export type MiniButton = 'jab' | 'cruzE' | 'ganchoE' | 'direto' | 'cruzD' | 'gan
 export type MiniPad = Record<MiniButton, Btn>;
 export const MINI_BUTTONS: readonly MiniButton[] = ['jab', 'cruzE', 'ganchoE', 'direto', 'cruzD', 'ganchoD', 'esqE', 'esqD', 'abaixar', 'guarda', 'especial'];
 export type MiniMode = 'boxing' | 'chase';
-/** Teclas do boxe: 6 golpes (QWE / JKL), esquivas (A/D ou setas), guarda (S/↓) e especial (Espaço/Enter). */
+/**
+ * Teclas do boxe (as duas mãos, espelhando a tela): a mão ESQUERDA defende — A/← esquiva para a esquerda,
+ * D/→ para a direita, S/↓ abaixa, W/↑ segurada = guarda — e a DIREITA soca: J jab, K direto, U cruzado
+ * esquerdo, I cruzado direito, N gancho esquerdo, M gancho direito. Espaço/Enter = ORELHADA.
+ */
 const MINI_KEYS: Record<MiniButton, string[]> = {
-  jab: ['KeyQ'], cruzE: ['KeyW'], ganchoE: ['KeyE'], direto: ['KeyJ'], cruzD: ['KeyK'], ganchoD: ['KeyL'],
-  esqE: ['KeyA', 'ArrowLeft'], esqD: ['KeyD', 'ArrowRight'], abaixar: [], guarda: ['KeyS', 'ArrowDown'], especial: ['Space', 'Enter'],
+  jab: ['KeyJ'], direto: ['KeyK'], cruzE: ['KeyU'], cruzD: ['KeyI'], ganchoE: ['KeyN'], ganchoD: ['KeyM'],
+  esqE: ['KeyA', 'ArrowLeft'], esqD: ['KeyD', 'ArrowRight'], abaixar: ['KeyS', 'ArrowDown'], guarda: ['KeyW', 'ArrowUp'], especial: ['Space', 'Enter'],
 };
 const newMiniPad = (): MiniPad => Object.fromEntries(MINI_BUTTONS.map((b) => [b, { held: false, pressed: false, released: false }])) as MiniPad;
 const newMiniHeld = (): Record<MiniButton, boolean> => Object.fromEntries(MINI_BUTTONS.map((b) => [b, false])) as Record<MiniButton, boolean>;
@@ -366,11 +370,14 @@ export class Input {
       raw.pause = raw.pause || b(9);
       raw.reload=raw.reload||b(11);raw.interact=raw.interact||b(8);
       if (mraw) {
+        // controle: X jab, Y direto, LB/RB cruzados, LT/RT ganchos, A = ORELHADA; direcional ou analógico esquerdo
+        // esquivam (←/→), abaixam (↓) e seguram a guarda (↑)
         mraw.jab = mraw.jab || b(2); mraw.direto = mraw.direto || b(3);
         mraw.cruzE = mraw.cruzE || b(4); mraw.cruzD = mraw.cruzD || b(5);
         mraw.ganchoE = mraw.ganchoE || b(6); mraw.ganchoD = mraw.ganchoD || b(7);
         mraw.esqE = mraw.esqE || dpadL || ax < -0.55; mraw.esqD = mraw.esqD || dpadR || ax > 0.55;
-        mraw.guarda = mraw.guarda || dpadD || ay > 0.55;
+        mraw.abaixar = mraw.abaixar || dpadD || ay > 0.55;
+        mraw.guarda = mraw.guarda || dpadU || ay < -0.55 || b(1);
         mraw.especial = mraw.especial || b(0);
       }
       const rx = gp.axes[2] ?? 0;

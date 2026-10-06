@@ -20,6 +20,8 @@ export interface Settings {
   showFps: boolean;
   leftHanded: boolean;
   haptics: boolean; // vibração (celular) / rumble (gamepad)
+  /** boxe no celular: gestos por metade da tela (padrão) ou botões */
+  boxControls: 'gestos' | 'botoes';
   narrator: boolean; // voz do narrador da história
   difficulty: DifficultyId; // nível das próximas partidas
 }
@@ -90,6 +92,7 @@ export const defaultSettings = (): Settings => ({
   showFps: false,
   leftHanded: false,
   haptics: true,
+  boxControls: 'gestos',
   narrator: true,
   difficulty: 'normal',
 });
@@ -132,6 +135,7 @@ function save(key: string, v: object) {
 
 export const settings: Settings = load(KEY_S, defaultSettings);
 if (!isDifficulty(settings.difficulty)) settings.difficulty = 'normal';
+if (settings.boxControls !== 'botoes') settings.boxControls = 'gestos';
 export function validateProgress(v: unknown): Progress | null {
   if (!record(v)) return null;
   const p = { ...defaultProgress(), ...v };

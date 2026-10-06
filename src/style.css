@@ -860,22 +860,44 @@ kbd {
 .t-reload.reloading::after {content:'';position:absolute;inset:-4px;border-radius:50%;pointer-events:none;background:conic-gradient(#85e1d1 calc(var(--reload,0) * 360deg),rgba(255,255,255,.12) 0);-webkit-mask:radial-gradient(circle,transparent 60%,#000 63%);mask:radial-gradient(circle,transparent 60%,#000 63%);}
 .touch.mounted .t-reload {display:none;}
 .touch .ibtn { display: none; }
-/* minijogos: perseguição = joystick + PULO; boxe = 3 botões de cada lado + zona de gestos */
-.touch .mbtn, .touch .mzone { display: none; }
+/* minijogos: perseguição = joystick + PULO; boxe = a tela se divide em duas mãos (toque = reto, deslizar = cruzado /
+   gancho / abaixar, dois polegares parados = guarda) + esquivas « » nos cantos. O esquema "botões" é opcional. */
+.touch .mbtn, .touch .mhz { display: none; }
 .touch.mini-chase > *:not(.t-jump):not(.t-pause):not(.stick-zone) { display: none !important; }
-.touch.mini-boxing > *:not(.mbtn):not(.mzone):not(.t-pause) { display: none !important; }
-.touch.mini-boxing .mbtn { display: flex; font-size: calc(10px * var(--ts)); font-weight: 800; letter-spacing: .02em; }
-.touch.mini-boxing .mbtn.hidden { display: none; }
-.touch.mini-boxing .mzone { display: block; position: absolute; left: calc(var(--sal) + 86px * var(--ts)); right: calc(var(--sar) + 86px * var(--ts)); top: calc(var(--sat) + 52px); bottom: 0; pointer-events: auto; touch-action: none; }
-.touch.mini-boxing .mzone.down { background: rgba(120,200,255,.12); box-shadow: inset 0 0 0 2px rgba(150,220,255,.35); border-radius: 18px; }
-.m-l1,.m-l2,.m-l3,.m-r1,.m-r2,.m-r3 { width: calc(66px * var(--ts)); height: calc(66px * var(--ts)); }
-.m-l1,.m-l2,.m-l3 { left: calc(var(--sal) + 14px * var(--ts)); background: radial-gradient(circle at 35% 30%, rgba(255,255,255,calc(var(--to) * .4)), rgba(70,140,255,calc(var(--to) * .75)) 72%); }
-.m-r1,.m-r2,.m-r3 { right: calc(var(--sar) + 14px * var(--ts)); background: radial-gradient(circle at 35% 30%, rgba(255,255,255,calc(var(--to) * .4)), rgba(255,86,110,calc(var(--to) * .75)) 72%); }
-.m-l1,.m-r1 { bottom: calc(var(--sab) + 12px * var(--ts)); }
-.m-l2,.m-r2 { bottom: calc(var(--sab) + 82px * var(--ts)); }
-.m-l3,.m-r3 { bottom: calc(var(--sab) + 152px * var(--ts)); }
-.m-sp { left: 50%; bottom: calc(var(--sab) + 16px * var(--ts)); transform: translateX(-50%); width: calc(120px * var(--ts)); height: calc(70px * var(--ts)); border-radius: 20px; font-size: calc(15px * var(--ts)) !important; background: radial-gradient(circle at 35% 30%, rgba(255,255,255,.7), rgba(255,210,58,.95) 72%); color: #3a1d00; animation: mspulse .5s ease-in-out infinite alternate; }
+.touch.mini-boxing > *:not(.mbtn):not(.mhz):not(.mfx):not(.t-pause) { display: none !important; }
+.touch.mini-boxing .mhz { display: block; position: absolute; top: calc(var(--sat) + 48px); bottom: 0; width: 50%; pointer-events: auto; touch-action: none; }
+.touch.mini-boxing .mhz-l { left: 0; }
+.touch.mini-boxing .mhz-r { right: 0; }
+.touch.mini-boxing .mhz.down { background: rgba(140, 200, 255, 0.07); }
+.touch.mini-boxing.boxguard .mhz { background: rgba(120, 200, 255, 0.17); box-shadow: inset 0 0 0 3px rgba(150, 220, 255, 0.45); }
+.touch.mini-boxing .mbtn { font-weight: 800; letter-spacing: 0.02em; }
+.touch.mini-boxing .m-dl, .touch.mini-boxing .m-dr, .touch.mini-boxing .m-sp { display: flex; }
+.touch.mini-boxing .m-sp.hidden { display: none; }
+.touch.mini-boxing.box-botoes .mhz { display: none; }
+.touch.mini-boxing.box-botoes .mbtns { display: flex; }
+.m-dl, .m-dr, .m-du, .m-gu, .m-l1, .m-l2, .m-l3, .m-r1, .m-r2, .m-r3 { width: calc(68px * var(--ts)); height: calc(68px * var(--ts)); font-size: calc(9px * var(--ts)); }
+.m-dl, .m-dr { width: calc(78px * var(--ts)); height: calc(78px * var(--ts)); }
+.m-dl { left: calc(var(--sal) + 14px * var(--ts)); bottom: calc(var(--sab) + 14px * var(--ts)); background: radial-gradient(circle at 35% 30%, rgba(255, 255, 255, calc(var(--to) * 0.5)), rgba(80, 150, 255, calc(var(--to) * 0.85)) 72%); }
+.m-dr { right: calc(var(--sar) + 14px * var(--ts)); bottom: calc(var(--sab) + 14px * var(--ts)); background: radial-gradient(circle at 35% 30%, rgba(255, 255, 255, calc(var(--to) * 0.5)), rgba(80, 150, 255, calc(var(--to) * 0.85)) 72%); }
+.m-du, .m-gu { bottom: calc(var(--sab) + 12px * var(--ts)); width: calc(58px * var(--ts)); height: calc(58px * var(--ts)); background: radial-gradient(circle at 35% 30%, rgba(255, 255, 255, calc(var(--to) * 0.4)), rgba(140, 110, 255, calc(var(--to) * 0.8)) 72%); }
+.m-du { left: calc(50% - 66px * var(--ts)); }
+.m-gu { left: calc(50% + 8px * var(--ts)); }
+.m-l1, .m-l2, .m-l3 { background: radial-gradient(circle at 35% 30%, rgba(255, 255, 255, calc(var(--to) * 0.4)), rgba(70, 140, 255, calc(var(--to) * 0.75)) 72%); }
+.m-r1, .m-r2, .m-r3 { background: radial-gradient(circle at 35% 30%, rgba(255, 255, 255, calc(var(--to) * 0.4)), rgba(255, 86, 110, calc(var(--to) * 0.75)) 72%); }
+/* esquema botões: dois blocos 2×2 sob os polegares (esquiva no canto, reto ao lado, cruzado e gancho em cima) */
+.m-l1 { left: calc(var(--sal) + 98px * var(--ts)); bottom: calc(var(--sab) + 14px * var(--ts)); }
+.m-l2 { left: calc(var(--sal) + 14px * var(--ts)); bottom: calc(var(--sab) + 100px * var(--ts)); }
+.m-l3 { left: calc(var(--sal) + 98px * var(--ts)); bottom: calc(var(--sab) + 100px * var(--ts)); }
+.m-r1 { right: calc(var(--sar) + 98px * var(--ts)); bottom: calc(var(--sab) + 14px * var(--ts)); }
+.m-r2 { right: calc(var(--sar) + 14px * var(--ts)); bottom: calc(var(--sab) + 100px * var(--ts)); }
+.m-r3 { right: calc(var(--sar) + 98px * var(--ts)); bottom: calc(var(--sab) + 100px * var(--ts)); }
+.m-sp { left: 50%; bottom: calc(var(--sab) + 16px * var(--ts)); transform: translateX(-50%); width: calc(124px * var(--ts)); height: calc(72px * var(--ts)); border-radius: 22px; font-size: calc(15px * var(--ts)) !important; background: radial-gradient(circle at 35% 30%, rgba(255, 255, 255, 0.75), rgba(255, 210, 58, 0.97) 72%); color: #3a1d00; animation: mspulse 0.5s ease-in-out infinite alternate; }
+.touch.box-botoes .m-sp { bottom: calc(var(--sab) + 86px * var(--ts)); }
 @keyframes mspulse { to { transform: translateX(-50%) scale(1.08); } }
+/* rótulo do golpe que o gesto acabou de dar */
+.mfx { position: absolute; transform: translate(-50%, 0); pointer-events: none; font-family: var(--display); font-size: calc(15px * var(--ts)); letter-spacing: 0.04em; color: #ffe27a; text-shadow: 0 2px 0 var(--ink), 0 0 8px rgba(0, 0, 0, 0.6); opacity: 0; z-index: 3; }
+.mfx.go { animation: mfxgo 0.55s ease-out; }
+@keyframes mfxgo { 0% { opacity: 0; transform: translate(-50%, 8px) scale(0.7); } 18% { opacity: 1; transform: translate(-50%, 0) scale(1.15); } 100% { opacity: 0; transform: translate(-50%, -26px) scale(1); } }
 .touch.interior > *:not(.ibtn):not(.t-pause):not(.stick-zone) { display: none !important; }
 .touch.interior .ibtn { display: flex; }
 .t-iact { right: calc(var(--sar) + 20px * var(--ts)); bottom: calc(var(--sab) + 26px * var(--ts)); width: calc(82px * var(--ts)); height: calc(82px * var(--ts)); font-size: calc(14px * var(--ts)); background: radial-gradient(circle at 35% 30%, rgba(255,255,255,calc(var(--to) * .45)), rgba(255,196,80,calc(var(--to) * .75)) 72%); }
