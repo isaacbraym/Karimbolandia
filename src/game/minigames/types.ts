@@ -23,7 +23,7 @@ export interface MinigameContext {
   /** liga o layout de toque do minijogo (null = volta ao normal) */
   touch: (mode: TouchMinigameMode | null) => void;
   /** mostra/esconde o botão ORELHADA! do toque */
-  special: (on: boolean) => void;
+  special: (on: boolean, label?: string) => void;
   /** vibração curta (celular) / rumble (controle), respeitando a configuração do jogador */
   haptic?: (strength: number, ms: number) => void;
 }

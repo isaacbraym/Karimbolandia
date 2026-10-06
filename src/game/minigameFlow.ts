@@ -18,7 +18,7 @@ export interface MinigameHost {
   view: () => { W: number; H: number };
   /** layout de toque do minijogo (null = normal) */
   touchMode: (mode: MiniMode | null) => void;
-  touchSpecial: (on: boolean) => void;
+  touchSpecial: (on: boolean, label?: string) => void;
   /** grava a partida depois de uma vitória */
   saved: () => void;
   banner: (title: string, sub: string, dur?: number) => void;
@@ -128,7 +128,7 @@ export class MinigameFlow {
         w, quality: this.host.quality(), viewW: W, viewH: H, difficulty: difficultyId(), backdrop: this.backdrop,
         music: (s) => w.setMusic(s),
         touch: (m) => this.host.touchMode(m),
-        special: (on) => this.host.touchSpecial(on),
+        special: (on, label) => this.host.touchSpecial(on, label),
         haptic: (strength, ms) => this.host.input.haptic(strength, ms),
       });
     } catch (e) {

@@ -15,7 +15,7 @@ import { drawGatorBoxer, type GatorPose } from './gatorBoxer';
 import { drawKids, drawShouts } from './kids';
 import { boxLayout, type BoxLayout } from './layout';
 import { drawRingArt, drawRingLive } from './ring';
-import { drawBoxHud } from './hud';
+import { drawBoxHud, drawResultCard, type ResultView } from './hud';
 import { BoxFx, txt } from './fx';
 
 const ease = (t: number) => t * t * (3 - 2 * t);
@@ -23,6 +23,8 @@ const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
 
 export class BoxingScene {
   readonly fx = new BoxFx();
+  /** cartão de resultado (a sessão o liga quando a luta acaba) */
+  card: ResultView | null = null;
   private ringArt: ReturnType<typeof drawRingArt> | null = null;
   private L: BoxLayout = boxLayout(667, 320);
   private W = 0;
@@ -169,9 +171,10 @@ export class BoxingScene {
     if (!ko && !(cin === 'orelhada' && m.cineT >= 1.6)) drawGatorBoxer(g, gx, gy, gs, gp, k, true, this.dt);
     this.fx.draw(g);
     g.restore();
-    drawBoxHud(g, m, W, H, t, k);
+    drawBoxHud(g, m, W, H, t, k, L);
     this.drawCine(g, m, W, H);
     this.fx.drawOverlay(g, W, H);
+    if (this.card) drawResultCard(g, W, H, this.card, t);
   }
 
   private drawCine(g: CanvasRenderingContext2D, m: BoxingMatch, W: number, H: number) {
@@ -196,6 +199,14 @@ export class BoxingScene {
       const n = Math.min(10, Math.floor(t / (COUNT_TIME / 10)) + 1);
       if (t < COUNT_TIME) txt(g, `${n}...`, W / 2, H * 0.3, 40 * u, '#ffffff', 'center', 1, 1 + (1 - ((t / (COUNT_TIME / 10)) % 1)) * 0.35);
       else txt(g, 'NOCAUTE!', W / 2, H * 0.34, 54 * u, '#ffd23a', 'center', 1, 1 + Math.sin(this.time * 12) * 0.04);
+    } else if (m.cine === 'decision') {
+      const dots = '.'.repeat(1 + (Math.floor(this.time * 3) % 3));
+      txt(g, `DECISÃO DOS JUÍZES${dots}`, W / 2, H * 0.3, 30 * u, '#ffe27a', 'center', Math.min(1, t * 3));
+      if (t > 1.6) {
+        const a = clamp01((t - 1.6) / 0.4);
+        txt(g, `KARIMBO ${Math.round(m.scoreK / 10)}   ×   ${Math.round(m.scoreG / 10)} JACARÉ`, W / 2, H * 0.3 + 34 * u, 18 * u, '#ffffff', 'center', a);
+        txt(g, m.scoreK > m.scoreG ? 'O PÚBLICO ENLOUQUECE!' : 'empate favorece o campeão...', W / 2, H * 0.3 + 58 * u, 13 * u, m.scoreK > m.scoreG ? '#9fe07a' : '#ff9a8a', 'center', a);
+      }
     } else if (m.cine === 'lose') {
       txt(g, 'Volta pro berçário, Parabólica!', W / 2, H * 0.42, 14 * u, '#fff1cd', 'center', clamp01(t / 0.4));
       txt(g, 'Essa orelha apanha mais que bandeira em dia de vento!', W / 2, H * 0.42 + 18 * u, 12 * u, '#fff1cd', 'center', clamp01((t - 0.3) / 0.4));

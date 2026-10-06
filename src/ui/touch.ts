@@ -137,9 +137,10 @@ export class TouchUI {
   }
 
   /** O botão ORELHADA! só aparece quando o jacaré está grogue. */
-  showSpecial(on: boolean) {
+  showSpecial(on: boolean, label?: string) {
     const b = this.root.querySelector<HTMLElement>('.m-sp');
     if (!b) return;
+    if (label !== undefined && b.textContent !== label) { b.textContent = label; b.setAttribute('aria-label', label); }
     b.classList.toggle('hidden', !on);
     if (!on) { this.clearRelease('mini:especial'); this.input.touch.mini.especial = false; b.classList.remove('down'); delete b.dataset.pid; }
   }

@@ -1,49 +1,72 @@
 /**
  * Sessão do boxe em 3ª pessoa (carregada só por import() pelo `minigameFlow`): liga a simulação
- * (sim/match.ts, headless) à cena (art/minigames/boxing), aos sons, à música por round, à vibração e ao
- * layout de toque. A luta não mexe no mundo: o prêmio (skin do Jacaré) é dado pela conversa
- * (alligatorTalk) quando chega a vitória.
+ * (sim/match.ts, headless) à cena (art/minigames/boxing), aos sons, à música por round, à vibração, ao
+ * layout de toque e ao cartão de resultado (nota S–C, revanche). A luta não mexe no mundo: o prêmio (skin do
+ * Jacaré) é dado pela conversa (alligatorTalk) quando chega a vitória.
  *
  * Presentação do golpe (estudo de game feel): a simulação para por instantes no impacto (parada de impacto,
  * 2–14 quadros conforme o peso) e a cena congela junto, só a câmera segue; câmera lenta na esquiva perfeita
  * vale também para a animação (dt × timeScale); cada golpe tem estalo + corpo + baque, e a música cresce com
  * os rounds.
+ *
+ * Fim da luta: o cartão de resultado fica na tela até o jogador dispensar. Depois de uma DERROTA ele pode
+ * pedir REVANCHE na hora (um golpe) ou sair (esquiva/abaixar); depois de uma vitória qualquer golpe continua.
  */
 import type { MinigameContext, MinigameModule, MinigameResult, MinigameSession } from '../types';
 import type { ControlState, MiniPad } from '../../../core/input';
 import type { MusicState } from '../../world';
 import { audio } from '../../../core/audio';
+import { isFirstFight, readBoxingStats, recordFight } from '../../../core/boxingStats';
 import { BoxingMatch, type MatchEvent } from './sim/match';
+import { PUNCH_BUTTONS } from './sim/rules';
 import { Crowd } from './sim/crowd';
 import { sfxFor, hapticFor, musicFor } from './presentation';
 import { BoxingScene } from '../../../art/minigames/boxing/scene';
 import { resetHud } from '../../../art/minigames/boxing/hud';
 import { loadBackPhotos } from '../../../art/minigames/boxing/backPhotos';
 
+const SEED = 1337;
+/** o cartão de uma vitória some sozinho depois disto (s) se ninguém tocar */
+const CARD_AUTO = 20;
+
 class BoxingSession implements MinigameSession {
-  private match: BoxingMatch;
+  private match!: BoxingMatch;
   private crowd = new Crowd();
   private scene: BoxingScene;
-  private special = false;
+  private specialLabel: string | null = null;
   private time = 0;
   private finished = false;
   /** um golpe bloqueado emite `block` e depois `hit`: o segundo não faz o som de dano */
   private blocked = false;
+  /** o cartão de resultado está na tela (a luta acabou) */
+  private cardT = -1;
+  private attempts = 0;
+  private final: MinigameResult | null = null;
 
   constructor(private ctx: MinigameContext) {
-    this.match = new BoxingMatch(ctx.difficulty);
     this.scene = new BoxingScene(ctx.backdrop, ctx.viewW, ctx.viewH);
-    resetHud();
-    ctx.music('fight1');
+    this.newMatch();
     ctx.touch('boxing');
+  }
+
+  private newMatch() {
+    this.match = new BoxingMatch(this.ctx.difficulty, SEED + this.attempts * 7919, { tutorial: isFirstFight() });
+    this.crowd = new Crowd();
+    this.scene.card = null;
+    this.cardT = -1;
+    this.blocked = false;
+    resetHud();
+    this.ctx.music('fight1');
   }
 
   get done() { return this.finished; }
 
   update(dt: number, ctl: ControlState) {
     if (this.finished) return;
+    const pad = ctl.mini ?? EMPTY;
+    if (this.cardT >= 0) { this.updateCard(dt, pad); return; }
     const m = this.match;
-    m.step(dt, ctl.mini ?? EMPTY);
+    m.step(dt, pad);
     const frozen = m.hitStopT > 0;
     const sdt = dt * m.timeScale;
     this.time += dt;
@@ -53,9 +76,40 @@ class BoxingSession implements MinigameSession {
     for (const e of m.events) this.onEvent(e);
     m.events.length = 0;
     // o botão ORELHADA! aparece com o jacaré grogue ou com estrelas para gastar
-    const want = m.specialKind !== null;
-    if (want !== this.special) { this.special = want; this.ctx.special(want); }
-    if (m.over) { this.finished = true; this.ctx.special(false); }
+    const kind = m.specialKind;
+    const label = kind === 'finale' ? 'ORELHADA!' : kind === 'carga' ? `ORELHADA ${'★'.repeat(m.stars)}` : null;
+    if (label !== this.specialLabel) { this.specialLabel = label; this.ctx.special(label !== null, label ?? undefined); }
+    if (m.over) this.showCard();
+  }
+
+  /** A luta acabou: registra a marca e mostra o cartão (nota, números, revanche). */
+  private showCard() {
+    const m = this.match, r = m.result!;
+    const before = readBoxingStats().best;
+    recordFight({ win: r.outcome === 'win', grade: r.grade, knockdowns: m.kdK, champion: false });
+    const RANK = { C: 0, B: 1, A: 2, S: 3 } as const;
+    const newBest = r.outcome === 'win' && (before === null || RANK[r.grade] > RANK[before]);
+    this.final = { id: 'boxing', outcome: r.outcome, time: r.time, mistakes: r.mistakes };
+    this.cardT = 0;
+    this.scene.card = { r, newBest, canRematch: r.outcome === 'lose', t: 0, champion: false };
+    if (this.specialLabel !== null) { this.specialLabel = null; this.ctx.special(false); }
+    if (r.outcome === 'lose') this.ctx.music('silence');
+  }
+
+  private updateCard(dt: number, pad: MiniPad) {
+    this.cardT += dt;
+    this.time += dt;
+    this.crowd.update(dt, false);
+    this.scene.update(dt, false);
+    const card = this.scene.card!;
+    card.t = this.cardT;
+    if (this.cardT < 1.1) return;
+    const punch = PUNCH_BUTTONS.some((p) => pad[p].pressed) || pad.especial.pressed;
+    const leave = pad.esqE.pressed || pad.esqD.pressed || pad.abaixar.pressed;
+    if (card.canRematch) {
+      if (punch) { this.attempts++; this.newMatch(); }
+      else if (leave) this.finished = true;
+    } else if (punch || leave || this.cardT > CARD_AUTO) this.finished = true;
   }
 
   private onEvent(e: MatchEvent) {
@@ -81,10 +135,7 @@ class BoxingSession implements MinigameSession {
 
   resize(W: number, H: number) { this.scene.resize(W, H); }
 
-  result(): MinigameResult | null {
-    const r = this.match.result;
-    return r ? { id: 'boxing', outcome: r.outcome, time: r.time, mistakes: r.mistakes } : null;
-  }
+  result(): MinigameResult | null { return this.finished ? this.final : null; }
 
   dispose() { this.scene.fx.reset(); this.ctx.special(false); }
 }
