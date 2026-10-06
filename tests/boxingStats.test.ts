@@ -53,3 +53,20 @@ describe('marcas do boxe (chave própria, fora do perfil)', () => {
     expect(() => m.recordFight({ win: true, grade: 'A', knockdowns: 0, champion: false })).not.toThrow();
   });
 });
+
+describe('tutorial do boxe: aparece nas primeiras vezes e some', () => {
+  it('conta cada vez que foi visto/pulado; depois da 2ª não abre mais; dado estranho volta a mostrar', async () => {
+    const m = await import('../src/core/boxingStats');
+    expect(m.shouldShowTutorial()).toBe(true);
+    m.markTutorialSeen();
+    expect(m.shouldShowTutorial()).toBe(true);
+    m.markTutorialSeen();
+    expect(m.tutorialSeen()).toBe(2);
+    expect(m.shouldShowTutorial()).toBe(false);
+    disk.set('karimbolandia.boxing.tut.v1', '"lixo"');
+    expect(m.shouldShowTutorial()).toBe(true);
+    vi.stubGlobal('localStorage', { getItem: () => { throw new Error('negado'); }, setItem: () => { throw new Error('cheio'); } });
+    expect(() => m.markTutorialSeen()).not.toThrow();
+    expect(m.shouldShowTutorial()).toBe(true);
+  });
+});

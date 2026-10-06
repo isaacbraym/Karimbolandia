@@ -19,6 +19,8 @@ export interface MinigameHost {
   /** layout de toque do minijogo (null = normal) */
   touchMode: (mode: MiniMode | null) => void;
   touchSpecial: (on: boolean, label?: string) => void;
+  /** o layout de toque está em uso (a dica do tutorial muda: dedo e analógico em vez de mouse e teclado) */
+  usesTouch?: () => boolean;
   /** grava a partida depois de uma vitória */
   saved: () => void;
   banner: (title: string, sub: string, dur?: number) => void;
@@ -127,7 +129,7 @@ export class MinigameFlow {
     const { W, H } = this.host.view();
     try {
       this.session = this.mods.get(this.id!)!.create({
-        w, quality: this.host.quality(), viewW: W, viewH: H, difficulty: difficultyId(), champion: this.opts.champion === true, backdrop: this.backdrop,
+        w, quality: this.host.quality(), viewW: W, viewH: H, difficulty: difficultyId(), champion: this.opts.champion === true, coarse: this.host.usesTouch?.() === true, backdrop: this.backdrop,
         music: (s) => w.setMusic(s),
         touch: (m) => this.host.touchMode(m),
         special: (on, label) => this.host.touchSpecial(on, label),

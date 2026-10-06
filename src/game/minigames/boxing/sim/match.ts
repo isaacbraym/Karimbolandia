@@ -455,6 +455,9 @@ export class BoxingMatch {
     else if ((kind === 'rabada' || kind === 'mordidona') && this.stats.dodges === 0) this.showHint('esquiva');
   }
 
+  /** Só para a demonstração do tutorial: o jacaré dispara este ataque agora (a luta de verdade usa o roteiro). */
+  demoAttack(kind: AttackKind) { this.startAttack(kind); }
+
   private goGuard(think?: number) {
     const g = this.g;
     const [a, b] = SCRIPT[this.round].think;

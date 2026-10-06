@@ -60,3 +60,17 @@ export const championUnlocked = (s: BoxingStats = readBoxingStats()) => s.wins >
 export interface BoxPerks { goldGloves: boolean; leopardCuffs: boolean; goldBell: boolean }
 /** Luvas de ouro (nota S), punhos de onça (vitória sem cair) e sino de ouro (derrotou o Campeão). Só enfeites. */
 export const boxingPerks = (s: BoxingStats = readBoxingStats()): BoxPerks => ({ goldGloves: s.best === 'S', leopardCuffs: s.clean, goldBell: s.champion });
+
+// ───────────────────────── tutorial ─────────────────────────
+const TUT_KEY = 'karimbolandia.boxing.tut.v1';
+/** o tutorial aparece nas primeiras vezes e some (a qualquer hora dá para chamar com ?tut=1 em QA) */
+export const TUTORIAL_SHOWS = 2;
+
+/** Quantas vezes o tutorial já foi visto até o fim ou pulado. */
+export function tutorialSeen(): number {
+  try { return count(JSON.parse(localStorage.getItem(TUT_KEY) ?? '0')); } catch { return 0; }
+}
+export function markTutorialSeen(): void {
+  try { localStorage.setItem(TUT_KEY, JSON.stringify(tutorialSeen() + 1)); } catch { /* sem armazenamento: aparece sempre */ }
+}
+export const shouldShowTutorial = () => tutorialSeen() < TUTORIAL_SHOWS;

@@ -69,7 +69,7 @@ export class TouchUI {
       <button class="tbtn mbtn m-dl" data-m="esqE" aria-label="Esquivar para a esquerda">${ICONS.dodgeL}</button>
       <button class="tbtn mbtn m-dr" data-m="esqD" aria-label="Esquivar para a direita">${ICONS.dodgeR}</button>
       <button class="tbtn mbtn mbtns m-du" data-m="abaixar" aria-label="Abaixar">${ICONS.duck}</button>
-      <button class="tbtn mbtn mbtns m-gu" data-m="guarda" aria-label="Guarda (segurar)">${ICONS.guard}</button>
+      <button class="tbtn mbtn mbtns m-gu" data-m="guarda" aria-label="Bloquear (segurar)">${ICONS.guard}<span>BLOQUEAR</span></button>
       <button class="tbtn mbtn mbtns m-l1" data-m="jab" aria-label="Jab esquerdo">${ICONS.jab}<span>JAB</span></button>
       <button class="tbtn mbtn mbtns m-l2" data-m="cruzE" aria-label="Cruzado esquerdo">${ICONS.hook}<span>CRUZ.</span></button>
       <button class="tbtn mbtn mbtns m-l3" data-m="ganchoE" aria-label="Gancho esquerdo">${ICONS.upper}<span>GANCHO</span></button>

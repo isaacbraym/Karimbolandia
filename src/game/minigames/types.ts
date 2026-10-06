@@ -25,6 +25,8 @@ export interface MinigameContext {
   difficulty: DifficultyId;
   /** boxe: a revanche contra o Jacaré Campeão */
   champion?: boolean;
+  /** a pessoa está no celular/toque (o tutorial fala de dedo e analógico em vez de mouse e teclado) */
+  coarse?: boolean;
   /** retrato borrado do mundo na entrada (assado uma vez pelo fluxo); null se ainda não houve captura */
   backdrop: HTMLCanvasElement | null;
   music: (s: MusicState) => void;

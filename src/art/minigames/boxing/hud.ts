@@ -21,10 +21,10 @@ const coarse = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)
 
 /** dicas em duas linhas curtas (celular, teclado): ficam no espaço livre à esquerda, nunca sobre o rosto do jacaré */
 const HINT: Record<HintId, [[string, string], [string, string]]> = {
-  soco: [['TOQUE NA TELA = SOCO', 'DESLIZE PRA CIMA = GANCHO'], ['J / K = SOCO RETO', 'N / M = GANCHO']],
-  gancho: [['SAI DA GUARDA COM', 'O GANCHO! (pra cima)'], ['SAI DA GUARDA COM', 'O GANCHO! (N / M)']],
-  esquiva: [['VERMELHO: ESQUIVE!', 'toque « ou »'], ['VERMELHO: ESQUIVE!', '(A / D)']],
-  abaixar: [['LARANJA: ABAIXE!', '(deslize pra baixo)'], ['LARANJA: ABAIXE!', '(S ou ↓)']],
+  soco: [['TOQUE NA TELA = SOCO', 'ARRASTE PRA CIMA = GANCHO'], ['CLIQUE NA TELA = SOCO', 'ARRASTE PRA CIMA = GANCHO']],
+  gancho: [['SAI DA GUARDA COM', 'O GANCHO! (arraste pra cima)'], ['SAI DA GUARDA COM', 'O GANCHO! (arraste pra cima)']],
+  esquiva: [['VERMELHO: ESQUIVE!', 'analógico ◀ ou ▶'], ['VERMELHO: ESQUIVE!', '(A / D)']],
+  abaixar: [['LARANJA: ABAIXE!', 'analógico ▼'], ['LARANJA: ABAIXE!', '(S ou ↓)']],
   descansa: [['RESPIRA!', 'defender dá fôlego'], ['RESPIRA!', 'defender dá fôlego']],
   lido: [['ELE LEU O SEU SOCO!', 'VARIE OS GOLPES'], ['ELE LEU O SEU SOCO!', 'VARIE OS GOLPES']],
 };

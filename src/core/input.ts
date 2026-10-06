@@ -1,4 +1,5 @@
 import { settings } from './storage';
+import { BoxGestures } from '../ui/boxGestures';
 const hapticsOn = () => settings.haptics !== false;
 /**
  * Entrada unificada: teclado + mouse + gamepad + toque.
@@ -28,6 +29,10 @@ const MINI_KEYS: Record<MiniButton, string[]> = {
   jab: ['KeyJ'], direto: ['KeyK'], cruzE: ['KeyU'], cruzD: ['KeyI'], ganchoE: ['KeyN'], ganchoD: ['KeyM'],
   esqE: ['KeyA', 'ArrowLeft'], esqD: ['KeyD', 'ArrowRight'], abaixar: ['KeyS', 'ArrowDown'], guarda: ['KeyW', 'ArrowUp'], especial: ['Space', 'Enter'],
 };
+/** id do "dedo" do mouse no reconhecedor de gestos do boxe */
+const MOUSE_BOX_ID = -7;
+/** analógico do boxe (0..1): quanto empurrar para esquivar / abaixar */
+export const STICK_DODGE = 0.5, STICK_DUCK = 0.55;
 const newMiniPad = (): MiniPad => Object.fromEntries(MINI_BUTTONS.map((b) => [b, { held: false, pressed: false, released: false }])) as MiniPad;
 const newMiniHeld = (): Record<MiniButton, boolean> => Object.fromEntries(MINI_BUTTONS.map((b) => [b, false])) as Record<MiniButton, boolean>;
 
@@ -117,6 +122,8 @@ export class Input {
     this.miniPrev = newMiniHeld();
     this.miniSuppressed.clear();
     this.touch.miniTaps.length = 0;
+    this.boxMouse.reset();
+    this.mouseGuard = false;
     // o que já está apertado (toque ou teclado) só vale depois de solto: nada de esquiva/guarda/soco "de graça" na entrada
     if (mode === 'boxing') for (const b of MINI_BUTTONS) if (this.touch.mini[b] || MINI_KEYS[b].some((c) => this.keys.has(c) || this.down.has(c))) this.miniSuppressed.add(b);
     this.suppressHeldActions();
@@ -150,6 +157,9 @@ export class Input {
   mouseActions = true;
   private mouseDown = false;
   private mouseRight = false;
+  /** boxe com o mouse: clique = soco da metade da tela, arrastar = gancho/cruzado/abaixar, botão direito segurado = guarda */
+  private boxMouse = new BoxGestures();
+  private mouseGuard = false;
   private mouseTap=false;
   private mouseRightTap=false;
   private wheelNext = false;
@@ -239,6 +249,11 @@ export class Input {
         this.mouseLastMove = this.now();
         this.state.device = 'kb';
         if (this.touch.active) this.touch.active = false;
+        // arrastar com o botão esquerdo apertado: gancho/cruzado/abaixar no instante em que passa do limite
+        if (this._miniMode === 'boxing' && (e.buttons & 1)) {
+          const out = this.boxMouse.move(MOUSE_BOX_ID, e.clientX, e.clientY, this.now());
+          if (out) this.touch.miniTaps.push(out);
+        }
       }
     });
     target.addEventListener('pointerdown', (e) => {
@@ -249,11 +264,21 @@ export class Input {
       this.mouseLastMove = this.now();
       if (e.button === 0) {this.mouseDown = true;if(this.enabled)this.mouseTap=true;}
       else if (e.button === 2) {this.mouseRight = true;if(this.enabled)this.mouseRightTap=true;}
+      if (this._miniMode === 'boxing') {
+        if (e.button === 0) {
+          const r = target.getBoundingClientRect();
+          this.boxMouse.down(MOUSE_BOX_ID, e.clientX < r.left + r.width / 2 ? -1 : 1, e.clientX, e.clientY, this.now());
+        } else if (e.button === 2) this.mouseGuard = true;
+      }
     });
     window.addEventListener('pointerup', (e) => {
       if (e.pointerType !== 'mouse') return;
       if (e.button === 0) this.mouseDown = false;
       else if (e.button === 2) this.mouseRight = false;
+      if (this._miniMode === 'boxing') {
+        if (e.button === 0) { const out = this.boxMouse.up(MOUSE_BOX_ID, this.now()); if (out) this.touch.miniTaps.push(out); }
+        else if (e.button === 2) this.mouseGuard = false;
+      }
     });
     target.addEventListener('contextmenu', (e) => e.preventDefault());
     target.addEventListener(
@@ -287,6 +312,8 @@ export class Input {
     this.mouseTap=this.mouseRightTap=false;
     this.mouseDown = false;
     this.mouseRight = false;
+    this.boxMouse.reset();
+    this.mouseGuard = false;
   }
 
   private k(...codes: string[]) {
@@ -329,6 +356,7 @@ export class Input {
     const mraw = this._miniMode === 'boxing' ? newMiniHeld() : null;
     if (mraw) {
       for (const b of MINI_BUTTONS) mraw[b] = this.k(...MINI_KEYS[b]);
+      if (this.mouseGuard) mraw.guarda = true;
     }
     this.keyTaps.clear();this.mouseTap=this.mouseRightTap=false;
     this.wheelNext = this.wheelPrev = false;
@@ -397,7 +425,13 @@ export class Input {
       for (const a of ACTIONS) raw[a] = raw[a] || t.held[a];
       raw.jump = raw.jump || jumpTap;
       s.device = 'touch';
-      if (mraw) for (const b of MINI_BUTTONS) mraw[b] = mraw[b] || t.mini[b];
+      if (mraw) {
+        for (const b of MINI_BUTTONS) mraw[b] = mraw[b] || t.mini[b];
+        // analógico do boxe: empurrar para o lado esquiva, puxar para baixo abaixa (o eixo dominante decide)
+        const ax = Math.abs(t.stickX);
+        if (ax > STICK_DODGE && ax >= t.stickY) { if (t.stickX < 0) mraw.esqE = true; else mraw.esqD = true; }
+        else if (t.stickY > STICK_DUCK && t.stickY > ax) mraw.abaixar = true;
+      }
     }
     // esquivas por gesto: a borda de um quadro (cada gesto vira um aperto, mesmo que caiba entre dois polls)
     const gestures = mraw ? t.miniTaps.splice(0) : (t.miniTaps.length = 0, null);

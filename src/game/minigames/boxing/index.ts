@@ -16,7 +16,7 @@ import type { MinigameContext, MinigameModule, MinigameResult, MinigameSession }
 import type { ControlState, MiniPad } from '../../../core/input';
 import type { MusicState } from '../../world';
 import { audio } from '../../../core/audio';
-import { boxingPerks, isFirstFight, readBoxingStats, recordFight } from '../../../core/boxingStats';
+import { boxingPerks, isFirstFight, markTutorialSeen, readBoxingStats, recordFight, shouldShowTutorial } from '../../../core/boxingStats';
 import { BoxingMatch, type MatchEvent } from './sim/match';
 import { PUNCH_BUTTONS } from './sim/rules';
 import { Crowd } from './sim/crowd';
@@ -24,6 +24,8 @@ import { sfxFor, hapticFor, musicFor } from './presentation';
 import { BoxingScene } from '../../../art/minigames/boxing/scene';
 import { resetHud } from '../../../art/minigames/boxing/hud';
 import { loadBackPhotos } from '../../../art/minigames/boxing/backPhotos';
+import { BoxTutorial } from '../../../art/minigames/boxing/tutorialView';
+import { STEPS, TutorialDemo } from './tutorial';
 
 const SEED = 1337;
 /** o cartão de uma vitória some sozinho depois disto (s) se ninguém tocar */
@@ -42,6 +44,10 @@ class BoxingSession implements MinigameSession {
   private cardT = -1;
   private attempts = 0;
   private final: MinigameResult | null = null;
+  /** tutorial antes da luta: a demonstração ao vivo (a luta de verdade só começa depois do OK) */
+  private tut: TutorialDemo | null = null;
+  private tutUI: BoxTutorial | null = null;
+  private tutStep = 0;
   private champion: boolean;
 
   constructor(private ctx: MinigameContext) {
@@ -50,6 +56,59 @@ class BoxingSession implements MinigameSession {
     this.scene.champion = this.champion;
     this.newMatch();
     ctx.touch('boxing');
+    if (this.wantsTutorial()) this.openTutorial();
+  }
+
+  /** O tutorial abre nas primeiras vezes; `?tut=1` força e `?tut=0` desliga (QA). */
+  private wantsTutorial(): boolean {
+    const q = typeof location === 'undefined' ? null : new URLSearchParams(location.search).get('tut');
+    if (q === '0') return false;
+    return q === '1' || shouldShowTutorial();
+  }
+
+  private openTutorial() {
+    this.tut = new TutorialDemo();
+    this.tutStep = 0;
+    this.tutUI = new BoxTutorial(document.getElementById('ui') ?? document.body, this.ctx.coarse === true, {
+      onNext: () => this.tutGo(this.tutStep + 1),
+      onBack: () => this.tutGo(this.tutStep - 1),
+      onSkip: () => this.closeTutorial(),
+    });
+    this.tutUI.setStep(0);
+    this.ctx.music('fightBreak');
+  }
+
+  private tutGo(i: number) {
+    if (!this.tut || !this.tutUI) return;
+    if (i >= STEPS.length) { this.closeTutorial(); return; }
+    this.tutStep = Math.max(0, i);
+    this.tut.setStep(this.tutStep);
+    this.tutUI.setStep(this.tutStep);
+  }
+
+  /** Fim do tutorial (OK ou pular): conta como visto e a luta de verdade começa do zero. */
+  private closeTutorial() {
+    markTutorialSeen();
+    this.tutUI?.dispose();
+    this.tutUI = null;
+    this.tut = null;
+    this.scene.fx.reset();
+    this.newMatch();
+  }
+
+  private updateTutorial(dt: number, pad: MiniPad) {
+    const d = this.tut!;
+    // Espaço/Enter = próximo (a demonstração ignora esse botão)
+    if (pad.especial.pressed) { this.tutGo(this.tutStep + 1); if (!this.tut) return; }
+    const ev = d.update(dt, pad);
+    const m = d.match;
+    const frozen = m.hitStopT > 0;
+    const sdt = dt * m.timeScale;
+    this.time += dt;
+    this.crowd.update(frozen ? 0 : sdt, false);
+    this.scene.update(sdt, frozen);
+    for (const e of ev) this.onEvent(e, m);
+    this.tutUI?.update(d.cue);
   }
 
   private newMatch() {
@@ -68,6 +127,7 @@ class BoxingSession implements MinigameSession {
   update(dt: number, ctl: ControlState) {
     if (this.finished) return;
     const pad = ctl.mini ?? EMPTY;
+    if (this.tut) { this.updateTutorial(dt, pad); return; }
     if (this.cardT >= 0) { this.updateCard(dt, pad); return; }
     const m = this.match;
     m.step(dt, pad);
@@ -116,8 +176,8 @@ class BoxingSession implements MinigameSession {
     } else if (punch || leave || this.cardT > CARD_AUTO) this.finished = true;
   }
 
-  private onEvent(e: MatchEvent) {
-    this.scene.handle(e, this.match);
+  private onEvent(e: MatchEvent, m: BoxingMatch = this.match) {
+    this.scene.handle(e, m);
     this.crowd.react(e);
     // um golpe bloqueado emite `block` e logo depois `hit`: o segundo não faz o baque nem a vibração de dano
     if (e.type === 'block' && e.punch) this.blocked = true;
@@ -127,21 +187,23 @@ class BoxingSession implements MinigameSession {
     if (e.type === 'roundEnd') window.setTimeout(() => audio.play('bell', 0.7), 160); // o fim do round toca o sino duas vezes
     const h = hapticFor(e, blocked);
     if (h) this.ctx.haptic?.(h.s, h.ms);
-    const mu = musicFor(e, this.match.round);
-    if (mu) this.ctx.music(mu);
+    if (m === this.match) {
+      const mu = musicFor(e, m.round);
+      if (mu) this.ctx.music(mu);
+    }
     // depois da ORELHADA carregada a trilha volta
-    if (e.type === 'impact' && this.match.cine === 'carga') this.ctx.music(`fight${this.match.round}` as MusicState);
+    if (m === this.match && e.type === 'impact' && m.cine === 'carga') this.ctx.music(`fight${m.round}` as MusicState);
   }
 
   draw(g: CanvasRenderingContext2D, W: number, H: number) {
-    this.scene.draw(g, this.match, this.crowd, W, H, g.getTransform().a);
+    this.scene.draw(g, this.tut ? this.tut.match : this.match, this.crowd, W, H, g.getTransform().a);
   }
 
   resize(W: number, H: number) { this.scene.resize(W, H); }
 
   result(): MinigameResult | null { return this.finished ? this.final : null; }
 
-  dispose() { this.scene.fx.reset(); this.ctx.special(false); }
+  dispose() { this.tutUI?.dispose(); this.tutUI = null; this.scene.fx.reset(); this.ctx.special(false); }
 }
 
 const EMPTY = Object.fromEntries(['jab', 'cruzE', 'ganchoE', 'direto', 'cruzD', 'ganchoD', 'esqE', 'esqD', 'abaixar', 'guarda', 'especial'].map((b) => [b, { held: false, pressed: false, released: false }])) as unknown as MiniPad;

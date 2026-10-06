@@ -156,7 +156,7 @@ export class Game {
     });
     this.mini = new MinigameFlow({
       input: this.input, quality: () => this.quality, view: () => ({ W: this.viewW, H: this.viewH }),
-      touchMode: (m) => this.touch.setMinigame(m), touchSpecial: (on, label) => this.touch.showSpecial(on, label),
+      usesTouch: () => this.touch.enabled, touchMode: (m) => this.touch.setMinigame(m), touchSpecial: (on, label) => this.touch.showSpecial(on, label),
       saved: () => { const w = this.world; if (w) { w.checkpointSnap = w.player.snapshot(); this.saveGame(); } },
       banner: (t, sub, d) => this.world?.hooks.onBanner?.(t, sub, d),
     });

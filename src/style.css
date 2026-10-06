@@ -864,14 +864,21 @@ kbd {
    gancho / abaixar, dois polegares parados = guarda) + esquivas « » nos cantos. O esquema "botões" é opcional. */
 .touch .mbtn, .touch .mhz { display: none; }
 .touch.mini-chase > *:not(.t-jump):not(.t-pause):not(.stick-zone) { display: none !important; }
-.touch.mini-boxing > *:not(.mbtn):not(.mhz):not(.mfx):not(.t-pause) { display: none !important; }
+.touch.mini-boxing > *:not(.mbtn):not(.mhz):not(.mfx):not(.t-pause):not(.stick-zone) { display: none !important; }
 .touch.mini-boxing .mhz { display: block; position: absolute; top: calc(var(--sat) + 48px); bottom: 0; width: 50%; pointer-events: auto; touch-action: none; }
 .touch.mini-boxing .mhz-l { left: 0; }
 .touch.mini-boxing .mhz-r { right: 0; }
 .touch.mini-boxing .mhz.down { background: rgba(140, 200, 255, 0.07); }
 .touch.mini-boxing.boxguard .mhz { background: rgba(120, 200, 255, 0.17); box-shadow: inset 0 0 0 3px rgba(150, 220, 255, 0.45); }
 .touch.mini-boxing .mbtn { font-weight: 800; letter-spacing: 0.02em; }
-.touch.mini-boxing .m-dl, .touch.mini-boxing .m-dr, .touch.mini-boxing .m-sp { display: flex; }
+.touch.mini-boxing .m-sp { display: flex; }
+/* esquema por gestos (padrão): analógico à esquerda esquiva (lados) e abaixa (para baixo); BLOQUEAR à direita; toques nas metades socam */
+.touch.mini-boxing .stick-zone { width: 38%; height: 58%; pointer-events: auto; z-index: 2; }
+.touch.mini-boxing .stick-ghost::after { content: "◀ ESQUIVA ▶\A▼ ABAIXA"; white-space: pre; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); text-align: center; font: 800 calc(9px * var(--ts))/1.5 var(--display, sans-serif); letter-spacing: 0.04em; color: rgba(255, 255, 255, calc(var(--to) + 0.2)); text-shadow: 0 1px 0 var(--ink, #170f2e); }
+.touch.mini-boxing.box-botoes .stick-zone { display: none !important; }
+.touch.lefty.mini-boxing:not(.box-botoes) .m-gu { right: auto; left: calc(var(--sal) + 14px * var(--ts)); }
+.touch.mini-boxing.box-botoes .m-dl, .touch.mini-boxing.box-botoes .m-dr { display: flex; }
+.touch.mini-boxing:not(.box-botoes) .m-gu { display: flex; flex-direction: column; z-index: 3; left: auto; right: calc(var(--sar) + 14px * var(--ts)); bottom: calc(var(--sab) + 14px * var(--ts)); width: calc(92px * var(--ts)); height: calc(92px * var(--ts)); font-size: calc(10px * var(--ts)); }
 .touch.mini-boxing .m-sp.hidden { display: none; }
 .touch.mini-boxing.box-botoes .mhz { display: none; }
 .touch.mini-boxing.box-botoes .mbtns { display: flex; }
@@ -1566,3 +1573,58 @@ kbd {
   .forge-shop .forge-tab canvas { display: none; }
   .forge-shop .forge-tab strong, .forge-shop .forge-tab small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 }
+
+/* ───────── tutorial do boxe (DOM sobre a cena; ver src/art/minigames/boxing/tutorialView.ts) ───────── */
+.bt { position: fixed; inset: 0; z-index: 40; pointer-events: none; font-family: var(--display); color: #fff; }
+.bt-card { position: absolute; right: calc(env(safe-area-inset-right, 0px) + 10px); bottom: calc(env(safe-area-inset-bottom, 0px) + 10px); width: min(46cqw, 430px); box-sizing: border-box; pointer-events: auto; padding: 8px 12px 10px; border-radius: 16px; background: linear-gradient(180deg, rgba(52, 30, 104, 0.97), rgba(23, 15, 46, 0.97)); border: 3px solid var(--ink, #170f2e); box-shadow: 0 0 0 2px rgba(255, 226, 122, 0.6), 0 10px 26px rgba(0, 0, 0, 0.5); }
+.bt-touch .bt-card { right: calc(env(safe-area-inset-right, 0px) + 122px * var(--ts, 1)); width: min(42cqw, 380px); }
+.bt-card header { display: flex; justify-content: space-between; align-items: center; font-size: clamp(9px, 2.2cqh, 12px); opacity: 0.85; letter-spacing: 0.05em; }
+.bt-dots i { display: inline-block; width: 8px; height: 8px; margin-left: 4px; border-radius: 50%; background: rgba(255, 255, 255, 0.25); }
+.bt-dots i.on { background: #ffe27a; }
+.bt-dots i.done { background: #9fe07a; }
+.bt-title { margin: 2px 0 4px; font: clamp(14px, 3.6cqh, 22px) var(--display); color: #ffe27a; letter-spacing: 0.03em; text-shadow: 0 2px 0 var(--ink, #170f2e); }
+.bt-row { display: flex; gap: 10px; align-items: center; }
+.bt-body { flex: 1; margin: 0; font: 700 clamp(10.5px, 2.5cqh, 15px)/1.32 system-ui, sans-serif; }
+.bt-body b { color: #fff3a0; }
+.bt-body b.r { color: #ff7a7a; } .bt-body b.o { color: #ffb04a; } .bt-body b.y { color: #ffe27a; }
+.bt-pic { display: flex; align-items: center; justify-content: center; min-width: 56px; }
+.bt-keys { margin: 6px 0 0; font: 700 clamp(9.5px, 2.2cqh, 13px) system-ui, sans-serif; opacity: 0.92; }
+.bt kbd { display: inline-block; min-width: 1.5em; margin: 0 1px; padding: 1px 6px; border-radius: 6px; background: #fff; color: #170f2e; border: 2px solid #170f2e; box-shadow: 0 2px 0 #7a6a9a; font: 800 0.95em var(--display); text-align: center; transition: transform 0.06s, background 0.06s; }
+.bt-pic kbd { font-size: clamp(14px, 3.4cqh, 20px); margin: 2px; }
+.bt kbd.on { background: #ffe27a; transform: translateY(2px); box-shadow: 0 0 0 3px rgba(255, 226, 122, 0.55), 0 0 14px #ffe27a; }
+.bt-card footer { display: flex; gap: 8px; align-items: center; margin-top: 8px; }
+.bt-card button { font: 800 clamp(10px, 2.6cqh, 14px) var(--display); letter-spacing: 0.04em; border: 3px solid var(--ink, #170f2e); border-radius: 12px; padding: 6px 12px; cursor: pointer; color: #170f2e; background: #fff; }
+.bt-card button:disabled { opacity: 0.35; cursor: default; }
+.bt-skip { margin-right: auto; background: transparent !important; color: #fff !important; border-color: rgba(255, 255, 255, 0.35) !important; font-size: clamp(9px, 2.2cqh, 12px) !important; }
+.bt-next { flex: 1; background: linear-gradient(180deg, #ffe27a, #ffb52e) !important; }
+.bt-next.go { background: linear-gradient(180deg, #b6f08a, #4fc23a) !important; animation: btpulse 0.6s ease-in-out infinite alternate; }
+@keyframes btpulse { to { transform: scale(1.05); } }
+.bt-mouse { width: clamp(26px, 6.5cqh, 38px); height: auto; }
+.bt-mouse .mb { fill: #fff; stroke: #170f2e; stroke-width: 3; }
+.bt-mouse .ml, .bt-mouse .mr { fill: transparent; }
+.bt-mouse .mk { stroke: #170f2e; stroke-width: 2; fill: none; }
+.bt-mouse:not(.rbtn).lit .ml, .bt-mouse.rbtn.lit .mr { fill: #ffc21a; }
+/* cursor / dedo animado sobre a cena */
+.bt-ptr { position: fixed; left: 0; top: 0; width: 0; height: 0; opacity: 0; transition: opacity 0.12s; pointer-events: none; }
+.bt-ptr.on { opacity: 1; }
+.bt-ptr svg { position: absolute; left: -4px; top: -3px; width: clamp(22px, 5cqh, 32px); filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.5)); }
+.bt-dot { position: absolute; left: -18px; top: -18px; width: 36px; height: 36px; border-radius: 50%; background: rgba(255, 255, 255, 0.8); border: 3px solid #fff; box-shadow: 0 0 12px rgba(255, 255, 255, 0.7); transition: transform 0.08s; }
+.bt-ptr.down .bt-dot { transform: scale(0.78); }
+.bt-rip { position: absolute; left: -24px; top: -24px; width: 48px; height: 48px; border-radius: 50%; border: 4px solid #ffe27a; opacity: 0; }
+.bt-ptr.down .bt-rip { animation: btrip 0.45s ease-out; }
+@keyframes btrip { from { transform: scale(0.3); opacity: 0.95; } to { transform: scale(2.3); opacity: 0; } }
+.bt-trail { position: fixed; height: 8px; margin-top: -4px; border-radius: 4px; transform-origin: 0 50%; background: linear-gradient(90deg, rgba(255, 226, 122, 0), rgba(255, 226, 122, 0.95)); opacity: 0; pointer-events: none; }
+.bt-trail.on { opacity: 1; }
+.bt-mid { position: fixed; left: 50%; top: 13%; bottom: 0; width: 0; border-left: 3px dashed rgba(255, 255, 255, 0.38); display: none; pointer-events: none; }
+.bt-mid.on { display: block; }
+.bt-mid span { position: absolute; top: 4px; white-space: nowrap; font: clamp(9px, 2.4cqh, 13px) var(--display); letter-spacing: 0.05em; color: #fff; text-shadow: 0 2px 0 var(--ink, #170f2e); opacity: 0.9; }
+.bt-mid span:first-child { right: 8px; } .bt-mid span:last-child { left: 8px; }
+/* analógico virtual: no cartão (pequeno) e sobre o analógico real (grande) */
+.bt-stick { position: relative; width: clamp(38px, 10cqh, 56px); height: clamp(38px, 10cqh, 56px); border-radius: 50%; border: 3px solid rgba(255, 255, 255, 0.85); background: rgba(60, 240, 255, 0.14); }
+.bt-stick i { position: absolute; left: 50%; top: 50%; width: 44%; height: 44%; margin: -22% 0 0 -22%; border-radius: 50%; background: #c6f4ff; border: 2px solid #170f2e; transform: translate(calc(var(--kx, 0) * 30%), calc(var(--ky, 0) * 30%)); transition: transform 0.09s; }
+.bt-stick.pull i { background: #ffe27a; }
+.bt-stick-big { position: fixed; left: calc(env(safe-area-inset-left, 0px) + 28px * var(--ts, 1)); bottom: calc(env(safe-area-inset-bottom, 0px) + 26px * var(--ts, 1)); width: calc(122px * var(--ts, 1)); height: calc(122px * var(--ts, 1)); opacity: 0; pointer-events: none; border-color: #ffe27a; box-shadow: 0 0 0 4px rgba(255, 226, 122, 0.35); }
+.bt-stick-big.on { opacity: 1; }
+.bt-stick-big i { transform: translate(calc(var(--kx, 0) * 54%), calc(var(--ky, 0) * 54%)); }
+#touch.bt-hl-guard .m-gu { animation: btglow 0.5s ease-in-out infinite alternate; }
+@keyframes btglow { from { box-shadow: 0 0 0 3px rgba(255, 226, 122, 0.4); } to { box-shadow: 0 0 0 8px rgba(255, 226, 122, 0.9), 0 0 18px #ffe27a; } }
