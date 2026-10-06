@@ -32,19 +32,19 @@ export interface PunchDef {
 }
 
 export const PUNCHES: Record<Punch, PunchDef> = {
-  jab: { side: 'L', tier: 'jab', dmg: 4, energy: 5, wind: 0.06, active: 0.06, recover: 0.14, stop: 0.034 },
-  direto: { side: 'R', tier: 'direto', dmg: 7, energy: 8, wind: 0.10, active: 0.07, recover: 0.20, stop: 0.05 },
-  cruzE: { side: 'L', tier: 'cruzado', dmg: 10, energy: 12, wind: 0.16, active: 0.08, recover: 0.28, stop: 0.084 },
-  cruzD: { side: 'R', tier: 'cruzado', dmg: 11, energy: 13, wind: 0.17, active: 0.08, recover: 0.30, stop: 0.084 },
-  ganchoE: { side: 'L', tier: 'gancho', dmg: 13, energy: 16, wind: 0.22, active: 0.08, recover: 0.36, stop: 0.117 },
-  ganchoD: { side: 'R', tier: 'gancho', dmg: 14, energy: 17, wind: 0.23, active: 0.08, recover: 0.38, stop: 0.117 },
+  jab: { side: 'L', tier: 'jab', dmg: 5, energy: 5, wind: 0.06, active: 0.06, recover: 0.14, stop: 0.034 },
+  direto: { side: 'R', tier: 'direto', dmg: 9, energy: 8, wind: 0.10, active: 0.07, recover: 0.20, stop: 0.05 },
+  cruzE: { side: 'L', tier: 'cruzado', dmg: 14, energy: 12, wind: 0.16, active: 0.08, recover: 0.28, stop: 0.084 },
+  cruzD: { side: 'R', tier: 'cruzado', dmg: 15, energy: 13, wind: 0.17, active: 0.08, recover: 0.30, stop: 0.084 },
+  ganchoE: { side: 'L', tier: 'gancho', dmg: 18, energy: 16, wind: 0.22, active: 0.08, recover: 0.36, stop: 0.117 },
+  ganchoD: { side: 'R', tier: 'gancho', dmg: 19, energy: 17, wind: 0.23, active: 0.08, recover: 0.38, stop: 0.117 },
 };
 
 export type Guard = 'alta' | 'baixa' | 'aberta' | 'tonto' | 'cobertura' | 'ataque';
 /** fração do dano que passa pela guarda do jacaré, por tipo de golpe */
 export const GUARD_PASS: Record<Guard, Record<PunchTier, number>> = {
   /** o gancho abre a guarda alta ("SAI DA GUARDA COM O GANCHO!") */
-  alta: { jab: 0.2, direto: 0.2, cruzado: 0.6, gancho: 1 },
+  alta: { jab: 0.3, direto: 0.3, cruzado: 0.6, gancho: 1 },
   baixa: { jab: 1, direto: 1, cruzado: 1, gancho: 0.3 },
   aberta: { jab: 1, direto: 1, cruzado: 1, gancho: 1 },
   tonto: { jab: 1.5, direto: 1.5, cruzado: 1.5, gancho: 1.5 },
@@ -125,7 +125,7 @@ export const BUFFER_TIME = 0.3;
 // ───────────────────────── estrelas de orelha e Fúria ─────────────────────────
 export const MAX_STARS = 3;
 /** dano da ORELHADA carregada: base × (1 + estrelas), ignora a guarda */
-export const CARGA_DMG = 24;
+export const CARGA_DMG = 32;
 export const CARGA_WIND = 0.45;
 export const CARGA_TIME = 0.9;
 export const FURY_MAX = 100;
@@ -140,7 +140,7 @@ export const FURY_SPEED = 0.77;
 export const FURY_DMG = 1.25;
 
 // ───────────────────────── jacaré e a luta ─────────────────────────
-/** calibrado por varredura de bots: o leitor perfeito termina em ~150 s (round 2), um jogador mais lento em ~200 s (round 3) */
+/** calibrado por varredura de bots: o leitor perfeito termina em ~115 s (round 2), um jogador mais lento em ~150 s; cada soco que passa tira cerca de 1–2% da barra (o dano subiu 35% e a guarda alta deixa passar 30% dos retos depois do relato "a vida quase não desce") */
 export const G_HP = 1000;
 export const ROUNDS = 3;
 export const ROUND_TIME = 60;

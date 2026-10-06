@@ -22,7 +22,8 @@ import type { BoxLayout } from './layout';
 const OUT = '#170f2e';
 /** altura da cabeça (nuca ao topo) em unidades do corpo; a base do pescoço é a origem (0,0) */
 const HEAD_H = 132;
-const HEAD_OVERLAP = 18;
+/** quanto da base da foto entra por baixo da gola (era 18 e a cabeça ficava abaixo do nível do pescoço; 4 a deixa 14 unidades mais alta) */
+const HEAD_OVERLAP = 4;
 const EAR_K = 1.55;
 
 interface SkinLook { shirt: string; shirt2: string; stripe: string; sleeve: 'short' | 'long' | 'elbow'; glow?: string }
@@ -430,9 +431,9 @@ export function drawKarimboBack(g: CanvasRenderingContext2D, art: KarimboArt, sk
   if (skin === 'neon' || skin === 'diver' || skin === 'atlante') { g.strokeStyle = lk.stripe; g.lineWidth = 2.2; g.beginPath(); g.moveTo(-36, 4); g.quadraticCurveTo(0, 25, 36, 4); g.stroke(); }
   // capuz de caça do jacaré (a cabeça de um jacaré vista de trás, por cima do cabelo)
   if (skin === 'jacare' && !front) {
-    g.fillStyle = OUT; g.beginPath(); g.ellipse(0, -112 + headY, 42, 24, 0, Math.PI, 0); g.fill();
-    g.fillStyle = '#5f8a45'; g.beginPath(); g.ellipse(0, -111 + headY, 38.5, 21, 0, Math.PI, 0); g.fill();
-    g.fillStyle = '#3f6430'; for (let i = -3; i <= 3; i++) { g.beginPath(); g.moveTo(i * 10 - 4, -111 + headY); g.lineTo(i * 10, -126 + headY + Math.abs(i) * 3); g.lineTo(i * 10 + 4, -111 + headY); g.closePath(); g.fill(); }
+    g.fillStyle = OUT; g.beginPath(); g.ellipse(0, -126 + headY, 42, 24, 0, Math.PI, 0); g.fill();
+    g.fillStyle = '#5f8a45'; g.beginPath(); g.ellipse(0, -125 + headY, 38.5, 21, 0, Math.PI, 0); g.fill();
+    g.fillStyle = '#3f6430'; for (let i = -3; i <= 3; i++) { g.beginPath(); g.moveTo(i * 10 - 4, -125 + headY); g.lineTo(i * 10, -140 + headY + Math.abs(i) * 3); g.lineTo(i * 10 + 4, -125 + headY); g.closePath(); g.fill(); }
   }
   // ---- braços e luvas (por cima do tronco E da cabeça: o braço que cruza na frente da nuca nunca some atrás dela)
   const lead = p.punch ? (p.punch.side === 'L' ? 0 : 1) : -1;

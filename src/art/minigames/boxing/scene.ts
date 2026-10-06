@@ -78,6 +78,8 @@ export class BoxingScene {
         else if (tier === 'cruzado') { fx.kick(-side * 12 * u, 0); fx.addShake(1.2 * u, 0.1); fx.punch(0.018); }
         else { fx.kick(0, -11 * u); fx.addShake(2.4 * u, 0.14); fx.punch(0.026); }
         if (e.amount !== undefined && e.amount >= 14) fx.addFlash(0.12, '#ffffff');
+        // o número do dano (em pontos de vida): cada soco que passa mostra quanto tirou da barra do jacaré
+        if (e.amount !== undefined && e.amount >= 0.5) fx.pop(`-${Math.round(e.amount)}`, hx + side * 46 * u, hy + 4 * u, heavy ? '#ff8a6a' : '#ffffff', (heavy ? 21 : 15) * u, 0.9);
         break;
       }
       case 'block': fx.pop('TOC', hx, hy - 10 * u, '#bfe8ff', 14 * u, 0.5); fx.burst(hx, hy, 4, 0, '#bfe8ff', 120 * u, 2 * u); break;

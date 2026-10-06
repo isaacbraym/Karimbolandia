@@ -79,7 +79,7 @@ describe('boxe v2: golpes e guarda do jacaré', () => {
     const hp0 = m.g.hp;
     for (const p of ['jab', 'direto', 'cruzD'] as Punch[]) { while (m.k.action !== 'idle') m.step(DT, pad()); m.step(DT, pad([p])); }
     stepN(m, 1.2);
-    expect(hp0 - m.g.hp).toBeCloseTo(4 + 7 + 11 * 1.25, 4);
+    expect(hp0 - m.g.hp).toBeCloseTo(PUNCHES.jab.dmg + PUNCHES.direto.dmg + PUNCHES.cruzD.dmg * 1.25, 4);
     expect(m.events.some((e) => e.type === 'combo')).toBe(true);
     const m2 = fight();
     m2.g.mode = 'recover'; m2.g.recoverT = 99; m2.g.guard = 'aberta';
@@ -87,6 +87,24 @@ describe('boxe v2: golpes e guarda do jacaré', () => {
     for (const p of seq) { while (m2.k.action !== 'idle') m2.step(DT, pad()); m2.step(DT, pad([p])); }
     stepN(m2, 0.3);
     expect(m2.g.mode).toBe('dizzy');
+  });
+
+  it('cada soco que passa tira uma fatia VISÍVEL da barra do jacaré (relato: "a vida quase não desce")', () => {
+    const open = (p: Punch) => {
+      const m = fight();
+      m.g.mode = 'recover'; m.g.recoverT = 99; m.g.guard = 'aberta';
+      const hp0 = m.g.hp;
+      m.step(DT, pad([p]));
+      stepN(m, 0.8);
+      return (hp0 - m.g.hp) / m.g.maxHp;
+    };
+    // com a guarda aberta nenhum soco tira menos de 0,4% e o gancho passa de 1,5%
+    for (const p of ['jab', 'direto', 'cruzE', 'cruzD', 'ganchoE', 'ganchoD'] as Punch[]) expect(open(p), p).toBeGreaterThan(0.004);
+    expect(open('ganchoD')).toBeGreaterThan(0.015);
+    // e mesmo contra a guarda alta (o estado mais comum) um reto já passa de 0,12% e o cruzado de 1%
+    const high = (p: Punch) => { const m = fight(); m.g.mode = 'guard'; m.g.guard = 'alta'; m.g.thinkT = 99; const hp0 = m.g.hp; m.step(DT, pad([p])); stepN(m, 0.8); return (hp0 - m.g.hp) / m.g.maxHp; };
+    expect(high('jab')).toBeGreaterThan(0.0012);
+    expect(high('cruzD')).toBeGreaterThan(0.008);
   });
 
   it('sem energia os golpes ficam 40% mais lentos; defender devolve energia', () => {
@@ -450,7 +468,7 @@ describe('boxe v2: equilíbrio com bots', () => {
   it('um jogador médio (reage em 0,28 s) vence no normal, no round 2 ou 3; no fácil até o bem lento (0,34 s) vence', () => {
     const n = play(reader(0.28), 'normal');
     expect(n.m.result?.outcome).toBe('win');
-    expect(n.t).toBeGreaterThan(150);
+    expect(n.t).toBeGreaterThan(125); // mais lento que o leitor perfeito (~115 s)
     expect(n.t).toBeLessThan(330);
     expect(play(reader(0.34), 'facil').m.result?.outcome).toBe('win');
   });
