@@ -1,0 +1,214 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>Recorte da foto de costas do Karimbo</title>
+<style>body{background:#2a2540;color:#eee;font:14px sans-serif;margin:16px}canvas{background:repeating-conic-gradient(#555 0 25%,#777 0 50%) 50%/16px 16px;margin:4px;max-width:46vw}</style>
+<h3>Recorte da foto de costas (Karimbo_costas.webp → karimbo_back_*.webp)</h3>
+<p id="log">Carregando…</p>
+<div id="out"></div>
+<script type="module">
+/**
+ * Ferramenta de desenvolvimento (não entra no jogo): gera, a partir de `Karimbo_costas.webp` (foto
+ * canônica do Karimbo de costas, fundo preto puro), os recortes usados pelo boxe 3ª pessoa:
+ *   public/assets/img/karimbo_back_head.webp   cabeça + nuca SEM orelhas e SEM pescoço (some em degradê)
+ *   public/assets/img/karimbo_back_ear_l.webp  orelha esquerda (do ponto de vista de quem olha as costas)
+ *   public/assets/img/karimbo_back_ear_r.webp  orelha direita
+ *   public/assets/img/karimbo_back_meta.json   tamanhos e a raiz de cada orelha (pivô de crescimento)
+ *
+ * Uso: com o servidor de desenvolvimento no ar (npm run dev), abra /tools/cutout_karimbo_back/index.html.
+ * Sem `?save=URL` só mostra o resultado; com `?save=http://localhost:5599` envia cada arquivo por POST
+ * (`node tools/cutout_karimbo_back/receiver.mjs` grava em public/assets/img). A foto NÃO é redesenhada:
+ * só se separam as camadas (o jogo amplia as orelhas em tempo de desenho, como no rosto de frente).
+ */
+const SRC = '/Karimbo_costas.webp';
+const params = new URLSearchParams(location.search);
+const SAVE = params.get('save');
+const log = (s) => (document.getElementById('log').textContent = s);
+
+const bmp = await createImageBitmap(await (await fetch(SRC)).blob());
+const W = bmp.width, H = bmp.height;
+const base = new OffscreenCanvas(W, H);
+const bg = base.getContext('2d', { willReadFrequently: true });
+bg.drawImage(bmp, 0, 0);
+const img = bg.getImageData(0, 0, W, H);
+const d = img.data;
+const lum = (i) => Math.max(d[i * 4], d[i * 4 + 1], d[i * 4 + 2]);
+
+// ---- 1) fundo preto: preenchimento a partir da borda (o cabelo escuro NUNCA é furado por dentro)
+const BG_T = 9;
+const isBg = new Uint8Array(W * H);
+const stack = [];
+const push = (x, y) => {
+  if (x < 0 || y < 0 || x >= W || y >= H) return;
+  const i = y * W + x;
+  if (isBg[i] || lum(i) > BG_T) return;
+  isBg[i] = 1; stack.push(i);
+};
+for (let x = 0; x < W; x++) { push(x, 0); push(x, H - 1); }
+for (let y = 0; y < H; y++) { push(0, y); push(W - 1, y); }
+while (stack.length) {
+  const i = stack.pop(), x = i % W, y = (i / W) | 0;
+  push(x + 1, y); push(x - 1, y); push(x, y + 1); push(x, y - 1);
+}
+// borda suave: 3 px em volta do fundo recebem alfa pelo brilho (sem halo preto duro)
+const alpha = new Uint8Array(W * H).fill(255);
+for (let i = 0; i < W * H; i++) if (isBg[i]) alpha[i] = 0;
+const near = (x, y) => {
+  for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++) {
+    const xx = x + dx, yy = y + dy;
+    if (xx >= 0 && yy >= 0 && xx < W && yy < H && isBg[yy * W + xx]) return true;
+  }
+  return false;
+};
+const sstep = (a, b, v) => { const t = Math.max(0, Math.min(1, (v - a) / (b - a))); return t * t * (3 - 2 * t); };
+for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+  const i = y * W + x;
+  if (!isBg[i] && near(x, y)) alpha[i] = Math.round(255 * sstep(BG_T, 34, lum(i)));
+}
+
+// ---- 2) geometria (coordenadas da foto original; medidas na foto de 1097 × 1434)
+const CX = 548.5;                       // eixo de simetria do crânio
+// borda esquerda do crânio nas linhas das orelhas (onde a orelha nasce); a direita é o espelho
+const SKULL = [[600, 136], [650, 148], [700, 160], [750, 172], [800, 182], [850, 190], [900, 196], [950, 200], [1000, 194]];
+const EAR_Y0 = 600, EAR_Y1 = 1000;      // faixa vertical das orelhas
+const skullL = (y) => {
+  if (y <= SKULL[0][0]) return SKULL[0][1];
+  for (let k = 1; k < SKULL.length; k++) if (y <= SKULL[k][0]) {
+    const [y0, x0] = SKULL[k - 1], [y1, x1] = SKULL[k];
+    return x0 + ((y - y0) / (y1 - y0)) * (x1 - x0);
+  }
+  return SKULL[SKULL.length - 1][1];
+};
+const MIN_Y0 = 640, MIN_Y1 = 985;      // janela onde a orelha realmente nasce no crânio
+const FEATHER = 9;                      // degradê da cabeça sobre a raiz da orelha (px da foto)
+const NECK_FADE0 = 1000, NECK_FADE1 = 1088; // o pescoço some em degradê (a gola da roupa cobre)
+
+function colorKeyed() {
+  const c = new OffscreenCanvas(W, H);
+  const g = c.getContext('2d');
+  const out = g.createImageData(W, H);
+  for (let i = 0; i < W * H; i++) {
+    out.data[i * 4] = d[i * 4]; out.data[i * 4 + 1] = d[i * 4 + 1]; out.data[i * 4 + 2] = d[i * 4 + 2];
+    out.data[i * 4 + 3] = alpha[i];
+  }
+  g.putImageData(out, 0, 0);
+  return { c, out };
+}
+const keyed = colorKeyed();
+
+// ---- 3) cabeça: tudo à direita do crânio (esquerda) e à esquerda do espelho (direita), sem pescoço
+function headLayer() {
+  const c = new OffscreenCanvas(W, NECK_FADE1);
+  const g = c.getContext('2d');
+  const out = g.createImageData(W, NECK_FADE1);
+  for (let y = 0; y < NECK_FADE1; y++) for (let x = 0; x < W; x++) {
+    const i = y * W + x, o = (y * W + x) * 4;
+    let a = alpha[i] / 255;
+    if (y >= EAR_Y0 && y <= EAR_Y1 + 12) {
+      const sl = skullL(Math.min(y, SKULL[SKULL.length - 1][0]));
+      const dl = x - sl, dr = (2 * CX - sl) - x;
+      a *= sstep(-FEATHER, FEATHER, Math.min(dl, dr));
+    } else if (y > EAR_Y1 + 12) {
+      // abaixo das orelhas: só o miolo da nuca
+      const sl = SKULL[SKULL.length - 1][1];
+      a *= sstep(-FEATHER, FEATHER, Math.min(x - sl, 2 * CX - sl - x));
+    }
+    if (y > NECK_FADE0) a *= 1 - sstep(NECK_FADE0, NECK_FADE1, y);
+    out.data[o] = d[i * 4]; out.data[o + 1] = d[i * 4 + 1]; out.data[o + 2] = d[i * 4 + 2]; out.data[o + 3] = Math.round(a * 255);
+  }
+  g.putImageData(out, 0, 0);
+  // recorta a caixa útil
+  return trim(c);
+}
+
+// ---- 4) orelhas: pixels FORA do crânio (com 34 px de sobreposição para baixo da cabeça)
+function earLayer(side) {
+  const OVER = 26;
+  const x0 = side === 'l' ? 0 : Math.round(2 * CX - 235), x1 = side === 'l' ? 235 : W;
+  const y0 = EAR_Y0 - 30, y1 = EAR_Y1 + 40;
+  const c = new OffscreenCanvas(x1 - x0, y1 - y0);
+  const g = c.getContext('2d');
+  const out = g.createImageData(c.width, c.height);
+  for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) {
+    const i = y * W + x, o = ((y - y0) * c.width + (x - x0)) * 4;
+    const sl = skullL(Math.max(EAR_Y0, Math.min(y, SKULL[SKULL.length - 1][0])));
+    const dist = side === 'l' ? sl - x : x - (2 * CX - sl);   // >0: fora do crânio
+    let a = alpha[i] / 255;
+    // a orelha termina OVER px DENTRO do crânio (essa sobra fica escondida sob a cabeça) e só dentro de
+    // uma janela vertical: a pele da lateral da cabeça acima/abaixo da orelha não pode virar "orelha"
+    if (dist <= -OVER) a = 0;
+    else if (dist < 0) a *= sstep(MIN_Y0, MIN_Y0 + 60, y) * (1 - sstep(MIN_Y1 - 60, MIN_Y1, y));
+    out.data[o] = d[i * 4]; out.data[o + 1] = d[i * 4 + 1]; out.data[o + 2] = d[i * 4 + 2]; out.data[o + 3] = Math.round(a * 255);
+  }
+  g.putImageData(out, 0, 0);
+  const t = trim(c);
+  // raiz (pivô de crescimento): ponto do crânio na altura média da orelha, em px do recorte
+  const yMid = (EAR_Y0 + EAR_Y1) / 2 + 20;
+  const rootXimg = side === 'l' ? skullL(yMid) : 2 * CX - skullL(yMid);
+  t.root = [rootXimg - x0 - t.ox, yMid - y0 - t.oy];
+  t.meta = { x: x0 + t.ox, y: y0 + t.oy };
+  return t;
+}
+
+function trim(c) {
+  const g = c.getContext('2d');
+  const { width: w, height: h } = c;
+  const data = g.getImageData(0, 0, w, h).data;
+  let x0 = w, y0 = h, x1 = -1, y1 = -1;
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (data[(y * w + x) * 4 + 3] > 12) {
+    if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y;
+  }
+  const t = new OffscreenCanvas(x1 - x0 + 1, y1 - y0 + 1);
+  t.getContext('2d').drawImage(c, -x0, -y0);
+  t.ox = x0; t.oy = y0;
+  return t;
+}
+
+const head = headLayer();
+const earL = earLayer('l'), earR = earLayer('r');
+
+// ---- 5) saída em meia resolução (bake do jogo reduz de novo; mantém o arquivo leve)
+const SC = 0.5;
+async function toWebp(c, name) {
+  const o = new OffscreenCanvas(Math.max(1, Math.round(c.width * SC)), Math.max(1, Math.round(c.height * SC)));
+  const g = o.getContext('2d');
+  g.imageSmoothingQuality = 'high';
+  g.drawImage(c, 0, 0, o.width, o.height);
+  const blob = await o.convertToBlob({ type: 'image/webp', quality: 0.92 });
+  const cv = document.createElement('canvas');
+  cv.width = o.width; cv.height = o.height; cv.title = name;
+  cv.getContext('2d').drawImage(o, 0, 0);
+  document.getElementById('out').append(cv);
+  if (SAVE) await fetch(`${SAVE}/save?name=${name}`, { method: 'POST', body: blob });
+  return { w: o.width, h: o.height, bytes: blob.size };
+}
+const sh = await toWebp(head, 'karimbo_back_head.webp');
+const sl = await toWebp(earL, 'karimbo_back_ear_l.webp');
+const sr = await toWebp(earR, 'karimbo_back_ear_r.webp');
+const r = (v) => Math.round(v * SC * 100) / 100;
+// prévia: orelhas ampliadas (como no jogo) atrás da cabeça
+{
+  const EARK = 1.35, pad = 120;
+  const cv = document.createElement('canvas');
+  cv.width = Math.round(head.width * SC) + pad * 2; cv.height = Math.round(head.height * SC) + 60;
+  const g = cv.getContext('2d');
+  g.fillStyle = '#7a6a9a'; g.fillRect(0, 0, cv.width, cv.height);
+  for (const [e, left] of [[earL, true], [earR, false]]) {
+    const rx = e.root[0] * SC, ry = e.root[1] * SC;
+    const px = pad + (e.meta.x - head.ox) * SC + rx, py = (e.meta.y - head.oy) * SC + ry;
+    g.save(); g.translate(px, py); g.scale(EARK, EARK); g.drawImage(e, -rx, -ry, e.width * SC, e.height * SC); g.restore();
+  }
+  g.drawImage(head, pad, 0, head.width * SC, head.height * SC);
+  cv.title = 'prévia'; document.getElementById('out').append(cv);
+}
+const meta = {
+  source: { w: W, h: H },
+  head: { w: sh.w, h: sh.h, /* centro do crânio e fim da nuca no recorte */ cx: r(CX - head.ox), neckY: r(NECK_FADE0 - head.oy) },
+  earL: { w: sl.w, h: sl.h, rootX: r(earL.root[0]), rootY: r(earL.root[1]), headX: r(earL.meta.x - head.ox), headY: r(earL.meta.y - head.oy) },
+  earR: { w: sr.w, h: sr.h, rootX: r(earR.root[0]), rootY: r(earR.root[1]), headX: r(earR.meta.x - head.ox), headY: r(earR.meta.y - head.oy) },
+  /** soma das alturas úteis (para o jogo escalar): a cabeça tem `head.h` px nesta escala */
+  scale: SC,
+};
+if (SAVE) await fetch(`${SAVE}/save?name=karimbo_back_meta.json`, { method: 'POST', body: JSON.stringify(meta, null, 1) });
+window.__result = meta;
+log('Pronto: ' + JSON.stringify(meta) + (SAVE ? ' (enviado)' : ' (use ?save=http://localhost:5599 para gravar)'));
+</script>
