@@ -12,11 +12,11 @@ const OUT = '#170f2e';
 /** unidades lógicas do quadro assado: a luva ocupa ~(GW × GH) com o punho (cuff) embaixo */
 export const GW = 64, GH = 66;
 
-interface Pal { hi: string; mid: string; lo: string; cuff: string; cuffStripe: string; text: string; claws: boolean }
+interface Pal { hi: string; mid: string; lo: string; cuff: string; cuffStripe: string; text: string; claws: boolean; hotHi: string; hotMid: string }
 const PAL: Record<GloveStyle, Pal> = {
-  karimbo: { hi: '#ff8f7c', mid: '#e0343a', lo: '#8f1422', cuff: '#f3efe2', cuffStripe: '#c4202e', text: '#c4202e', claws: false },
-  ouro: { hi: '#fff3a0', mid: '#f0b82e', lo: '#a86a10', cuff: '#fff7d8', cuffStripe: '#a86a10', text: '#a86a10', claws: false },
-  jacare: { hi: '#a8d878', mid: '#5f8a45', lo: '#2f4f26', cuff: '#e2d8a4', cuffStripe: '#3f6430', text: '#3f6430', claws: true },
+  karimbo: { hi: '#ff8f7c', mid: '#e0343a', lo: '#8f1422', cuff: '#f3efe2', cuffStripe: '#c4202e', text: '#c4202e', claws: false, hotHi: '#ffd0c4', hotMid: '#ff6f5f' },
+  ouro: { hi: '#fff3a0', mid: '#f0b82e', lo: '#a86a10', cuff: '#fff7d8', cuffStripe: '#a86a10', text: '#a86a10', claws: false, hotHi: '#fffbd0', hotMid: '#ffd84a' },
+  jacare: { hi: '#a8d878', mid: '#5f8a45', lo: '#2f4f26', cuff: '#e2d8a4', cuffStripe: '#3f6430', text: '#3f6430', claws: true, hotHi: '#e8ffc8', hotMid: '#9fe06a' },
 };
 const cache = new Map<string, HTMLCanvasElement>();
 
@@ -31,7 +31,7 @@ function bakeGlove(style: GloveStyle, view: GloveView, k: number): HTMLCanvasEle
     // contorno + degradê (luz no alto à esquerda)
     g.fillStyle = OUT; g.beginPath(); g.ellipse(cx, cy, rx + 2.4, ry + 2.4, rot, 0, Math.PI * 2); g.fill();
     const gr = g.createRadialGradient(cx - rx * 0.35, cy - ry * 0.4, 2, cx, cy, Math.max(rx, ry) * 1.1);
-    gr.addColorStop(0, hot ? '#ffd0c4' : p.hi); gr.addColorStop(0.45, hot ? '#ff6f5f' : p.mid); gr.addColorStop(1, p.lo);
+    gr.addColorStop(0, hot ? p.hotHi : p.hi); gr.addColorStop(0.45, hot ? p.hotMid : p.mid); gr.addColorStop(1, p.lo);
     g.fillStyle = gr; g.beginPath(); g.ellipse(cx, cy, rx, ry, rot, 0, Math.PI * 2); g.fill();
   };
   if (view === 'perfil') {

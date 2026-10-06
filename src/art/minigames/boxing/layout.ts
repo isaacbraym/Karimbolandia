@@ -73,7 +73,7 @@ export function boxLayout(W: number, H: number): BoxLayout {
   spots.push({ x: protect.x - KID_HALF_W * 0.82 * u - 2 * u, y: H * 0.5, s: 0.82 * u, band: 'judge', side: -1, size: 1 });
   return {
     W, H, u, protect,
-    gator: { x: W * 0.6, feetY: H * 0.7, s: u * 1.08 },
+    gator: { x: W * 0.6, feetY: H * 0.7, s: u * 1.0 },
     karimbo: { x: W * 0.3, y: H * 0.79, s: u * 0.95 },
     target: { x: W * 0.6, y: H * 0.43 },
     head: { x: W * 0.6, y: H * 0.3 },

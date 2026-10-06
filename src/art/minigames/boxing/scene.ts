@@ -8,10 +8,10 @@ import { getArt } from '../../index';
 import { progress } from '../../../core/storage';
 import { drawAlligatorKO } from '../../alligatorKO';
 import type { BoxingMatch, MatchEvent } from '../../../game/minigames/boxing/sim/match';
-import { ORELHADA_TIME, COUNT_TIME } from '../../../game/minigames/boxing/sim/rules';
+import { ORELHADA_TIME, COUNT_TIME, PUNCHES } from '../../../game/minigames/boxing/sim/rules';
 import type { Crowd } from '../../../game/minigames/boxing/sim/crowd';
 import { drawKarimboBack, backPoseOf } from './karimboBack';
-import { drawGatorFront, type GatorPose } from './gatorFront';
+import { drawGatorBoxer, type GatorPose } from './gatorBoxer';
 import { drawKids, drawShouts } from './kids';
 import { boxLayout, type BoxLayout } from './layout';
 import { drawRingArt, drawRingLive } from './ring';
@@ -28,10 +28,16 @@ export class BoxingScene {
   private W = 0;
   private H = 0;
   private lastAttack: GatorPose['lastAttack'] = null;
+  private lastIdx = 0;
   private sinceImpact = 9;
   private time = 0;
+  private dt = 1 / 60;
   private hand: -1 | 1 = 1;
   private lastCount = 0;
+  /** reação do jacaré ao soco que levou (decai) */
+  private react = 0;
+  private reactSide: -1 | 1 = -1;
+  private reactTier: 0 | 1 | 2 | 3 = 0;
 
   constructor(private backdrop: HTMLCanvasElement | null, W: number, H: number) { this.resize(W, H); }
 
@@ -48,6 +54,7 @@ export class BoxingScene {
     const gx = this.L.target.x, gy = this.L.target.y;
     switch (e.type) {
       case 'hit':
+        if (e.punch) { const d = PUNCHES[e.punch]; this.react = 1; this.reactSide = d.side === 'L' ? -1 : 1; this.reactTier = d.tier === 'jab' ? 0 : d.tier === 'direto' ? 1 : d.tier === 'cruzado' ? 2 : 3; }
         this.fx.burst(gx + (Math.random() - 0.5) * 40 * u, gy + (Math.random() - 0.5) * 30 * u, 8, 0, '#ffe27a', 230 * u, 2.4 * u);
         this.fx.pop(e.punch && e.punch.startsWith('gancho') ? 'POW!' : e.punch === 'jab' ? 'tap' : 'PAF!', gx + (Math.random() - 0.5) * 60 * u, gy - 20 * u, '#ffe27a', 22 * u, 0.7);
         this.fx.addShake((e.amount ?? 0) >= 14 ? 3 * u : 1.4 * u, 0.15);
@@ -55,10 +62,10 @@ export class BoxingScene {
       case 'counter': this.fx.pop('CONTRA-ATAQUE!', gx, H * 0.2, '#7ff9ff', 20 * u, 1.1); break;
       case 'perfect': this.fx.pop('ESQUIVA PERFEITA!', W / 2, H * 0.3, '#7ff9ff', 22 * u, 1.3); this.fx.addFlash(0.15, '#7ff9ff'); break;
       case 'combo': this.fx.pop(`COMBO x${e.n ?? 1}!`, W / 2, H * 0.26, '#ffe27a', 24 * u, 1.1); this.fx.burst(W / 2, H * 0.45, 12, 1, '#ffd23a', 260 * u, 3 * u, 300); break;
-      case 'gatorAttack': this.lastAttack = e.attack ?? null; this.hand = this.hand === 1 ? -1 : 1; this.sinceImpact = -9; break;
-      case 'gatorMiss': this.sinceImpact = 0; this.fx.pop('UUU!', gx, gy - 30 * u, '#ffffff', 18 * u, 0.7); break;
+      case 'gatorAttack': this.lastAttack = e.attack ?? null; if (m.g.hitIdx === 0) this.hand = this.hand === 1 ? -1 : 1; this.sinceImpact = -9; break;
+      case 'gatorMiss': this.sinceImpact = 0; this.lastAttack = e.attack ?? this.lastAttack; this.lastIdx = m.g.mode === 'tele' ? m.g.hitIdx - 1 : m.g.hitIdx; this.fx.pop('UUU!', gx, gy - 30 * u, '#ffffff', 18 * u, 0.7); break;
       case 'gatorHit':
-        this.sinceImpact = 0;
+        this.sinceImpact = 0; this.lastAttack = e.attack ?? this.lastAttack; this.lastIdx = m.g.mode === 'tele' ? m.g.hitIdx - 1 : m.g.hitIdx;
         this.fx.addShake(e.attack === 'mordidona' ? 7 * u : 4 * u, 0.28);
         this.fx.addFlash(0.28, '#ff3a3a');
         this.fx.pop(e.attack === 'mordidona' ? 'CHOMP!' : e.attack === 'rabada' ? 'VUUM!' : 'POW!', W / 2, H * 0.62, '#ff9a8a', 26 * u, 0.9);
@@ -81,7 +88,9 @@ export class BoxingScene {
 
   update(dt: number) {
     this.time += dt;
+    this.dt = dt;
     this.sinceImpact += dt;
+    this.react = Math.max(0, this.react - dt * 5.5);
     this.fx.update(dt);
   }
 
@@ -95,30 +104,35 @@ export class BoxingScene {
     if (this.ringArt) drawRingLive(g, L, this.ringArt, t);
     drawKids(g, L, crowd, t, k);
     drawShouts(g, L, crowd);
-    // ---- jacaré
+    // ---- jacaré (o corpo antes do Karimbo; o que vai por cima dele no impacto, depois)
     const gp: GatorPose = {
-      mode: m.g.mode, guard: m.g.guard, attack: m.g.attack, tele01: m.g.mode === 'tele' ? 1 - m.g.tele / Math.max(1e-6, m.g.teleMax) : 0,
-      since: m.g.mode === 'tele' ? 9 : this.sinceImpact, hand: this.hand, phase: m.g.phase, flinch: Math.max(0, m.g.flinchT / 0.12), time: t, lastAttack: this.lastAttack,
+      mode: m.g.mode, guard: m.g.guard, attack: m.g.attack, hitIdx: m.g.hitIdx,
+      tele01: m.g.mode === 'tele' ? 1 - m.g.tele / Math.max(1e-6, m.g.teleMax) : 0,
+      since: m.g.mode === 'tele' ? 9 : this.sinceImpact, lastAttack: this.lastAttack, lastIdx: this.lastIdx, hand: this.hand,
+      round: m.g.phase, time: t, react: this.react, reactSide: this.reactSide, reactTier: this.reactTier,
+      fury: m.g.phase === 3, champion: false, hatOff: false, still: m.flow === 'intro' || m.flow === 'break',
     };
     const gs = L.gator.s, gx = L.gator.x, gy = L.gator.feetY;
     const cin = m.cine;
+    const ko = cin === 'count' || m.g.mode === 'ko' || m.g.mode === 'down';
     if (cin === 'orelhada' && m.cineT >= 1.6) {
       // lançado pelo ar: gira, voa para trás e cai
       const Lp = clamp01((m.cineT - 1.6) / (ORELHADA_TIME - 1.6));
       g.save();
       g.translate(gx + 240 * Lp * u, gy - 120 * u * Math.sin(Lp * Math.PI) - 40 * u * Lp);
       g.rotate(Lp * 9);
-      drawGatorFront(g, 0, 0, gs * (1 - 0.3 * Lp), { ...gp, mode: 'groggy' });
+      drawGatorBoxer(g, 0, 0, gs * (1 - 0.3 * Lp), { ...gp, mode: 'groggy', attack: null, since: 9 }, k, false, this.dt);
       g.restore();
-    } else if (cin === 'count' || m.g.mode === 'ko' || m.g.mode === 'down') {
+    } else if (ko) {
       drawAlligatorKO(g, gx, gy + 6 * u, t, -1);
-    } else drawGatorFront(g, gx, gy, gs, gp);
+    } else drawGatorBoxer(g, gx, gy, gs, gp, k, false, this.dt);
     // ---- Karimbo de costas (embaixo, à esquerda)
     const fall = cin === 'lose' ? ease(clamp01(m.cineT / 0.7)) : undefined;
     const spin = cin === 'orelhada' ? ease(clamp01(m.cineT / 1.6)) * Math.PI * 2 : 0;
     const ears = cin === 'orelhada' ? 1 + 1.6 * ease(clamp01(m.cineT / 1.5)) : 1;
     const pose = backPoseOf(m.k, t, { spin, ears, fall, fury: m.furyOn });
     drawKarimboBack(g, art.karimbo, progress.equippedSkin, L, pose, k);
+    if (!ko && !(cin === 'orelhada' && m.cineT >= 1.6)) drawGatorBoxer(g, gx, gy, gs, gp, k, true, this.dt);
     this.fx.draw(g);
     g.restore();
     drawBoxHud(g, m, W, H, t, k);

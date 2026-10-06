@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-/** Orçamento de desenho do boxe: ≤ 250 `drawImage` por quadro em todas as cenas (contexto falso que só conta). */
+/** Orçamento de desenho do boxe 2.0: ≤ 140 `drawImage` por quadro em todas as cenas (contexto falso que só conta). O boxe antigo gastava ~160. */
 const spr = () => ({ c: { width: 100, height: 100 }, w: 40, h: 40, ox: 20, oy: 20, s: 2 });
 // a mesma arte a cada chamada (como no jogo): os sprites têm cache próprio por identidade
 const artOnce = { karimbo: { heads: { earNear: spr(), earFar: spr(), portrait: spr(), right: spr() }, variants: { jacare: { hood: spr() } } } };
@@ -8,6 +8,9 @@ vi.mock('../src/art/index', () => ({ getArt: () => artOnce }));
 vi.mock('../src/art/village', () => ({ drawResident: (g: CanvasRenderingContext2D) => g.drawImage({} as CanvasImageSource, 0, 0, 10, 10) }));
 const partsOnce = { torso: spr(), head: spr(), foot: spr() };
 vi.mock('../src/art/dancingAlligator', () => ({ gatorParts: () => partsOnce, GATOR_GREEN: '#5f8a45', GATOR_SCALE: 0.56 }));
+// a foto de costas do Karimbo (as imagens são só objetos: o contexto falso aceita qualquer coisa)
+const earMeta = { w: 111, h: 221, rootX: 90, rootY: 125, headX: -54, headY: 285 };
+vi.mock('../src/art/minigames/boxing/backPhotos', () => ({ getBackPhotos: () => ({ head: { width: 435, height: 539 }, earL: { width: 111, height: 221 }, earR: { width: 111, height: 221 }, meta: { head: { w: 435, h: 539, cx: 217, neckY: 500 }, earL: earMeta, earR: { ...earMeta, headX: 379, rootX: 20 } } }), loadBackPhotos: async () => null }));
 
 let draws = 0, canvases = 0;
 const ctx = (): CanvasRenderingContext2D => new Proxy({} as object, {
@@ -16,6 +19,7 @@ const ctx = (): CanvasRenderingContext2D => new Proxy({} as object, {
     if (key === 'getTransform') return () => ({ a: 2 });
     if (key === 'createLinearGradient' || key === 'createRadialGradient') return () => ({ addColorStop() {} });
     if (key === 'measureText') return () => ({ width: 40 });
+    if (key === 'getImageData') return () => ({ data: [150, 100, 80, 255] });
     if (key in target) return (target as Record<string | symbol, unknown>)[key];
     return () => {};
   },
@@ -31,7 +35,7 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('custo de desenho do boxe', () => {
-  it('nenhuma cena passa de 250 drawImage por quadro (idle, ataques, ORELHADA, contagem, derrota)', async () => {
+  it('nenhuma cena passa de 140 drawImage por quadro (idle, ataques, ORELHADA, contagem, derrota)', async () => {
     const { BoxingMatch } = await import('../src/game/minigames/boxing/sim/match');
     const { Crowd } = await import('../src/game/minigames/boxing/sim/crowd');
     const { BoxingScene } = await import('../src/art/minigames/boxing/scene');
@@ -42,8 +46,9 @@ describe('custo de desenho do boxe', () => {
     const frame = () => { draws = 0; scene.update(1 / 60); crowd.update(1 / 60, true); scene.draw(g, m, crowd, 667, 320, 2); return draws; };
     const worst: Record<string, number> = {};
     const note = (k: string) => { worst[k] = Math.max(worst[k] ?? 0, frame()); };
+    frame(); frame(); // o primeiro desenho assa a torcida, o ringue e as luvas (uma vez): não conta como custo por quadro
     note('idle');
-    for (const atk of ['patada', 'rabada', 'mordidona', 'cabecada'] as const) {
+    for (const atk of ['patada', 'rabada', 'mordidona', 'cabecada', 'chapelada', 'giro'] as const) {
       (m as unknown as { startAttack: (k: string) => void }).startAttack(atk);
       for (let i = 0; i < 60; i++) { m.step(1 / 60, EMPTY); note(atk); }
     }
@@ -51,7 +56,7 @@ describe('custo de desenho do boxe', () => {
     for (let i = 0; i < 400 && m.cine !== 'none'; i++) { m.step(1 / 60, EMPTY); note(m.cine); }
     const l = new BoxingMatch(); l.k.hp = 0; l.step(1 / 60, EMPTY);
     for (let i = 0; i < 120; i++) { l.step(1 / 60, EMPTY); draws = 0; scene.draw(g, l, crowd, 667, 320, 2); worst.lose = Math.max(worst.lose ?? 0, draws); }
-    for (const [k, v] of Object.entries(worst)) expect(v, k).toBeLessThanOrEqual(250);
+    for (const [k, v] of Object.entries(worst)) expect(v, k).toBeLessThanOrEqual(140);
     expect(Object.keys(worst).length).toBeGreaterThan(5);
   });
 });
@@ -70,6 +75,21 @@ describe('letreiros do boxe', () => {
     const warm = canvases;
     for (let i = 0; i < 60 && m.cine === 'orelhada' && m.cineT < 1.5; i++) { m.step(1 / 60, EMPTY); scene.update(1 / 60); scene.draw(g, m, crowd, 667, 320, 2); }
     expect(canvases - warm).toBeLessThanOrEqual(2);
+  });
+});
+
+describe('torcida do boxe', () => {
+  it('cada criança custa UM drawImage (o boxe antigo gastava ~8 por criança e uma camada intermediária)', async () => {
+    const { Crowd } = await import('../src/game/minigames/boxing/sim/crowd');
+    const { boxLayout } = await import('../src/art/minigames/boxing/layout');
+    const { drawKids } = await import('../src/art/minigames/boxing/kids');
+    const L = boxLayout(667, 320), crowd = new Crowd();
+    const g = ctx();
+    drawKids(g, L, crowd, 0, 2); // 1º desenho assa os quadros
+    draws = 0; canvases = 0;
+    for (let i = 0; i < 30; i++) drawKids(g, L, crowd, i / 30, 2);
+    expect(canvases).toBe(0); // nada é assado depois do primeiro quadro
+    expect(draws / 30).toBeLessThanOrEqual(L.spots.length + 2);
   });
 });
 
