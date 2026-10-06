@@ -84,7 +84,7 @@ class BoxingSession implements MinigameSession {
   dispose() { this.scene.fx.reset(); this.ctx.special(false); }
 }
 
-const EMPTY = Object.fromEntries(['jab', 'cruzE', 'ganchoE', 'direto', 'cruzD', 'ganchoD', 'esqE', 'esqD', 'guarda', 'especial'].map((b) => [b, { held: false, pressed: false, released: false }])) as unknown as import('../../../core/input').MiniPad;
+const EMPTY = Object.fromEntries(['jab', 'cruzE', 'ganchoE', 'direto', 'cruzD', 'ganchoD', 'esqE', 'esqD', 'abaixar', 'guarda', 'especial'].map((b) => [b, { held: false, pressed: false, released: false }])) as unknown as import('../../../core/input').MiniPad;
 
 export const create: MinigameModule['create'] = (ctx) => new BoxingSession(ctx);
 export default { create } satisfies MinigameModule;

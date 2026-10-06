@@ -15,14 +15,14 @@ export interface Btn {
 }
 
 /** Botões do boxe em 3ª pessoa (minijogo): 4 golpes de cada lado, esquivas, guarda e a ORELHADA. */
-export type MiniButton = 'jab' | 'cruzE' | 'ganchoE' | 'direto' | 'cruzD' | 'ganchoD' | 'esqE' | 'esqD' | 'guarda' | 'especial';
+export type MiniButton = 'jab' | 'cruzE' | 'ganchoE' | 'direto' | 'cruzD' | 'ganchoD' | 'esqE' | 'esqD' | 'abaixar' | 'guarda' | 'especial';
 export type MiniPad = Record<MiniButton, Btn>;
-export const MINI_BUTTONS: readonly MiniButton[] = ['jab', 'cruzE', 'ganchoE', 'direto', 'cruzD', 'ganchoD', 'esqE', 'esqD', 'guarda', 'especial'];
+export const MINI_BUTTONS: readonly MiniButton[] = ['jab', 'cruzE', 'ganchoE', 'direto', 'cruzD', 'ganchoD', 'esqE', 'esqD', 'abaixar', 'guarda', 'especial'];
 export type MiniMode = 'boxing' | 'chase';
 /** Teclas do boxe: 6 golpes (QWE / JKL), esquivas (A/D ou setas), guarda (S/↓) e especial (Espaço/Enter). */
 const MINI_KEYS: Record<MiniButton, string[]> = {
   jab: ['KeyQ'], cruzE: ['KeyW'], ganchoE: ['KeyE'], direto: ['KeyJ'], cruzD: ['KeyK'], ganchoD: ['KeyL'],
-  esqE: ['KeyA', 'ArrowLeft'], esqD: ['KeyD', 'ArrowRight'], guarda: ['KeyS', 'ArrowDown'], especial: ['Space', 'Enter'],
+  esqE: ['KeyA', 'ArrowLeft'], esqD: ['KeyD', 'ArrowRight'], abaixar: [], guarda: ['KeyS', 'ArrowDown'], especial: ['Space', 'Enter'],
 };
 const newMiniPad = (): MiniPad => Object.fromEntries(MINI_BUTTONS.map((b) => [b, { held: false, pressed: false, released: false }])) as MiniPad;
 const newMiniHeld = (): Record<MiniButton, boolean> => Object.fromEntries(MINI_BUTTONS.map((b) => [b, false])) as Record<MiniButton, boolean>;
