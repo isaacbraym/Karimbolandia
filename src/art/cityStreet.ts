@@ -54,20 +54,32 @@ export class CityStreet {
     }
     g.clip(mask); f.clip(mask);
     const road = g.createLinearGradient(0, base - 128, 0, base + 230);
-    road.addColorStop(0, '#777c88'); road.addColorStop(.35, '#4b505c');
+    road.addColorStop(0, 'rgba(63,70,88,0)'); road.addColorStop(.18, '#434957'); road.addColorStop(.35, '#4b505c');
     road.addColorStop(.65, '#343945'); road.addColorStop(1, '#232835');
     g.fillStyle = road; g.fillRect(wx, base - 128, SPAN, 368);
     // A cobertura próxima da rua oculta a face do teto da balada vista do exterior.
     // Começa abaixo dos pés; o mundo suprime esse passe ao entrar no interior.
     f.fillStyle = road; f.fillRect(wx, base + 24, SPAN, 216);
-    // Calçada larga, meio-fio em volume e sarjeta separada da faixa de caminhada.
-    g.fillStyle = '#a5a8ad'; g.fillRect(wx, base - 128, SPAN, 107);
-    g.fillStyle = '#646a75'; g.fillRect(wx, base - 21, SPAN, 8);
-    g.fillStyle = '#d7d3ca'; g.fillRect(wx, base - 23, SPAN, 3);
-    g.fillStyle = '#232936'; g.fillRect(wx, base - 12, SPAN, 4);
-    g.strokeStyle = '#808691'; g.lineWidth = .8;
+    // Plano de calçada baixo e recuado: as juntas seguem o chão, não uma parede vertical.
+    const pavement = g.createLinearGradient(0, base - 50, 0, base - 20);
+    pavement.addColorStop(0, '#636b7b'); pavement.addColorStop(.55, '#7c828e'); pavement.addColorStop(1, '#90949b');
+    g.fillStyle = pavement; g.fillRect(wx, base - 50, SPAN, 30);
+    // Meio-fio de seis pixels e sarjeta: contraste localizado junto ao asfalto molhado.
+    g.fillStyle = '#59616e'; g.fillRect(wx, base - 20, SPAN, 6);
+    g.fillStyle = '#b3b4b3'; g.fillRect(wx, base - 21, SPAN, 1.5);
+    g.fillStyle = 'rgba(24,29,43,.65)'; g.fillRect(wx, base - 14, SPAN, 4);
+    g.strokeStyle = 'rgba(36,45,61,.35)'; g.lineWidth = .8;
     for (let x = Math.floor(wx / 64) * 64; x < wx + SPAN; x += 64) {
-      g.beginPath(); g.moveTo(x, base - 126); g.lineTo(x + 25, base - 24); g.stroke();
+      g.beginPath(); g.moveTo(x, base - 49); g.lineTo(x + 25, base - 22); g.stroke();
+    }
+    g.strokeStyle = 'rgba(48,57,73,.2)'; g.beginPath(); g.moveTo(wx, base - 36); g.lineTo(wx + SPAN, base - 36); g.stroke();
+    // Concreto irregular em baixo contraste, assado com sementes globais para emendar os patches.
+    for (let cell = Math.floor(wx / 64); cell < (wx + SPAN) / 64; cell++) {
+      const r = new Rng(cell * 3571 + 41);
+      for (let k = 0; k < 12; k++) {
+        g.fillStyle = k % 2 ? 'rgba(192,198,205,.08)' : 'rgba(31,41,58,.1)';
+        g.beginPath(); g.ellipse(cell * 64 + r.range(0, 64), base - r.range(25, 48), r.range(1, 4), .6, 0, 0, Math.PI * 2); g.fill();
+      }
     }
     for (let cell = Math.floor(wx / 128) - 1; cell <= Math.ceil((wx + SPAN) / 128); cell++) {
       const r = new Rng(cell * 8191 + 937), x = cell * 128;

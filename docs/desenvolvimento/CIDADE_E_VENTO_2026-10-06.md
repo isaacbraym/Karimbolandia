@@ -18,6 +18,12 @@ A pintura usa patches de 512×590 unidades a 1,25×, dois canvases por patch, no
 
 ## Vento sem refazer a arte
 
+### Refinamento da calçada baixa (2026-10-06)
+
+A superfície clara ocupava 107 unidades verticais, com juntas quase verticais e pouca variação tonal: a projeção parecia um muro atrás do personagem, especialmente na loja de açaí. O plano de concreto agora ocupa 30 unidades, com juntas diagonais e uma junta transversal discreta. O meio-fio tem seis unidades de face e um filete de luz de 1,5; a sarjeta faz a ligação com o asfalto. A paleta de concreto cinza azulado e pequenas variações de textura acompanham a iluminação da cidade. O asfalto recuado começa transparente e ganha opacidade gradualmente, revelando a paisagem distante em vez de substituir a antiga parede branca por outra faixa opaca. As sementes da textura usam coordenadas globais para manter continuidade entre patches. As posições de bancos, jardins, prédios, colisões e perigos continuam as do mapa.
+
+A comparação local antes/depois inclui o trecho do açaí, intervalos entre prédios e primeiro fosso, além de viewports 844×390 e 360×640. O fosso permanece visível, a caminhada isolada passa sem pulo/parede e não houve overflow ou erro JavaScript. Após aquecimento, 120 repetições dos passes de cenário continuam criando zero canvases e gradientes. Typecheck, 868 testes em 95 arquivos e build aprovados. As capturas e o harness estão em `tools/_work/sidewalk-*`, fora do commit; a medição local não prova cadência em aparelho físico.
+
 `art/wind.ts` fornece rajadas determinísticas que variam suavemente em espaço e tempo. Árvores, palmeiras, bananeiras, arbustos, flores, samambaias e plantas de brejo usam os mesmos ciclos de vento. A amplitude depende da flexibilidade do elemento. Pedras, raízes, fachadas, postes e construções mantêm sua geometria.
 
 As imagens cacheadas de vegetação são desenhadas em faixas com deformação crescente em direção às pontas. Cada faixa usa uma transformação linear que coincide com a seguinte na borda; pequeno recobrimento protege contra frestas de amostragem. As bases ficam firmes. A bandeira da floresta separa o mastro rígido do tecido deformado. O culling inclui margem para o movimento das pontas.
