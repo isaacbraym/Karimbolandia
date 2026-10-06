@@ -226,6 +226,7 @@ export class Narrator {
     if (p.mode === 'dead' && id !== 27) return false;
     if (p.mode === 'mounting') return false;
     if (id === 27) return true; // a morte tem prioridade sobre avisos de cenas próximas
+    if (w.club.inside(w)) return false;
     // cenas com voz logo à frente: não começa uma fala que ainda estaria tocando quando elas chegarem
     const reach = (len + 0.8) * APPROACH;
     if (!w.nomadUsed && !w.nomadLost && !d.triggered.has('nomadMeet')) {

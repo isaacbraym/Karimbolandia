@@ -1,12 +1,14 @@
 <!doctype html><html lang="pt-BR"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Amostra de ambientação</title><div id="app"><canvas id="game"></canvas><div id="ui"></div></div>
 <style>nav{position:fixed;bottom:12px;left:12px;right:12px;z-index:200;display:flex;gap:6px;flex-wrap:wrap}nav[hidden]{display:none}nav button{border:1px solid #8ab373;border-radius:18px;background:#183528e8;color:#f1efd0;padding:8px 14px;font:600 13px sans-serif;cursor:pointer}nav button:hover{background:#3c6240}</style>
-<nav><button id="city">Cidade atacada: início</button><button id="forest">Floresta: início</button><button id="village">Vilarejo</button><button id="play">Jogar</button><button id="hide">Ocultar botões</button></nav>
+<nav><button id="city">Cidade atacada: início</button><button id="forest">Floresta: início</button><button id="village">Vilarejo</button><button id="chase">Perseguição do macaco</button><button id="club">Balada: porta e narração</button><button id="play">Jogar</button><button id="hide">Ocultar botões</button></nav>
 <script type="module">
 import '/src/style.css';import{Game}from'/src/game/game.ts';import{loadJungle}from'/src/art/jungle.ts';import{setProfile}from'/src/core/persistence.ts';import{reloadProgress,settings}from'/src/core/storage.ts';import{newCtl}from'/tests/helpers/bot.ts';
 setProfile('amostra-ambientacao');reloadProgress();settings.quality='high';settings.narrator=false;settings.showFps=false;
 const game=new Game(document.querySelector('#game'),document.querySelector('#ui'));await game.boot('/');await loadJungle('/','high');game.play(true,2);game.pause();game.menus.hideAll();
 let w=game.world;function scene(x=w.data.playerStart.x){game.pause();game.menus.hideAll();w.player.reset(x,w.level.reliefSurface(x)??w.level.groundBelow(x,1000)??1024);w.player.invuln=0;w.camera.zoom=.95;w.camera.snapTo(x+65,w.player.y-25);game.render(0);}
-function stage(n,x){if(w.data.stage!==n){game.play(true,n);w=game.world;}scene(x);}
+function stage(n,x,narrator=false){settings.narrator=narrator;game.play(true,n);w=game.world;if(narrator){w.director.cine=null;w.narrator.stop();}scene(x);}
 document.querySelector('#city').onclick=()=>stage(1);document.querySelector('#forest').onclick=()=>stage(2);document.querySelector('#village').onclick=()=>stage(2,712*32);document.querySelector('#play').onclick=()=>game.resume();document.querySelector('#hide').onclick=()=>document.querySelector('nav').hidden=true;
+document.querySelector('#chase').onclick=()=>{stage(2);w.hooks.onMinigame('chase',()=>{});game.resume();};
+document.querySelector('#club').onclick=()=>{stage(1,undefined,true);const r=w.club.room;const d=w.data.doors.find(d=>d.kind==='in'&&d.tx>=r.x&&d.tx<=r.x+r.w);scene(d.x);w.enemies=[];w.player.invuln=999;for(const t of w.data.triggers)w.director.triggered.add(t.id);w.narrator.queue.length=0;w.narrator.played.add(1);game.resume();};
 window.qa={game,get w(){return w},scene,render:()=>game.render(0),newCtl};if(new URLSearchParams(location.search).has('cidade'))stage(1);else scene();window.ready=true;
 </script></html>

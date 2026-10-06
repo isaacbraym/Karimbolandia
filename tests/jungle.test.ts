@@ -473,6 +473,7 @@ describe('Fase 1: pista de neon (boate secreta)', () => {
     expect(d.beams).toEqual([]);
     expect(d.drums.filter((x) => x.style === 'speaker').length).toBeGreaterThanOrEqual(3);
     const w = new World(d);
+    w.narrator.enabled = false; // este caso cobre porta/pista; a espera do áudio tem suíte própria
     w.invulnerable = true;
     const ctl = newCtl();
     const inn = d.doors.find((x) => x.kind === 'in' && x.tx > room.x && x.tx < room.x + room.w)!;

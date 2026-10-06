@@ -22,6 +22,14 @@ Estudo de caso da revisão da cena da balada da fase 1 (2026-10-06). Código: `s
 
 ## Proteção contra regressão
 
+### Entrada e contato — revisão de 2026-10-06
+
+A fala 8 da descoberta podia iniciar ao atravessar a porta e cruzar com a música. `World.updateDoors` agora registra a entrada solicitada do lado de fora, pede essa fala e aguarda tanto a fila quanto o áudio ativo acabarem. Usa o estado real `narrPlaying`, não apenas a duração estimada. Terminada a fala, a mesma solicitação entra automaticamente; afastar-se cancela a entrada e não trava o controle. Com narrador desligado, a porta responde diretamente. Reinício limpa a espera, e o narrador não começa falas dentro da pista.
+
+Sivirino termina a aproximação 20 px atrás da posição real do Karimbo, em vez de 46 px atrás do alvo de caminhada. Isso encosta as silhuetas mesmo com a tolerância de parada do roteiro. O teste de câmera usa a posição real e essa distância. `clubEntry.test.ts` cobre áudio ainda carregando, reprodução prolongada além da estimativa, entrada automática, ausência de sobreposição, narrador desligado e saída da porta durante a espera. O teste de porta/pista em `jungle.test.ts` desliga a narração para isolar seu objetivo.
+
+No navegador, a fala carregada pelo jogo estava tocando do lado de fora, com `doorT = -1` e música `explore`. Ao entrar, `narrBusy` e `narrPlaying(8)` já eram falsos e a música era `rave`. A captura da dança confirmou contato, com distância física de 20 px, sem erros JavaScript. O atalho **Balada: porta e narração** isola os inimigos e gatilhos anteriores somente na página de desenvolvimento; aperte ↑ ou ↓ para solicitar a entrada. Isso verifica sequência de reprodução, mas não é uma avaliação auditiva humana.
+
 `tests/club.test.ts` (linha do tempo; câmera: zoom, foco acompanhando o Sivirino e virada; um em cada cinco anda, nos limites, o bar cabe no enquadramento e ninguém dança nem passa pela ilha dele) e `tests/clubBar.test.ts` (ciclo completo usa todas as peças, mão contínua e dentro do alcance, cor muda, copo enche e desliza). Os testes de `communityInteriors` continuam garantindo 65 dançarinos espaçados.
 
 ## Limites

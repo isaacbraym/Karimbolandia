@@ -22,6 +22,7 @@ export const CLUB_DANCE_ID = 'club:dance';
 export const CLUB_T = { walk: 1.1, dance: 1.3, sivirino: 9.0, sivWalk: 4.4, turn: 14.2, max: 22 } as const;
 const BPM = 150;
 export const CLUB_FLOOR_DEPTH = 224;
+export const SIV_CONTACT_DISTANCE = 20;
 
 
 
@@ -159,7 +160,7 @@ export class ClubScene {
     if (!this.active) {
       if (w.encounters.completed.has(CLUB_DANCE_ID)) {
         if (this.t < 0) this.t = 99;
-        if (Number.isNaN(this.sivX)) this.sivX = this.spotX - 46;
+        if (Number.isNaN(this.sivX)) this.sivX = this.spotX - SIV_CONTACT_DISTANCE;
         return;
       }
       if (this.t >= 0 || !this.inside(w) || p.mode !== 'foot' || !p.body.onGround || w.director.cine || w.doorT >= 0) return;
@@ -194,7 +195,7 @@ export class ClubScene {
     // Sivirino entra de calção, dançando, por trás
     if (t >= CLUB_T.sivirino) {
       const from = this.room.x + 24;
-      const to = this.spotX - 46;
+      const to = p.x - SIV_CONTACT_DISTANCE;
       const k = clamp01((t - CLUB_T.sivirino) / CLUB_T.sivWalk);
       // passo quase constante (a câmera acompanha); só entra e chega devagar
       this.sivX = from + (to - from) * (0.8 * k + 0.2 * smooth(k));

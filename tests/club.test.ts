@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { buildLevel } from '../src/game/level/index';
 import { analyzeReach } from '../src/game/level/reach';
 import { TILE } from '../src/game/level';
-import { CLUB_DANCE_ID, CLUB_T } from '../src/game/club';
+import { CLUB_DANCE_ID, CLUB_T, SIV_CONTACT_DISTANCE } from '../src/game/club';
 import { makeWorld, newCtl } from './helpers/bot';
 import { BASE_ZOOM } from '../src/game/camera';
 
@@ -119,7 +119,7 @@ describe('Balada da fase 1', () => {
     expect(mid.sx).toBeGreaterThan(early.sx);
     expect(late.sx).toBeGreaterThan(mid.sx);
     expect(mid.f!.x).toBeGreaterThan(early.f!.x);
-    expect(late.sx).toBeCloseTo(w.club.spotX - 46, 0);
+    expect(late.sx).toBeCloseTo(w.player.x - SIV_CONTACT_DISTANCE, 0);
     // a virada: plano mais fechado ainda e nos dois
     const turn = at(CLUB_T.turn + 0.5);
     expect(turn.z).toBeGreaterThanOrEqual(late.z);

@@ -216,6 +216,8 @@ export class World {
   /** transição de porta: escurece, teletransporta e clareia */
   doorT = -1;
   private doorGo: DoorSpawn | null = null;
+  /** Entrada solicitada: aguarda o áudio real da descoberta, ainda do lado de fora. */
+  private clubDoorWait: DoorSpawn | null = null;
   /** 0..1 tela preta da transição (o jogo desenha por cima do mundo) */
   blackout = 0;
   private lastMoveY = 0;
@@ -350,6 +352,7 @@ export class World {
     this.doorT = -1;
     this.blackout = 0;
     this.doorGo = null;
+    this.clubDoorWait = null;
     this.drumHit.clear();
     const rr = this.data.secretRooms.find((s) => s.id === 'ritmo' || s.id === 'club');
     // cada nota aparece duas vezes (volta logo depois de pega): o dobro de pulos no ritmo
@@ -529,6 +532,8 @@ export class World {
     const my = ctl.moveY;
     const edge = Math.abs(my) > 0.6 && Math.abs(this.lastMoveY) <= 0.6;
     this.lastMoveY = my;
+    if (this.clubDoorWait && (p.mode !== 'foot' || !p.body.onGround
+      || Math.abs(p.x - this.clubDoorWait.x) >= 24 || Math.abs(p.feetY - this.clubDoorWait.y) >= 10)) this.clubDoorWait = null;
     if (this.doorT >= 0) {
       this.doorT += dt;
       const T_OUT = 0.28;
@@ -562,7 +567,14 @@ export class World {
     for (const d of this.data.doors) {
       if (Math.abs(p.x - d.x) < 24 && Math.abs(p.feetY - d.y) < 10) {
         this.doorNear = d;
-        if (edge) {
+        if (edge && this.data.stage === 1 && d.kind === 'in' && this.club.room
+          && d.tx >= this.club.room.x && d.tx <= this.club.room.x + this.club.room.w && this.narrator.enabled) {
+          this.clubDoorWait = d;
+          this.narrator.request(8, 60, () => this.clubDoorWait === d, 3, true);
+        }
+        if ((edge && !this.clubDoorWait) || (this.clubDoorWait === d && (!this.narrator.enabled
+          || (!this.narrator.pending(8) && !this.narrator.busy())))) {
+          this.clubDoorWait = null;
           this.doorGo = d;
           this.doorT = 0;
           this.audio('lock', 0.8, d.x);
