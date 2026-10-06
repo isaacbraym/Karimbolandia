@@ -21,6 +21,8 @@ O [caso dos minijogos](MINIJOGOS_PERSEGUICAO_E_BOXE_2026-10-05.md) explica o car
 
 O [caso do Boxe 2.0](BOXE_2_0_2026-10-05.md) documenta a reconstrução da luta (3 rounds, defesa por cor, câmera por cima do ombro, gestos no celular, HUD guiado, revanche do Jacaré Campeão e enfeites por nota), o cache assado com variantes na chave, o orçamento de desenho (≤ 140 `drawImage`) e o que a medição não prova.
 
+O [caso da balada](BALADA_FILMINHO_BAR_E_PISTA_VIVA_2026-10-06.md) registra o filminho com zoom e câmera que acompanha o Sivirino, a pista com gente andando dançando, o bar com o barman animado (e por que ele precisou sair do fundo da sala), o apito medido sobre a foto e a cabeça do Sivirino do tamanho da do Karimbo.
+
 ## Como este conhecimento é protegido
 
 | Camada | Função |

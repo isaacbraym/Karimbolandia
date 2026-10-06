@@ -976,34 +976,39 @@ function danceArm(g: CanvasRenderingContext2D, arm: Sprite, x: number, y: number
   g.stroke();
 }
 
-/** Apito na boca (com cordão) e o sopro saindo a cada batida. */
+/**
+ * Apito de festa NA BOCA: o bocal fica no centro dos lábios (x ≈ 5, y ≈ −4,5 do pivô da cabeça, medido sobre a foto)
+ * e o corpo aponta para a frente, com a câmara da bolinha e uma faixa rosa; cordão pendurado e o sopro saindo a
+ * cada batida. Maior que antes (era 6 × 3 e ficava no nariz).
+ */
 function drawWhistle(g: CanvasRenderingContext2D, db: number) {
-  g.strokeStyle = '#ff4fd0';
-  g.lineWidth = 0.7;
-  g.beginPath();
-  g.moveTo(5, -8);
-  g.quadraticCurveTo(1, 2, -3, 3);
-  g.stroke();
-  g.fillStyle = '#d9e2ea';
-  g.strokeStyle = OUT;
-  g.lineWidth = 0.7;
-  g.beginPath();
-  g.roundRect(5.4, -10.6, 6.2, 2.8, 1.1);
-  g.fill();
-  g.stroke();
-  g.beginPath();
-  g.arc(10.6, -8.2, 1.6, 0, Math.PI * 2);
-  g.fill();
-  g.stroke();
+  const mx = 4.2, my = -4.5;
+  g.lineCap = 'round';
+  // cordão rosa até o pescoço
+  g.strokeStyle = OUT; g.lineWidth = 1.9;
+  g.beginPath(); g.moveTo(mx + 6.6, my - 1.2); g.quadraticCurveTo(mx + 4, my + 9, mx - 9, my + 8.6); g.stroke();
+  g.strokeStyle = '#ff4fd0'; g.lineWidth = 0.9; g.stroke();
+  // corpo (bocal + câmara), do lábio para a frente
+  g.fillStyle = OUT;
+  g.beginPath(); g.roundRect(mx - 0.8, my - 2.6, 11.4, 5.2, 2); g.fill();
+  g.beginPath(); g.arc(mx + 8.2, my - 2.5, 3.9, 0, Math.PI * 2); g.fill();
+  g.fillStyle = '#e8eef4';
+  g.beginPath(); g.roundRect(mx - 0.2, my - 1.9, 10.2, 3.8, 1.6); g.fill();
+  g.beginPath(); g.arc(mx + 8.2, my - 2.5, 3.1, 0, Math.PI * 2); g.fill();
+  // faixa rosa, furo do apito e brilho
+  g.fillStyle = '#ff4fd0'; g.fillRect(mx + 3, my - 1.9, 1.5, 3.8);
+  g.fillStyle = OUT; g.beginPath(); g.ellipse(mx + 6.6, my - 2.1, 1.3, 0.55, 0, 0, Math.PI * 2); g.fill();
+  g.fillStyle = 'rgba(255,255,255,.9)'; g.fillRect(mx + 0.4, my - 1.5, 2.4, 0.7);
+  g.beginPath(); g.arc(mx + 7.2, my - 3.6, 0.8, 0, Math.PI * 2); g.fill();
   const puff = Math.max(0, Math.sin(db));
-  if (puff > 0.55) {
+  if (puff > 0.4) {
     g.strokeStyle = '#ffffff';
-    g.globalAlpha = (puff - 0.55) * 2.2;
-    g.lineWidth = 0.8;
+    g.globalAlpha = Math.min(1, (puff - 0.4) * 2.4);
+    g.lineWidth = 1;
     g.beginPath();
-    for (const a of [-0.35, 0, 0.35]) {
-      g.moveTo(13 + Math.cos(a) * 1.5, -9.5 + Math.sin(a) * 1.5);
-      g.lineTo(13 + Math.cos(a) * 5, -9.5 + Math.sin(a) * 5);
+    for (const a of [-0.55, 0, 0.55]) {
+      g.moveTo(mx + 14 + Math.cos(a) * 2, my - 2.5 + Math.sin(a) * 2);
+      g.lineTo(mx + 14 + Math.cos(a) * 7.5, my - 2.5 + Math.sin(a) * 7.5);
     }
     g.stroke();
     g.globalAlpha = 1;

@@ -98,6 +98,8 @@ export function imageToSprite(img: HTMLImageElement, w: number, h: number, ox: n
 
 // ------------------------------------------------------------------------------------------
 export const KARIMBO_HEAD_H = 41; // altura lógica da cabeça (rosto em destaque)
+/** a cabeça do Sivirino aparece do tamanho da do Karimbo (41 × KSCALE 1,2 de tela), onde quer que ele esteja */
+export const SIVIRINO_HEAD_H = 49;
 
 export interface KarimboHeads {
   right: Sprite; // cabeça SEM orelhas, em perspectiva p/ a direita (espelhar p/ esquerda)
@@ -310,7 +312,8 @@ export function outlineSprite(spr: Sprite, width = 1.1, cutY = Infinity, color =
 /** Cabeça do Sivirino: a foto é o rosto (nunca redesenhado), com contorno cartoon. Pivô no pescoço. */
 export function bakeSivirinoHead(p: Photos, scale = 3): Sprite {
   const img = p.sivirino;
-  const h = 30;
+  // cabeça do tamanho da do Karimbo na tela: KARIMBO_HEAD_H (41) × KSCALE (1,2) ≈ 49 (antes 30, bem menor)
+  const h = SIVIRINO_HEAD_H;
   const w = h * img.naturalWidth / img.naturalHeight;
   return outlineSprite(imageToSprite(img, w, h, w / 2, h - 1.5, scale), 0.55);
 }

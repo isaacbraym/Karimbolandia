@@ -4,6 +4,7 @@ import { analyzeReach } from '../src/game/level/reach';
 import { TILE } from '../src/game/level';
 import { CLUB_DANCE_ID, CLUB_T } from '../src/game/club';
 import { makeWorld, newCtl } from './helpers/bot';
+import { BASE_ZOOM } from '../src/game/camera';
 
 const data = buildLevel();
 const room = data.secretRooms.find((s) => s.id === 'club')!.rect;
@@ -64,14 +65,15 @@ describe('Balada da fase 1', () => {
     expect(w.club.active).toBe(false);
   }, 30000);
 
-  it('a animação de dança antes da chegada do Sivirino foi estendida em +5 segundos e o áudio balada está registrado', async () => {
+  it('a dança antes da chegada do Sivirino é longa (7,7 s) e o áudio balada está registrado', async () => {
     const { CLIP_FILES } = await import('../src/core/audio');
     expect(CLIP_FILES.balada).toBe('balada.mp3');
 
-    // Antes o Karimbo dançava de 1.3 até 4.6 (3.3s). Agora dança até 9.6s (8.3s, exatamente +5s).
-    expect(CLUB_T.sivirino).toBe(9.6);
+    // O Karimbo dança de 1,3 s até a entrada do Sivirino (9 s); ele atravessa a pista em 4,4 s e só então o Karimbo se vira.
+    expect(CLUB_T.sivirino).toBe(9.0);
     expect(CLUB_T.dance).toBe(1.3);
-    expect(CLUB_T.sivirino - CLUB_T.dance).toBeCloseTo(8.3, 1);
+    expect(CLUB_T.sivirino - CLUB_T.dance).toBeCloseTo(7.7, 1);
+    expect(CLUB_T.turn).toBeGreaterThan(CLUB_T.sivirino + CLUB_T.sivWalk);
 
     const w = makeWorld();
     w.enemies = [];
@@ -86,10 +88,10 @@ describe('Balada da fase 1', () => {
     }
     // Karimbo já está dançando
     expect(w.player.danceT).toBeGreaterThan(0);
-    // Mas o Sivirino ainda NÃO chegou (só a partir de 9.6s)
+    // Mas o Sivirino ainda NÃO chegou (só a partir de 9 s)
     expect(Number.isFinite(w.club.sivX)).toBe(false);
 
-    // Avança mais 4 segundos (t = 10.0s > 9.6s)
+    // Avança mais 4 segundos (t = 10.0s > 9.0s)
     const framesTo10s = Math.round(60 * 4.0);
     for (let f = 0; f < framesTo10s; f++) {
       w.update(1 / 60, ctl);
@@ -97,4 +99,62 @@ describe('Balada da fase 1', () => {
     // Agora sim o Sivirino chegou
     expect(Number.isFinite(w.club.sivX)).toBe(true);
   });
+
+  it('câmera do filminho: aproxima do Karimbo, acompanha o Sivirino pela pista até o Karimbo e fecha nos dois na virada', () => {
+    const w = makeWorld();
+    w.enemies = [];
+    const ctl = newCtl();
+    w.camera.viewW = 640; // tela de computador (a escala do filminho depende da largura visível)
+    w.player.reset(room.x + 3 * TILE + 16, room.y + room.h);
+    w.cameraSnap();
+    const at = (sec: number) => { while (w.club.t < sec && (w.club.active || w.club.t < 0)) w.update(1 / 60, ctl); return { z: w.camera.zoomTarget, f: w.camera.focus ? { ...w.camera.focus } : null, sx: w.club.sivX }; };
+    const open = BASE_ZOOM;
+    const dance = at(CLUB_T.dance + 1.5);
+    expect(dance.z).toBeGreaterThan(open * 1.12); // zoom no Karimbo
+    expect(Math.abs(dance.f!.x - w.player.x)).toBeLessThan(40); // e é nele que a câmera fica
+    // o Sivirino entra pela esquerda e atravessa a pista: o foco anda junto com ele
+    const early = at(CLUB_T.sivirino + 1.2);
+    const mid = at(CLUB_T.sivirino + CLUB_T.sivWalk / 2);
+    const late = at(CLUB_T.sivirino + CLUB_T.sivWalk);
+    expect(mid.sx).toBeGreaterThan(early.sx);
+    expect(late.sx).toBeGreaterThan(mid.sx);
+    expect(mid.f!.x).toBeGreaterThan(early.f!.x);
+    expect(late.sx).toBeCloseTo(w.club.spotX - 46, 0);
+    // a virada: plano mais fechado ainda e nos dois
+    const turn = at(CLUB_T.turn + 0.5);
+    expect(turn.z).toBeGreaterThanOrEqual(late.z);
+    expect(Math.abs(turn.f!.x - w.player.x)).toBeLessThan(40);
+    expect(w.player.facing).toBe(-1);
+  }, 30000);
+
+  it('alguns da pista (um em cada cinco, não todos) andam dançando e param nas pontas; o bar fica no fundo', () => {
+    const w = makeWorld();
+    const crowd = w.club.crowd;
+    const walkers = crowd.filter((d) => d.walk);
+    expect(walkers.length).toBe(13);
+    expect(walkers.length).toBeLessThan(crowd.length * 0.3);
+    const start = walkers.map((d) => d.x);
+    const ctl = newCtl();
+    w.enemies = [];
+    for (let f = 0; f < 60 * 30; f++) w.update(1 / 60, ctl);
+    let moved = 0;
+    for (const [i, d] of walkers.entries()) {
+      if (Math.abs(d.x - start[i]) > 20) moved++;
+      expect(d.x).toBeGreaterThanOrEqual(d.walk!.min - 1e-6);
+      expect(d.x).toBeLessThanOrEqual(d.walk!.max + 1e-6);
+      expect(d.facing).toBe(d.walk!.dir);
+    }
+    expect(moved).toBeGreaterThan(6);
+    expect(crowd.filter((d) => !d.walk).length).toBe(52);
+    const bar = w.club.bar!;
+    expect(bar.x).toBeGreaterThan(room.x + 200);
+    expect(bar.x).toBeLessThan(room.x + room.w - 200);
+    // o bar cabe no enquadramento normal (a parede do fundo fica acima da tela) e é uma ilha: ninguém dança nem passa pelo balcão
+    expect(bar.depth).toBeLessThanOrEqual(160);
+    for (const d of crowd) {
+      const inBand = d.depth > 100 && d.depth < 210;
+      if (inBand) expect(Math.abs(d.x - bar.x), `pessoa em ${Math.round(d.x)}`).toBeGreaterThanOrEqual(170);
+      if (d.walk && inBand) { expect(Math.abs(d.walk.min - bar.x) >= 170 || d.walk.min > bar.x).toBe(true); expect(Math.abs(d.walk.max - bar.x) >= 170 || d.walk.max < bar.x).toBe(true); }
+    }
+  }, 60000);
 });

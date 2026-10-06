@@ -12,6 +12,7 @@ import { sivirinoHead } from './merchant';
 import { SOLDIER_SCALE } from './soldiers';
 import { music } from '../core/music';
 import { bakeDancers, drawDancer } from './clubDancers';
+import { bakeBarArt, drawBar } from './clubBar';
 
 interface ClubArt {
   bouncer: { look: FigureLook; pose: FigurePose };
@@ -57,6 +58,7 @@ export function bakeClubArt() {
   bakeExitArt();
   bakeCivilians(CLUB_CROWD);
   bakeDancers();
+  bakeBarArt();
   const face = bakeFace({ skin: '#5e3820', hair: '#1c1424', hairStyle: 'bald', accent: '#111', iris: '#2a1a12', glasses: true, beard: 'stubble' }, 'calm');
   const bouncer = {
     look: figureLook({ skin: '#5e3820', top: '#15151c', top2: '#e8e8f0', sleeve: 0.5, bottom: '#22232c', bottomKind: 'pants', shoe: '#0c0c10',
@@ -150,6 +152,8 @@ export function drawClub(g: CanvasRenderingContext2D, w: World, layer: 'floor' |
     }
     g.globalAlpha = 1;
     g.globalCompositeOperation = 'source-over';
+    // o bar do fundo (atrás de toda a pista): barman preparando drinques
+    if (club.bar && cam.visible(club.bar.x, club.floorY - club.bar.depth - 40, 170)) drawBar(g, club.bar.x, club.floorY - club.bar.depth, t, beat);
     for (let i = 0; i < club.crowd.length; i++) {
       const d = club.crowd[i];
       if (!cam.visible(d.x, club.floorY - d.depth - 40, 80)) continue;
@@ -158,7 +162,9 @@ export function drawClub(g: CanvasRenderingContext2D, w: World, layer: 'floor' |
       const k = (beat + d.phase) % 1;
       const y=club.floorY-d.depth,sc=ca.scale*d.scale;
       g.fillStyle='rgba(8,5,18,.35)';g.beginPath();g.ellipse(d.x,y+1,17*d.scale,5*d.scale,0,0,Math.PI*2);g.fill();
-      drawDancer(g,i,d.x,y-(raving?(1-k)**2*5:0),sc,d.facing,k);
+      // quem anda pela pista usa a passada (a fase vem da distância andada); parado nas pontas, dança no lugar
+      const walking = !!d.walk && d.walk.pause <= 0;
+      drawDancer(g,i,d.x,y-(raving&&!walking?(1-k)**2*5:0),sc,d.facing,walking?d.walk!.steps % 1:k,walking);
     }
     if (a.siv && Number.isFinite(club.sivX)) drawSivirino(g, a.siv, club.sivX, club.floorY, t, beat, club.active);
     drawExits(g, w);

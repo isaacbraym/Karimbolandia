@@ -800,9 +800,11 @@ export class AudioEngine {
       case 'whistle':
         // apito de festa: dois sopros curtos com a bolinha trinando (vibrato rápido) e um chiado de ar
         for (const [d, len] of [[0, 0.16], [0.21, 0.3]] as [number, number][]) {
-          this.tone({ type: 'sine', f0: 2850 * r, f1: 2700 * r, dur: len, vol: 0.13 * v, att: 0.006, delay: d, vib: 140, vibHz: 34, pan });
-          this.tone({ type: 'triangle', f0: 1425 * r, dur: len, vol: 0.04 * v, delay: d, vib: 70, vibHz: 34, pan });
-          this.noise({ dur: len, vol: 0.035 * v, type: 'bandpass', f0: 3200, q: 2, delay: d, pan });
+          // mais alto e mais agudo-estridente (era 0,13): o apito da boca do Karimbo precisa se destacar na balada
+          this.tone({ type: 'sine', f0: 2850 * r, f1: 2700 * r, dur: len, vol: 0.3 * v, att: 0.004, delay: d, vib: 140, vibHz: 34, pan });
+          this.tone({ type: 'square', f0: 2850 * r, f1: 2700 * r, dur: len, vol: 0.05 * v, att: 0.004, delay: d, vib: 140, vibHz: 34, pan });
+          this.tone({ type: 'triangle', f0: 1425 * r, dur: len, vol: 0.08 * v, delay: d, vib: 70, vibHz: 34, pan });
+          this.noise({ dur: len, vol: 0.07 * v, type: 'bandpass', f0: 3200, q: 2, delay: d, pan });
         }
         break;
       case 'clap':
