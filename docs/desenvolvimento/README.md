@@ -19,6 +19,8 @@ O [caso do lago vivo](LAGO_VIVO_E_MINIMAPA_2026-10-05.md) documenta por que peix
 
 O [caso dos minijogos](MINIJOGOS_PERSEGUICAO_E_BOXE_2026-10-05.md) explica o carregamento sob demanda (regra D09), a entrada/toque por modo, o equilíbrio por bots do boxe e da perseguição (51 / 64 / ≤ 92 s), o filminho da carta e a skin Jacaré gravada numa chave separada para não invalidar clientes antigos.
 
+O [caso do Boxe 2.0](BOXE_2_0_2026-10-05.md) documenta a reconstrução da luta (3 rounds, defesa por cor, câmera por cima do ombro, gestos no celular, HUD guiado, revanche do Jacaré Campeão e enfeites por nota), o cache assado com variantes na chave, o orçamento de desenho (≤ 140 `drawImage`) e o que a medição não prova.
+
 ## Como este conhecimento é protegido
 
 | Camada | Função |

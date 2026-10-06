@@ -20,8 +20,8 @@ async function village(opts: { danced?: boolean } = {}) {
   w.enemies = [];
   if (opts.danced !== false) w.encounters.completed.add(DANCE_ID);
   const d = w.village.dance!;
-  const hooks = { boxing: vi.fn<(done: (r: MinigameResult) => void) => void>(), banners: [] as string[] };
-  w.hooks.onMinigame = (_id, done) => hooks.boxing(done);
+  const hooks = { boxing: vi.fn<(done: (r: MinigameResult) => void, opts?: { champion?: boolean }) => void>(), banners: [] as string[] };
+  w.hooks.onMinigame = (_id, done, opts) => hooks.boxing(done, opts);
   w.hooks.onBanner = (t) => hooks.banners.push(t);
   const idle = () => newCtl();
   const stand = (dx = -90) => { w.player.reset(d.x + dx, d.y); w.cameraSnap(); for (let i = 0; i < 24; i++) w.update(1 / 60, idle()); };
@@ -220,5 +220,76 @@ describe('revisão T5–T8: reinício e skin', () => {
     for (let i = 0; i < 10; i++) w.update(1 / 60, newCtl());
     expect(progress.ownedSkins.filter((s) => s === 'jacare').length).toBe(1);
     expect(hooks.banners).not.toContain('SKIN DE JACARÉ DESBLOQUEADA!');
+  });
+});
+
+describe('revanche contra o Jacaré Campeão', () => {
+  const unlock = () => disk.set('karimbolandia.boxing.v1', JSON.stringify({ fights: 1, wins: 1, best: 'B', clean: false, champion: false }));
+  /** vencido uma vez: de curativo, ao lado da roda, falando */
+  async function won() {
+    const v = await village();
+    v.w.encounters.completed.add('jungle:alligator-boxing');
+    v.run(0.3);
+    return v;
+  }
+  const done = (v: Awaited<ReturnType<typeof won>>, outcome: MinigameResult['outcome']) =>
+    v.hooks.boxing.mock.calls[0][0]({ id: 'boxing', outcome, time: 80, mistakes: 1, grade: 'A', champion: true });
+
+  it('sem nenhuma vitória no cartão do boxe o AGIR só cumprimenta (nada de desafio)', async () => {
+    const v = await won();
+    v.w.update(1 / 60, v.agir());
+    v.run(6);
+    v.w.update(1 / 60, v.agir());
+    v.run(10);
+    expect(v.hooks.boxing).not.toHaveBeenCalled();
+  });
+
+  it('um AGIR só oferece; o segundo, dentro da janela, aceita e pede o boxe do Campeão uma vez', async () => {
+    unlock();
+    const v = await won();
+    v.w.update(1 / 60, v.agir());
+    expect(v.w.village.talk.balloons.some((b) => b.text.includes('revanche'))).toBe(true);
+    expect(v.hooks.boxing).not.toHaveBeenCalled();
+    v.run(1);
+    v.w.update(1 / 60, v.agir());
+    expect(v.w.player.lockInput).toBe(true);
+    v.run(6);
+    expect(v.hooks.boxing).toHaveBeenCalledTimes(1);
+    expect(v.hooks.boxing.mock.calls[0][1]).toEqual({ champion: true });
+  });
+
+  it('o desafio expira: passada a janela, o AGIR volta a só oferecer', async () => {
+    unlock();
+    const v = await won();
+    v.w.update(1 / 60, v.agir());
+    v.run(6);
+    v.w.update(1 / 60, v.agir());
+    v.run(1);
+    expect(v.w.player.lockInput).toBe(false);
+    expect(v.hooks.boxing).not.toHaveBeenCalled();
+  });
+
+  it('vencer o Campeão: sem skin nova, faixa própria e o jacaré nocauteado de novo', async () => {
+    unlock();
+    const v = await won();
+    v.w.update(1 / 60, v.agir()); v.run(0.5);
+    v.w.update(1 / 60, v.agir()); v.run(6);
+    done(v, 'win');
+    expect(v.hooks.banners).toContain('CAMPEÃO DA RODA DERROTADO!');
+    expect(v.hooks.banners).not.toContain('SKIN DE JACARÉ DESBLOQUEADA!');
+    expect(v.w.village.talk.mode).toBe('ko');
+    expect(v.w.player.lockInput).toBe(false);
+  });
+
+  it('perder para o Campeão não vira a derrota do boxe comum nem tranca o jogador', async () => {
+    unlock();
+    const v = await won();
+    v.w.update(1 / 60, v.agir()); v.run(0.5);
+    v.w.update(1 / 60, v.agir()); v.run(6);
+    done(v, 'lose');
+    expect(v.w.village.talk.lost).toBe(false);
+    expect(v.w.encounters.completed.has('jungle:alligator-boxing')).toBe(true);
+    v.run(2);
+    expect(v.w.player.lockInput).toBe(false);
   });
 });

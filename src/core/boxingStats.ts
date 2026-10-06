@@ -57,5 +57,6 @@ export function recordFight(r: { win: boolean; grade: Grade; knockdowns: number;
 export const isFirstFight = (s: BoxingStats = readBoxingStats()) => s.wins === 0 && s.fights < 3;
 /** A revanche (Jacaré Campeão) só abre depois de vencer o jacaré uma vez. */
 export const championUnlocked = (s: BoxingStats = readBoxingStats()) => s.wins > 0;
-/** Luvas de ouro (nota S), calção de onça (vitória sem cair) e sino de ouro (derrotou o Campeão). */
-export const boxingPerks = (s: BoxingStats = readBoxingStats()) => ({ goldGloves: s.best === 'S', leopardShorts: s.clean, goldBell: s.champion });
+export interface BoxPerks { goldGloves: boolean; leopardCuffs: boolean; goldBell: boolean }
+/** Luvas de ouro (nota S), punhos de onça (vitória sem cair) e sino de ouro (derrotou o Campeão). Só enfeites. */
+export const boxingPerks = (s: BoxingStats = readBoxingStats()): BoxPerks => ({ goldGloves: s.best === 'S', leopardCuffs: s.clean, goldBell: s.champion });

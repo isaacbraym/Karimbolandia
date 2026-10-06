@@ -56,6 +56,7 @@ interface Parts {
 }
 let parts: Parts | null = null;
 let partsK = 0;
+let partsChamp = false;
 
 const grad = (g: CanvasRenderingContext2D, x0: number, y0: number, r0: number, x1: number, y1: number, r1: number, stops: [number, string][]) => {
   const gr = g.createRadialGradient(x0, y0, r0, x1, y1, r1);
@@ -491,7 +492,7 @@ function drawHead(g: CanvasRenderingContext2D, b: Parts, x: number, y: number, s
  */
 export function drawGatorBoxer(g: CanvasRenderingContext2D, x: number, y: number, s: number, p: GatorPose, k: number, late: boolean, dt = 1 / 60) {
   const bk = Math.max(1.2, Math.round(s * k * 1.15 * 4) / 4);
-  if (!parts || partsK !== bk) { parts = bakeParts(bk, p.champion); partsK = bk; }
+  if (!parts || partsK !== bk || partsChamp !== p.champion) { parts = bakeParts(bk, p.champion); partsK = bk; partsChamp = p.champion; }
   const b = parts;
   if (!late) computePose(p, dt);
   const gs = 'jacare' as const;

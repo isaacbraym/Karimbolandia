@@ -30,7 +30,7 @@ function fakeSession(outcome: MinigameResult['outcome'], life = 1) {
   return { s, log };
 }
 
-async function setup(session: MinigameSession, fail = false) {
+async function setup(session: MinigameSession, fail = false, seen?: (ctx: import('../src/game/minigames/types').MinigameContext) => void) {
   const { World } = await import('../src/game/world');
   const { buildJungle } = await import('../src/game/level/jungle');
   const { MinigameFlow } = await import('../src/game/minigameFlow');
@@ -42,7 +42,7 @@ async function setup(session: MinigameSession, fail = false) {
   const banners: string[] = [];
   const saved = vi.fn();
   const loaders: MinigameLoaders = {
-    boxing: fail ? () => Promise.reject(new Error('rede')) : () => Promise.resolve({ create: () => session }),
+    boxing: fail ? () => Promise.reject(new Error('rede')) : () => Promise.resolve({ create: (ctx) => { seen?.(ctx); return session; } }),
     chase: () => Promise.resolve({ create: () => session }),
   };
   const flow = new MinigameFlow({
@@ -84,6 +84,17 @@ describe('MinigameFlow: congela o mundo e devolve tudo', () => {
     expect(w.musicState).toBe('explore');
     expect(saved).toHaveBeenCalledTimes(1); // salva só depois da vitória
     expect(flow.active).toBe(false);
+  });
+
+  it('o pedido de revanche (champion) chega à sessão; sem pedido, a luta é a comum', async () => {
+    const ctxs: boolean[] = [];
+    for (const opts of [undefined, { champion: true }]) {
+      const { s } = fakeSession('win');
+      const { w, flow } = await setup(s, false, (ctx) => ctxs.push(ctx.champion === true));
+      flow.start(w, 'boxing', vi.fn(), opts);
+      await run(w, flow, 1.2);
+    }
+    expect(ctxs).toEqual([false, true]);
   });
 
   it('reset no meio devolve controle, toque, música e resultado abort (nenhum prêmio), uma vez só', async () => {

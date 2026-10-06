@@ -6,6 +6,7 @@
 import { makeCanvas } from '../../kit';
 import { getArt } from '../../index';
 import { progress } from '../../../core/storage';
+import type { BoxPerks } from '../../../core/boxingStats';
 import { drawAlligatorKO } from '../../alligatorKO';
 import type { BoxingMatch, MatchEvent } from '../../../game/minigames/boxing/sim/match';
 import { ORELHADA_TIME, COUNT_TIME, PUNCHES } from '../../../game/minigames/boxing/sim/rules';
@@ -13,6 +14,7 @@ import type { Crowd } from '../../../game/minigames/boxing/sim/crowd';
 import { drawKarimboBack, backPoseOf } from './karimboBack';
 import { drawGatorBoxer, type GatorPose } from './gatorBoxer';
 import { drawKids, drawShouts } from './kids';
+import { gloveStyleFor } from './gloves';
 import { boxLayout, type BoxLayout } from './layout';
 import { drawRingArt, drawRingLive } from './ring';
 import { drawBoxHud, drawResultCard, type ResultView } from './hud';
@@ -25,6 +27,10 @@ export class BoxingScene {
   readonly fx = new BoxFx();
   /** cartão de resultado (a sessão o liga quando a luta acaba) */
   card: ResultView | null = null;
+  /** revanche contra o Jacaré Campeão (calção e cinto dourados) */
+  champion = false;
+  /** enfeites ganhos por nota (luvas douradas, punhos de onça, sino de ouro) */
+  perks: BoxPerks = { goldGloves: false, leopardCuffs: false, goldBell: false };
   private ringArt: ReturnType<typeof drawRingArt> | null = null;
   private L: BoxLayout = boxLayout(667, 320);
   private W = 0;
@@ -138,7 +144,7 @@ export class BoxingScene {
     if (this.fx.zoom > 0.001) { const z = 1 + this.fx.zoom; g.translate(W / 2, H * 0.55); g.scale(z, z); g.translate(-W / 2, -H * 0.55); }
     if (this.ringArt) g.drawImage(this.ringArt.bg, -10, -10, W + 20, H + 20);
     if (this.ringArt) drawRingLive(g, L, this.ringArt, t);
-    drawKids(g, L, crowd, t, k);
+    drawKids(g, L, crowd, t, k, this.perks.goldBell);
     drawShouts(g, L, crowd);
     // ---- jacaré (o corpo antes do Karimbo; o que vai por cima dele no impacto, depois)
     const gp: GatorPose = {
@@ -146,7 +152,7 @@ export class BoxingScene {
       tele01: m.g.mode === 'tele' ? 1 - m.g.tele / Math.max(1e-6, m.g.teleMax) : 0,
       since: m.g.mode === 'tele' ? 9 : this.sinceImpact, lastAttack: this.lastAttack, lastIdx: this.lastIdx, hand: this.hand,
       round: m.g.phase, time: t, react: this.react, reactSide: this.reactSide, reactTier: this.reactTier,
-      fury: m.g.phase === 3, champion: false, hatOff: false, still: m.flow === 'intro' || m.flow === 'break',
+      fury: m.g.phase === 3, champion: this.champion, hatOff: false, still: m.flow === 'intro' || m.flow === 'break',
     };
     const gs = L.gator.s, gx = L.gator.x, gy = L.gator.feetY;
     const cin = m.cine;
@@ -167,7 +173,7 @@ export class BoxingScene {
     const spin = cin === 'orelhada' ? ease(clamp01(m.cineT / 1.6)) * Math.PI * 2 : 0;
     const ears = cin === 'orelhada' ? 1 + 1.6 * ease(clamp01(m.cineT / 1.5)) : 1;
     const pose = backPoseOf(m.k, t, { spin, ears, fall, fury: m.furyOn });
-    drawKarimboBack(g, art.karimbo, progress.equippedSkin, L, pose, k);
+    drawKarimboBack(g, art.karimbo, progress.equippedSkin, L, pose, k, gloveStyleFor(this.perks));
     if (!ko && !(cin === 'orelhada' && m.cineT >= 1.6)) drawGatorBoxer(g, gx, gy, gs, gp, k, true, this.dt);
     this.fx.draw(g);
     g.restore();

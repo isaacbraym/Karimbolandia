@@ -54,21 +54,21 @@ function bakeFrame(look: number, size: 0 | 1 | 2, facing: 1 | -1, mood: 'cheer' 
   return c;
 }
 
-function bellImg(scale: number) {
+function bellImg(scale: number, gold: boolean) {
   const c = makeCanvas(Math.ceil(26 * scale), Math.ceil(30 * scale));
   const g = c.getContext('2d')!;
   g.scale(scale, scale);
   g.translate(13, 4);
   g.fillStyle = '#170f2e'; g.beginPath(); g.moveTo(-9, 20); g.quadraticCurveTo(-9, 4, 0, 2); g.quadraticCurveTo(9, 4, 9, 20); g.closePath(); g.fill();
-  g.fillStyle = '#e8c868'; g.beginPath(); g.moveTo(-7.5, 18.5); g.quadraticCurveTo(-7.5, 5.5, 0, 3.8); g.quadraticCurveTo(7.5, 5.5, 7.5, 18.5); g.closePath(); g.fill();
-  g.fillStyle = '#fff3b0'; g.fillRect(-4.5, 8, 2.4, 8);
+  g.fillStyle = gold ? '#ffd23a' : '#e8c868'; g.beginPath(); g.moveTo(-7.5, 18.5); g.quadraticCurveTo(-7.5, 5.5, 0, 3.8); g.quadraticCurveTo(7.5, 5.5, 7.5, 18.5); g.closePath(); g.fill();
+  g.fillStyle = gold ? '#fffbe0' : '#fff3b0'; g.fillRect(-4.5, 8, 2.4, 8);
   g.fillStyle = '#170f2e'; g.beginPath(); g.arc(0, 22, 2.6, 0, Math.PI * 2); g.fill();
   return c;
 }
 
 /** Assa a torcida inteira no tamanho da tela (uma vez, na primeira vez que se desenha, ou quando a tela muda). */
-export function bakeKids(L: BoxLayout, crowd: Crowd, k: number) {
-  const key = `${L.W}x${L.H}x${k.toFixed(1)}`;
+export function bakeKids(L: BoxLayout, crowd: Crowd, k: number, goldBell = false) {
+  const key = `${L.W}x${L.H}x${k.toFixed(1)}${goldBell ? 'g' : ''}`;
   if (baked && baked.key === key) return baked;
   const frames: Frames[] = L.spots.map((sp, i) => {
     const kid = crowd.kids[i];
@@ -80,7 +80,7 @@ export function bakeKids(L: BoxLayout, crowd: Crowd, k: number) {
     return { cheer, gasp: mk('worry', [0, 0.1]), laugh: mk('laugh', [0, 0.07]), w: cheer[0].width, h: cheer[0].height };
   });
   const order = L.spots.map((_, i) => i).sort((a, b) => L.spots[a].y - L.spots[b].y);
-  baked = { key, frames, bell: bellImg(2.4 * k), order };
+  baked = { key, frames, bell: bellImg(2.4 * k, goldBell), order };
   return baked;
 }
 
@@ -97,8 +97,8 @@ const frameOf = (mood: Mood, kid: Kid, f: Frames, t: number): HTMLCanvasElement 
 };
 
 /** Desenha a torcida inteira (de longe para perto): UM drawImage por criança. */
-export function drawKids(g: CanvasRenderingContext2D, L: BoxLayout, crowd: Crowd, t: number, k: number) {
-  const b = bakeKids(L, crowd, k);
+export function drawKids(g: CanvasRenderingContext2D, L: BoxLayout, crowd: Crowd, t: number, k: number, goldBell = false) {
+  const b = bakeKids(L, crowd, k, goldBell);
   for (const i of b.order) {
     const sp = L.spots[i], kid = crowd.kids[i], f = b.frames[i];
     const p = place(sp);

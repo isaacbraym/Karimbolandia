@@ -9,7 +9,13 @@ import type { DifficultyId } from '../../core/difficulty';
 
 export type MinigameId = 'boxing' | 'chase';
 export type TouchMinigameMode = MiniMode;
-export interface MinigameResult { id: MinigameId; outcome: 'win' | 'lose' | 'abort'; time: number; mistakes: number }
+export interface MinigameResult {
+  id: MinigameId; outcome: 'win' | 'lose' | 'abort'; time: number; mistakes: number;
+  /** só o boxe: nota S–C da luta e se era a revanche do Campeão */
+  grade?: 'S' | 'A' | 'B' | 'C'; champion?: boolean;
+}
+/** pedidos do mundo ao entrar no minijogo */
+export interface MinigameOpts { champion?: boolean }
 
 export interface MinigameContext {
   w: World;
@@ -17,6 +23,8 @@ export interface MinigameContext {
   viewW: number;
   viewH: number;
   difficulty: DifficultyId;
+  /** boxe: a revanche contra o Jacaré Campeão */
+  champion?: boolean;
   /** retrato borrado do mundo na entrada (assado uma vez pelo fluxo); null se ainda não houve captura */
   backdrop: HTMLCanvasElement | null;
   music: (s: MusicState) => void;

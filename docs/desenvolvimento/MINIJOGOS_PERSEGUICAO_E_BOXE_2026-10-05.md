@@ -1,5 +1,7 @@
 # Minijogos sob demanda: perseguição do macaco, boxe do jacaré e a skin Jacaré
 
+> **Atualização:** o boxe descrito aqui (luta única, seis botões, camada de crianças) foi **reconstruído** no [Boxe 2.0](BOXE_2_0_2026-10-05.md). As regras de carregamento (D09), a entrada por modo, a skin Jacaré e a roda continuam valendo como descritas; as medições e o "achado não resolvido" do boxe abaixo são do boxe antigo.
+
 ## Sintomas e escopo
 
 A fase 2 ganhou dois minijogos de tela cheia: o **boxe em terceira pessoa** contra o jacaré dançante da roda (prêmio: a skin Jacaré) e a **perseguição pela copa** atrás do macaco que rouba a carta da princesa Júlia (cena do pombo-correio no mundo → corrida → filminho da carta → rebobinar até o ponto do roubo). Os riscos que o desenho precisava evitar eram: (1) crescer o pacote principal, que a tela de carregamento e o celular pagam sempre; (2) deixar o jogador preso (controle, toque, música) se algo falhasse no meio; (3) prêmio duplicado ou concedido sem vitória; (4) dois dedos no mesmo botão; (5) perfil gravado pela versão nova invalidado por um cliente antigo em cache; (6) minijogos que "passam nos testes" mas ficam longos demais, curtos demais ou impossíveis.
@@ -56,7 +58,7 @@ Perk da skin: fôlego +30%, nado +40%, vida +10% (`SKIN_PERKS`, reaplicado em `P
 | Fluxo: abort único, restauração, falha de import, exceção na sessão, pausa | `tests/minigameFlow.test.ts` |
 | Toque por dedo, gestos, entrada por modo | `tests/minigameFlow.test.ts` (toque do boxe) |
 | Boxe: tabela, guarda, esquiva, combo, vitória só pela ORELHADA, equilíbrio por bots | `tests/boxing.test.ts` |
-| Custo de desenho do boxe (≤ 250 `drawImage`) e letreiros sem canvas por quadro | `tests/boxingRenderCost.test.ts` |
+| Custo de desenho do boxe (≤ 140 `drawImage` no 2.0, 1 por criança) e letreiros sem canvas por quadro | `tests/boxingRenderCost.test.ts` |
 | Perseguição: tempos dos bots (51 / 64 / ≤ 92 s), regras do macaco, galhos que tremem, sem arma | `tests/chase.test.ts` |
 | Custo de desenho da perseguição, da carta e do rebobinar | `tests/chaseRenderCost.test.ts` |
 | Texto da carta idêntico ao Apêndice A, páginas, pular após 2 s, rebobinar 4 s, fonte ausente | `tests/letterFilm.test.ts` |
@@ -79,7 +81,7 @@ Ambiente: Chromium embutido do app, 1440×900, DPR 1, **painel oculto** (os quad
 
 O lago ficou ~1 ms mais caro no P95 com 65% mais peixes, vegetação e pérolas; nenhum quadro passou do orçamento de 20,8 ms na 2ª passada. Não foi cortado nenhum efeito (D05).
 
-**Achado não resolvido (boxe):** nos estados de ataque do jacaré (`tele`/`recover`) alguns quadros levam 100–190 ms, todos dentro de `drawKidsFront` (a cópia da camada intermediária das crianças da frente para o canvas principal; cronometrado: `blit` 109/192/172 ms). Com essa camada desligada: p99 5,7 ms e máximo 7 ms. Remover `source-atop` não mudou; desenhar as crianças direto no canvas principal deu resultados inconsistentes entre rodadas, então pode ser artefato do raster por software com painel oculto. **Não foi tratado como defeito de aparelho nem como resolvido**; está aberto no Beads para repetir em Chrome visível/aparelho real e, se persistir, trocar a camada por sprites pré-assados escurecidos.
+**Achado do boxe antigo (resolvido por projeto no 2.0, ainda sem validação em aparelho):** nos estados de ataque do jacaré (`tele`/`recover`) alguns quadros levam 100–190 ms, todos dentro de `drawKidsFront` (a cópia da camada intermediária das crianças da frente para o canvas principal; cronometrado: `blit` 109/192/172 ms). Com essa camada desligada: p99 5,7 ms e máximo 7 ms. Remover `source-atop` não mudou; desenhar as crianças direto no canvas principal deu resultados inconsistentes entre rodadas, então pode ser artefato do raster por software com painel oculto. **Não foi tratado como defeito de aparelho nem como resolvido** no boxe antigo. No Boxe 2.0 a camada deixou de existir (cada criança é um quadro assado desenhado direto, p50 0,5 ms contra 3,0 ms); o item continua aberto no Beads para repetir em Chrome visível/aparelho real e, se persistir, trocar a camada por sprites pré-assados escurecidos.
 
 Build de produção (`npm run build`), brutos / gzip:
 

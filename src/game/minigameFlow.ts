@@ -7,7 +7,7 @@
  */
 import type { World, MusicState } from './world';
 import type { ControlState, Input, MiniMode } from '../core/input';
-import type { MinigameId, MinigameModule, MinigameResult, MinigameSession } from './minigames/types';
+import type { MinigameId, MinigameModule, MinigameOpts, MinigameResult, MinigameSession } from './minigames/types';
 import type { Quality } from '../art/index';
 import { difficultyId } from '../core/difficulty';
 import { audio } from '../core/audio';
@@ -41,6 +41,7 @@ export class MinigameFlow {
   session: MinigameSession | null = null;
   id: MinigameId | null = null;
   private onDone: ((r: MinigameResult) => void) | null = null;
+  private opts: MinigameOpts = {};
   private t = 0;
   private mods = new Map<MinigameId, MinigameModule>();
   private loading = new Map<MinigameId, Promise<MinigameModule>>();
@@ -75,9 +76,10 @@ export class MinigameFlow {
   }
 
   /** Entra no minijogo: íris, carregamento (se preciso) e sessão. `onDone` recebe o resultado (inclusive `abort`). */
-  start(w: World, id: MinigameId, onDone: (r: MinigameResult) => void): boolean {
+  start(w: World, id: MinigameId, onDone: (r: MinigameResult) => void, opts: MinigameOpts = {}): boolean {
     if (this.phase !== 'idle') return false;
     this.id = id;
+    this.opts = opts;
     this.onDone = onDone;
     this.phase = 'zoom';
     this.t = 0;
@@ -125,7 +127,7 @@ export class MinigameFlow {
     const { W, H } = this.host.view();
     try {
       this.session = this.mods.get(this.id!)!.create({
-        w, quality: this.host.quality(), viewW: W, viewH: H, difficulty: difficultyId(), backdrop: this.backdrop,
+        w, quality: this.host.quality(), viewW: W, viewH: H, difficulty: difficultyId(), champion: this.opts.champion === true, backdrop: this.backdrop,
         music: (s) => w.setMusic(s),
         touch: (m) => this.host.touchMode(m),
         special: (on, label) => this.host.touchSpecial(on, label),

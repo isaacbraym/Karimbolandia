@@ -2,7 +2,7 @@
 
 > Objetivo: transformar a luta do Karimbo contra o jacaré dançante num minijogo **épico, fluido, engraçado e viciante**, igualmente bom no celular e no computador. Tudo é refeito: câmera, ringue, crianças, luvas, golpes, animações, IA do jacaré, controles, botões, som e recompensa. A infraestrutura que já funciona (carregamento sob demanda, mundo congelado, simulação headless testada) é mantida.
 >
-> Status: **plano** (nada do jogo foi alterado). Base de código: `main` em `04363ff`.
+> Status: **executado** nas fases B0–B9 na branch `feat/boxe-2` (épico Beads `karim-az5`); o relato do que foi feito, medido e deixado de fora está em [`../desenvolvimento/BOXE_2_0_2026-10-05.md`](../desenvolvimento/BOXE_2_0_2026-10-05.md). O texto abaixo é o plano original, mantido como registro de decisão. Base de código do plano: `main` em `04363ff`.
 
 ---
 

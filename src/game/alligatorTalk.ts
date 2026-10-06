@@ -4,11 +4,16 @@
  * (crianças preocupadas, uma cutucando com graveto) e, quando o Karimbo se afasta, volta a dançar com
  * curativo no focinho. Antes da primeira dança nada disso existe: a roda continua como sempre foi.
  * O jacaré NÃO usa chapéu (o chapéu de caça é só da skin Jacaré).
+ *
+ * Revanche: depois da primeira vitória o jacaré (de curativo) oferece a luta do Campeão. O AGIR de sempre
+ * só cumprimenta; um SEGUNDO AGIR em até CHALLENGE_S segundos aceita (nunca por acidente). A luta do Campeão
+ * não dá skin nem mexe no save do mundo: só marca o cartão do boxe (enfeites) e mostra uma faixa.
  */
 import type { World } from './world';
 import type { MinigameResult } from './minigames/types';
 import type { LevelData } from './level';
 import { grantSkin } from '../core/skins';
+import { championUnlocked } from '../core/boxingStats';
 import { DANCE_ID } from './level/community';
 
 export const GATOR_ID = 'jungle:alligator-boxing';
@@ -19,6 +24,8 @@ export const TALK_RESET = 1500;
 /** nocauteado até o Karimbo se afastar tanto (px) */
 export const KO_FAR = 2500;
 export const BALLOON_S = 3.2;
+/** janela (s) para aceitar o desafio do Campeão com um segundo AGIR */
+export const CHALLENGE_S = 5;
 
 export type GatorPose = 'dance' | 'stand' | 'angry' | 'slap';
 export type GatorMode = 'dance' | 'ko' | 'bandaged';
@@ -35,6 +42,8 @@ export const TALK = {
   bandaged: 'Seu Karimbo! Tudo certo, patrão? Pode passar, pode passar...',
   shh: 'Shhh! Ele tá dormindo!',
   laugh: 'HAHAHA, ORELHUDO!',
+  rematch: 'Seu Karimbo... eu treinei. Quer a revanche do CAMPEÃO DA RODA? Fala comigo de novo!',
+  champ: 'Então vem! Agora é o Campeão!',
 } as const;
 export const KO_LINES = ['Será que ele morreu?', 'Cutuca de novo!', 'Ele tá respirando!', 'Chama a Dona Benedita!'] as const;
 
@@ -66,6 +75,8 @@ export class AlligatorTalk {
   private pokeT = 0;
   private requested = false;
   private regrant = false;
+  /** tempo restante (s) em que um novo AGIR aceita o desafio do Campeão */
+  private challengeT = 0;
 
   constructor(data: Pick<LevelData, 'decos'>) {
     this.dance = data.decos.find((d) => d.kind === 'villageDance') ?? null;
@@ -86,6 +97,7 @@ export class AlligatorTalk {
     this.poke = -1;
     this.requested = false;
     this.lockT = 0;
+    this.challengeT = 0;
     // partida nova (a roda ainda não foi feita): esquece a derrota anterior
     if (!w?.encounters.completed.has(DANCE_ID)) this.lost = false;
     // quem já venceu volta a vê-lo dançando de curativo (o nocaute só dura enquanto o Karimbo está por perto)
@@ -114,7 +126,12 @@ export class AlligatorTalk {
     const d = this.dance!;
     this.slapDir = w.player.x <= d.x ? -1 : 1;
     if (this.mode === 'ko') { this.say('kids', TALK.shh); return; }
-    if (this.mode === 'bandaged' && !this.lost) { this.say('gator', TALK.bandaged); return; }
+    if (this.mode === 'bandaged' && !this.lost) {
+      if (this.challengeT > 0) { this.challengeT = 0; this.startChampion(w); return; }
+      this.say('gator', TALK.bandaged);
+      if (championUnlocked()) { this.say('gator', TALK.rematch, 4.2); this.challengeT = CHALLENGE_S; }
+      return;
+    }
     if (this.lost) { this.startLost(w); return; }
     this.stage = Math.min(3, this.stage + 1);
     if (this.stage === 1) this.startDialog(w, TALK.stage1, 'stand');
@@ -161,6 +178,22 @@ export class AlligatorTalk {
     ];
   }
 
+  /** Aceitou a revanche: provocação curta e o boxe com o Campeão. */
+  private startChampion(w: World) {
+    const p = w.player;
+    this.ownsLock = true;
+    p.lockInput = true;
+    p.body.vx = p.body.vy = 0;
+    p.facing = this.slapDir === -1 ? 1 : -1;
+    this.clock = 0;
+    this.balloons.length = 0;
+    this.steps = [
+      { at: 0, run: () => { this.say('gator', TALK.champ, 2.2); this.pose = 'angry'; this.poseUntil = this.time + 6; } },
+      { at: 1.6, run: () => this.say('kids', TALK.chant, 2) },
+      { at: 3.4, run: () => this.requestBoxing(w, true) },
+    ];
+  }
+
   /** Perdeu antes: ele só provoca e a luta recomeça. */
   private startLost(w: World) {
     const p = w.player;
@@ -176,11 +209,11 @@ export class AlligatorTalk {
     ];
   }
 
-  private requestBoxing(w: World) {
+  private requestBoxing(w: World, champion = false) {
     this.requested = true;
     const hook = w.hooks.onMinigame;
-    if (!hook) { this.onResult(w, { id: 'boxing', outcome: 'abort', time: 0, mistakes: 0 }); return; }
-    hook('boxing', (r) => this.onResult(w, r));
+    if (!hook) { this.onResult(w, { id: 'boxing', outcome: 'abort', time: 0, mistakes: 0, champion }); return; }
+    hook('boxing', (r) => this.onResult(w, r), champion ? { champion: true } : undefined);
   }
 
   /** Resultado do boxe (também chamado com `abort` se o jogador abandonar). Prêmio só na vitória, uma vez. */
@@ -191,6 +224,7 @@ export class AlligatorTalk {
     w.camera.focus = null;
     this.slapT = -1;
     this.pose = 'dance';
+    if (r.champion) { this.onChampionResult(w, r); return; }
     if (r.outcome === 'win') {
       const first = !w.encounters.completed.has(GATOR_ID);
       w.encounters.completed.add(GATOR_ID);
@@ -218,12 +252,30 @@ export class AlligatorTalk {
     }
   }
 
+  /** Fim da revanche: sem skin nem estágios novos; vencer deixa o Campeão nocauteado de novo, perder só dá risada. */
+  private onChampionResult(w: World, r: MinigameResult) {
+    this.stage = 0;
+    this.challengeT = 0;
+    if (r.outcome === 'win') {
+      this.mode = 'ko';
+      this.koT = 3;
+      w.hooks.onBanner?.('CAMPEÃO DA RODA DERROTADO!', 'Sino de ouro no ringue — e a marca fica no seu cartão do boxe', 4);
+    } else if (r.outcome === 'lose') {
+      this.ownsLock = true;
+      w.player.lockInput = true;
+      this.lockT = 1.5;
+      this.say('kids', TALK.laugh, 2.2);
+    }
+    w.hooks.onControlReturned?.();
+  }
+
   update(w: World, dt: number) {
     const d = this.dance;
     if (!d) return;
     const step = Math.min(dt, 0.1);
     this.time += step;
     this.clock += step;
+    if (this.challengeT > 0) this.challengeT = Math.max(0, this.challengeT - step);
     const p = w.player;
     // restaurar um save com a vitória: sempre começa de curativo
     if (this.mode === 'dance' && w.encounters.completed.has(GATOR_ID)) this.mode = 'bandaged';

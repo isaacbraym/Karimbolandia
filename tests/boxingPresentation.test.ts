@@ -3,6 +3,7 @@ import { hapticFor, musicFor, sfxFor } from '../src/game/minigames/boxing/presen
 import { ATTACKS, PUNCHES, type AttackKind } from '../src/game/minigames/boxing/sim/rules';
 import { BoxFx } from '../src/art/minigames/boxing/fx';
 import { MIX } from '../src/core/music';
+import { gloveStyleFor } from '../src/art/minigames/boxing/gloves';
 
 const KINDS = Object.keys(ATTACKS) as AttackKind[];
 
@@ -76,5 +77,14 @@ describe('efeitos de câmera do boxe', () => {
     fx.draw({ globalAlpha: 1, save() {}, restore() {}, translate() {}, rotate() {}, fillRect() { alive++; }, beginPath() {}, fill() {}, arc() {}, ellipse() {}, moveTo() {}, lineTo() {}, closePath() {} } as unknown as CanvasRenderingContext2D);
     expect(alive).toBe(3);
     expect(fx.sx).not.toBe(before); // a câmera seguiu decaindo
+  });
+});
+
+describe('boxe: enfeites por nota', () => {
+  it('o estilo da luva do Karimbo combina ouro (nota S) e punho de onça (vitória sem cair)', () => {
+    expect(gloveStyleFor({ goldGloves: false, leopardCuffs: false })).toBe('karimbo');
+    expect(gloveStyleFor({ goldGloves: true, leopardCuffs: false })).toBe('ouro');
+    expect(gloveStyleFor({ goldGloves: false, leopardCuffs: true })).toBe('karimbo+onca');
+    expect(gloveStyleFor({ goldGloves: true, leopardCuffs: true })).toBe('ouro+onca');
   });
 });

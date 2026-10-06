@@ -6,22 +6,42 @@
  */
 import { makeCanvas } from '../../kit';
 
-export type GloveStyle = 'karimbo' | 'ouro' | 'jacare';
+/** `+onca`: punhos estampados de onça (enfeite de quem venceu sem cair) */
+export type GloveStyle = 'karimbo' | 'ouro' | 'jacare' | 'karimbo+onca' | 'ouro+onca';
 export type GloveView = 'costas' | 'perfil' | 'quente';
 const OUT = '#170f2e';
 /** unidades lógicas do quadro assado: a luva ocupa ~(GW × GH) com o punho (cuff) embaixo */
 export const GW = 64, GH = 66;
 
 interface Pal { hi: string; mid: string; lo: string; cuff: string; cuffStripe: string; text: string; claws: boolean; hotHi: string; hotMid: string }
-const PAL: Record<GloveStyle, Pal> = {
+const PAL: Record<'karimbo' | 'ouro' | 'jacare', Pal> = {
   karimbo: { hi: '#ff8f7c', mid: '#e0343a', lo: '#8f1422', cuff: '#f3efe2', cuffStripe: '#c4202e', text: '#c4202e', claws: false, hotHi: '#ffd0c4', hotMid: '#ff6f5f' },
   ouro: { hi: '#fff3a0', mid: '#f0b82e', lo: '#a86a10', cuff: '#fff7d8', cuffStripe: '#a86a10', text: '#a86a10', claws: false, hotHi: '#fffbd0', hotMid: '#ffd84a' },
   jacare: { hi: '#a8d878', mid: '#5f8a45', lo: '#2f4f26', cuff: '#e2d8a4', cuffStripe: '#3f6430', text: '#3f6430', claws: true, hotHi: '#e8ffc8', hotMid: '#9fe06a' },
 };
 const cache = new Map<string, HTMLCanvasElement>();
 
+/** o estilo da luva do Karimbo conforme os enfeites ganhos */
+export const gloveStyleFor = (perks: { goldGloves: boolean; leopardCuffs: boolean }): GloveStyle =>
+  `${perks.goldGloves ? 'ouro' : 'karimbo'}${perks.leopardCuffs ? '+onca' : ''}` as GloveStyle;
+
+/** estampa de onça num retângulo (rosetas marrons em fundo dourado) */
+function leopard(g: CanvasRenderingContext2D, x: number, y: number, w: number, h: number) {
+  g.save();
+  g.beginPath(); g.rect(x, y, w, h); g.clip();
+  g.fillStyle = '#e9ad3f'; g.fillRect(x, y, w, h);
+  for (let j = 0; j < 3; j++) for (let i = 0; i < 6; i++) {
+    const px = x + 2 + i * (w / 5.4) + (j % 2) * 2.6, py = y + 1.5 + j * (h / 2.6);
+    g.fillStyle = '#6b3a14'; g.beginPath(); g.ellipse(px, py, 2.1, 1.6, 0.5 * (i + j), 0, Math.PI * 2); g.fill();
+    g.fillStyle = '#e9ad3f'; g.beginPath(); g.ellipse(px + 0.2, py, 0.9, 0.7, 0, 0, Math.PI * 2); g.fill();
+  }
+  g.restore();
+}
+
 function bakeGlove(style: GloveStyle, view: GloveView, k: number): HTMLCanvasElement {
-  const p = PAL[style];
+  const onca = style.endsWith('+onca');
+  const base = (onca ? style.slice(0, -5) : style) as 'karimbo' | 'ouro' | 'jacare';
+  const p = PAL[base];
   const c = makeCanvas(Math.ceil(GW * k), Math.ceil(GH * k));
   const g = c.getContext('2d')!;
   g.scale(k, k);
@@ -45,14 +65,16 @@ function bakeGlove(style: GloveStyle, view: GloveView, k: number): HTMLCanvasEle
     // punho
     g.fillStyle = OUT; g.fillRect(2.5, 14, 14.5, 30);
     g.fillStyle = p.cuff; g.fillRect(4, 15.5, 11.5, 27);
+    if (onca) leopard(g, 4, 15.5, 11.5, 27);
     g.fillStyle = p.cuffStripe; g.fillRect(4, 26, 11.5, 5);
   } else {
     // visão de costas: luva redonda de frente para quem olha, polegar na lateral, punho em baixo
     g.fillStyle = OUT; g.fillRect(17, 46, 30, 18.5);
     g.fillStyle = p.cuff; g.fillRect(18.5, 47.5, 27, 15.5);
+    if (onca) leopard(g, 18.5, 47.5, 27, 15.5);
     g.fillStyle = p.cuffStripe; g.fillRect(18.5, 53, 27, 4.4);
     g.fillStyle = p.text; g.font = '800 7px "Lilita One",Impact,sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
-    if (style === 'karimbo') g.fillText('KRB', 32, 50.6);
+    if (base === 'karimbo' && !onca) g.fillText('KRB', 32, 50.6);
     // polegar do lado de dentro
     g.fillStyle = OUT; g.beginPath(); g.ellipse(11.5, 34, 9.5, 14, 0.35, 0, Math.PI * 2); g.fill();
     g.fillStyle = hot ? '#ff6f5f' : p.mid; g.beginPath(); g.ellipse(11.5, 34, 7.2, 11.6, 0.35, 0, Math.PI * 2); g.fill();

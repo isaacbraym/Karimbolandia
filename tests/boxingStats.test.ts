@@ -15,7 +15,7 @@ describe('marcas do boxe (chave própria, fora do perfil)', () => {
     expect(s).toEqual({ fights: 0, wins: 0, best: null, clean: false, champion: false });
     expect(m.isFirstFight(s)).toBe(true);
     expect(m.championUnlocked(s)).toBe(false);
-    expect(m.boxingPerks(s)).toEqual({ goldGloves: false, leopardShorts: false, goldBell: false });
+    expect(m.boxingPerks(s)).toEqual({ goldGloves: false, leopardCuffs: false, goldBell: false });
   });
 
   it('guarda a melhor nota, vitórias, vitória sem cair e o Campeão; nota pior não sobrescreve', async () => {
@@ -26,7 +26,7 @@ describe('marcas do boxe (chave própria, fora do perfil)', () => {
     s = m.recordFight({ win: true, grade: 'C', knockdowns: 2, champion: true });
     expect(s.best).toBe('S');
     expect(s.champion).toBe(true);
-    expect(m.boxingPerks(s)).toEqual({ goldGloves: true, leopardShorts: true, goldBell: true });
+    expect(m.boxingPerks(s)).toEqual({ goldGloves: true, leopardCuffs: true, goldBell: true });
     expect(m.championUnlocked(s)).toBe(true);
     expect(m.isFirstFight(s)).toBe(false);
     // sobrevive a um recarregamento

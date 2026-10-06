@@ -16,7 +16,7 @@ import type { MinigameContext, MinigameModule, MinigameResult, MinigameSession }
 import type { ControlState, MiniPad } from '../../../core/input';
 import type { MusicState } from '../../world';
 import { audio } from '../../../core/audio';
-import { isFirstFight, readBoxingStats, recordFight } from '../../../core/boxingStats';
+import { boxingPerks, isFirstFight, readBoxingStats, recordFight } from '../../../core/boxingStats';
 import { BoxingMatch, type MatchEvent } from './sim/match';
 import { PUNCH_BUTTONS } from './sim/rules';
 import { Crowd } from './sim/crowd';
@@ -42,17 +42,21 @@ class BoxingSession implements MinigameSession {
   private cardT = -1;
   private attempts = 0;
   private final: MinigameResult | null = null;
+  private champion: boolean;
 
   constructor(private ctx: MinigameContext) {
+    this.champion = ctx.champion === true;
     this.scene = new BoxingScene(ctx.backdrop, ctx.viewW, ctx.viewH);
+    this.scene.champion = this.champion;
     this.newMatch();
     ctx.touch('boxing');
   }
 
   private newMatch() {
-    this.match = new BoxingMatch(this.ctx.difficulty, SEED + this.attempts * 7919, { tutorial: isFirstFight() });
+    this.match = new BoxingMatch(this.ctx.difficulty, SEED + this.attempts * 7919, { tutorial: isFirstFight() && !this.champion, champion: this.champion });
     this.crowd = new Crowd();
     this.scene.card = null;
+    this.scene.perks = boxingPerks();
     this.cardT = -1;
     this.blocked = false;
     resetHud();
@@ -86,12 +90,12 @@ class BoxingSession implements MinigameSession {
   private showCard() {
     const m = this.match, r = m.result!;
     const before = readBoxingStats().best;
-    recordFight({ win: r.outcome === 'win', grade: r.grade, knockdowns: m.kdK, champion: false });
+    recordFight({ win: r.outcome === 'win', grade: r.grade, knockdowns: m.kdK, champion: this.champion });
     const RANK = { C: 0, B: 1, A: 2, S: 3 } as const;
     const newBest = r.outcome === 'win' && (before === null || RANK[r.grade] > RANK[before]);
-    this.final = { id: 'boxing', outcome: r.outcome, time: r.time, mistakes: r.mistakes };
+    this.final = { id: 'boxing', outcome: r.outcome, time: r.time, mistakes: r.mistakes, grade: r.grade, champion: this.champion };
     this.cardT = 0;
-    this.scene.card = { r, newBest, canRematch: r.outcome === 'lose', t: 0, champion: false };
+    this.scene.card = { r, newBest, canRematch: r.outcome === 'lose', t: 0, champion: this.champion };
     if (this.specialLabel !== null) { this.specialLabel = null; this.ctx.special(false); }
     if (r.outcome === 'lose') this.ctx.music('silence');
   }
