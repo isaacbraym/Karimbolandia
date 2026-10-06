@@ -3,8 +3,9 @@ import { Level, TILE, T, THEME } from '../game/level';
 import { Rng } from '../core/math';
 import { makeCanvas, softDot } from './kit';
 import { windAt } from './wind';
+import { CITY_BLOCKS, CITY_GARDENS } from '../game/level/cityScenery';
 
-const SPAN = 512, TOP = 480, HEIGHT = 720, DENSITY = 1.25;
+const SPAN = 512, TOP = 350, HEIGHT = 590, DENSITY = 1.25;
 interface Patch { back: HTMLCanvasElement; front: HTMLCanvasElement }
 
 /** Somente a rua base; degraus altos, plataformas e fossos continuam explícitos. */
@@ -44,54 +45,37 @@ export class CityStreet {
     const back = makeCanvas(SPAN * DENSITY, HEIGHT * DENSITY), front = makeCanvas(SPAN * DENSITY, HEIGHT * DENSITY);
     const g = back.getContext('2d')!, f = front.getContext('2d')!;
     for (const c of [g, f]) { c.scale(DENSITY, DENSITY); c.translate(-wx, TOP - base); }
-    // Fachadas de dois planos, com intervalos irregulares e becos em perspectiva.
-    for (let cell = Math.floor(wx / 256) - 2; cell <= Math.ceil((wx + SPAN) / 256) + 1; cell++) {
-      if (cell * 256 < 0 || cell * 256 >= L.scenicStreet!.x1) continue;
-      const r = new Rng(cell * 7919 + 771), bx = cell * 256 + r.range(-25, 20);
-      const foot = base - r.range(83, 115), bw = r.range(170, 218), bh = r.range(225, 355);
-      this.building(g, bx + 75, foot - 38, bw * .8, bh + 35, r, true);
-      this.building(g, bx, foot, bw, bh, r, false);
-      // Becos apontam para dentro do quarteirão, e não para uma parede plana.
-      g.fillStyle = '#211d38'; g.beginPath();
-      g.moveTo(bx + bw - 8, foot - 110); g.lineTo(bx + bw + 26, foot - 138);
-      g.lineTo(bx + bw + 26, base - 30); g.lineTo(bx + bw + 94, base + 25);
-      g.lineTo(bx + bw - 12, base + 35); g.closePath(); g.fill();
-      g.strokeStyle = '#787184'; g.lineWidth = 2; g.beginPath();
-      g.moveTo(bx + bw + 26, foot - 5); g.lineTo(bx + bw + 94, base + 25); g.stroke();
-    }
-    // Paredes recuadas sustentam os patamares existentes: lajes ligadas à arquitetura,
-    // mantendo exatamente os mesmos tiles de mão única e a rua livre na frente.
-    for (let row = L.reliefRow - 8; row < L.reliefRow - 1; row++) {
-      for (let col = Math.max(0, wx / TILE - 32); col < (wx + SPAN) / TILE; col++) {
-        if (col * TILE >= L.scenicStreet!.x1 || L.get(col, row) !== T.ONEWAY || L.get(col - 1, row) === T.ONEWAY) continue;
-        let end = col + 1; while (end < L.w && L.get(end, row) === T.ONEWAY) end++;
-        if (end - col < 3 || end * TILE < wx) continue;
-        const foot = base - 38, top = row * TILE + 6;
-        if (foot - top > 40) this.building(g, col * TILE, foot, (end - col) * TILE - 18, foot - top, new Rng(col * 977 + row), false);
-      }
-    }
     // Mascara só o piso: um fosso continua aberto, mesmo com prédios atrás.
     g.save(); f.save(); const mask = new Path2D();
     for (let col = wx / TILE; col < (wx + SPAN) / TILE; col++) {
       if (!cityGround(L, col, L.reliefRow)) continue;
       const x = col * TILE;
-      mask.rect(x, base - 64, TILE + .3, 304);
+      mask.rect(x, base - 128, TILE + .3, 368);
     }
     g.clip(mask); f.clip(mask);
-    const road = g.createLinearGradient(0, base - 64, 0, base + 230);
-    road.addColorStop(0, '#777081'); road.addColorStop(.26, '#585469');
-    road.addColorStop(.65, '#434052'); road.addColorStop(1, '#292637');
-    g.fillStyle = road; g.fillRect(wx, base - 64, SPAN, 304);
+    const road = g.createLinearGradient(0, base - 128, 0, base + 230);
+    road.addColorStop(0, '#777c88'); road.addColorStop(.35, '#4b505c');
+    road.addColorStop(.65, '#343945'); road.addColorStop(1, '#232835');
+    g.fillStyle = road; g.fillRect(wx, base - 128, SPAN, 368);
     // A cobertura próxima da rua oculta a face do teto da balada vista do exterior.
     // Começa abaixo dos pés; o mundo suprime esse passe ao entrar no interior.
     f.fillStyle = road; f.fillRect(wx, base + 24, SPAN, 216);
-    // Calçada recuada, sem riscar uma linha contínua na posição dos pés.
-    g.fillStyle = '#979091'; g.beginPath(); g.moveTo(wx, base - 64);
-    g.lineTo(wx + SPAN, base - 64);
-    for (let x = wx + SPAN; x >= wx; x -= 8) g.lineTo(x, base - 44 + Math.sin(x * .006) * 12);
-    g.closePath(); g.fill();
+    // Calçada larga, meio-fio em volume e sarjeta separada da faixa de caminhada.
+    g.fillStyle = '#a5a8ad'; g.fillRect(wx, base - 128, SPAN, 107);
+    g.fillStyle = '#646a75'; g.fillRect(wx, base - 21, SPAN, 8);
+    g.fillStyle = '#d7d3ca'; g.fillRect(wx, base - 23, SPAN, 3);
+    g.fillStyle = '#232936'; g.fillRect(wx, base - 12, SPAN, 4);
+    g.strokeStyle = '#808691'; g.lineWidth = .8;
+    for (let x = Math.floor(wx / 64) * 64; x < wx + SPAN; x += 64) {
+      g.beginPath(); g.moveTo(x, base - 126); g.lineTo(x + 25, base - 24); g.stroke();
+    }
     for (let cell = Math.floor(wx / 128) - 1; cell <= Math.ceil((wx + SPAN) / 128); cell++) {
       const r = new Rng(cell * 8191 + 937), x = cell * 128;
+      g.fillStyle = '#c1b78b'; g.fillRect(x + 15, base + 80, 56, 3);
+      if (cell % 4 === 2) { // bocas de lobo
+        g.fillStyle = '#222b37'; g.fillRect(x + 35, base - 10, 35, 6);
+        g.fillStyle = '#727e88'; for (let k = 0; k < 7; k++) g.fillRect(x + 37 + k * 5, base - 10, 1.5, 5);
+      }
       for (let k = 0; k < 38; k++) {
         const px = x + r.range(0, 128), py = base + r.range(-34, 218);
         g.fillStyle = k % 2 ? 'rgba(221,207,187,.07)' : 'rgba(10,7,23,.12)';
@@ -107,16 +91,46 @@ export class CityStreet {
         g.ellipse(x + 45, base + 68, 54, 8, -.08, 0, Math.PI * 2); g.fill();
         g.fillStyle = 'rgba(255,197,123,.12)'; g.fillRect(x + 15, base + 63, 47, 1.5);
       }
-      // Restos do ataque no plano próximo, longe do corpo e da mira.
-      for (let k = 0; k < 4; k++) {
-        const px = x + r.range(0, 128), py = base + r.range(125, 204), size = r.range(6, 17);
-        f.fillStyle = '#222030'; f.beginPath(); f.ellipse(px, py + 4, size * 1.8, 5, -.2, 0, Math.PI * 2); f.fill();
-        f.fillStyle = ['#46404c', '#65545a', '#565567'][k % 3]; f.beginPath();
-        f.moveTo(px - size, py); f.lineTo(px - 5, py - size * .7); f.lineTo(px + size, py - size * .25); f.lineTo(px + size * .6, py + 4); f.closePath(); f.fill();
-        f.strokeStyle = '#817078'; f.lineWidth = 1; f.stroke();
+    }
+    // Reutiliza o asfalto texturizado no passe próximo, sem tapar os pés.
+    f.drawImage(back, 0, (TOP + 24) * DENSITY, back.width, 216 * DENSITY, wx, base + 24, SPAN, 216);
+    g.restore(); f.restore();
+    // Pilares apoiados na calçada sustentam as lajes existentes, sem novas fachadas.
+    for (let row = L.reliefRow - 8; row < L.reliefRow - 1; row++) {
+      for (let col = Math.max(0, wx / TILE - 32); col < (wx + SPAN) / TILE; col++) {
+        if (col * TILE >= L.scenicStreet!.x1 || L.get(col, row) !== T.ONEWAY || L.get(col - 1, row) === T.ONEWAY) continue;
+        let end = col + 1; while (end < L.w && L.get(end, row) === T.ONEWAY) end++;
+        if (end - col < 3 || end * TILE < wx) continue;
+        const foot = base - 38, top = row * TILE + 6;
+        for (const pole of [col + 0.4, end - 0.8]) {
+          if (!cityGround(L, Math.floor(pole), L.reliefRow)) continue;
+          g.fillStyle = '#555160'; g.fillRect(pole * TILE, top, 14, foot - top);
+          g.fillStyle = '#b2b0ac'; g.fillRect(pole * TILE - 4, foot - 4, 22, 5);
+        }
       }
     }
-    g.restore(); f.restore();
+    // Construções vêm DEPOIS da calçada: suas bases nunca são apagadas pelo piso.
+    for (const block of CITY_BLOCKS) {
+      if (block.x + block.w + 30 < wx || block.x > wx + SPAN
+        || !cityGround(L, Math.floor(Math.max(0, block.x) / TILE), L.reliefRow)
+        || !cityGround(L, Math.floor((block.x + block.w) / TILE), L.reliefRow)) continue;
+      this.building(g, block.x, base - 58, block.w, block.h, new Rng(block.x * 977 + 71), false);
+      g.fillStyle = '#bbb7ae'; g.fillRect(block.x - 5, base - 58, block.w + 10, 5);
+      g.fillStyle = 'rgba(18,21,31,.22)'; g.beginPath();
+      g.ellipse(block.x + block.w / 2, base - 49, block.w * .58, 9, 0, 0, Math.PI * 2); g.fill();
+    }
+    // Canteiros em ilhas na calçada; árvores e bancos usam as mesmas posições no mapa.
+    for (const x of CITY_GARDENS) {
+      if (x + 75 < wx || x - 65 > wx + SPAN || !cityGround(L, Math.floor((x - 58) / TILE), L.reliefRow)
+        || !cityGround(L, Math.floor((x + 59) / TILE), L.reliefRow)) continue;
+      g.fillStyle = '#575f66'; g.beginPath(); g.roundRect(x - 58, base - 43, 118, 22, 8); g.fill();
+      g.fillStyle = '#b4bbaf'; g.beginPath(); g.roundRect(x - 59, base - 48, 118, 12, 7); g.fill();
+      g.fillStyle = '#425e46'; g.beginPath(); g.ellipse(x, base - 43, 50, 5, 0, 0, Math.PI * 2); g.fill();
+      for (let i = 0; i < 10; i++) {
+        g.fillStyle = i % 2 ? '#769a62' : '#55784f'; g.beginPath();
+        g.ellipse(x - 42 + i * 9, base - 42, 10, 7, 0, 0, Math.PI * 2); g.fill();
+      }
+    }
     // Lábios dos buracos continuam legíveis: não esconder perigo com arte de piso.
     for (let col = wx / TILE; col < (wx + SPAN) / TILE; col++) {
       if (!cityGround(L, col, L.reliefRow)) continue;
@@ -161,22 +175,27 @@ export class CityStreet {
   private air(g: CanvasRenderingContext2D, x: number, w: number, t: number) {
     const base = this.level.reliefRow * TILE, range = this.level.scenicStreet!;
     const smoke = softDot('#8f8799', 24);
-    for (let cell = Math.max(0, Math.floor((x - 180) / 768)); cell * 768 < Math.min(x + w + 180, range.x1); cell++) {
-      const bx = cell * 768 + 330, wind = windAt(bx, t);
+    for (let cell = 0; cell < CITY_BLOCKS.length; cell++) {
+      const block = CITY_BLOCKS[cell], bx = block.x + block.w / 2;
+      if (bx + 180 < x || bx - 180 > x + w || bx >= range.x1
+        || !cityGround(this.level, Math.floor(Math.max(0, block.x) / TILE), this.level.reliefRow)
+        || !cityGround(this.level, Math.floor((block.x + block.w) / TILE), this.level.reliefRow)) continue;
+      const wind = windAt(bx, t);
       for (let i = 0; i < 4; i++) {
         const ph = (t * .16 + i / 4 + cell * .17) % 1, size = 30 + ph * 68;
         g.globalAlpha = .23 * (1 - ph);
-        g.drawImage(smoke.c, bx - size / 2 + wind * ph * 110, base - 140 - ph * 210, size, size * 1.3);
+        g.drawImage(smoke.c, bx - size / 2 + wind * ph * 110, base - 58 - block.h - ph * 150, size, size * 1.3);
       }
       g.globalAlpha = 1;
       // Tecidos suspensos: fio firme, pontas soltas sob a mesma rajada.
       g.strokeStyle = '#292235'; g.lineWidth = 1.4; g.beginPath();
-      g.moveTo(bx - 110, base - 218); g.quadraticCurveTo(bx, base - 181, bx + 108, base - 235); g.stroke();
-      for (let k = 0; k < 5; k++) {
-        const u = (k + 1) / 6, v = u + .085;
-        const px = bx - 110 * (1 - u) ** 2 + 108 * u * u;
-        const py = base - 218 * (1 - u) ** 2 - 362 * u * (1 - u) - 235 * u * u;
-        const rightY = base - 218 * (1 - v) ** 2 - 362 * v * (1 - v) - 235 * v * v;
+      const half = block.w / 2 - 15, wireY = base - 160;
+      g.moveTo(bx - half, wireY); g.quadraticCurveTo(bx, wireY + 18, bx + half, wireY); g.stroke();
+      for (let k = 0; k < 3; k++) {
+        const u = (k + 1) / 4, v = u + .085;
+        const px = bx - half + 2 * half * u;
+        const py = wireY + 36 * u * (1 - u);
+        const rightY = wireY + 36 * v * (1 - v);
         const flap = wind * 10 + Math.sin(t * 3.1 - k * .7 + cell) * 3;
         g.fillStyle = ['#887583', '#b59a82', '#6e8f95'][k % 3]; g.beginPath();
         g.moveTo(px, py); g.lineTo(px + 19, rightY); g.quadraticCurveTo(px + 23 + flap, py + 17, px + 18 + flap, py + 33);

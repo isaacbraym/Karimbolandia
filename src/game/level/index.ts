@@ -8,6 +8,7 @@ import { assignLooks } from '../civLook';
 import { applyCuts, CUT_TOTAL } from './cut';
 import { addPatrolStories } from './story';
 import { RUN } from '../movement';
+import { dressCitySample } from './cityScenery';
 
 /** largura da fase montada (antes dos cortes) */
 const RAW_W = 1352;
@@ -45,5 +46,6 @@ export function buildLevel(): LevelData {
   // cada morador com uma aparência única (sem repetir combinação)
   assignLooks(b.civilians);
   b.level.scenicStreet = { x0: 0, x1: b.playerStart.x + RUN * 30 };
+  dressCitySample(b);
   return b.build('boss');
 }

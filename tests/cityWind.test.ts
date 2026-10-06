@@ -7,8 +7,26 @@ import { TILE, T, THEME } from '../src/game/level';
 import { RUN } from '../src/game/movement';
 import { World } from '../src/game/world';
 import { newCtl } from './helpers/bot';
+import { CITY_BLOCKS, CITY_GARDENS } from '../src/game/level/cityScenery';
 
 describe('Rua integrada e vento ambiental', () => {
+  it('abre intervalos variados entre prédios e apoia bancos e jardins na calçada', () => {
+    const d = buildLevel(), gaps: number[] = [];
+    for (let i = 1; i < CITY_BLOCKS.length; i++) {
+      const prev = CITY_BLOCKS[i - 1], block = CITY_BLOCKS[i];
+      gaps.push(block.x - prev.x - prev.w);
+    }
+    expect(Math.min(...gaps)).toBeGreaterThan(250);
+    expect(new Set(gaps).size).toBeGreaterThan(4);
+    expect(d.decos.some(a => a.kind === 'facade' && a.x < d.level.scenicStreet!.x1)).toBe(false);
+    for (const x of CITY_GARDENS) {
+      for (const a of d.decos.filter(a => (a.x === x || a.x === x + 115) && (a.kind === 'streetTree' || a.kind === 'bench'))) {
+        expect(cityGround(d.level, Math.floor(a.x / TILE), 32)).toBe(true);
+        expect(a.y).toBeLessThan(32 * TILE);
+      }
+    }
+    expect(d.decos.filter(a => a.kind === 'bench' && a.x < 6000).length).toBeGreaterThan(3);
+  });
   it('cobre 30 segundos da cidade e preserva buracos, plataformas e a balada subterrânea', () => {
     const data = buildLevel(), L = data.level;
     expect(L.scenicStreet).toEqual({ x0: 0, x1: data.playerStart.x + RUN * 30 });
