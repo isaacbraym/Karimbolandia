@@ -48,6 +48,8 @@ Perk da skin: fôlego +30%, nado +40%, vida +10% (`SKIN_PERKS`, reaplicado em `P
 
 ## Roda do jacaré: AGIR = FALAR
 
+> **Tempo dos balões (2026-10-06):** cada balão da conversa dura o tempo de ler o texto (`readTime` em `alligatorTalk.ts`: ~14 caracteres/s + 1,3 s, mínimo 2,4 s) e o roteiro espera a leitura antes da resposta; antes todos duravam 1,8–3,6 s e as falas longas (mais de 100 caracteres) sumiam pela metade. A janela do desafio do Campeão acompanha a leitura da oferta. Os testes (`tests/alligatorTalk.test.ts`) esperam por `settle()`/`untilBoxing()` em vez de segundos fixos.
+
 ↑ continua batendo palmas (a roda de antes); **AGIR** conversa com o jacaré em 3 estágios (conversa, bronca, tapa na orelha → convite ao boxe). A ação mais próxima vence (`preferred`): porta de casa mais perto que o jacaré = exploração; jacaré mais perto = conversa. Depois da vitória ele fica nocauteado só enquanto o Karimbo está por perto; ao se afastar volta de curativo. Reiniciar a partida o devolve a dançar e esquece a derrota (revisão: a ordem `village.reset × encounters.reset` estava invertida).
 
 ## Proteção contra regressão

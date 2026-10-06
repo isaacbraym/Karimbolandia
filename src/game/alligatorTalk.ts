@@ -24,8 +24,14 @@ export const TALK_RESET = 1500;
 /** nocauteado até o Karimbo se afastar tanto (px) */
 export const KO_FAR = 2500;
 export const BALLOON_S = 3.2;
-/** janela (s) para aceitar o desafio do Campeão com um segundo AGIR */
-export const CHALLENGE_S = 5;
+/**
+ * Quanto um balão fica na tela: o tempo de ler o texto (cerca de 14 caracteres por segundo, mais um fôlego de
+ * 1,3 s para ver quem fala), nunca menos que 2,4 s. Antes todo balão durava 1,8–3,6 s e as falas longas sumiam
+ * pela metade.
+ */
+export const readTime = (text: string) => Math.max(2.4, 1.3 + text.length / 14);
+/** janela mínima (s) para aceitar o desafio do Campeão com um segundo AGIR (vale ao menos o tempo de ler a oferta) */
+export const CHALLENGE_S = 9;
 
 export type GatorPose = 'dance' | 'stand' | 'angry' | 'slap';
 export type GatorMode = 'dance' | 'ko' | 'bandaged';
@@ -128,8 +134,9 @@ export class AlligatorTalk {
     if (this.mode === 'ko') { this.say('kids', TALK.shh); return; }
     if (this.mode === 'bandaged' && !this.lost) {
       if (this.challengeT > 0) { this.challengeT = 0; this.startChampion(w); return; }
-      this.say('gator', TALK.bandaged);
-      if (championUnlocked()) { this.say('gator', TALK.rematch, 4.2); this.challengeT = CHALLENGE_S; }
+      // quem já ganhou ouve o convite (que já começa com o cumprimento); os dois balões juntos ficariam um sobre o outro
+      if (championUnlocked()) { this.say('gator', TALK.rematch); this.challengeT = Math.max(CHALLENGE_S, readTime(TALK.rematch) + 2); }
+      else this.say('gator', TALK.bandaged);
       return;
     }
     if (this.lost) { this.startLost(w); return; }
@@ -139,17 +146,20 @@ export class AlligatorTalk {
     else this.startFight(w);
   }
 
-  private say(who: Balloon['who'], text: string, dur = BALLOON_S) {
+  private say(who: Balloon['who'], text: string, dur = readTime(text)) {
     if (this.balloons.length >= 3) this.balloons.shift();
     this.balloons.push({ who, text, t: 0, dur });
   }
 
   private startDialog(w: World, lines: { k: string; g: string }, pose: GatorPose) {
     this.clock = 0;
+    const rk = readTime(lines.k), rg = readTime(lines.g);
+    // o jacaré responde quando a pergunta do Karimbo já foi lida; o próximo AGIR só vale depois de ler a resposta
+    const gAt = Math.max(1.7, rk - 0.3);
     this.steps = [
-      { at: 0, run: () => this.say('karimbo', lines.k, 1.8) },
-      { at: 1.7, run: () => { this.say('gator', lines.g, 3.6); this.pose = pose; this.poseUntil = this.time + 5.8; } },
-      { at: 5.4, run: () => { /* fim: o próximo AGIR vale */ } },
+      { at: 0, run: () => this.say('karimbo', lines.k, rk) },
+      { at: gAt, run: () => { this.say('gator', lines.g, rg); this.pose = pose; this.poseUntil = this.time + rg + 1.8; } },
+      { at: gAt + rg * 0.85, run: () => { /* fim: o próximo AGIR vale */ } },
     ];
     void w;
   }
@@ -162,19 +172,22 @@ export class AlligatorTalk {
     p.body.vx = p.body.vy = 0;
     p.facing = this.slapDir === -1 ? 1 : -1;
     this.clock = 0;
+    // tempos pela leitura: a pergunta, o tapa, o "UUUUUH!", a fala do jacaré e o coro de "BRIGA!"
+    const rg = readTime(TALK.stage3.g), rc = readTime(TALK.chant);
+    const gAt = 3.0, cAt = gAt + rg - 0.4;
     this.steps = [
-      { at: 0, run: () => this.say('karimbo', TALK.stage3.k, 1.2) },
-      { at: 1.1, run: () => {
-        this.pose = 'slap'; this.slapT = 0; this.poseUntil = this.time + 9;
+      { at: 0, run: () => this.say('karimbo', TALK.stage3.k) },
+      { at: 1.8, run: () => {
+        this.pose = 'slap'; this.slapT = 0; this.poseUntil = this.time + 9 + rg;
         w.audio('thump', 1, p.x);
         w.fx.addShake(4, 0.4);
         p.earPop(3.2);
         w.fx.addFlash(0.18, '#ffffff');
       } },
-      { at: 1.6, run: () => this.say('kids', TALK.uuuh, 1.6) },
-      { at: 2.2, run: () => this.say('gator', TALK.stage3.g, 3.4) },
-      { at: 5.2, run: () => this.say('kids', TALK.chant, 2.6) },
-      { at: 7.9, run: () => this.requestBoxing(w) },
+      { at: 2.2, run: () => this.say('kids', TALK.uuuh, 2.2) },
+      { at: gAt, run: () => this.say('gator', TALK.stage3.g, rg) },
+      { at: cAt, run: () => this.say('kids', TALK.chant, rc) },
+      { at: cAt + rc * 0.8, run: () => this.requestBoxing(w) },
     ];
   }
 
@@ -188,9 +201,9 @@ export class AlligatorTalk {
     this.clock = 0;
     this.balloons.length = 0;
     this.steps = [
-      { at: 0, run: () => { this.say('gator', TALK.champ, 2.2); this.pose = 'angry'; this.poseUntil = this.time + 6; } },
-      { at: 1.6, run: () => this.say('kids', TALK.chant, 2) },
-      { at: 3.4, run: () => this.requestBoxing(w, true) },
+      { at: 0, run: () => { this.say('gator', TALK.champ); this.pose = 'angry'; this.poseUntil = this.time + 8; } },
+      { at: readTime(TALK.champ) - 0.3, run: () => this.say('kids', TALK.chant) },
+      { at: readTime(TALK.champ) + readTime(TALK.chant) * 0.7, run: () => this.requestBoxing(w, true) },
     ];
   }
 
@@ -203,9 +216,9 @@ export class AlligatorTalk {
     p.facing = this.slapDir === -1 ? 1 : -1;
     this.clock = 0;
     this.steps = [
-      { at: 0, run: () => { this.say('gator', TALK.lost, 2.6); this.pose = 'angry'; this.poseUntil = this.time + 6; } },
-      { at: 2.7, run: () => this.say('kids', TALK.chant, 2.4) },
-      { at: 5.1, run: () => this.requestBoxing(w) },
+      { at: 0, run: () => { this.say('gator', TALK.lost); this.pose = 'angry'; this.poseUntil = this.time + 8; } },
+      { at: readTime(TALK.lost) - 0.3, run: () => this.say('kids', TALK.chant) },
+      { at: readTime(TALK.lost) + readTime(TALK.chant) * 0.7, run: () => this.requestBoxing(w) },
     ];
   }
 
@@ -243,7 +256,7 @@ export class AlligatorTalk {
       this.ownsLock = true;
       w.player.lockInput = true;
       this.lockT = 1.5;
-      this.say('kids', TALK.laugh, 2.2);
+      this.say('kids', TALK.laugh);
       w.hooks.onControlReturned?.();
     } else {
       // abandonou: o próximo AGIR recomeça o tapa
@@ -264,7 +277,7 @@ export class AlligatorTalk {
       this.ownsLock = true;
       w.player.lockInput = true;
       this.lockT = 1.5;
-      this.say('kids', TALK.laugh, 2.2);
+      this.say('kids', TALK.laugh);
     }
     w.hooks.onControlReturned?.();
   }
@@ -306,7 +319,7 @@ export class AlligatorTalk {
       if (this.poke >= 0 && this.poke < step / 0.6 + 1e-6 && Math.abs(p.x - d.x) < 800) w.audio('snore', 0.35, d.x);
       this.koT -= step;
       if (this.koT <= 0 && !this.balloons.length && far < 700) {
-        this.say('kids', KO_LINES[this.koLine++ % KO_LINES.length], 3);
+        this.say('kids', KO_LINES[this.koLine++ % KO_LINES.length]);
         this.koT = 8 + ((this.koLine * 37) % 5); // 8–12 s, determinístico
       }
     }

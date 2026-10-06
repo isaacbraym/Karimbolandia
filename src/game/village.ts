@@ -155,17 +155,17 @@ export class Village {
     const a=Math.min(1,b.t*6,(b.dur-b.t)*5);
     g.save();g.globalAlpha=Math.max(0,a);g.textAlign='center';
     const big=b.text===b.text.toUpperCase()&&b.who==='kids';
-    g.font=(big?'bold 13px':'10px')+' sans-serif';
+    g.font=(big?'bold 14px':'11px')+' sans-serif';
     // quebra em até 2 linhas
     const words=b.text.split(' '),lines:string[]=[];let cur='';
-    for(const wd of words){if(g.measureText(cur+' '+wd).width>(big?170:150)&&cur){lines.push(cur);cur=wd;}else cur=cur?cur+' '+wd:wd;}
+    for(const wd of words){if(g.measureText(cur+' '+wd).width>(big?180:170)&&cur){lines.push(cur);cur=wd;}else cur=cur?cur+' '+wd:wd;}
     lines.push(cur);
-    const width=Math.max(...lines.map(l=>g.measureText(l).width))+16,h=lines.length*13+9;
+    const width=Math.max(...lines.map(l=>g.measureText(l).width))+16,h=lines.length*14+9;
     const bx=Math.max(w.camera.x+width/2+4,Math.min(w.camera.x+w.camera.w-width/2-4,x));
     g.fillStyle=b.who==='karimbo'?'#e8f4ff':b.who==='gator'?'#fff1cd':'#ffe9f0';g.strokeStyle='#4a3e37';g.lineWidth=1.2;
     g.beginPath();g.roundRect(bx-width/2,y-h+4-lines.length*0,width,h,5);g.fill();g.stroke();
     g.fillStyle=big?'#8a1f3a':'#41322d';
-    lines.forEach((l,i)=>g.fillText(l,bx,y-h+15+i*13));
+    lines.forEach((l,i)=>g.fillText(l,bx,y-h+15+i*14));
     g.restore();
   }
   /** um morador por vez: ninguém começa a falar por cima do outro */

@@ -28,40 +28,66 @@ async function village(opts: { danced?: boolean } = {}) {
   stand();
   const agir = () => { const c = newCtl(); c.interact = { held: true, pressed: true, released: false }; return c; };
   const run = (s: number, ctl = idle) => { for (let i = 0; i < s * 60; i++) w.update(1 / 60, ctl()); };
-  return { w, d, hooks, stand, agir, run, idle, DANCE_ID };
+  /** espera a fala terminar (as falas duram o tempo de ler o texto: nada de segundos fixos nos testes) */
+  const settle = (max = 40) => { for (let i = 0; i < max * 60 && w.village.talk.busy; i++) w.update(1 / 60, idle()); };
+  /** espera o boxe ser pedido (a n-ésima vez) */
+  const untilBoxing = (n = 1, max = 40) => { for (let i = 0; i < max * 60 && hooks.boxing.mock.calls.length < n; i++) w.update(1 / 60, idle()); };
+  return { w, d, hooks, stand, agir, run, idle, DANCE_ID, settle, untilBoxing };
 }
 
 describe('conversa com o jacaré da roda', () => {
   it('três AGIR dão os estágios 1, 2, 3 e pedem o boxe exatamente uma vez', async () => {
-    const { w, hooks, agir, run } = await village();
+    const { w, hooks, agir, run, settle, untilBoxing } = await village();
     const t = w.village.talk;
     expect(t.stage).toBe(0);
     w.update(1 / 60, agir()); expect(t.stage).toBe(1);
     run(0.3);
     w.update(1 / 60, agir()); expect(t.stage).toBe(1); // ainda falando: o AGIR repetido não pula a fala
-    run(6);
+    settle();
     w.update(1 / 60, agir()); expect(t.stage).toBe(2);
-    run(1.8);
-    expect(t.pose).toBe('angry');
     run(5);
+    expect(t.pose).toBe('angry');
+    settle();
     w.update(1 / 60, agir()); expect(t.stage).toBe(3);
     expect(w.player.lockInput).toBe(true);
-    run(10);
+    untilBoxing();
     expect(hooks.boxing).toHaveBeenCalledTimes(1);
     expect(t.balloons.length).toBeLessThanOrEqual(3);
   });
 
   it('as falas centrais saem na ordem do plano', async () => {
-    const { w, agir, run } = await village();
+    const { w, agir, run, hooks } = await village();
     const seen: string[] = [];
     const t = w.village.talk;
-    const watch = (s: number) => { for (let i = 0; i < s * 60; i++) { w.update(1 / 60, newCtl()); for (const b of t.balloons) if (!seen.includes(b.text)) seen.push(b.text); } };
-    w.update(1 / 60, agir()); watch(6);
-    w.update(1 / 60, agir()); watch(6);
-    w.update(1 / 60, agir()); watch(9);
+    const watch = (until: () => boolean) => { for (let i = 0; i < 40 * 60 && !until(); i++) { w.update(1 / 60, newCtl()); for (const b of t.balloons) if (!seen.includes(b.text)) seen.push(b.text); } };
+    w.update(1 / 60, agir()); watch(() => !t.busy);
+    w.update(1 / 60, agir()); watch(() => !t.busy);
+    w.update(1 / 60, agir()); watch(() => hooks.boxing.mock.calls.length > 0);
     const { TALK } = await import('../src/game/alligatorTalk');
     expect(seen).toEqual([TALK.stage1.k, TALK.stage1.g, TALK.stage2.k, TALK.stage2.g, TALK.stage3.k, TALK.uuuh, TALK.stage3.g, TALK.chant]);
     void run;
+  });
+
+  it('cada balão fica o tempo de LER o texto (ninguém é cortado pela metade) e a resposta só vem depois da leitura', async () => {
+    const { w, agir, hooks } = await village();
+    const { TALK, readTime } = await import('../src/game/alligatorTalk');
+    const t = w.village.talk;
+    const dur = new Map<string, number>(), start = new Map<string, number>();
+    let now = 0;
+    const watch = (until: () => boolean) => { for (let i = 0; i < 40 * 60 && !until(); i++) { w.update(1 / 60, newCtl()); now += 1 / 60; for (const b of t.balloons) { dur.set(b.text, b.dur); if (!start.has(b.text)) start.set(b.text, now); } } };
+    w.update(1 / 60, agir()); watch(() => !t.busy);
+    w.update(1 / 60, agir()); watch(() => !t.busy);
+    w.update(1 / 60, agir()); watch(() => hooks.boxing.mock.calls.length > 0);
+    for (const text of [TALK.stage1.k, TALK.stage1.g, TALK.stage2.k, TALK.stage2.g, TALK.stage3.k, TALK.stage3.g, TALK.chant]) {
+      expect(dur.get(text), text).toBeGreaterThanOrEqual(readTime(text) - 1e-6);
+      expect(dur.get(text)!, text).toBeGreaterThanOrEqual(2.4);
+    }
+    // a fala longa do jacaré (mais de 100 caracteres) passa de 8 s na tela
+    expect(dur.get(TALK.stage1.g)!).toBeGreaterThan(8);
+    // o jacaré responde quando o Karimbo já teve o tempo de ser lido (no máximo 0,3 s de sobreposição)
+    expect(start.get(TALK.stage1.g)! - start.get(TALK.stage1.k)!).toBeGreaterThanOrEqual(readTime(TALK.stage1.k) - 0.35);
+    expect(readTime('')).toBe(2.4);
+    expect(readTime('x'.repeat(140))).toBeCloseTo(11.3, 1);
   });
 
   it('↑ continua batendo palmas (a roda de antes)', async () => {
@@ -82,9 +108,9 @@ describe('conversa com o jacaré da roda', () => {
   });
 
   it('afastar 1500 px zera a conversa', async () => {
-    const { w, agir, run, stand } = await village();
+    const { w, agir, run, stand, settle } = await village();
     w.update(1 / 60, agir());
-    run(6);
+    settle();
     expect(w.village.talk.stage).toBe(1);
     stand(-1700);
     run(0.2);
@@ -101,8 +127,8 @@ describe('conversa com o jacaré da roda', () => {
   });
 
   it('ao fim do tapa o Karimbo fica travado só até o boxe começar e a conversa não repete', async () => {
-    const { w, hooks, agir, run } = await village();
-    for (let i = 0; i < 3; i++) { w.update(1 / 60, agir()); run(i < 2 ? 6 : 10); }
+    const { w, hooks, agir, settle, untilBoxing } = await village();
+    for (let i = 0; i < 3; i++) { w.update(1 / 60, agir()); if (i < 2) settle(); else untilBoxing(); }
     expect(hooks.boxing).toHaveBeenCalledTimes(1);
     const done = hooks.boxing.mock.calls[0][0];
     done({ id: 'boxing', outcome: 'abort', time: 0, mistakes: 0 });
@@ -115,20 +141,20 @@ describe('conversa com o jacaré da roda', () => {
 describe('depois do boxe: derrota, vitória, nocaute e curativo', () => {
   async function fight(outcome: MinigameResult['outcome']) {
     const v = await village();
-    for (let i = 0; i < 3; i++) { v.w.update(1 / 60, v.agir()); v.run(i < 2 ? 6 : 10); }
+    for (let i = 0; i < 3; i++) { v.w.update(1 / 60, v.agir()); if (i < 2) v.settle(); else v.untilBoxing(); }
     v.hooks.boxing.mock.calls[0][0]({ id: 'boxing', outcome, time: 40, mistakes: 1 });
     return v;
   }
 
   it('derrota: próxima conversa vai direto ao boxe, sem prêmio e sem skin', async () => {
-    const { w, hooks, agir, run } = await fight('lose');
+    const { w, hooks, agir, run, untilBoxing } = await fight('lose');
     expect(w.village.talk.lost).toBe(true);
     expect(w.encounters.completed.has('jungle:alligator-boxing')).toBe(false);
     expect(w.village.talk.mode).toBe('dance');
     run(2); // Karimbo tonto por 1,5 s
     expect(w.player.lockInput).toBe(false);
     w.update(1 / 60, agir());
-    run(6);
+    untilBoxing(2);
     expect(hooks.boxing).toHaveBeenCalledTimes(2);
     const { progress } = await import('../src/core/storage');
     expect(progress.ownedSkins).not.toContain('jacare');
@@ -169,7 +195,7 @@ describe('depois do boxe: derrota, vitória, nocaute e curativo', () => {
     run(0.2, up);
     expect(w.village.active).toBe(true);
     // terminar as palmas para o AGIR valer
-    run(6, idle);
+    run(8, idle);
     stand(-90);
     const agir = () => { const c = newCtl(); c.interact = { held: true, pressed: true, released: false }; return c; };
     w.update(1 / 60, agir());
@@ -185,8 +211,8 @@ describe('depois do boxe: derrota, vitória, nocaute e curativo', () => {
   });
 
   it('reset no meio (respawn/novo jogo) solta o controle e a câmera', async () => {
-    const { w, agir, run } = await village();
-    for (let i = 0; i < 3; i++) { w.update(1 / 60, agir()); run(i < 2 ? 6 : 1.5); }
+    const { w, agir, run, settle } = await village();
+    for (let i = 0; i < 3; i++) { w.update(1 / 60, agir()); if (i < 2) settle(); else run(1.5); }
     expect(w.player.lockInput).toBe(true);
     w.village.reset(w);
     expect(w.player.lockInput).toBe(false);
@@ -238,9 +264,9 @@ describe('revanche contra o Jacaré Campeão', () => {
   it('sem nenhuma vitória no cartão do boxe o AGIR só cumprimenta (nada de desafio)', async () => {
     const v = await won();
     v.w.update(1 / 60, v.agir());
-    v.run(6);
+    v.settle();
     v.w.update(1 / 60, v.agir());
-    v.run(10);
+    v.run(15);
     expect(v.hooks.boxing).not.toHaveBeenCalled();
   });
 
@@ -253,7 +279,7 @@ describe('revanche contra o Jacaré Campeão', () => {
     v.run(1);
     v.w.update(1 / 60, v.agir());
     expect(v.w.player.lockInput).toBe(true);
-    v.run(6);
+    v.untilBoxing();
     expect(v.hooks.boxing).toHaveBeenCalledTimes(1);
     expect(v.hooks.boxing.mock.calls[0][1]).toEqual({ champion: true });
   });
@@ -262,7 +288,7 @@ describe('revanche contra o Jacaré Campeão', () => {
     unlock();
     const v = await won();
     v.w.update(1 / 60, v.agir());
-    v.run(6);
+    v.run(14); // a janela do desafio (leitura da oferta + 2 s) já passou
     v.w.update(1 / 60, v.agir());
     v.run(1);
     expect(v.w.player.lockInput).toBe(false);
@@ -273,7 +299,7 @@ describe('revanche contra o Jacaré Campeão', () => {
     unlock();
     const v = await won();
     v.w.update(1 / 60, v.agir()); v.run(0.5);
-    v.w.update(1 / 60, v.agir()); v.run(6);
+    v.w.update(1 / 60, v.agir()); v.untilBoxing();
     done(v, 'win');
     expect(v.hooks.banners).toContain('CAMPEÃO DA RODA DERROTADO!');
     expect(v.hooks.banners).not.toContain('SKIN DE JACARÉ DESBLOQUEADA!');
@@ -285,7 +311,7 @@ describe('revanche contra o Jacaré Campeão', () => {
     unlock();
     const v = await won();
     v.w.update(1 / 60, v.agir()); v.run(0.5);
-    v.w.update(1 / 60, v.agir()); v.run(6);
+    v.w.update(1 / 60, v.agir()); v.untilBoxing();
     done(v, 'lose');
     expect(v.w.village.talk.lost).toBe(false);
     expect(v.w.encounters.completed.has('jungle:alligator-boxing')).toBe(true);
