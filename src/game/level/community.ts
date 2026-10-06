@@ -22,8 +22,12 @@ export function expandCommunity(b: LevelBuilder) {
   for (const [name, x] of [['Roças', 838], ['Riacho da aldeia', 920], ['Praça da aldeia', 982],
     ['Oficinas', 1070], ['Pomares', 1164], ['Saída da aldeia', 1282]] as const) b.checkpoint(name, x, G);
   for (let i = 0; i < 27; i++) {
-    const x = 766 + i * 17 + (i >= 13 ? 62 : 0);
-    b.deco('villageHome', x, G, 'back', { scale: .85 + i % 4 * .08, flip: i % 3 === 1 });
+    // Pequenos núcleos, quintais e uma praça livre; preserva a ordem das identidades.
+    const clusters = [762, 838, 917, 1064, 1142, 1230];
+    const offsets = [0, 7.5, 14, 23, 30.5];
+    const x = clusters[Math.floor(i / 5)] + offsets[i % 5];
+    b.deco('villageHome', x, G, 'back', { scale: .85 + i % 4 * .08, flip: i % 3 === 1,
+      identityX: b.px(766 + i * 17 + (i >= 13 ? 62 : 0)) });
     b.deco('villagePottery', x + 4, G, 'back', { scale: .65 + i % 3 * .12 });
     b.deco(i % 2 ? 'villageWeaver' : 'villageCarrier', x - 3, G, 'back');
   }
@@ -45,10 +49,10 @@ export function expandCommunity(b: LevelBuilder) {
   for (let x = 1180; x < 1255; x += 16) {
     b.deco('villageOrchard', x, G, 'back'); b.deco('villageFarmer', x - 3, G, 'back');
   }
-  // Optional canopy route, never a wall across the village road.
+  // As rotas opcionais são montadas sobre as casas depois de assentar o relevo.
+  // Conservar a emissão antiga de IDs; roofRoutes reposiciona essas moedas.
   for (let x = 780; x < COMMUNITY_END - 24; x += 72) {
     if (Math.abs(x - DANCE_TILE) < 32) continue;
-    b.plat(x, G - 2, 5, THEME.WOOD); b.plat(x + 7, G - 4, 5, THEME.WOOD);
     b.tokenArc(x - 4, G - 1, x + 11, G - 5, 6);
   }
   for (let x = 758; x < COMMUNITY_END - 5; x += 13) {

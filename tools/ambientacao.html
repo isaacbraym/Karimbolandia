@@ -1,0 +1,11 @@
+<!doctype html><html lang="pt-BR"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Amostra de ambientação</title><div id="app"><canvas id="game"></canvas><div id="ui"></div></div>
+<style>nav{position:fixed;bottom:12px;left:12px;right:12px;z-index:200;display:flex;gap:6px;flex-wrap:wrap}nav button{border:1px solid #8ab373;border-radius:18px;background:#183528e8;color:#f1efd0;padding:8px 14px;font:600 13px sans-serif;cursor:pointer}nav button:hover{background:#3c6240}</style>
+<nav><button id="forest">Floresta: início</button><button id="village">Vilarejo</button><button id="play">Jogar</button><button id="hide">Ocultar botões</button></nav>
+<script type="module">
+import '/src/style.css';import{Game}from'/src/game/game.ts';import{loadJungle}from'/src/art/jungle.ts';import{setProfile}from'/src/core/persistence.ts';import{reloadProgress,settings}from'/src/core/storage.ts';import{newCtl}from'/tests/helpers/bot.ts';
+setProfile('amostra-ambientacao');reloadProgress();settings.quality='high';settings.narrator=false;settings.showFps=false;
+const game=new Game(document.querySelector('#game'),document.querySelector('#ui'));await game.boot('/');await loadJungle('/','high');game.play(true,2);game.pause();game.menus.hideAll();
+const w=game.world;function scene(x=w.data.playerStart.x){game.pause();game.menus.hideAll();w.player.reset(x,w.level.reliefSurface(x)??w.level.groundBelow(x,1000)??1024);w.player.invuln=0;w.camera.zoom=.95;w.camera.snapTo(x+65,w.player.y-25);game.render(0);}
+document.querySelector('#forest').onclick=()=>scene();document.querySelector('#village').onclick=()=>scene(712*32);document.querySelector('#play').onclick=()=>game.resume();document.querySelector('#hide').onclick=()=>document.querySelector('nav').hidden=true;
+window.qa={game,w,scene,render:()=>game.render(0),newCtl};scene();window.ready=true;
+</script></html>

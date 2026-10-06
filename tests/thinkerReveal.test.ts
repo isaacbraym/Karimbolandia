@@ -125,7 +125,9 @@ describe('12 pérolas do lago e cardume fiel', () => {
     expect(pearls.length).toBe(12);
     expect(w.pearlTotal()).toBe(12);
     const others = w.data.pickups.filter((p) => p.kind !== 'pearl');
-    expect(Math.min(...pearls.map((p) => p.id))).toBeGreaterThan(Math.max(...others.map((p) => p.id)));
+    // IDs históricos permanecem fixos; moedas de novas rotas são anexadas após eles.
+    expect(pearls.map(p => p.id)).toEqual(Array.from({ length: 12 }, (_, i) => 372 + i));
+    expect(others.filter(p => p.kind !== 'token').every(p => p.id < 372)).toBe(true);
     // os pickups antigos mantêm o índice (IDs): relíquias seguem 0..4 na ordem
     expect(others.filter((p) => p.kind === 'relic').map((p) => p.itemId)).toEqual([0, 1, 2, 3, 4]);
     // flood fill sobre tiles não sólidos, a partir da fenda

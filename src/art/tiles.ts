@@ -2,8 +2,9 @@
 import { bake, makeCanvas, OUT, shadedRR } from './kit';
 import { PAL } from './palette';
 import { Rng, shade, mixColor } from '../core/math';
-import { Level, T, TILE } from '../game/level';
+import { Level, T, TILE, THEME } from '../game/level';
 import { GROUND_DEPTH } from './perspective';
+import { scenicGround } from './forestTrail';
 
 const CELL = 64; // px do atlas por tile (2x)
 const N_MASK = 16;
@@ -87,6 +88,12 @@ export function bakeTiles(): TileArt {
 
   const drawTile = (g: CanvasRenderingContext2D, level: Level, tx: number, ty: number, ox: number, oy: number, k: number, time: number) => {
     const t = level.tiles[ty * level.w + tx];
+    if (t === T.SOLID && level.themeAt(tx, ty) === THEME.EARTH && scenicGround(level, tx, ty)) return;
+    if (t === T.EMPTY && level.get(tx, ty + 1) === T.SOLID && scenicGround(level, tx, ty + 1)) return;
+    if (t === T.ONEWAY || t === T.EMPTY && level.get(tx, ty + 1) === T.ONEWAY) {
+      const top = (ty + (t === T.EMPTY ? 1 : 0)) * TILE;
+      if (level.roofs.some(r => r.y === top && tx * TILE >= r.x && tx * TILE < r.x + r.w)) return;
+    }
     if (t === T.EMPTY) {
       const below = level.get(tx, ty + 1);
       if (below === T.SOLID || below === T.ONEWAY) {

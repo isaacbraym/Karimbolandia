@@ -48,6 +48,7 @@ import { drawVines, drawRoomBack, drawRoomDark, drawDoorPrompt, drawDrums, drawB
 import { ForestLight } from './forestLight';
 import { InteriorStore } from './interiorStore';
 import { drawForestLight } from '../art/forestLight';
+import { ForestTrail, drawVillageRoofs } from '../art/forestTrail';
 
 export interface Stats {
   kills: number;
@@ -114,6 +115,7 @@ export interface Wreck {
 
 export class World {
   readonly forestLight: ForestLight;
+  readonly forestTrail: ForestTrail;
   data: LevelData;
   level: Level;
   fx = new Fx();
@@ -263,6 +265,7 @@ export class World {
   private baseTheme: Uint8Array;
 
   constructor(data: LevelData) {
+    this.forestTrail = new ForestTrail(data.level);
     this.data = data;
     setStageScale(data.stage);
     this.level = data.level;
@@ -1314,10 +1317,12 @@ export class World {
     setDecoFocus(this.player.x, this.player.y);
     if (this.water.zones.length) drawWaterBack(g, this);
     if (this.data.rooms?.length) drawRoomBack(g, this);
+    this.forestTrail.draw(g, cam.x, cam.y, cam.w, cam.h);
     this.director.drawDecos(g, 'back');
     drawClub(g, this, 'floor');
     // tiles
     art.tiles.render(g, L, cam.x, cam.y, cam.w, cam.h, this.time);
+    drawVillageRoofs(g, L, cam.x, cam.w);
     this.drawWet(g);
     this.drawPits(g);
     this.wildlife.drawTrees(g, this);
@@ -1374,6 +1379,7 @@ export class World {
     for (const e of this.enemies) if (cam.visible(e.x, e.y, 80)) e.drawStatus(g);
     drawClub(g, this, 'back');
     this.player.draw(g, this);
+    this.forestTrail.draw(g, cam.x, cam.y, cam.w, cam.h, true);
     drawClub(g, this, 'front');
     for (const gr of this.grenades) gr.draw(g);
     for (const b of this.bullets) if (cam.visible(b.x, b.y, b.interceptable ? 24 : 60)) b.draw(g);

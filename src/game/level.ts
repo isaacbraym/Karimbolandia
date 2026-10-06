@@ -12,6 +12,9 @@ export const THEME = { STREET: 0, STEEL: 1, RUINS: 2, HANGAR: 3, EARTH: 4, WOOD:
 /** temas da selva (fase 2): chão de terra, madeira, pedra do templo e lama do pântano */
 export const isJungleTheme = (th: number) => th >= 4;
 
+/** A varanda frontal do telhado também é a superfície física de mão única. */
+export interface RoofSurface { x: number; y: number; w: number; depth: number; color: string; awning: boolean }
+
 export class Level {
   readonly w: number;
   readonly h: number;
@@ -20,6 +23,8 @@ export class Level {
   /** Altura das bordas de cada coluna; pequenas colinas contínuas, sem paredes. */
   readonly relief: Float32Array;
   reliefRow = 32;
+  scenicTrail?: { x0: number; x1: number };
+  readonly roofs: RoofSurface[] = [];
 
   constructor(w: number, h: number) {
     this.w = w;
@@ -230,6 +235,8 @@ export interface DecoSpawn {
   scale?: number;
   /** Identidade estável de construções exploráveis; compartilhada com a planta interna. */
   variant?: number;
+  /** Posição histórica usada no ID da casa: reagrupar fachadas não apaga visitas do save. */
+  identityX?: number;
   /** paralaxe de primeiro plano (0 = parado no mundo; 0.3 = passa 30% mais rápido, "perto da câmera") */
   par?: number;
 }

@@ -63,7 +63,8 @@ export class Exploration {
     const homes=data.stage===2?data.decos.filter(d=>d.kind==='villageHome').sort((a,b)=>a.x-b.x):[];
     for(const [i,home] of homes.entries()) {
       const x=villageHomeDoorX(home);
-      this.spots.push({id:`house:${Math.round(x/32)}`,x,y:data.level.reliefSurface(x)??home.y,cabin:true,home:true,interior:i === 0 ? 'benedita' : `home:${i}`,
+      const identityX = villageHomeDoorX({ ...home, x: home.identityX ?? home.x });
+      this.spots.push({id:`house:${Math.round(identityX/32)}`,x,y:data.level.reliefSurface(x)??home.y,cabin:true,home:true,interior:i === 0 ? 'benedita' : `home:${i}`,
         title:`Casa de ${HOME_NAMES[i]}`,subtitle:i === 0 ? 'A porta está encostada. Alguém tece lá dentro... ou saiu para a roça.' : `${HOME_TRADES[i % 6]} · ${buildingStyle(i).floors === 2 ? 'Sala e andar superior' : 'Casa térrea'} · Entre e conheça.`,objects:[]});
     }
     if(data.stage===2) for(const [i,x] of [774,936,1024].entries()) {

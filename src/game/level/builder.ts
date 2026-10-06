@@ -145,7 +145,7 @@ export class LevelBuilder {
   checkpoint(name: string, x: number, row: number) {
     this.checkpoints.push({ id: this.checkpoints.length, x: this.px(x), y: this.py(row), name });
   }
-  deco(kind: string, x: number, row: number, layer: 'back' | 'front' = 'back', o: { flip?: boolean; scale?: number; par?: number } = {}) {
+  deco(kind: string, x: number, row: number, layer: 'back' | 'front' = 'back', o: { flip?: boolean; scale?: number; par?: number; identityX?: number } = {}) {
     this.decos.push({ kind, x: this.px(x), y: this.py(row), layer, ...o });
   }
   trigger(id: string, x0: number, y0: number, w: number, h: number, once = true) {

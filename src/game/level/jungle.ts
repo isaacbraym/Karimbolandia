@@ -8,6 +8,8 @@ import { G, LEVEL_H, LevelBuilder } from './builder';
 import { addPatrolStories } from './story';
 import { expandCommunity, COMMUNITY_EXTRA, DANCE_TILE } from './community';
 import { buildAtlantis, JUNGLE_H, LAKE_X0, LAKE_X1, LAKE_TOP, LAKE_FLOOR } from './atlantis';
+import { RUN } from '../movement';
+import { addVillageRoofs } from './roofRoutes';
 
 /** a masmorra do templo ocupa as primeiras SHIFT colunas do mapa; a selva vem depois */
 export const SHIFT = 150;
@@ -102,15 +104,15 @@ function expandJungle(b: LevelBuilder) {
   b.section('Comunidade da trilha', 692, G);
   b.checkpoint('Trilha da comunidade', 692, G);
   b.atmos(692, 0.08, 0.12);
-  for (const [i,x] of [702,719,739].entries()) {
-    b.deco('villageHome',x,G,'back',{scale:1+i*0.05,flip:i===1});
+  for (const [i,x] of [702,710,721].entries()) {
+    b.deco('villageHome',x,G,'back',{scale:1+i*0.05,flip:i===1,identityX:b.px([702,719,739][i])});
     b.deco('villageGarden',x-5,G,'back');
     b.deco('villagePottery',x+4,G,'back',{scale:0.9});
     b.deco('villageResident',x-2,G,'back');
     b.deco('villageResident',x+5,G,'back');
   }
-  // A trilha pública contorna as casas. A copa guarda uma rota opcional de moedas.
-  for (const [x,y,w] of [[696,G-2,5],[703,G-4,4],[710,G-6,8],[722,G-6,8],[735,G-4,4]] as [number,number,number][]) b.plat(x,y,w,THEME.WOOD);
+  // A trilha pública contorna as casas; a rota alta nasce das fachadas reais.
+  // Reserva histórica de IDs de moedas, reposicionada nos telhados ao final.
   b.tokens(710,G-7,7); b.tokens(722,G-7,7);
   b.tokenArc(693,G-1,704,G-5,7);
   dressJungle(b,686,752,{seed:12,dense:0.65});
@@ -631,12 +633,15 @@ export function buildJungle(): LevelData {
 
   b.atmosphere.sort((a, c) => a.x - c.x);
   rollingGround(b);
+  b.level.scenicTrail = { x0: SHIFT * TILE, x1: b.playerStart.x + RUN * 30 };
   for (const kind of ['villageHome', 'jHut']) {
     b.decos.filter(d => d.kind === kind).sort((a, z) => a.x - z.x).forEach((d, i) => { d.variant = i; });
   }
+  // Acrescenta moedas depois de todos os itens antigos, conservando seus IDs de save.
   addPatrolStories(b);
   // Atlântida por último: só acrescenta (IDs antigos de inimigos e itens continuam os mesmos)
   buildAtlantis(b);
+  addVillageRoofs(b);
   const data = b.build('none');
   data.voidRow = LEVEL_H;
   return data;
