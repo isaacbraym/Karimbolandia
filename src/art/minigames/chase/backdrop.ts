@@ -4,6 +4,9 @@
  * imagens com paralaxe: nenhum gradiente, canvas ou fonte é criado durante o jogo.
  */
 import { makeCanvas } from '../../kit';
+import { Rng } from '../../../core/math';
+import { livingTree, sprig } from './trees';
+import type { LeafPalette } from '../../foliage';
 
 const LAYER_W = 1280;
 
@@ -49,10 +52,24 @@ function crowns(g: CanvasRenderingContext2D, w: number, y0: number, h: number, b
 /** Camadas mais altas que a tela (1,5×) e com a base preenchida: a câmera sobe e desce sem mostrar o céu por baixo. */
 function layer(H: number, fill: string, build: (g: CanvasRenderingContext2D) => void): HTMLCanvasElement {
   const c = makeCanvas(LAYER_W, Math.round(H * 1.5)), g = c.getContext('2d')!;
+  const haze = g.createLinearGradient(0, H * .45, 0, H * 1.15);
+  haze.addColorStop(0, 'rgba(0,0,0,0)'); haze.addColorStop(1, fill);
+  g.fillStyle = haze; g.fillRect(0, 0, LAYER_W, H * 1.5);
   build(g);
-  g.fillStyle = fill;
-  g.fillRect(0, H * 0.86, LAYER_W, H * 0.7);
   return c;
+}
+
+function forest(g: CanvasRenderingContext2D, H: number, seed: number, n: number, pal: LeafPalette, scale: number) {
+  const r = new Rng(seed);
+  for (let i = 0; i < n; i++) {
+    const x = i * LAYER_W / n + r.range(-35, 35), base = H * r.range(1.1, 1.5);
+    const h = H * r.range(.85, 1.6) * scale, w = r.range(20, 38) * scale;
+    const kind = i % 4;
+    for (const offset of [-LAYER_W, 0, LAYER_W]) {
+      if (x + offset < -h * .35 || x + offset > LAYER_W + h * .35) continue;
+      livingTree(g, new Rng(seed + i), x + offset, base, h, w, kind, pal);
+    }
+  }
 }
 
 export function bakeBackdrop(W: number, H: number): ChaseBackdrop {
@@ -67,29 +84,24 @@ export function bakeBackdrop(W: number, H: number): ChaseBackdrop {
   sun.addColorStop(0, 'rgba(255,248,200,.95)'); sun.addColorStop(0.25, 'rgba(255,230,150,.45)'); sun.addColorStop(1, 'rgba(255,230,150,0)');
   sg.fillStyle = sun; sg.fillRect(0, 0, W, H);
   const far = layer(H, '#6fae8a', (g) => {
+    forest(g, H, 114, 13, { dark: '#558f7d', mids: ['#6ca993', '#83b49a', '#77aa98'], light: '#bdd4ab' }, .8);
     crowns(g, LAYER_W, H * 0.34, H * 0.7, '#5b9c7e', '#86c29a', 11, 90, 70);
-    g.fillStyle = 'rgba(255,240,190,.28)'; g.fillRect(0, H * 0.5, LAYER_W, H);
+    const mist = g.createLinearGradient(0, 0, 0, H * 1.4);
+    mist.addColorStop(0, 'rgba(255,240,190,0)'); mist.addColorStop(1, 'rgba(255,240,190,.45)');
+    g.fillStyle = mist; g.fillRect(0, 0, LAYER_W, H * 1.5);
   });
   const mid = layer(H, '#2c6044', (g) => {
-    const r = rng(23);
-    // troncos finos subindo da neblina
-    for (let i = 0; i < 9; i++) {
-      const x = (i / 9) * LAYER_W + r() * 40, w = 16 + r() * 18;
-      g.strokeStyle = '#3d5a3e'; g.lineWidth = w; g.beginPath(); g.moveTo(x, H * 1.5);
-      g.bezierCurveTo(x + w * 1.6, H * .85, x - w, H * .5, x + w * .5, -H * .1); g.stroke();
-      g.strokeStyle = 'rgba(201,219,134,.2)'; g.lineWidth = w * .18; g.stroke();
-      g.strokeStyle = '#3d5a3e'; g.lineWidth = w * .45;
-      g.beginPath(); g.moveTo(x, H * .52); g.quadraticCurveTo(x - 45, H * .39, x - 100, H * .35); g.stroke();
-    }
-    crowns(g, LAYER_W, H * 0.28, H * 0.7, '#2f6b4a', '#58a066', 31, 70, 62);
-    g.fillStyle = 'rgba(30,60,50,.35)'; g.fillRect(0, H * 0.78, LAYER_W, H);
+    forest(g, H, 23, 5, { dark: '#244b3a', mids: ['#396b4a', '#44845c', '#5b9768'], light: '#aad68a' }, 1);
+    crowns(g, LAYER_W, H * .96, H * .3, '#2f6b4a', '#58a066', 31, 85, 60);
   });
   const near = layer(H, '#1c4631', (g) => {
-    crowns(g, LAYER_W, H * 0.62, H * 0.5, '#1f4a35', '#3f8a52', 47, 110, 80);
+    forest(g, H, 47, 3, { dark: '#183c2c', mids: ['#285c3e', '#34754d', '#448252'], light: '#9bc177' }, 1.25);
+    crowns(g, LAYER_W, H * 1.13, H * .3, '#1f4a35', '#3f8a52', 47, 110, 80);
     const r = rng(5);
     for (let i = 0; i < 7; i++) {
       const x = r() * LAYER_W, y = H * (0.45 + r() * 0.3);
       g.strokeStyle = '#1b3b2b'; g.lineWidth = 3; g.beginPath(); g.moveTo(x, 0); g.quadraticCurveTo(x + 14, y * 0.5, x - 6, y); g.stroke();
+      sprig(g, new Rng(i + 40), x - 6, y - 12, 45, -1.7);
     }
   });
   const leaves = layer(Math.max(80, H * 0.28), 'rgba(0,0,0,0)', (g) => {

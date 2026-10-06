@@ -3,26 +3,18 @@ import { makeCanvas } from '../../kit';
 import { Rng } from '../../../core/math';
 import { TILE } from '../../../game/level';
 import type { Course } from '../../../game/minigames/chase/sim/course';
+import { foliage, JUNGLE_LEAVES } from '../../foliage';
+import { livingTree, sprig } from './trees';
 
 interface BranchArt { x: number; y: number; w: number; c: HTMLCanvasElement; row: number }
 export class BranchCanopy {
   private readonly pieces: BranchArt[] = [];
-  private readonly trunk = makeCanvas(240, 620);
+  private readonly trunks = [0, 1, 2].map(() => makeCanvas(460, 1120));
   constructor(course: Course) {
-    const tree = this.trunk.getContext('2d')!;
-    const bark = tree.createLinearGradient(40, 0, 210, 0);
-    bark.addColorStop(0, '#183e34'); bark.addColorStop(.4, '#57734a'); bark.addColorStop(1, '#273e2c');
-    tree.fillStyle = bark; tree.beginPath(); tree.moveTo(110, 0);
-    tree.bezierCurveTo(85, 140, 155, 250, 120, 440); tree.lineTo(45, 620); tree.lineTo(225, 620);
-    tree.bezierCurveTo(155, 450, 198, 250, 144, 0); tree.closePath(); tree.fill();
-    tree.strokeStyle = 'rgba(145,165,86,.3)'; tree.lineWidth = 4;
-    for (let i = 0; i < 7; i++) {
-      tree.beginPath(); tree.moveTo(115 + i * 4, 15);
-      tree.bezierCurveTo(100 + i * 8, 200, 178 + i * 5, 360, 75 + i * 16, 600); tree.stroke();
-    }
+    this.trunks.forEach((c, i) => livingTree(c.getContext('2d')!, new Rng(91 + i), 230, 1120, 970, 53 + i * 7, i));
     for (const [a, b, row] of course.branches) {
-      const x = a * TILE, w = (b - a) * TILE, y = row * TILE - 70;
-      const c = makeCanvas(w, 180), g = c.getContext('2d')!, rng = new Rng(a * 787 + row);
+      const x = a * TILE, w = (b - a) * TILE, y = row * TILE - 120;
+      const c = makeCanvas(w, 260), g = c.getContext('2d')!, rng = new Rng(a * 787 + row);
       g.translate(-x, -y);
       const wood = g.createLinearGradient(0, row * TILE - 25, 0, row * TILE + 75);
       wood.addColorStop(0, '#9b8e51'); wood.addColorStop(.3, '#70623d'); wood.addColorStop(1, '#302d25');
@@ -43,6 +35,16 @@ export class BranchCanopy {
         g.beginPath(); g.moveTo(xx, yy); g.quadraticCurveTo(xx + 18, yy + 45, xx + 48, yy + 58); g.stroke();
         g.lineWidth = 2; g.beginPath(); g.moveTo(xx + 31, yy + 48); g.quadraticCurveTo(xx + 15, yy + 52, xx + 11, yy + 70); g.stroke(); g.lineWidth = 6;
         g.fillStyle = '#426b3f'; g.beginPath(); g.ellipse(xx + 45, yy + 55, 12, 4, -.7, 0, Math.PI * 2); g.fill();
+      }
+      // Ramagens alternam acima e abaixo da trilha; a madeira caminhável continua visível.
+      for (let xx = x + 80, i = 0; xx < x + w - 65; xx += 170, i++) {
+        const yy = course.pathY(xx) + 14, side = i % 2 ? 1 : -1;
+        g.strokeStyle = '#5a5937'; g.lineWidth = 5; g.beginPath(); g.moveTo(xx, yy);
+        g.quadraticCurveTo(xx + 28, yy + side * 35, xx + 55, yy + side * 48); g.stroke();
+        g.lineWidth = 2; g.beginPath(); g.moveTo(xx + 30, yy + side * 30);
+        g.quadraticCurveTo(xx + 9, yy + side * 44, xx + 12, yy + side * 65); g.stroke();
+        foliage(g, rng, xx + 56, yy + side * 48, rng.range(22, 31), JUNGLE_LEAVES, 5);
+        sprig(g, rng, xx + 12, yy + side * 65, 34, side * .6);
       }
       // Nervuras de madeira seguem a curvatura, sem emendas quadradas entre tiles.
       for (let k = 0; k < 4; k++) {
@@ -69,14 +71,15 @@ export class BranchCanopy {
     }
   }
   draw(g: CanvasRenderingContext2D, course: Course, left: number, width: number) {
-    for (const p of this.pieces) {
+    for (let i = 0; i < this.pieces.length; i++) {
+      const p = this.pieces[i];
       if (p.x > left + width + 130 || p.x + p.w < left - 130) continue;
-      // Tronco enraizado sob o galho; a câmera vê a floresta continuar abaixo da corrida.
+      // Árvores continuam acima E abaixo dos galhos, com forquilhas e copas vivas.
       const rootX = p.x + p.w * .55;
-      g.drawImage(this.trunk, rootX - 120, course.pathY(rootX) + 12, 240, 620);
+      if (p.w > 300 || i % 3 === 0) g.drawImage(this.trunks[i % 3], rootX - 230, course.pathY(rootX) - 480);
       g.save(); g.beginPath();
       for (let tx = p.x / TILE; tx < (p.x + p.w) / TILE; tx++) {
-        if (course.level.get(tx, p.row) === 2) g.rect(tx * TILE, p.y, TILE, 180);
+        if (course.level.get(tx, p.row) === 2) g.rect(tx * TILE, p.y, TILE, 260);
       }
       g.clip(); g.drawImage(p.c, p.x, p.y); g.restore();
     }
