@@ -196,7 +196,7 @@ class BoxingSession implements MinigameSession {
   }
 
   draw(g: CanvasRenderingContext2D, W: number, H: number) {
-    this.scene.draw(g, this.tut ? this.tut.match : this.match, this.crowd, W, H, g.getTransform().a);
+    this.scene.draw(g, this.tut ? this.tut.match : this.match, this.crowd, W, H, g.getTransform().a, !!this.tut);
   }
 
   resize(W: number, H: number) { this.scene.resize(W, H); }

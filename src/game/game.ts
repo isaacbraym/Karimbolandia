@@ -38,6 +38,7 @@ import { backingSize, resizeBacking, targetRenderHeight } from '../core/renderBu
 import { InteriorFlow } from './interiorFlow';
 import { MinigameFlow } from './minigameFlow';
 import { DANCE_ID } from './level/community';
+import type { AimTutorial } from '../ui/aimTutorial';
 
 type State = 'loading' | 'menu' | 'playing' | 'paused' | 'complete' | 'continue' | 'gameover' | 'comic';
 
@@ -63,6 +64,11 @@ export class Game {
   private mini!: MinigameFlow;
   private flowPrefetchT = 0;
   private pendingWeapons: WeaponId[] = [];
+  private aimTutorial: AimTutorial | null = null;
+  private aimPending = false;
+  private aimOpening = false;
+  private aimGeneration = 0;
+  private aimShown = false;
   canvas: HTMLCanvasElement;
   g: CanvasRenderingContext2D;
   ui: HTMLElement;
@@ -475,6 +481,7 @@ export class Game {
       return;
     }
     this.stage = stage;
+    this.cancelAimTutorial();
     this.saveSession = session;
     this.saveConflictShown = false;
     setArtStage(stage);
@@ -513,6 +520,7 @@ export class Game {
     this.hud.banners = [];
     this.hud.hint = null;
     this.hintsShown.clear();
+    this.aimPending = stage === 1 && !(save && save.checkpointIdx >= 0) && !this.aimShown;
     this.updateRotate();
     audio.setDuck(1);
     this.wasMusic = null;
@@ -593,8 +601,38 @@ export class Game {
     };
   }
 
+  private cancelAimTutorial() {
+    this.aimGeneration++;
+    this.aimTutorial?.dispose(); this.aimTutorial = null;
+    this.aimOpening = false; this.aimPending = false;
+  }
+
+  /** Também permite repetir o treino pela página de validação. */
+  showAimTutorial() {
+    const w = this.world;
+    if (!w || this.aimOpening || this.aimTutorial || this.state !== 'playing') return;
+    this.aimPending = false; this.aimOpening = true;
+    const generation = ++this.aimGeneration;
+    const device = this.isTouch || this.input.touch.active ? 'touch' : this.input.state.device;
+    this.pause(); this.menus.hidePause(); this.input.suppressHeldActions();
+    void import('../ui/aimTutorial').then(({ AimTutorial }) => {
+      if (generation !== this.aimGeneration || this.world !== w || this.state !== 'paused') return;
+      this.aimOpening = false;
+      this.aimTutorial = new AimTutorial(this.ui, device, () => {
+        this.aimShown = true;
+        this.aimTutorial?.dispose(); this.aimTutorial = null;
+        this.input.suppressHeldActions(); this.input.clearEdges(); this.resume();
+      });
+    }).catch(() => {
+      if (generation !== this.aimGeneration || this.world !== w) return;
+      this.aimOpening = false; this.aimPending = true;
+      this.menus.toast('Não foi possível abrir o treino de mira.'); this.menus.showPause();
+    });
+  }
+
   private handleMenuKey(code: string) {
     if (this.state === 'playing') return;
+    if (this.aimOpening || this.aimTutorial) return;
     if (this.investigation) { this.investigation.handleKey(code); return; }
     if (this.menus.handleKey(code)) return;
     if (code === 'Escape' && this.state === 'paused') this.resume();
@@ -620,6 +658,7 @@ export class Game {
 
   resume() {
     if (this.state !== 'paused') return;
+    if (this.aimOpening || this.aimTutorial) return;
     if(this.investigation){this.investigation.destroy();this.investigation=null;this.input.suppressHeldActions();}
     audio.wake();
     this.menus.hidePause();
@@ -638,6 +677,7 @@ export class Game {
 
   restartLevel() {
     if (!this.world) return;
+    this.cancelAimTutorial();
     this.investigation?.destroy();this.investigation=null;
     this.flow.reset(this.world);
     this.mini.reset(this.world);
@@ -660,6 +700,7 @@ export class Game {
   }
 
   toMenu(first = false) {
+    this.cancelAimTutorial();
     this.investigation?.destroy();this.investigation=null;
     this.flow.reset(this.world ?? undefined);
     this.mini.reset(this.world ?? undefined);
@@ -1014,6 +1055,7 @@ export class Game {
     else { this.drsAcc = this.drsN = 0; this.frameTimes.length = 0; this.metrics?.inactive(); }
     this.input.poll();
     const w = this.world;
+    if (this.state === 'paused') this.aimTutorial?.update(dt);
 
     const t0 = performance.now();
     if (this.state === 'playing' && w) {
@@ -1068,6 +1110,7 @@ export class Game {
   }
 
   private step(w: World, dt: number) {
+    if (this.aimPending && !w.director.cine && !w.narrator.busy() && !this.flow.active && !this.mini.active) { this.showAimTutorial(); return; }
     if (this.flow.active) { this.flow.step(w, dt, this.input.state); return; }
     if (this.mini.active) { this.mini.step(w, dt, this.input.state); return; }
     this.flowPrefetchT -= dt;

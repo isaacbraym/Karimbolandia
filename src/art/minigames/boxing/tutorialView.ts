@@ -77,16 +77,18 @@ export class BoxTutorial {
     const r = document.createElement('div');
     r.className = `bt ${coarse ? 'bt-touch' : 'bt-pc'}`;
     r.innerHTML = `
+      <div class="bt-frame" aria-hidden="true"></div>
+      <div class="bt-mode"><strong>TUTORIAL DE BOXE</strong><span>Demonstração e prática · a luta ainda não começou</span></div>
       <div class="bt-mid" aria-hidden="true"><span>◀ MÃO ESQUERDA</span><span>MÃO DIREITA ▶</span></div>
       <div class="bt-trail" aria-hidden="true"></div>
       <div class="bt-ptr" aria-hidden="true">${coarse ? '<i class="bt-dot"></i>' : CURSOR}<i class="bt-rip"></i></div>
       ${coarse ? STICK.replace('bt-stick', 'bt-stick bt-stick-big') : ''}
-      <section class="bt-card" role="dialog" aria-label="Como lutar">
+      <section class="bt-card" role="dialog" aria-label="Tutorial de boxe: como lutar">
         <header><span class="bt-count"></span><span class="bt-dots"></span></header>
         <h3 class="bt-title"></h3>
         <div class="bt-row"><p class="bt-body"></p><div class="bt-pic"></div></div>
         <p class="bt-keys"></p>
-        <footer><button type="button" class="bt-skip">PULAR</button><button type="button" class="bt-back">◀</button><button type="button" class="bt-next"></button></footer>
+        <footer><button type="button" class="bt-skip">IR PARA A LUTA</button><button type="button" class="bt-back">◀</button><button type="button" class="bt-next"></button></footer>
       </section>`;
     parent.appendChild(r);
     this.root = r;
@@ -116,7 +118,7 @@ export class BoxTutorial {
     q('.bt-title').textContent = c.title;
     q('.bt-body').innerHTML = this.coarse ? c.touch : c.pc;
     q('.bt-keys').innerHTML = this.coarse ? c.touchKeys : c.pcKeys;
-    q('.bt-next').textContent = last ? 'OK, LUTAR!' : 'PRÓXIMO ▶';
+    q('.bt-next').textContent = last ? 'TERMINAR TREINO E LUTAR ▶' : 'PRÓXIMO ▶';
     q('.bt-next').classList.toggle('go', last);
     (q('.bt-back') as HTMLButtonElement).disabled = i === 0;
     this.root.dataset.step = this.id;

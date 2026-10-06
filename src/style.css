@@ -1579,6 +1579,10 @@ kbd {
 .bt-card { position: absolute; right: calc(env(safe-area-inset-right, 0px) + 10px); bottom: calc(env(safe-area-inset-bottom, 0px) + 10px); width: min(46cqw, 430px); box-sizing: border-box; pointer-events: auto; padding: 8px 12px 10px; border-radius: 16px; background: linear-gradient(180deg, rgba(52, 30, 104, 0.97), rgba(23, 15, 46, 0.97)); border: 3px solid var(--ink, #170f2e); box-shadow: 0 0 0 2px rgba(255, 226, 122, 0.6), 0 10px 26px rgba(0, 0, 0, 0.5); }
 .bt-touch .bt-card { right: calc(env(safe-area-inset-right, 0px) + 122px * var(--ts, 1)); width: min(42cqw, 380px); }
 .bt-card header { display: flex; justify-content: space-between; align-items: center; font-size: clamp(9px, 2.2cqh, 12px); opacity: 0.85; letter-spacing: 0.05em; }
+.bt-frame { position: absolute; inset: 8px; border: 3px solid #ffe27a; border-radius: 18px; box-shadow: inset 0 0 55px #170f2e88; }
+.bt-mode { position: absolute; top: max(12px, env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); width: max-content; max-width: 88%; padding: 8px 22px; border: 2px solid #ffe27a; border-radius: 0 0 18px 18px; background: #241b45f5; box-shadow: 0 6px 22px #0005; text-align: center; }
+.bt-mode strong { display: block; color: #ffe27a; font-size: clamp(18px, 4cqh, 28px); letter-spacing: .08em; }
+.bt-mode span { display: block; font: 700 clamp(10px, 2.5cqh, 15px)/1.4 system-ui; }
 .bt-dots i { display: inline-block; width: 8px; height: 8px; margin-left: 4px; border-radius: 50%; background: rgba(255, 255, 255, 0.25); }
 .bt-dots i.on { background: #ffe27a; }
 .bt-dots i.done { background: #9fe07a; }
@@ -1628,3 +1632,58 @@ kbd {
 .bt-stick-big i { transform: translate(calc(var(--kx, 0) * 54%), calc(var(--ky, 0) * 54%)); }
 #touch.bt-hl-guard .m-gu { animation: btglow 0.5s ease-in-out infinite alternate; }
 @keyframes btglow { from { box-shadow: 0 0 0 3px rgba(255, 226, 122, 0.4); } to { box-shadow: 0 0 0 8px rgba(255, 226, 122, 0.9), 0 0 18px #ffe27a; } }
+
+/* Treino de mira: janela própria, com o mundo pausado ao fundo. */
+.aim-lesson { position: fixed; inset: 0; z-index: 150; display: grid; place-items: center; padding: max(10px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left)); background: #091021d9; color: #eff8f4; font-family: system-ui, sans-serif; box-sizing: border-box; }
+.aim-card { width: min(960px, 100%); max-height: 100%; overflow: auto; box-sizing: border-box; padding: 24px; border-radius: 24px; border: 3px solid #f7d779; background: linear-gradient(150deg, #283753, #18243a 65%, #253e43); box-shadow: 0 16px 70px #0009; }
+.aim-card header { position: sticky; top: 0; z-index: 2; display: flex; justify-content: space-between; gap: 12px; align-items: center; padding: 5px 0; background: #24324a; }
+.aim-tag { color: #ffe493; font: 22px var(--display); letter-spacing: .055em; }
+.aim-safe { font: 800 11px system-ui; letter-spacing: .12em; padding: 7px 10px; border-radius: 20px; background: #71d4b328; color: #a5f2d0; white-space: nowrap; }
+.aim-card h2 { margin: 14px 0 6px; font: 32px var(--display); }
+.aim-intro { margin: 0 0 16px; color: #c5d4df; font-size: 14px; line-height: 1.45; }
+.aim-tabs { display: flex; gap: 7px; margin-bottom: 18px; }
+.aim-card button { cursor: pointer; font: 700 12px system-ui; border: 1px solid #59738b; background: #142237; color: #d1deea; padding: 10px 13px; border-radius: 11px; }
+.aim-card button:focus-visible, .aim-stick:focus-visible { outline: 3px solid #72eced; outline-offset: 3px; }
+.aim-tabs button[aria-pressed="true"] { background: #ffe493; color: #1a283e; border-color: #ffe493; }
+.aim-content { display: grid; grid-template-columns: 1.4fr 1fr; gap: 22px; align-items: center; }
+.aim-demo { border: 1px solid #5f8293; border-radius: 18px; padding: 12px; background: #101e32; }
+.aim-demo-label { display: block; font: 700 10px system-ui; letter-spacing: .15em; text-align: center; color: #8aa7bb; margin-bottom: 8px; }
+.aim-arena { width: 100%; display: block; touch-action: none; cursor: crosshair; }
+.aim-feedback { display: flex; justify-content: space-between; gap: 10px; margin-top: 8px; font: 700 10px system-ui; color: #ffe493; }
+.aim-count { white-space: nowrap; color: #a5f2d0; }
+.aim-guide h3 { font: 21px var(--display); color: #ffe493; margin: 0 0 8px; }
+.aim-copy { font-size: 14px; line-height: 1.5; min-height: 63px; margin: 0; }
+.aim-controller { display: flex; gap: 55px; align-items: center; justify-content: center; padding: 12px 0 8px; }
+.aim-stick, .aim-move-stick { position: relative; width: 84px; height: 84px; border: 2px solid #76ddd0; border-radius: 50%; background: radial-gradient(#4b8b8930, #13233a); touch-action: none; cursor: grab; }
+.aim-stick i, .aim-move-stick i { position: absolute; width: 34px; height: 34px; left: 25px; top: 25px; border-radius: 50%; background: #b8f0db; border: 2px solid #253952; box-sizing: border-box; }
+.aim-stick b { position: absolute; top: -9px; right: -3px; width: 22px; height: 22px; border-radius: 50%; background: #ffe493; color: #1a283e; text-align: center; line-height: 22px; font-size: 13px; }
+.aim-move-stick { width: 50px; height: 50px; opacity: .42; border-color: #97a4b6; cursor: default; }
+.aim-move-stick i { width: 24px; height: 24px; left: 13px; top: 13px; background: #8293a6; }
+.aim-move-stick small { position: absolute; bottom: -18px; width: 100%; text-align: center; font-size: 9px; }
+.aim-stick-label { display: block; font-size: 11px; text-align: center; color: #abefdc; margin: 3px 0 9px; }
+.aim-card .aim-fire { display: block; margin: 0 auto 8px; background: #ee937c; border-color: #ee937c; color: #222c3e; touch-action: none; }
+.aim-tip { display: block; text-align: center; font-size: 10px; line-height: 1.4; color: #96b0c3; }
+.aim-card footer { display: flex; gap: 15px; align-items: center; justify-content: space-between; padding-top: 20px; margin-top: 15px; border-top: 1px solid #506179; }
+.aim-card footer span { font-size: 12px; color: #a5bacc; }
+.aim-card .aim-done { background: #ffe493; color: #18243a; border-color: #ffe493; font-size: 14px; padding: 13px 18px; white-space: nowrap; }
+@media (max-height: 500px) and (min-width: 600px) {
+  .aim-card { padding: 12px 18px; border-radius: 16px; }
+  .aim-tag { font-size: 16px; } .aim-card h2 { display: none; }
+  .aim-intro { display: none; } .aim-tabs { margin: 7px 0; }
+  .aim-card button { padding: 7px 11px; font-size: 11px; }
+  .aim-content { grid-template-columns: 1.4fr 1fr; gap: 16px; }
+  .aim-demo { padding: 8px; } .aim-arena { max-height: 140px; }
+  .aim-guide h3 { font-size: 17px; margin-bottom: 3px; } .aim-copy { font-size: 11px; min-height: 0; }
+  .aim-controller { padding: 7px 0 4px; } .aim-stick { width: 56px; height: 56px; } .aim-stick i { left: 11px; top: 11px; }
+  .aim-tip { display: none; } .aim-card footer { padding-top: 8px; margin-top: 7px; }
+  .aim-card .aim-done { padding: 9px 14px; font-size: 12px; }
+}
+@media (max-width: 599px) {
+  .aim-card { padding: 16px; border-radius: 17px; }
+  .aim-card header { align-items: start; } .aim-tag { font-size: 16px; } .aim-safe { font-size: 8px; padding: 5px; }
+  .aim-card h2 { font-size: 25px; } .aim-intro { font-size: 12px; }
+  .aim-content { grid-template-columns: 1fr; gap: 16px; } .aim-arena { max-height: 175px; }
+  .aim-tabs button { flex: 1; padding: 9px 6px; font-size: 10px; } .aim-tabs { gap: 4px; }
+  .aim-guide h3 { font-size: 20px; } .aim-copy { font-size: 12px; min-height: 0; }
+  .aim-card footer { flex-direction: column; align-items: stretch; } .aim-card .aim-done { font-size: 12px; white-space: normal; }
+}

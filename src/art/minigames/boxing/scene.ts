@@ -137,7 +137,7 @@ export class BoxingScene {
     this.fx.update(dt, freeze);
   }
 
-  draw(g: CanvasRenderingContext2D, m: BoxingMatch, crowd: Crowd, W: number, H: number, k: number) {
+  draw(g: CanvasRenderingContext2D, m: BoxingMatch, crowd: Crowd, W: number, H: number, k: number, training = false) {
     if (W !== this.W || H !== this.H) this.resize(W, H);
     const art = getArt();
     const L = this.L, u = L.u, t = this.time;
@@ -179,7 +179,7 @@ export class BoxingScene {
     if (!ko && !(cin === 'orelhada' && m.cineT >= 1.6)) drawGatorBoxer(g, gx, gy, gs, gp, k, true, this.dt);
     this.fx.draw(g);
     g.restore();
-    drawBoxHud(g, m, W, H, t, k, L);
+    if (!training) drawBoxHud(g, m, W, H, t, k, L);
     this.drawCine(g, m, W, H);
     this.fx.drawOverlay(g, W, H);
     if (this.card) drawResultCard(g, W, H, this.card, t);
