@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { runBot, PERFECT, SLOPPY, AWFUL } from './helpers/chaseBot';
 import { ChaseMatch, MIN_CATCH_T, RESCUE_T, FAR_GAP, MONKEY_V } from '../src/game/minigames/chase/sim/match';
-import { CHASE_RUN, PERFECT_BOOST } from '../src/game/minigames/chase/sim/runner';
+import { CHASE_RUN, PERFECT_BOOST, chasePace, Runner } from '../src/game/minigames/chase/sim/runner';
+import { buildCourse } from '../src/game/minigames/chase/sim/course';
 import { RUN } from '../src/game/movement';
 import type { RunInput } from '../src/game/minigames/chase/sim/runner';
 
@@ -15,10 +16,10 @@ describe('perseguição: ritmo dos bots', () => {
     expect(m.result!.time).toBeLessThanOrEqual(56);
     expect(m.falls + m.stumbles).toBe(0);
   });
-  it('jogador comum fica entre 58 e 74 s', () => {
+  it('jogador comum acompanha a aceleração e termina entre 50 e 74 s', () => {
     const m = runBot(SLOPPY);
     expect(m.result?.outcome, `tempo ${m.time.toFixed(1)}`).toBe('win');
-    expect(m.result!.time).toBeGreaterThanOrEqual(58);
+    expect(m.result!.time).toBeGreaterThanOrEqual(50);
     expect(m.result!.time).toBeLessThanOrEqual(74);
   });
   it('jogador péssimo, com qualquer sorte, ainda vence em até 92 s', () => {
@@ -34,6 +35,28 @@ describe('perseguição: ritmo dos bots', () => {
 });
 
 describe('perseguição: regras', () => {
+  it('pés acompanham a curva sem pulo e desaparecimento do galho remove o apoio', () => {
+    const c = buildCourse(), r = new Runner(c.spawn.x, c.spawn.y);
+    const ev = { jump() {}, land() {}, glide() {}, slide() {}, fall() {}, respawn() {} };
+    r.body.onGround = true;
+    let min = Infinity, max = -Infinity;
+    for (let i = 0; i < 100; i++) {
+      r.step(1 / 60, IDLE, c, ev);
+      expect(r.body.onGround).toBe(true);
+      expect(r.feetY).toBeCloseTo(c.surfaceY(r.x)!, 6);
+      min = Math.min(min, r.feetY); max = Math.max(max, r.feetY);
+    }
+    expect(max - min).toBeGreaterThan(25);
+    c.level.set(Math.floor(r.x / 32), 20, 0);
+    r.body.vx = 0; r.step(1 / 60, { ...IDLE, moveX: -1 }, c, ev);
+    expect(r.body.onGround).toBe(false);
+  });
+  it('acelera após o aquecimento sem exceder o teto autorado', () => {
+    expect(chasePace(8)).toBe(1);
+    expect(chasePace(24)).toBeGreaterThan(chasePace(12));
+    expect(chasePace(48)).toBeCloseTo(1.32);
+    expect(chasePace(200)).toBe(chasePace(48));
+  });
   it('o Karimbo corre no máximo 22% acima do jogo base (+15% no pouso perfeito) e nunca perde energia', () => {
     expect(CHASE_RUN).toBeCloseTo(RUN * 1.22, 5);
     const m = new ChaseMatch();
@@ -92,8 +115,8 @@ describe('perseguição: regras', () => {
     const sh = new ChaseMatch().course.shaky[0];
     const walk = (brake: boolean) => {
       const m = new ChaseMatch();
-      m.runner.place((sh.x0 + 1) * 32, sh.row * 32);
-      m.runner.lastSafe = { x: m.runner.x, y: sh.row * 32 };
+      m.runner.place((sh.x0 + 1) * 32, m.course.pathY((sh.x0 + 1) * 32));
+      m.runner.lastSafe = { x: m.runner.x, y: m.runner.feetY };
       for (let i = 0; i < 60 * 4; i++) {
         m.step(1 / 60, { ...IDLE, moveX: brake && m.runner.x > sh.x0 * 32 ? -1 : 0 });
         if (m.falls || m.runner.x > sh.x1 * 32 + 8) break;

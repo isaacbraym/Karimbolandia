@@ -34,9 +34,13 @@ function crowns(g: CanvasRenderingContext2D, w: number, y0: number, h: number, b
       if (o && x + o + rr < 0 || o && x + o - rr > w) continue;
       g.fillStyle = base;
       g.beginPath(); g.ellipse(x + o, y + rr * 0.3, rr, rr * 0.8, 0, 0, Math.PI * 2); g.fill();
-      g.fillStyle = light;
-      g.globalAlpha = 0.5;
-      g.beginPath(); g.ellipse(x + o - rr * 0.2, y, rr * 0.7, rr * 0.45, 0, 0, Math.PI * 2); g.fill();
+      // Silhueta irregular de folhas pequenas, com luz filtrada nas pontas da copa.
+      for (let j = 0; j < 42; j++) {
+        const a = j * 2.4, d = rr * Math.sqrt(r()) * .94;
+        const lx = x + o + Math.cos(a) * d, ly = y + rr * .25 + Math.sin(a) * d * .75;
+        g.fillStyle = j % 3 ? base : light; g.globalAlpha = j % 3 ? .8 : .65;
+        g.beginPath(); g.ellipse(lx, ly, rr * (.13 + r() * .13), rr * .11, a, 0, Math.PI * 2); g.fill();
+      }
       g.globalAlpha = 1;
     }
   }
@@ -71,8 +75,11 @@ export function bakeBackdrop(W: number, H: number): ChaseBackdrop {
     // troncos finos subindo da neblina
     for (let i = 0; i < 9; i++) {
       const x = (i / 9) * LAYER_W + r() * 40, w = 16 + r() * 18;
-      g.fillStyle = '#3d5a3e'; g.fillRect(x, H * 0.3, w, H);
-      g.fillStyle = 'rgba(255,255,255,.12)'; g.fillRect(x + w * 0.15, H * 0.3, w * 0.2, H);
+      g.strokeStyle = '#3d5a3e'; g.lineWidth = w; g.beginPath(); g.moveTo(x, H * 1.5);
+      g.bezierCurveTo(x + w * 1.6, H * .85, x - w, H * .5, x + w * .5, -H * .1); g.stroke();
+      g.strokeStyle = 'rgba(201,219,134,.2)'; g.lineWidth = w * .18; g.stroke();
+      g.strokeStyle = '#3d5a3e'; g.lineWidth = w * .45;
+      g.beginPath(); g.moveTo(x, H * .52); g.quadraticCurveTo(x - 45, H * .39, x - 100, H * .35); g.stroke();
     }
     crowns(g, LAYER_W, H * 0.28, H * 0.7, '#2f6b4a', '#58a066', 31, 70, 62);
     g.fillStyle = 'rgba(30,60,50,.35)'; g.fillRect(0, H * 0.78, LAYER_W, H);

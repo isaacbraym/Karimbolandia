@@ -1,11 +1,11 @@
 /**
  * O Karimbo correndo pela copa (sem arma): usa as MESMAS constantes de movimento do jogo base
- * (`movement.ts`) e o `moveBody` da física, mas corre sozinho para a frente, 22% mais rápido
- * (`CHASE_RUN`). Controles: ←/stick esquerda = frear, ↓ = deslizar (corrida), pulo (altura variável,
+ * (`movement.ts`) com colisão local de superfície curva. Corre sozinho para a frente, começando
+ * 22% mais rápido (`CHASE_RUN`) e acelerando por `chasePace`. Controles: ←/stick esquerda = frear, ↓ = deslizar (corrida), pulo (altura variável,
  * coyote e buffer iguais ao jogo base), segurar o pulo no ar = planar com as orelhas, cipó = agarra ao
  * encostar, balança e solta com o pulo. Simulação pura.
  */
-import { newBody, moveBody, type Body } from '../../../physics';
+import { newBody, type Body } from '../../../physics';
 import {
   AIR_ACC, AIR_DEC, COYOTE, CROUCH_H, FALL_MAX, FOOT_H, FOOT_W, GLIDE_FALL, GLIDE_FUEL, GLIDE_SPEED, GRAV, JUMP_BUF, JUMP_V,
   RUN, RUN_ACC, RUN_DEC,
@@ -15,6 +15,8 @@ import type { Course, VineDef } from './course';
 
 /** o Karimbo na perseguição é 22% mais rápido que no jogo base */
 export const CHASE_RUN = RUN * 1.22;
+/** Aquecimento de 8 s, depois acelera gradualmente até +32% aos 48 s. */
+export const chasePace = (t: number) => 1 + Math.min(1, Math.max(0, (t - 8) / 40)) * .32;
 export const SLIDE_TIME = 0.45;
 export const BRAKE = 0.35;
 export const PERFECT_BOOST = 1.15;
@@ -55,6 +57,7 @@ export class Runner {
   wasGround = false;
   /** de onde veio a última aterrissagem boa (tile) — para o pouso perfeito */
   airStartX = 0;
+  elapsed = 0;
 
   constructor(x: number, feetY: number) { this.place(x, feetY); }
 
@@ -80,25 +83,28 @@ export class Runner {
   }
 
   /** Reaparece no último ponto seguro (um pouco para trás, com folga de invulnerabilidade). */
-  respawn() {
-    this.place(this.lastSafe.x - 64, this.lastSafe.y);
+  respawn(course: Course) {
+    const x = this.lastSafe.x - 64;
+    const surface = course.surfaceY(x);
+    this.place(surface === null ? this.lastSafe.x : x, surface ?? this.lastSafe.y);
     this.invuln = 1.2;
   }
 
   private maxSpeed() {
-    return CHASE_RUN * (this.boostT > 0 ? PERFECT_BOOST : 1) * (this.agitatedT > 0 ? 0.72 : 1);
+    return CHASE_RUN * chasePace(this.elapsed) * (this.boostT > 0 ? PERFECT_BOOST : 1) * (this.agitatedT > 0 ? 0.72 : 1);
   }
 
   /** Um quadro. Devolve eventos de "chegou/pulou/pousou" para a arte e o som. */
   step(dt: number, inp: RunInput, course: Course, ev: RunnerEvents) {
     const b = this.body;
+    this.elapsed += dt;
     if (this.invuln > 0) this.invuln -= dt;
     if (this.boostT > 0) this.boostT -= dt;
     if (this.agitatedT > 0) this.agitatedT -= dt;
     if (this.vineCd > 0) this.vineCd -= dt;
     if (this.fallT > 0) {
       this.fallT -= dt;
-      if (this.fallT <= 0) { this.respawn(); ev.respawn(); }
+      if (this.fallT <= 0) { this.respawn(course); ev.respawn(); }
       return;
     }
     if (this.vine) { this.stepVine(dt, inp, ev); return; }
@@ -163,7 +169,25 @@ export class Runner {
     }
     // ---- colisão
     const preVy = b.vy;
-    moveBody(b, dt, course.level, null, true);
+    const oldX = b.x, oldFeet = this.feetY, attached = b.onGround;
+    b.x += b.vx * dt;
+    b.y += b.vy * dt;
+    b.onGround = false;
+    const surface = course.surfaceY(b.x);
+    if (surface !== null && attached && course.surfaceY(oldX) !== null && preVy >= 0) {
+      b.y = surface - b.h / 2; b.vy = 0; b.onGround = true;
+    } else if (preVy >= 0) {
+      // Varredura curta acompanha também a subida do galho durante uma aterrissagem.
+      const n = Math.max(1, Math.ceil(Math.abs(b.x - oldX) / 8));
+      const newFeet = this.feetY;
+      for (let i = 1; i <= n; i++) {
+        const u = i / n, sx = oldX + (b.x - oldX) * u, sy = course.surfaceY(sx);
+        if (sy !== null && oldFeet <= sy + 2 && oldFeet + (newFeet - oldFeet) * u >= sy) {
+          if (surface !== null) { b.y = surface - b.h / 2; b.vy = 0; b.onGround = true; }
+          break;
+        }
+      }
+    }
     if (b.onGround) {
       if (!this.wasGround && preVy > 120) { this.landed = 1; ev.land(preVy); }
       if (this.state === 'air' || this.state === 'glide' || this.state === 'run') this.state = this.slideT > 0 ? 'slide' : 'run';

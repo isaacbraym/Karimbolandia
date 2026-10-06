@@ -26,7 +26,7 @@ class ChaseSession implements MinigameSession {
   private skipHold = 0;
 
   constructor(private ctx: MinigameContext) {
-    this.scene = new ChaseScene(ctx.viewW, ctx.viewH);
+    this.scene = new ChaseScene(ctx.viewW, ctx.viewH, this.match.course);
     this.filmScene = new FilmScene(ctx.viewW, ctx.viewH);
     ctx.music('chase');
     ctx.touch('chase');

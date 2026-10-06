@@ -8,7 +8,7 @@
  */
 import type { Course, HazardKind, ThrowDef } from './course';
 import { buildCourse } from './course';
-import { Runner, type RunInput, type RunnerEvents, CHASE_RUN } from './runner';
+import { Runner, type RunInput, type RunnerEvents, CHASE_RUN, chasePace } from './runner';
 
 export const LEAD0 = 520;
 export const FAR_GAP = 1100;
@@ -143,7 +143,7 @@ export class ChaseMatch {
     if (m.leapCd > 0) m.leapCd -= dt;
     // encurralado na clareira: o macaco para e é pego quando o Karimbo chega
     const cornerX = this.course.endX;
-    let v = MONKEY_V;
+    let v = MONKEY_V * chasePace(this.time);
     if (m.mode !== 'slip' && this.time >= RESCUE_T) { m.mode = 'slip'; m.slipT = 0; this.emit('line', { text: 'Ai! Minha casca de banana!' }); }
     // escorregou na própria casca: desliza para trás, de volta ao Karimbo (garante o fim da perseguição)
     if (m.mode === 'slip') { m.slipT += dt; v = -SLIP_V; }
@@ -214,7 +214,7 @@ export class ChaseMatch {
           for (const c of h.coatis!) {
             if (!c.alive) continue;
             if (h.on) c.x -= 96 * dt;
-            const rx = c.x - 14, ry = h.y - 22;
+            const rx = c.x - 14, ry = this.course.pathY(c.x) - 22;
             if (left < rx + 28 && right > rx && bottom > ry && top < ry + 22 && r.stumble()) { this.stumbles++; this.emit('stumble', { kind: 'coati' }); }
           }
           h.px = h.coatis![0].x;
@@ -285,7 +285,7 @@ export class ChaseMatch {
       const n = s.def.x1 - s.def.x0;
       if (!s.tiles) s.tiles = new Array(n).fill(-1);
       // cada tile começa a ceder quando pisado e quebra 0,28 s depois: quem corre sem frear atravessa
-      if (b.onGround && Math.abs(feet - s.def.row * 32) < 3) {
+      if (b.onGround && Math.abs(feet - this.course.pathY(b.x)) < 3) {
         for (let wx = b.x - 10; wx <= b.x + 10; wx += 10) {
           const i = Math.floor(wx / 32) - s.def.x0;
           if (i >= 0 && i < n && s.tiles[i] < 0 && !s.gone![i]) { s.tiles[i] = 0; if (!this.onCd('shake', 0.25)) this.emit('shake', { x: b.x }); }
@@ -308,7 +308,7 @@ export class ChaseMatch {
     if (r.landed) {
       r.landed = 0;
       const feet = r.feetY, x = r.x;
-      for (const p of this.course.perfect) if (x >= p.x - 4 && x <= p.x + p.w && Math.abs(feet - p.y) < 4 && r.boostT <= 0) { r.perfect(); this.emit('perfect', { x }); break; }
+      for (const p of this.course.perfect) if (x >= p.x - 4 && x <= p.x + p.w && Math.abs(feet - this.course.pathY(x)) < 4 && r.boostT <= 0) { r.perfect(); this.emit('perfect', { x }); break; }
     }
   }
 
@@ -317,7 +317,7 @@ export class ChaseMatch {
     const r = this.runner, b = r.body;
     for (const s of this.shaky) if (b.x > s.def.x0 * 32 && b.x < s.def.x1 * 32) return;
     const feet = r.feetY;
-    if (this.course.level.get(Math.floor(b.x / 32), Math.round(feet / 32)) === 2) r.lastSafe = { x: b.x, y: feet };
+    if (this.course.surfaceY(b.x) !== null) { r.lastSafe.x = b.x; r.lastSafe.y = feet; }
   }
 
   /** Média de passos para os testes: velocidade-alvo do Karimbo. */

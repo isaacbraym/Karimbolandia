@@ -1,6 +1,6 @@
 /**
- * Cena da perseguição pela copa: fundo em paralaxe assado, galhos pelo desenhista de tiles do jogo
- * (mesmos blocos em cache), Karimbo com `drawKarimbo` (sem arma), o macaco da fauna com a carta, os
+ * Cena da perseguição pela copa: fundo em paralaxe assado, galhos curvos com casca e musgo em cache,
+ * Karimbo com `drawKarimbo` (sem arma), o macaco da fauna com a carta, os
  * bichos e objetos de `critters.ts`, partículas em pool (`BoxFx`) e o HUD de distância. A simulação
  * mora em game/minigames/chase/sim; aqui só se desenha e se reage aos eventos.
  */
@@ -17,6 +17,8 @@ import { CATCH_GAP, MIN_CATCH_T } from '../../../game/minigames/chase/sim/match'
 import { CHASE_RUN } from '../../../game/minigames/chase/sim/runner';
 import type { Rewind } from '../../../game/minigames/chase/sim/letterFilm';
 import { RewindFx } from './rewindFx';
+import { BranchCanopy } from './branches';
+import { buildCourse, type Course } from '../../../game/minigames/chase/sim/course';
 
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
 const damp = (a: number, b: number, k: number, dt: number) => a + (b - a) * (1 - Math.exp(-k * dt));
@@ -43,8 +45,9 @@ export class ChaseScene {
   private hiveAngry = new Map<object, number>();
   private slothBounce = new Map<object, number>();
   private vhs: RewindFx | null = null;
+  private readonly canopy: BranchCanopy;
 
-  constructor(W: number, H: number) { this.resize(W, H); }
+  constructor(W: number, H: number, course: Course = buildCourse()) { this.canopy = new BranchCanopy(course); this.resize(W, H); }
 
   resize(W: number, H: number) {
     this.W = W; this.H = H;
@@ -128,8 +131,8 @@ export class ChaseScene {
     g.translate(this.fx.sx, this.fx.sy);
     g.scale(s, s);
     g.translate(-Math.round(this.camX * s) / s, -Math.round(this.camY * s) / s);
-    const vw = W / s, vh = H / s;
-    getArt().tiles.render(g, m.course.level, this.camX, this.camY, vw, vh, t);
+    const vw = W / s;
+    this.canopy.draw(g, m.course, this.camX, vw);
     this.drawShaky(g, m);
     this.drawCourse(g, m, vw, t);
     this.drawMonkeyActor(g, m, t);
@@ -152,11 +155,11 @@ export class ChaseScene {
     for (const s of m.shaky) {
       const x0 = s.def.x0 * TILE;
       if (x0 > this.camX + this.W / this.zoom + 64 || s.def.x1 * TILE < this.camX - 64) continue;
-      const y = s.def.row * TILE;
       for (let i = 0; i < s.tiles!.length; i++) {
         const tm = s.tiles![i];
         if (tm < 0 || s.gone![i]) continue;
         const a = Math.min(1, tm / 0.28);
+        const y = m.course.pathY(x0 + (i + .5) * TILE);
         g.fillStyle = `rgba(255,230,170,${0.12 + a * 0.3})`;
         g.fillRect(x0 + i * TILE + Math.sin(this.time * 70 + i) * 1.2, y - 1, TILE, 14);
         g.strokeStyle = 'rgba(30,18,8,.8)'; g.lineWidth = 1.2;
@@ -179,7 +182,7 @@ export class ChaseScene {
       if (h.x < x0 - 400 || h.x > x1 + 700) continue;
       switch (h.kind) {
         case 'sloth': { const bt = this.slothBounce.get(h) ?? 9; drawSloth(g, h.x, h.y, t, bt < 0.4 ? Math.sin((bt / 0.4) * Math.PI) : 0); break; }
-        case 'coati': for (const co of h.coatis!) if (co.alive && co.x > x0 - 40 && co.x < x1 + 40) drawCoati(g, co.x, h.y, t + co.x * 0.01); break;
+        case 'coati': for (const co of h.coatis!) if (co.alive && co.x > x0 - 40 && co.x < x1 + 40) drawCoati(g, co.x, c.pathY(co.x), t + co.x * 0.01); break;
         case 'toucan': if (h.on) drawToucan(g, h.px, h.y - 50 + Math.sin(t * 6 + h.x) * 3, t); break;
         case 'snake': drawSnake(g, h.px, h.y - 150, h.y - 38, t, Math.sin(h.t * 2.4) * 8); break;
         case 'hive': drawHive(g, h.x, h.y - 62, t, h.hit ? 1 : (this.hiveAngry.get(h) ?? 0), h.y - 150); break;

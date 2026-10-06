@@ -37,6 +37,8 @@ export interface Course {
   throws: ThrowDef[];
   /** altura do galho principal em x (a linha do macaco): px do topo do galho */
   pathY: (x: number) => number;
+  /** Superfície física curva; null nos vãos ou em madeira já quebrada. */
+  surfaceY: (x: number) => number | null;
   /** metros de pedaços de galho (decoração): [x0,x1,row] */
   branches: [number, number, number][];
 }
@@ -102,7 +104,7 @@ export function buildCourse(): Course {
       case 'firm': lay(x, s.n, row); x += s.n; break;
       case 'gap': {
         // pular uns 1,3 tile antes da borda: com o pulo longo cai 1-2 tiles depois do outro lado
-        hints.push({ x: px(x) - 44, act: 'hold', dur: 0.55 });
+        hints.push({ x: px(x) - ((s.dRow ?? 0) < 0 ? 18 : 44), act: 'hold', dur: (s.dRow ?? 0) < 0 ? .75 : s.g >= 4 ? .65 : .55 });
         if (s.g >= 5) hints.push({ x: px(x) + 24, act: 'glide', dur: 1 }); // vão largo: planar com as orelhas
         x += s.g; row += s.dRow ?? 0;
         perfect.push({ x: px(x), y: row * TILE, w: 40 });
@@ -165,13 +167,29 @@ export function buildCourse(): Course {
   // clareira final (chão largo onde a briga de desenho animado acontece)
   lay(x, 30, lastRow, THEME.EARTH);
   const endX = px(x + 12);
+  const curve = (wx: number) => -Math.sin(wx / 155) * 20 - Math.sin(wx / 73) * 5;
   const pathY = (wx: number) => {
     const tx = Math.floor(wx / TILE);
-    for (const r of rowAt) if (tx >= r.x0 && tx < r.x1) return r.row * TILE;
-    // no vão: o macaco salta; mantém a altura do galho anterior
-    let best = BASE_ROW * TILE;
-    for (const r of rowAt) if (r.x1 <= tx) best = r.row * TILE;
-    return best;
+    for (const r of rowAt) if (tx >= r.x0 && tx < r.x1) return r.row * TILE + curve(wx);
+    // Nos vãos, interpola a altura entre pontas para o arco do macaco não dar um tranco.
+    let previous = rowAt[0];
+    for (const r of rowAt) {
+      if (r.x1 <= tx) previous = r;
+      else if (r.x0 > tx) {
+        const u = Math.max(0, Math.min(1, (wx - previous.x1 * TILE) / ((r.x0 - previous.x1) * TILE)));
+        return (previous.row + (r.row - previous.row) * u * u * (3 - 2 * u)) * TILE + curve(wx);
+      }
+    }
+    return previous.row * TILE + curve(wx);
   };
-  return { level, length: px(W), endX, floorY: (BASE_ROW + 12) * TILE, spawn, hints, hazards, springs, vines, shaky, perfect, throws, pathY, branches };
+  const surfaceY = (wx: number) => {
+    const tx = Math.floor(wx / TILE);
+    for (const r of rowAt) if (tx >= r.x0 && tx < r.x1) return level.get(tx, r.row) === T.ONEWAY ? r.row * TILE + curve(wx) : null;
+    return null;
+  };
+  spawn.y = pathY(spawn.x);
+  for (const h of hazards) h.y = pathY(h.x);
+  for (const s of springs) s.y = pathY(s.x);
+  for (const p of perfect) p.y = pathY(p.x);
+  return { level, length: px(W), endX, floorY: (BASE_ROW + 12) * TILE, spawn, hints, hazards, springs, vines, shaky, perfect, throws, pathY, surfaceY, branches };
 }
