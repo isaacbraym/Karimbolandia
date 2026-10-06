@@ -1527,16 +1527,21 @@ export class Director {
     const t = this.w.time;
     const decos = this.w.data.decos as DecoSpawn[];
     const smashed = this.w.smash.smashed;
+    const p = this.w.player;
+    const passage = this.w.data.rooms.find(r => r.kind === 'passage' && p.x >= r.x && p.x < r.x + r.w && p.y >= r.y && p.y <= r.y + r.h);
     const left = Math.floor((cam.x - 200) / 512);
     const right = Math.floor((cam.x + cam.w + 200) / 512);
     for (const i of this.nearbyDecos(layer, left, right)) {
       const d = decos[i];
+      if (!passage && (d.kind === 'passageRoom' || d.kind === 'passageExit')) continue;
+      if (passage && (!d.kind.startsWith('passage') || d.kind === 'passageMound'
+        || d.x < passage.x || d.x > passage.x + passage.w || d.y <= passage.y)) continue;
       const bounds = this.decoBounds[i];
       if (bounds[2] < cam.x || bounds[0] > cam.x + cam.w) continue;
       if (smashed.has(i)) continue;
       drawDeco(g, d, t);
     }
-    if (layer === 'front' && this.parDecos.length) {
+    if (!passage && layer === 'front' && this.parDecos.length) {
       // primeiro plano "perto da câmera": desloca-se mais rápido que o mundo (profundidade)
       const cx = cam.x + cam.w / 2;
       const cy = cam.y + cam.h / 2;
@@ -1555,7 +1560,7 @@ export class Director {
         g.restore();
       }
     }
-    if (layer === 'back') {
+    if (!passage && layer === 'back') {
       for (const d of this.w.smash.extra) {
         const bounds = decoExtent(d);
         if (bounds[2] < cam.x || bounds[0] > cam.x + cam.w) continue;

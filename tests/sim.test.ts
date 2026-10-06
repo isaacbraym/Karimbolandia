@@ -230,6 +230,8 @@ describe('Seção 11: desembarque e túnel de engatinhar', () => {
 describe('Agachar desvia de tiros retos', () => {
   const setup = (crouch: boolean) => {
     const w = makeWorld();
+    // O ensaio exige atirador e alvo no mesmo plano, sem uma crista opcional entre eles.
+    w.data.level.mounds.length = 0;
     w.invulnerable = false;
     teleport(w, M(38), 32);
     w.director.arenas.length = 0;

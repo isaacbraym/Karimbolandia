@@ -35,6 +35,7 @@ export function moveBody(b: Body, dt: number, level: Level, solids: readonly Rec
   b.hitCeil = false;
   const wasGround = b.onGround;
   const previousFeet = b.y + b.h / 2;
+  const previousX = b.x;
   b.onGround = false;
   b.onOneWay = false;
   if (b.dropTimer > 0) b.dropTimer -= dt;
@@ -42,8 +43,28 @@ export function moveBody(b: Body, dt: number, level: Level, solids: readonly Rec
     stepX(b, dx / n, level, solids);
     stepY(b, dy / n, level, solids, useOneWay);
   }
+  // Cristas opcionais: acompanha a curva andando, mas permite entrar no vão por baixo.
+  // Só segue quem estava sobre a superfície; nunca teleporta alguém dentro da passagem.
+  let onMound = false;
+  if (level.mounds.length && useOneWay && b.dropTimer <= 0 && b.vy >= 0) {
+    const oldSurface = level.moundSurface(previousX);
+    const surface = level.moundSurface(b.x);
+    const ground = Math.min(level.reliefSurface(b.x) ?? Infinity,
+      level.reliefSurface(b.x - b.w * .4) ?? Infinity, level.reliefSurface(b.x + b.w * .4) ?? Infinity);
+    if (surface !== null && surface <= ground) {
+      const oldFloor = Math.min(level.reliefSurface(previousX) ?? Infinity,
+        level.reliefSurface(previousX - b.w * .4) ?? Infinity, level.reliefSurface(previousX + b.w * .4) ?? Infinity);
+      const previousSupport = Math.min(oldSurface ?? Infinity, oldFloor);
+      const follows = wasGround && oldSurface !== null && Math.abs(previousFeet - previousSupport) < 3;
+      const feet = b.y + b.h / 2;
+      if ((follows || previousFeet <= surface + 1.5) && feet >= surface - (follows ? TILE : 0)) {
+        b.y = surface - b.h / 2 - EPS; b.vy = 0; b.onGround = true; b.onOneWay = true;
+        onMound = true;
+      }
+    }
+  }
   // Segue o relevo baixo andando, sem exigir saltos sobre cada ondulação.
-  if (b.vy >= 0) {
+  if (!onMound && b.vy >= 0) {
     let surface = Infinity;
     for (const x of [b.x - b.w * 0.4, b.x, b.x + b.w * 0.4]) {
       const y = level.reliefSurface(x);

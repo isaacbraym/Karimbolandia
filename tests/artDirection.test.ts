@@ -40,13 +40,14 @@ describe('Amostra artística e telhados caminháveis', () => {
     }
   });
 
-  it('limita a clareira a 30 segundos e exclui água/poços, plataformas e o resto da fase', () => {
+  it('mantém a amostra de 30 segundos e clareiras locais, excluindo água, poços e plataformas', () => {
     const data = buildJungle(), L = data.level;
     expect(L.scenicTrail).toEqual({ x0: SHIFT * TILE, x1: data.playerStart.x + RUN * 30 });
     expect(scenicGround(L, 154, 32)).toBe(true);
     expect(scenicGround(L, 238, 32)).toBe(false); // brejo
     expect(scenicGround(L, 340, 32)).toBe(false); // abismo
-    expect(scenicGround(L, 400, 32)).toBe(false); // fora da amostra
+    expect(scenicGround(L, 400, 32)).toBe(true); // clareira local do templo reformulado
+    expect(scenicGround(L, 450, 32)).toBe(false); // fora da amostra e das clareiras
     expect(scenicGround(L, 154, 28)).toBe(false);
     expect(buildLevel().level.scenicTrail).toBeUndefined();
   });

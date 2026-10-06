@@ -21,7 +21,8 @@ describe('Fase: integridade dos dados', () => {
       const inside = L.solidAtPx(e.x, e.y - 10);
       if (inside && !e.ceiling) bad.push(`${e.type}#${e.id} dentro de sólido em (${tx},${Math.floor(e.y / TILE)})`);
       if (!flying && !e.ceiling && e.type !== 'boss') {
-        let ground = false;
+        const curve = L.moundSurface(e.x);
+        let ground = curve !== null && Math.abs(curve - e.y) < 2;
         for (let k = 0; k <= 3; k++) {
           const t = L.get(tx, Math.floor(e.y / TILE) + k);
           if (t === T.SOLID || t === T.ONEWAY) ground = true;

@@ -9,6 +9,7 @@ import { applyCuts, CUT_TOTAL } from './cut';
 import { addPatrolStories } from './story';
 import { RUN } from '../movement';
 import { dressCitySample } from './cityScenery';
+import { addSecretPassages } from './passages';
 
 /** largura da fase montada (antes dos cortes) */
 const RAW_W = 1352;
@@ -47,5 +48,6 @@ export function buildLevel(): LevelData {
   assignLooks(b.civilians);
   b.level.scenicStreet = { x0: 0, x1: b.playerStart.x + RUN * 30 };
   dressCitySample(b);
+  addSecretPassages(b);
   return b.build('boss');
 }

@@ -74,7 +74,9 @@ describe('Fase 2 (selva): dados', () => {
     for (const e of data.enemies) {
       if (e.type === 'piranha') continue;
       const t = L.get(Math.floor(e.x / TILE), Math.round(e.y / TILE));
-      if (!L.solidAtPx(e.x,e.y+1) && t !== T.SOLID && t !== T.ONEWAY) bad.push(`${e.type} @${Math.floor(e.x / TILE)} sem chão`);
+      const curve = L.moundSurface(e.x);
+      const onCurve = curve !== null && Math.abs(curve - e.y) < 1;
+      if (!onCurve && !L.solidAtPx(e.x,e.y+1) && t !== T.SOLID && t !== T.ONEWAY) bad.push(`${e.type} @${Math.floor(e.x / TILE)} sem chão`);
       if (data.water.some((z) => e.x >= z.x && e.x < z.x + z.w && e.y > z.y)) bad.push(`${e.type} @${Math.floor(e.x / TILE)} na água`);
     }
     expect(bad).toEqual([]);
@@ -232,7 +234,7 @@ describe('Fase 2 (selva): cipós', () => {
 });
 
 describe('Fase 2 (selva): templo', () => {
-  it('↑ na porta do topo da pirâmide leva ao interior; a saída fica ao lado da entrada', () => {
+  it('↑ no portal sob o morro leva ao templo; a saída fica ao lado da entrada', () => {
     const w = jungleWorld();
     const ctl = newCtl();
     w.player.reset(TEMPLE_DOOR_IN[0] * TILE + 16, TEMPLE_DOOR_IN[1] * TILE);

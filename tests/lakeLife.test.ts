@@ -156,8 +156,9 @@ describe('vegetação do lago', () => {
     // contagens medidas antes desta tarefa (T0): a vegetação só acrescenta decos
     expect(data.pickups.filter((p) => p.kind === 'relic').map((p) => p.itemId).sort()).toEqual([0, 1, 2, 3, 4]);
     expect(data.enemies.filter((e) => e.type === 'piranha').length).toBeGreaterThanOrEqual(30);
-    const lastDecos = data.decos.slice(-5).map((d) => d.kind);
-    expect(lastDecos.some((k) => k.startsWith('lk') || k === 'uVentLine')).toBe(true);
+    // O lago vem depois da decoração histórica; novos segredos podem ser anexados depois.
+    const lastLake = data.decos.reduce((last, d, i) => d.kind.startsWith('lk') || d.kind === 'uVentLine' ? i : last, -1);
+    expect(lastLake).toBeGreaterThan(data.decos.findIndex(d => d.kind === 'jTempleBack'));
   });
 
   it('cada cortina de bolhas (uVentLine) cria três fontes de bolhas', async () => {

@@ -91,7 +91,7 @@ export function bakeTiles(): TileArt {
     const t = level.tiles[ty * level.w + tx];
     if (t === T.SOLID && cityGround(level, tx, ty)) return;
     if (t === T.EMPTY && cityGround(level, tx, ty + 1)) return;
-    if (t === T.SOLID && level.themeAt(tx, ty) === THEME.EARTH && scenicGround(level, tx, ty)) return;
+    if (t === T.SOLID && scenicGround(level, tx, ty)) return;
     if (t === T.EMPTY && level.get(tx, ty + 1) === T.SOLID && scenicGround(level, tx, ty + 1)) return;
     if (t === T.ONEWAY || t === T.EMPTY && level.get(tx, ty + 1) === T.ONEWAY) {
       const top = (ty + (t === T.EMPTY ? 1 : 0)) * TILE;

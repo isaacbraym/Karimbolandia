@@ -10,6 +10,7 @@ import { VILLAGE_BOUNDS, paintVillageProp } from './village';
 import { ATLANTIS_BOUNDS, paintAtlantis } from './atlantisDecor';
 import { LAKE_BOUNDS, LAKE_EXTENTS, paintLake } from './lake/lakeFlora';
 import { paintBuilding } from './buildings';
+import { PASSAGE_BOUNDS, paintPassage, paintTempleRuins } from './passages';
 import { drawWindFlag, drawWindSprite, windAt, windFlex, windTip } from './wind';
 
 const rngCache = new Map<string, Rng>();
@@ -67,6 +68,7 @@ const STATIC_BOUNDS: Record<string, [number, number, number, number]> = {
   ...VILLAGE_BOUNDS,
   ...ATLANTIS_BOUNDS,
   ...LAKE_BOUNDS,
+  ...PASSAGE_BOUNDS,
 };
 let decoDensity = 2;
 const baked = new Map<string, HTMLCanvasElement>();
@@ -166,6 +168,8 @@ export function drawDeco(g: CanvasRenderingContext2D, d: DecoSpawn, t: number) {
 }
 
 function paintDeco(g: CanvasRenderingContext2D, kind: string, seed: number, t: number, worldX = 0) {
+  if (kind === 'jTempleBack') { paintTempleRuins(g, seed); return; }
+  if (paintPassage(g, kind, seed)) return;
   const wind = windAt(worldX, t);
   if (kind === 'jHut') { paintBuilding(g, seed, true); return; }
   if (paintAtlantis(g, kind, seed)) return;

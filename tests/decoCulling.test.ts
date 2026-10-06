@@ -17,6 +17,7 @@ describe('Seleção reutilizada do cenário',()=>{
         cam.x=x;cam.viewW=width;cam.zoom=zoom;
         for(const layer of ['back','front'] as const) {
           const expected=data.decos.filter((d,i)=>{
+            if(d.kind==='passageRoom'||d.kind==='passageExit')return false;
             if(d.par||d.layer!==layer||w.smash.smashed.has(i))return false;
             const bounds=decor.decoExtent(d);return bounds[2]>=cam.x&&bounds[0]<=cam.x+cam.w;
           });
@@ -30,6 +31,18 @@ describe('Seleção reutilizada do cenário',()=>{
           if(first>=0)w.smash.smashed.add(first);
         }
       }
+    }
+  });
+
+  it('mostra somente a própria sala no interior e oculta as salas enquanto se está na superfície',()=>{
+    const data=buildJungle(),w=new World(data),draw=vi.spyOn(decor,'drawDeco').mockImplementation(()=>{});
+    const g={save(){},restore(){},translate(){}} as unknown as CanvasRenderingContext2D;
+    for(const r of data.rooms.filter(r=>r.passage)) {
+      w.player.reset(r.x+112,r.y+r.h);w.camera.x=r.x;w.camera.viewW=r.w;w.camera.zoom=1;
+      draw.mockClear();w.director.drawDecos(g,'back');w.director.drawDecos(g,'front');
+      const painted=draw.mock.calls.map(([,d])=>d);
+      expect(painted.some(d=>d.kind==='passageRoom')).toBe(true);
+      expect(painted.every(d=>['passageRoom','passageExit'].includes(d.kind)&&d.x>=r.x&&d.x<=r.x+r.w)).toBe(true);
     }
   });
 

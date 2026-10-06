@@ -15,6 +15,12 @@ export const isJungleTheme = (th: number) => th >= 4;
 /** A varanda frontal do telhado também é a superfície física de mão única. */
 export interface RoofSurface { x: number; y: number; w: number; depth: number; color: string; awning: boolean }
 
+/** Crista de um morro com passagem por baixo: superfície de mão única. */
+export interface MoundSurface { x: number; y: number; forest: boolean }
+export function moundRise(x: number, forest: boolean) {
+  return Math.max(0, Math.sin((x + 550) / 880 * Math.PI)) ** 1.3 * (forest ? 257 : 225);
+}
+
 export class Level {
   readonly w: number;
   readonly h: number;
@@ -24,8 +30,10 @@ export class Level {
   readonly relief: Float32Array;
   reliefRow = 32;
   scenicTrail?: { x0: number; x1: number };
+  readonly scenicGroves: { x0: number; x1: number }[] = [];
   scenicStreet?: { x0: number; x1: number };
   readonly roofs: RoofSurface[] = [];
+  readonly mounds: MoundSurface[] = [];
 
   constructor(w: number, h: number) {
     this.w = w;
@@ -71,6 +79,14 @@ export class Level {
     const a = this.relief[col], b = this.relief[col + 1];
     if (a === 0 && b === 0) return null;
     return this.reliefRow * TILE - (a + (b - a) * (x / TILE - col));
+  }
+
+  moundSurface(x: number): number | null {
+    for (const m of this.mounds) {
+      const local = x - m.x;
+      if (local >= -550 && local <= 175) return m.y - moundRise(local, m.forest);
+    }
+    return null;
   }
   get pxW() {
     return this.w * TILE;
@@ -122,14 +138,19 @@ export class Level {
 
   /** Primeira coordenada Y de chão sólido/one-way abaixo de (x,y). */
   groundBelow(x: number, y: number, maxDist = 2000): number | null {
+    const crest = this.moundSurface(x);
+    const mound = crest !== null && crest >= y && crest <= y + maxDist ? crest : null;
     const tx = Math.floor(x / TILE);
     let ty = Math.floor(y / TILE);
     const end = Math.min(this.h - 1, ty + Math.ceil(maxDist / TILE));
     for (; ty <= end; ty++) {
       const t = this.get(tx, ty);
-      if (t === T.SOLID || t === T.ONEWAY) return ty === this.reliefRow ? this.reliefSurface(x) ?? ty * TILE : ty * TILE;
+      if (t === T.SOLID || t === T.ONEWAY) {
+        const floor = ty === this.reliefRow ? this.reliefSurface(x) ?? ty * TILE : ty * TILE;
+        return mound === null ? floor : Math.min(mound, floor);
+      }
     }
-    return null;
+    return mound;
   }
 }
 
@@ -326,7 +347,9 @@ export interface RoomZone {
   w: number;
   h: number;
   /** estilo do interior: templo (escuro, tochas) ou boate (neon) */
-  kind?: 'temple' | 'club';
+  kind?: 'temple' | 'club' | 'passage';
+  /** Passagens opcionais: identidade de descoberta e apresentação próprias. */
+  passage?: { id: string; title: string; clue: string; style: number };
 }
 
 export interface LevelData {

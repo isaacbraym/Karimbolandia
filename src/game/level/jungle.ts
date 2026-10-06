@@ -3,13 +3,14 @@
  * A expansão conserva IDs de entidades e índices de checkpoints usados por saves anteriores.
  */
 import { Rng } from '../../core/math';
-import { THEME, TILE, type LevelData } from '../level';
+import { THEME, TILE, moundRise, type LevelData } from '../level';
 import { G, LEVEL_H, LevelBuilder } from './builder';
 import { addPatrolStories } from './story';
 import { expandCommunity, COMMUNITY_EXTRA, DANCE_TILE } from './community';
 import { buildAtlantis, JUNGLE_H, LAKE_X0, LAKE_X1, LAKE_TOP, LAKE_FLOOR } from './atlantis';
 import { RUN } from '../movement';
 import { addVillageRoofs } from './roofRoutes';
+import { addSecretPassages } from './passages';
 
 /** a masmorra do templo ocupa as primeiras SHIFT colunas do mapa; a selva vem depois */
 export const SHIFT = 150;
@@ -25,8 +26,8 @@ export const GORGE_ISLAND: [number, number] = [201 + SHIFT, 207 + SHIFT];
 /** Masmorra do templo (isolada no começo do mapa): colunas [TEMPLE_X0, TEMPLE_X1), 3 andares. */
 export const TEMPLE_X0 = 4;
 export const TEMPLE_X1 = 146;
-export const TEMPLE_DOOR_IN: [number, number] = [261 + SHIFT, G - 4];
-export const TEMPLE_DOOR_OUT: [number, number] = [274 + SHIFT, G - 1];
+export const TEMPLE_DOOR_IN: [number, number] = [261 + SHIFT, G];
+export const TEMPLE_DOOR_OUT: [number, number] = [274 + SHIFT, G];
 
 /** Poços do pântano (1 tile de fundo, areia movediça). */
 const SWAMPS: [number, number][] = [
@@ -501,20 +502,15 @@ export function buildJungle(): LevelData {
   b.atmos(390, 0.02, 0.2);
   b.ground(386, 462, G, THEME.TEMPLE);
   b.checkpoint('Templo esquecido', 390, G);
-  // pirâmide em degraus
-  b.block(396, G - 1, 30, 1);
-  b.block(399, G - 2, 24, 1);
-  b.block(402, G - 3, 18, 1);
-  b.block(406, G - 4, 10, 1);
-  b.deco('jTempleBack', 411, G, 'back');
-  b.deco('jDoorway', TEMPLE_DOOR_IN[0], TEMPLE_DOOR_IN[1], 'back', { scale: 1.35 });
-  b.deco('jTorch', 407, G - 4, 'back');
-  b.deco('jTorch', 415, G - 4, 'back');
-  b.enemy('rifle', 414, G - 4, { facing: -1, idle: true });
-  b.tokens(407, G - 5, 3);
-  b.tokens(413, G - 5, 3);
+  // A masmorra se abre por baixo da colina; a crista curva é atravessável.
+  const ridgeRow = (col: number) => G - moundRise((col - TEMPLE_DOOR_IN[0]) * TILE, true) / TILE;
+  b.deco('jTempleBack', 420, G - 2, 'back', { scale: .9 });
+  b.deco('jTorch', 407, ridgeRow(407), 'back');
+  b.deco('jTorch', 415, ridgeRow(415), 'back');
+  b.enemy('rifle', 414, ridgeRow(414), { facing: -1, idle: true });
+  for (const col of [407, 408, 409, 413, 414, 415]) b.token(col, ridgeRow(col) - 1);
   templeInterior(b);
-  b.crate(424, G - 1, 'health');
+  b.crate(424, G, 'health');
   // armadilha de estacas dos bandidos
   b.spikes(432, G - 1, 3, THEME.WOOD);
   b.deco('jSkull', 430, G, 'back');
@@ -648,6 +644,15 @@ export function buildJungle(): LevelData {
   // Atlântida por último: só acrescenta (IDs antigos de inimigos e itens continuam os mesmos)
   buildAtlantis(b);
   addVillageRoofs(b);
+  const templeX = b.px(TEMPLE_DOOR_IN[0]);
+  b.level.mounds.push({ x: templeX, y: G * TILE, forest: true });
+  b.level.scenicGroves.push({ x0: templeX - 640, x1: templeX + 400 });
+  for (let col = TEMPLE_DOOR_IN[0] - 3; col <= TEMPLE_DOOR_IN[0] + 4; col++) b.level.relief[col] = 0;
+  b.decos.push({ kind: 'passageMound', x: templeX, y: G * TILE, layer: 'back', variant: 1 });
+  // A abertura e o vão de retorno permanecem visíveis entre as raízes.
+  b.decos = b.decos.filter(d => d.kind === 'passageMound' || Math.abs(d.x - templeX) > 130
+    || !['jBush', 'jRock', 'jFern', 'jTree'].includes(d.kind));
+  addSecretPassages(b);
   const data = b.build('none');
   data.voidRow = LEVEL_H;
   return data;

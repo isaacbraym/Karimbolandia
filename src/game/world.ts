@@ -549,7 +549,10 @@ export class World {
         p.body.vy = 0;
         p.lastSafe = { x: d.tx, y: d.ty };
         this.cameraSnap();
-        if (d.kind === 'in' && !this.roomShown) {
+        const passage = this.data.rooms.find(r => r.passage && d.tx >= r.x && d.tx < r.x + r.w && d.ty >= r.y && d.ty <= r.y + r.h)?.passage;
+        if (d.kind === 'in' && passage) {
+          this.director.banner(passage.title, passage.clue, 4);
+        } else if (d.kind === 'in' && !this.roomShown) {
           this.roomShown = true;
           this.director.banner(this.data.stage === 1 ? 'BALADA' : 'TEMPLO ESQUECIDO',
             this.data.stage === 1 ? 'Saída sinalizada nos fundos da pista →' : 'Dois caminhos... ache a saída', 2.6);
@@ -1332,7 +1335,7 @@ export class World {
     setDecoFocus(this.player.x, this.player.y);
     if (this.water.zones.length) drawWaterBack(g, this);
     if (this.data.rooms?.length) drawRoomBack(g, this);
-    this.forestTrail.draw(g, cam.x, cam.y, cam.w, cam.h);
+    if (!this.inRoom()) this.forestTrail.draw(g, cam.x, cam.y, cam.w, cam.h);
     if (!this.inRoom()) this.cityStreet.draw(g, cam.x, cam.y, cam.w, cam.h, this.time);
     this.director.drawDecos(g, 'back');
     drawClub(g, this, 'floor');
@@ -1395,7 +1398,7 @@ export class World {
     for (const e of this.enemies) if (cam.visible(e.x, e.y, 80)) e.drawStatus(g);
     drawClub(g, this, 'back');
     this.player.draw(g, this);
-    this.forestTrail.draw(g, cam.x, cam.y, cam.w, cam.h, true, this.time);
+    if (!this.inRoom()) this.forestTrail.draw(g, cam.x, cam.y, cam.w, cam.h, true, this.time);
     if (!this.inRoom()) this.cityStreet.draw(g, cam.x, cam.y, cam.w, cam.h, this.time, true);
     drawClub(g, this, 'front');
     for (const gr of this.grenades) gr.draw(g);

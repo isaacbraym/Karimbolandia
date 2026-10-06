@@ -247,6 +247,13 @@ export function drawRoomBack(g: CanvasRenderingContext2D, w: World) {
       drawClubBack(g, w, x0, y0, x1, y1, r);
       continue;
     }
+    if (r.kind === 'passage') {
+      const p = w.player;
+      if (p.x >= r.x && p.x <= r.x + r.w && p.y >= r.y && p.y <= r.y + r.h) {
+        g.fillStyle = '#152c2d'; g.fillRect(c.x, c.y, c.w, c.h);
+      }
+      continue;
+    }
     // a textura acompanha o mundo (não a câmera): parede parada atrás de tudo
     let ty = r.y + Math.floor((y0 - r.y) / 256) * 256;
     for (; ty < y1; ty += 256) {
@@ -274,6 +281,7 @@ export function drawRoomDark(g: CanvasRenderingContext2D, w: World) {
       drawClubLights(g, w, r);
       continue;
     }
+    if (r.kind === 'passage') continue;
     const x0 = Math.max(r.x, c.x - 8);
     const x1 = Math.min(r.x + r.w, c.x + c.w + 8);
     const y0 = Math.max(r.y, c.y - 8);

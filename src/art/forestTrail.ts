@@ -11,9 +11,12 @@ interface Patch { back: HTMLCanvasElement; plants: Fern[] }
 /** Só o chão seco da amostra. Plataformas, água, poços e o templo conservam sua arte. */
 export function scenicGround(level: Level, tx: number, ty: number) {
   const range = level.scenicTrail;
-  return !!range && tx * TILE >= range.x0 && tx * TILE < range.x1
+  return ((!!range && tx * TILE >= range.x0 && tx * TILE < range.x1)
+    || level.scenicGroves.some(r => tx * TILE >= r.x0 && tx * TILE < r.x1))
     && ty >= level.reliefRow - 1 && level.get(tx, level.reliefRow) === T.SOLID
-    && level.themeAt(tx, level.reliefRow) === THEME.EARTH;
+    && (level.themeAt(tx, level.reliefRow) === THEME.EARTH
+      || (level.themeAt(tx, level.reliefRow) === THEME.TEMPLE
+        && level.scenicGroves.some(r => tx * TILE >= r.x0 && tx * TILE < r.x1)));
 }
 
 /** Perfil global suave: a curva e a largura não reiniciam nas bordas dos patches. */
@@ -34,13 +37,16 @@ export class ForestTrail {
 
   draw(g: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, front = false, time = 0) {
     const L = this.level, range = L.scenicTrail;
-    if (!range || y + h < L.reliefRow * TILE - TOP || y > L.reliefRow * TILE + HEIGHT - TOP) return;
+    if ((!range && !L.scenicGroves.length) || y + h < L.reliefRow * TILE - TOP || y > L.reliefRow * TILE + HEIGHT - TOP) return;
     if (this.revision !== L.rev) { this.patches.clear(); this.revision = L.rev; }
-    const a = Math.max(Math.floor(range.x0 / SPAN), Math.floor(x / SPAN));
-    const b = Math.min(Math.floor((range.x1 - 1) / SPAN), Math.floor((x + w) / SPAN));
+    const a = Math.max(0, Math.floor(x / SPAN));
+    const b = Math.min(Math.ceil(L.pxW / SPAN) - 1, Math.floor((x + w) / SPAN));
     // No máximo dois preparos por quadro; os passes reutilizam as mesmas imagens.
     let made = 0;
     for (let i = a; i <= b; i++) {
+      const start = i * SPAN, end = start + SPAN;
+      if (!(range && range.x0 < end && range.x1 > start)
+        && !L.scenicGroves.some(r => r.x0 < end && r.x1 > start)) continue;
       let patch = this.patches.get(i);
       if (!patch && !front && made < 2) { patch = this.paint(i); this.patches.set(i, patch); made++; }
       if (patch && !front) g.drawImage(patch.back, i * SPAN, L.reliefRow * TILE - TOP, SPAN, HEIGHT);

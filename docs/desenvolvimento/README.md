@@ -1,5 +1,7 @@
 # Guia de desenvolvimento e lições reutilizáveis
 
+O [caso dos morros e passagens secretas](MORROS_E_PASSAGENS_SECRETAS_2026-10-06.md) explica a rota curva sobre a entrada inferior, seleção de áreas seguras, suporte físico, interiores opcionais e preparação da arte em cache.
+
 O [caso dos tutoriais de mira e boxe](TUTORIAIS_MIRA_E_BOXE_2026-10-06.md) explica a janela de treino inicial, separação da simulação, cancelamento de imports e identificação permanente do modo tutorial.
 
 Este é o ponto de entrada técnico para quem mantém Karimbolandia ou usa seus arquivos como referência para outro jogo. A intenção é preservar o conhecimento sobre **como desenvolver corretamente**, além do histórico de bugs: reconhecer o risco antes de escrever código, saber por que existe uma decisão e ter uma forma de detectar sua regressão.
