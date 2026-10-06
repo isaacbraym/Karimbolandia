@@ -2,9 +2,11 @@
 import { Level, TILE, T, THEME } from '../game/level';
 import { Rng } from '../core/math';
 import { makeCanvas } from './kit';
+import { windTip } from './wind';
 
 const SPAN = 512, TOP = 180, HEIGHT = 520, DENSITY = 1.5;
-interface Patch { back: HTMLCanvasElement; front: HTMLCanvasElement }
+interface Fern { x: number; y: number; size: number; variant: number }
+interface Patch { back: HTMLCanvasElement; plants: Fern[] }
 
 /** Só o chão seco da amostra. Plataformas, água, poços e o templo conservam sua arte. */
 export function scenicGround(level: Level, tx: number, ty: number) {
@@ -27,9 +29,10 @@ export function trailProfile(level: Level, x: number) {
 export class ForestTrail {
   private readonly patches = new Map<number, Patch>();
   private revision = -1;
+  private readonly fernSprites: HTMLCanvasElement[] = [];
   constructor(private readonly level: Level) {}
 
-  draw(g: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, front = false) {
+  draw(g: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, front = false, time = 0) {
     const L = this.level, range = L.scenicTrail;
     if (!range || y + h < L.reliefRow * TILE - TOP || y > L.reliefRow * TILE + HEIGHT - TOP) return;
     if (this.revision !== L.rev) { this.patches.clear(); this.revision = L.rev; }
@@ -40,7 +43,19 @@ export class ForestTrail {
     for (let i = a; i <= b; i++) {
       let patch = this.patches.get(i);
       if (!patch && !front && made < 2) { patch = this.paint(i); this.patches.set(i, patch); made++; }
-      if (patch) g.drawImage(front ? patch.front : patch.back, i * SPAN, L.reliefRow * TILE - TOP, SPAN, HEIGHT);
+      if (patch && !front) g.drawImage(patch.back, i * SPAN, L.reliefRow * TILE - TOP, SPAN, HEIGHT);
+      else if (patch && front) {
+        // Células vizinhas repetem os mesmos exemplares; recorte mantém continuidade entre patches.
+        g.save(); g.beginPath(); g.rect(i * SPAN, L.reliefRow * TILE - TOP, SPAN, HEIGHT); g.clip();
+        for (const plant of patch.plants) {
+          if (!scenicGround(L, Math.floor(plant.x / TILE), L.reliefRow)) continue;
+          g.save(); g.translate(plant.x, plant.y); g.scale(plant.size, plant.size);
+          // Raiz fixa em y=0; imagem pequena pronta, sem novo bake na animação.
+          g.transform(1, 0, -windTip('jFern', plant.x, time) / 70, 1, 0, 0);
+          g.drawImage(this.fernSprites[plant.variant], -60, -78, 120, 84); g.restore();
+        }
+        g.restore();
+      }
       else if (!front) {
         // Um viewport muito largo nunca fica sem chão enquanto o próximo bake espera.
         g.fillStyle = '#4b693e';
@@ -60,9 +75,13 @@ export class ForestTrail {
 
   private paint(index: number): Patch {
     const L = this.level, worldX = index * SPAN, base = L.reliefRow * TILE;
-    const back = makeCanvas(SPAN * DENSITY, HEIGHT * DENSITY), front = makeCanvas(SPAN * DENSITY, HEIGHT * DENSITY);
-    const g = back.getContext('2d')!, f = front.getContext('2d')!;
-    for (const ctx of [g, f]) { ctx.scale(DENSITY, DENSITY); ctx.translate(-worldX, TOP - base); ctx.lineCap = 'round'; }
+    const back = makeCanvas(SPAN * DENSITY, HEIGHT * DENSITY), plants: Fern[] = [];
+    const g = back.getContext('2d')!;
+    g.scale(DENSITY, DENSITY); g.translate(-worldX, TOP - base); g.lineCap = 'round';
+    if (!this.fernSprites.length) for (let v = 0; v < 4; v++) {
+      const image = makeCanvas(120 * DENSITY, 84 * DENSITY), ctx = image.getContext('2d')!;
+      ctx.scale(DENSITY, DENSITY); this.fern(ctx, 60, 78, 1, new Rng(v * 977 + 13)); this.fernSprites.push(image);
+    }
     // Máscara segue a topologia: nenhuma clareira pinta água ou cobre um abismo.
     const mask = new Path2D();
     for (let col = Math.floor(worldX / TILE); col < Math.ceil((worldX + SPAN) / TILE); col++) {
@@ -78,7 +97,7 @@ export class ForestTrail {
       mask.lineTo(x + TILE + .5, backSurface(x + TILE + .5) - fringe(x + TILE + .5));
       mask.lineTo(x + TILE + .5, base + HEIGHT - TOP); mask.lineTo(x, base + HEIGHT - TOP); mask.closePath();
     }
-    g.clip(mask); f.clip(mask);
+    g.clip(mask);
     const field = g.createLinearGradient(0, base - 120, 0, base + 280);
     field.addColorStop(0, '#526d40'); field.addColorStop(.28, '#61814a');
     field.addColorStop(.55, '#405a32'); field.addColorStop(1, '#142e26');
@@ -138,10 +157,13 @@ export class ForestTrail {
       for (let i = 0; i < 3; i++) {
         const x = cell * 128 + r.range(0, 128), y = this.surface(x) + r.range(80, 245);
         this.bank(g, x, y, r, r.range(.4, 1.1));
-        if (i % 3 === 0) this.fern(f, x, y + 18, r.range(.55, 1.2), r);
+        if (i % 3 === 0) {
+          plants.push({ x, y: y + 18, size: r.range(.55, 1.2), variant: Math.abs(cell) % 4 });
+          for (let stem = 0; stem < 5; stem++) r.range(0, 18);
+        }
       }
     }
-    return { back, front };
+    return { back, plants };
   }
 
   private bank(g: CanvasRenderingContext2D, x: number, y: number, r: Rng, scale: number) {

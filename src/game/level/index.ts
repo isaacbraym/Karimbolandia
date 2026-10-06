@@ -7,6 +7,7 @@ import { addSupplies, easeClimbs, addRollers, addCivilians, addCranes, addForegr
 import { assignLooks } from '../civLook';
 import { applyCuts, CUT_TOTAL } from './cut';
 import { addPatrolStories } from './story';
+import { RUN } from '../movement';
 
 /** largura da fase montada (antes dos cortes) */
 const RAW_W = 1352;
@@ -43,5 +44,6 @@ export function buildLevel(): LevelData {
   b.atmosphere.sort((a, c) => a.x - c.x);
   // cada morador com uma aparência única (sem repetir combinação)
   assignLooks(b.civilians);
+  b.level.scenicStreet = { x0: 0, x1: b.playerStart.x + RUN * 30 };
   return b.build('boss');
 }

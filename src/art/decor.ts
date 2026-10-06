@@ -10,6 +10,7 @@ import { VILLAGE_BOUNDS, paintVillageProp } from './village';
 import { ATLANTIS_BOUNDS, paintAtlantis } from './atlantisDecor';
 import { LAKE_BOUNDS, LAKE_EXTENTS, paintLake } from './lake/lakeFlora';
 import { paintBuilding } from './buildings';
+import { drawWindFlag, drawWindSprite, windAt, windFlex, windTip } from './wind';
 
 const rngCache = new Map<string, Rng>();
 const seedOf = (d: DecoSpawn) => Math.floor(d.x * 7.13 + d.y * 3.1);
@@ -108,8 +109,9 @@ export function decoScale(d: DecoSpawn) {
 /** Bounds in world coordinates, including flips and the spawn's scale. */
 export function decoExtent(d: DecoSpawn): [number, number, number, number] {
   const b = STATIC_BOUNDS[d.kind] ?? LAKE_EXTENTS[d.kind] ?? [-320, -512, 320, 320], s = decoScale(d);
-  return [d.x + (d.flip ? -b[2] : b[0]) * s, d.y + b[1] * s,
-    d.x + (d.flip ? -b[0] : b[2]) * s, d.y + b[3] * s];
+  const margin = windFlex(d.kind) * 1.2 * s;
+  return [d.x + (d.flip ? -b[2] : b[0]) * s - margin, d.y + b[1] * s,
+    d.x + (d.flip ? -b[0] : b[2]) * s + margin, d.y + b[3] * s];
 }
 
 /**
@@ -153,13 +155,18 @@ export function drawDeco(g: CanvasRenderingContext2D, d: DecoSpawn, t: number) {
   g.scale(s, s);
   const ready = b && typeof document !== 'undefined' ? baked.get(kd._bk!) : undefined;
   if (b && (ready || (typeof document !== 'undefined' && bakeBudget-- > 0))) {
-    g.drawImage(ready ?? bakedDeco(kd._bk!, d.kind, seed, s, b), b[0], b[1], b[2] - b[0], b[3] - b[1]);
-  } else paintDeco(g, d.kind, seed, t);
+    const image = ready ?? bakedDeco(kd._bk!, d.kind, seed, s, b);
+    if (d.kind === 'jFlag') drawWindFlag(g, image, windTip(d.kind, d.x, t));
+    else if (windFlex(d.kind)) drawWindSprite(g, image, b[0], b[1], b[2] - b[0], b[3] - b[1],
+      Math.min(-2, b[1] * .22), windTip(d.kind, d.x, t) * (d.flip ? -1 : 1));
+    else g.drawImage(image, b[0], b[1], b[2] - b[0], b[3] - b[1]);
+  } else paintDeco(g, d.kind, seed, t, d.x);
   g.restore();
   void rngCache;
 }
 
-function paintDeco(g: CanvasRenderingContext2D, kind: string, seed: number, t: number) {
+function paintDeco(g: CanvasRenderingContext2D, kind: string, seed: number, t: number, worldX = 0) {
+  const wind = windAt(worldX, t);
   if (kind === 'jHut') { paintBuilding(g, seed, true); return; }
   if (paintAtlantis(g, kind, seed)) return;
   if (paintLake(g, kind, seed, t)) return;
@@ -395,8 +402,8 @@ function paintDeco(g: CanvasRenderingContext2D, kind: string, seed: number, t: n
       g.beginPath();
       g.moveTo(1.5, -94);
       const n = 8;
-      for (let i = 0; i <= n; i++) g.lineTo(1.5 + i * 6.5, -94 + Math.sin(t * 4 + i * 0.7 + seed) * 3 + i * 0.4);
-      for (let i = n; i >= 0; i--) g.lineTo(1.5 + i * 6.5, -62 + Math.sin(t * 4 + i * 0.7 + seed) * 3 + i * 0.4);
+      for (let i = 0; i <= n; i++) g.lineTo(1.5 + i * 6.5, -94 + Math.sin(t * 4 - i * .7 + seed) * (2 + wind * 3) * i / n + i * .4);
+      for (let i = n; i >= 0; i--) g.lineTo(1.5 + i * 6.5, -62 + Math.sin(t * 4 - i * .7 + seed) * (2 + wind * 3) * i / n + i * .4);
       g.closePath();
       g.fillStyle = '#b13a8c';
       g.fill();
@@ -422,7 +429,7 @@ function paintDeco(g: CanvasRenderingContext2D, kind: string, seed: number, t: n
         const ph = ((t * 0.9 + i * 0.2 + seed * 0.07) % 1);
         g.globalAlpha = (1 - ph) * 0.5;
         const r = 5 + ph * 15;
-        g.drawImage(puff.c, -r + Math.sin(ph * 6 + i) * 4, -14 - ph * 46 - r, r * 2, r * 2);
+        g.drawImage(puff.c, -r + Math.sin(ph * 6 + i) * 4 + wind * ph * 24, -14 - ph * 46 - r, r * 2, r * 2);
       }
       g.globalAlpha = 1;
       break;
@@ -478,7 +485,7 @@ function paintDeco(g: CanvasRenderingContext2D, kind: string, seed: number, t: n
         const ph = (t * 3 + i * 0.25 + seed) % 1;
         g.globalAlpha = 1 - ph;
         const r = 9 - ph * 5;
-        g.drawImage(spr.c, -r + Math.sin(t * 9 + i) * 3, -26 - ph * 26 - r, r * 2, r * 2.4);
+        g.drawImage(spr.c, -r + Math.sin(t * 9 + i) * 3 + wind * ph * 9, -26 - ph * 26 - r, r * 2, r * 2.4);
       }
       g.globalAlpha = 0.35;
       g.drawImage(spr.c, -34, -60, 68, 68);
@@ -489,7 +496,7 @@ function paintDeco(g: CanvasRenderingContext2D, kind: string, seed: number, t: n
     case 'plant': {
       const r = new Rng(seed);
       for (let i = 0; i < 7; i++) {
-        const a = -Math.PI / 2 + (i - 3) * 0.32 + Math.sin(t * 1.4 + i + seed) * 0.05;
+        const a = -Math.PI / 2 + (i - 3) * .32 + wind * .12 + Math.sin(t * 1.4 + i + seed) * .05;
         const L = r.range(20, 44);
         g.strokeStyle = i % 2 ? '#3f8a3f' : '#2f6f38';
         g.lineWidth = 4;

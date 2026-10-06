@@ -27,6 +27,8 @@ O [caso da balada](BALADA_FILMINHO_BAR_E_PISTA_VIVA_2026-10-06.md) registra o fi
 
 A [amostra de ambientação da floresta e telhados](AMOSTRA_AMBIENTACAO_2026-10-06.md) documenta o piso largo integrado ao contato físico, os montes caminháveis e a trilha curva, a máscara que preserva brejos/abismos, o cache por células globais e o agrupamento de casas com IDs históricos e rotas de pulo sobre lajes.
 
+A [amostra da cidade atacada e vento ambiental](CIDADE_E_VENTO_2026-10-06.md) documenta a rua integrada, becos e fachadas em planos distintos, proteção de fossos/interiores e a animação de vegetação e tecidos com imagens cacheadas e bases firmes.
+
 | Camada | Função |
 |---|---|
 | Este índice e o README da raiz | Tornar o conhecimento encontrável por pessoas e outros projetos. |

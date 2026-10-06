@@ -24,6 +24,7 @@ export class Level {
   readonly relief: Float32Array;
   reliefRow = 32;
   scenicTrail?: { x0: number; x1: number };
+  scenicStreet?: { x0: number; x1: number };
   readonly roofs: RoofSurface[] = [];
 
   constructor(w: number, h: number) {
