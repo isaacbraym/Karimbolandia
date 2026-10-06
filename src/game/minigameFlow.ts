@@ -61,7 +61,7 @@ export class MinigameFlow {
     if (have) return Promise.resolve(have);
     let p = this.loading.get(id);
     if (!p) {
-      p = this.loaders[id]().then((m) => { this.mods.set(id, m); return m; });
+      p = this.loaders[id]().then(async (m) => { await m.preload?.(); this.mods.set(id, m); return m; });
       this.loading.set(id, p);
       p.catch(() => { this.loading.delete(id); });
     }

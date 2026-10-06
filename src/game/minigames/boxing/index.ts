@@ -10,6 +10,7 @@ import { BoxingMatch, type MatchEvent } from './sim/match';
 import { Crowd } from './sim/crowd';
 import { BoxingScene } from '../../../art/minigames/boxing/scene';
 import { resetHud } from '../../../art/minigames/boxing/hud';
+import { loadBackPhotos } from '../../../art/minigames/boxing/backPhotos';
 
 class BoxingSession implements MinigameSession {
   private match: BoxingMatch;
@@ -87,4 +88,6 @@ class BoxingSession implements MinigameSession {
 const EMPTY = Object.fromEntries(['jab', 'cruzE', 'ganchoE', 'direto', 'cruzD', 'ganchoD', 'esqE', 'esqD', 'abaixar', 'guarda', 'especial'].map((b) => [b, { held: false, pressed: false, released: false }])) as unknown as import('../../../core/input').MiniPad;
 
 export const create: MinigameModule['create'] = (ctx) => new BoxingSession(ctx);
-export default { create } satisfies MinigameModule;
+/** a foto de costas do Karimbo baixa durante a tela de carregamento (e a luta funciona sem ela, com silhueta) */
+export const preload = () => loadBackPhotos().then(() => undefined);
+export default { create, preload } satisfies MinigameModule;

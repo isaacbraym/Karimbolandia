@@ -114,11 +114,11 @@ export class BoxingScene {
       drawAlligatorKO(g, gx, gy + 6 * u, t, -1);
     } else drawGatorFront(g, gx, gy, gs, gp);
     // ---- Karimbo de costas (embaixo, à esquerda)
-    const fall = cin === 'lose' ? ease(clamp01(m.cineT / 0.7)) : 0;
+    const fall = cin === 'lose' ? ease(clamp01(m.cineT / 0.7)) : undefined;
     const spin = cin === 'orelhada' ? ease(clamp01(m.cineT / 1.6)) * Math.PI * 2 : 0;
-    const ears = cin === 'orelhada' ? 1 + 2.4 * ease(clamp01(m.cineT / 1.5)) : 1;
-    const pose = backPoseOf(m.k, t, { spin, ears, fall });
-    drawKarimboBack(g, art.karimbo, progress.equippedSkin, L.karimbo.x, L.karimbo.y, L.karimbo.s, pose);
+    const ears = cin === 'orelhada' ? 1 + 1.6 * ease(clamp01(m.cineT / 1.5)) : 1;
+    const pose = backPoseOf(m.k, t, { spin, ears, fall, fury: m.furyOn });
+    drawKarimboBack(g, art.karimbo, progress.equippedSkin, L, pose, k);
     this.fx.draw(g);
     g.restore();
     drawBoxHud(g, m, W, H, t, k);

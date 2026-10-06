@@ -30,8 +30,9 @@ export interface BoxLayout {
   gator: { x: number; feetY: number; s: number };
   /** base do pescoço do Karimbo e escala do desenho de costas */
   karimbo: { x: number; y: number; s: number };
-  /** descanso das luvas e alvo dos socos (centro do peito do jacaré) */
+  /** peito do jacaré (alvo dos retos ao corpo e dos ganchos) e a cabeça (alvo dos retos e cruzados) */
   target: { x: number; y: number };
+  head: { x: number; y: number };
   ring: { backY: number; horizonY: number; x0: number; x1: number; frontY: number; fx0: number; fx1: number; ropeH: [number, number, number] };
   spots: Spot[];
 }
@@ -73,8 +74,9 @@ export function boxLayout(W: number, H: number): BoxLayout {
   return {
     W, H, u, protect,
     gator: { x: W * 0.6, feetY: H * 0.7, s: u * 1.08 },
-    karimbo: { x: W * 0.285, y: H * 0.78, s: u * 0.66 },
-    target: { x: W * 0.6, y: H * 0.37 },
+    karimbo: { x: W * 0.3, y: H * 0.79, s: u * 0.95 },
+    target: { x: W * 0.6, y: H * 0.43 },
+    head: { x: W * 0.6, y: H * 0.3 },
     ring,
     spots,
   };

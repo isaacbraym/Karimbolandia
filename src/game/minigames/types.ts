@@ -37,4 +37,8 @@ export interface MinigameSession {
   dispose(): void;
 }
 
-export interface MinigameModule { create(ctx: MinigameContext): MinigameSession }
+export interface MinigameModule {
+  create(ctx: MinigameContext): MinigameSession;
+  /** o que precisa estar baixado antes de `create` (fotos, fontes): o fluxo espera esta promessa na tela de carregamento */
+  preload?: () => Promise<void>;
+}
