@@ -37,6 +37,7 @@ import { FramePacer } from '../core/framePacing';
 import { backingSize, resizeBacking, targetRenderHeight } from '../core/renderBudget';
 import { InteriorFlow } from './interiorFlow';
 import { MinigameFlow } from './minigameFlow';
+import { DANCE_ID } from './level/community';
 
 type State = 'loading' | 'menu' | 'playing' | 'paused' | 'complete' | 'continue' | 'gameover' | 'comic';
 
@@ -975,6 +976,8 @@ export class Game {
       w.checkpointSnap = w.player.snapshot();
       w.cameraSnap();
     }
+    // QA: ?dance=1 dá a roda do jacaré como feita (libera a conversa/boxe sem dançar antes; só com qa=1)
+    if (q.get('qa') === '1' && q.get('dance') === '1') w.encounters.completed.add(DANCE_ID);
     // QA: ?mini=boxing|chase entra direto no minijogo (só com qa=1)
     const mini = q.get('mini');
     if (q.get('qa') === '1' && (mini === 'boxing' || mini === 'chase')) {
