@@ -2,13 +2,44 @@ import { describe, expect, it } from 'vitest';
 import { buildJungle, SHIFT } from '../src/game/level/jungle';
 import { buildLevel } from '../src/game/level/index';
 import { TILE, T, THEME } from '../src/game/level';
-import { scenicGround } from '../src/art/forestTrail';
+import { scenicGround, trailProfile } from '../src/art/forestTrail';
 import { RUN } from '../src/game/movement';
 import { World } from '../src/game/world';
 import { newCtl } from './helpers/bot';
 import { villageHomeDoorX } from '../src/game/exploration';
 
 describe('Amostra artística e telhados caminháveis', () => {
+  it('a trilha muda de largura e atravessa montes e bordas de cache sem recortes retos', () => {
+    const L = buildJungle().level, widths: number[] = [];
+    for (let x = 162 * TILE; x <= 207 * TILE; x += 2) {
+      const p = trailProfile(L, x), next = trailProfile(L, x + 2);
+      widths.push(p.width);
+      expect(Math.abs(next.y - p.y)).toBeLessThan(1.3);
+    }
+    expect(Math.max(...widths) - Math.min(...widths)).toBeGreaterThan(10);
+    for (const x of [11, 12, 13].map(chunk => chunk * 512)) {
+      expect(Math.abs(trailProfile(L, x - .01).y - trailProfile(L, x + .01).y)).toBeLessThan(.02);
+      expect(Math.abs(trailProfile(L, x - .01).width - trailProfile(L, x + .01).width)).toBeLessThan(.02);
+    }
+  });
+  it('atravessa os dois montes iniciais andando nos dois sentidos sem paredes ou saltos', () => {
+    for (const [a, b] of [[162, 178], [196, 207]]) for (const dir of [1, -1]) {
+      const w = new World(buildJungle()), start = (dir > 0 ? a : b) * TILE, end = (dir > 0 ? b : a) * TILE;
+      w.player.reset(start, (w.level.reliefSurface(start) ?? 32 * TILE) - 8);
+      const ctl = newCtl();
+      for (let frame = 0; frame < 30; frame++) w.player.update(w, 1 / 60, ctl);
+      ctl.moveX = dir;
+      let walls = 0;
+      for (let frame = 0; frame < 240 && (end - w.player.x) * dir > 0; frame++) {
+        w.player.update(w, 1 / 60, ctl);
+        if (w.player.body.wallDir !== 0) walls++;
+      }
+      expect((w.player.x - end) * dir, `caminhada ${a}–${b}, sentido ${dir}`).toBeGreaterThanOrEqual(0);
+      expect(walls).toBe(0);
+      expect(ctl.jump.held).toBe(false);
+    }
+  });
+
   it('limita a clareira a 30 segundos e exclui água/poços, plataformas e o resto da fase', () => {
     const data = buildJungle(), L = data.level;
     expect(L.scenicTrail).toEqual({ x0: SHIFT * TILE, x1: data.playerStart.x + RUN * 30 });

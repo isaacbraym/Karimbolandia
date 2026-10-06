@@ -25,7 +25,7 @@ O [caso da balada](BALADA_FILMINHO_BAR_E_PISTA_VIVA_2026-10-06.md) registra o fi
 
 ## Como este conhecimento é protegido
 
-A [amostra de ambientação da floresta e telhados](AMOSTRA_AMBIENTACAO_2026-10-06.md) documenta o piso largo integrado ao contato físico, a máscara que preserva brejos/abismos, o cache por células globais e o agrupamento de casas com IDs históricos e rotas de pulo sobre lajes.
+A [amostra de ambientação da floresta e telhados](AMOSTRA_AMBIENTACAO_2026-10-06.md) documenta o piso largo integrado ao contato físico, os montes caminháveis e a trilha curva, a máscara que preserva brejos/abismos, o cache por células globais e o agrupamento de casas com IDs históricos e rotas de pulo sobre lajes.
 
 | Camada | Função |
 |---|---|

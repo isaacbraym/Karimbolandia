@@ -14,6 +14,16 @@ export function scenicGround(level: Level, tx: number, ty: number) {
     && level.themeAt(tx, level.reliefRow) === THEME.EARTH;
 }
 
+/** Perfil global suave: a curva e a largura não reiniciam nas bordas dos patches. */
+export function trailProfile(level: Level, x: number) {
+  const col = Math.floor(x / TILE), t = x / TILE - col;
+  const value = (c: number) => level.relief[Math.max(0, Math.min(level.w, c))];
+  const a = value(col - 1), b = value(col), c = value(col + 1), d = value(col + 2);
+  const rise = .5 * (2 * b + (-a + c) * t + (2 * a - 5 * b + 4 * c - d) * t * t + (-a + 3 * b - 3 * c + d) * t * t * t);
+  return { y: level.reliefRow * TILE - Math.max(0, rise) + 7 + Math.sin(x * .0039) * 13,
+    width: 22 + Math.sin(x * .0157) * 5 + Math.sin(x * .0271 + 1.2) * 3 };
+}
+
 export class ForestTrail {
   private readonly patches = new Map<number, Patch>();
   private revision = -1;
@@ -59,13 +69,13 @@ export class ForestTrail {
       if (!scenicGround(L, col, L.reliefRow)) continue;
       const x = col * TILE;
       const backSurface = (xx: number) => {
-        // A margem distante é uma colina contínua mesmo onde a rota tem um degrau.
-        const col = Math.floor(xx / TILE - .5), blend = xx / TILE - .5 - col;
-        return this.surface((col + .5) * TILE) * (1 - blend) + this.surface((col + 1.5) * TILE) * blend;
+        const p = trailProfile(L, xx);
+        return p.y - 7 - Math.sin(xx * .0039) * 13;
       };
-      const a = backSurface(x + .01), b = backSurface(x + TILE - .01);
       const fringe = (xx: number) => 84 + Math.sin(xx * .011) * 17 + Math.sin(xx * .027) * 7;
-      mask.moveTo(x, a - fringe(x)); mask.lineTo(x + TILE + .5, b - fringe(x + TILE));
+      mask.moveTo(x, backSurface(x) - fringe(x));
+      for (let xx = x + 4; xx <= x + TILE; xx += 4) mask.lineTo(xx, backSurface(xx) - fringe(xx));
+      mask.lineTo(x + TILE + .5, backSurface(x + TILE + .5) - fringe(x + TILE + .5));
       mask.lineTo(x + TILE + .5, base + HEIGHT - TOP); mask.lineTo(x, base + HEIGHT - TOP); mask.closePath();
     }
     g.clip(mask); f.clip(mask);
@@ -84,14 +94,18 @@ export class ForestTrail {
       }
     }
     // Trilha de terra com bordas macias e curvas que atravessam a clareira.
-    for (let stroke = 4; stroke >= 0; stroke--) {
-      g.strokeStyle = ['rgba(173,154,99,.42)', 'rgba(132,122,73,.26)', 'rgba(109,109,62,.20)', 'rgba(110,117,63,.12)', 'rgba(123,133,67,.08)'][stroke];
-      g.lineWidth = 22 + stroke * 11; g.beginPath();
-      for (let x = worldX - 40; x <= worldX + SPAN + 40; x += 8) {
-        const y = this.surface(x) + 7 + Math.sin(x * .0039) * 13;
-        if (x === worldX - 40) g.moveTo(x, y); else g.lineTo(x, y);
+    for (let band = 4; band >= 0; band--) {
+      g.fillStyle = ['rgba(173,154,99,.42)', 'rgba(132,122,73,.26)', 'rgba(109,109,62,.20)', 'rgba(110,117,63,.12)', 'rgba(123,133,67,.08)'][band];
+      const left = worldX - 96, right = worldX + SPAN + 96, step = 8;
+      g.beginPath();
+      for (let side = -1; side <= 1; side += 2) {
+        const from = side < 0 ? left : right, to = side < 0 ? right : left;
+        for (let x = from; side < 0 ? x <= to : x >= to; x -= side * step) {
+          const p = trailProfile(L, x), y = p.y + side * (p.width + band * 11) / 2;
+          if (side < 0 && x === from) g.moveTo(x, y); else g.lineTo(x, y);
+        }
       }
-      g.stroke();
+      g.closePath(); g.fill();
     }
     // Pequenas pinceladas, sem padrões quadrados; tudo é assado uma vez.
     for (let cell = Math.floor(worldX / 128) - 1; cell <= Math.ceil((worldX + SPAN) / 128); cell++) {

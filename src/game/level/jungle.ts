@@ -56,6 +56,13 @@ function rollingGround(b: LevelBuilder) {
     for (let i = 0; i <= width; i++) L.relief[x + i] = Math.sin(i / width * Math.PI) ** 2 * height;
     x += width + 4;
   }
+  // Os dois montes da abertura são colinas baixas, nunca paredes de um tile.
+  for (const [start, end, height] of [[164, 178, 32], [196, 206, 26]]) {
+    for (let x = start; x <= end; x++) {
+      const rise = Math.sin((x - start) / (end - start) * Math.PI) ** 2 * height;
+      L.relief[x] = Math.max(L.relief[x], rise);
+    }
+  }
   // Plantações e pedras são cenário: não entram na lista de colisões.
   for (const d of b.decos) {
     if (d.y === G * TILE) d.y = L.reliefSurface(d.x) ?? d.y;
@@ -417,14 +424,13 @@ export function buildJungle(): LevelData {
   b.trigger('hint:jump', 188, 0, 3, LEVEL_H);
   b.deco('jSign', 160, G, 'back');
   b.tokens(162, G - 1, 6);
-  // montinho de terra com raízes e troncos caídos
-  b.block(168, G - 1, 6, 1);
+  // Montinho de raízes: rollingGround cria uma colina contínua caminhável.
   b.plat(178, G - 3, 4, THEME.WOOD);
   b.plat(184, G - 5, 4, THEME.WOOD);
   b.tokens(184, G - 6, 4);
   b.enemy('rifle', 181, G, { idle: true, facing: -1 });
   b.crate(194, G, 'ammo');
-  b.block(198, G - 1, 4, 1);
+  // O segundo montinho também usa o relevo, sem parede oculta na trilha.
   b.enemy('rifle', 206, G, { patrol: 50, facing: -1 });
   b.crate(210, G, 'random');
   b.checkpoint('Orla da selva', 214, G);
