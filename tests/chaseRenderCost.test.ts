@@ -59,6 +59,22 @@ describe('custo de desenho da perseguição', () => {
 });
 
 describe('custo de desenho do filminho e do rebobinar', () => {
+  it('rebobina usando os mesmos galhos vivos da corrida, com cache aquecido', async () => {
+    const { ChaseScene } = await import('../src/art/minigames/chase/scene');
+    const { BranchCanopy } = await import('../src/art/minigames/chase/branches');
+    const { ChaseMatch } = await import('../src/game/minigames/chase/sim/match');
+    const { Rewind } = await import('../src/game/minigames/chase/sim/letterFilm');
+    const m=new ChaseMatch(), scene=new ChaseScene(667,320,m.course),g=ctx();
+    const canopy=vi.spyOn(BranchCanopy.prototype,'draw');
+    const rw=new Rewind([{x:800,y:m.course.pathY(800),air:false,mx:1100,my:m.course.pathY(1100)}],20);
+    scene.updateRewind(1/60,rw);scene.drawRewind(g,m,rw,667,320);
+    const warm=canvases,grad=gradients;
+    for(let i=0;i<120;i++){rw.update(1/60);scene.updateRewind(1/60,rw);scene.drawRewind(g,m,rw,667,320);}
+    expect(canopy).toHaveBeenCalledTimes(121);
+    expect(canvases-warm).toBeLessThan(30); // dígitos do cronômetro são cacheados
+    expect(gradients).toBe(grad);
+    canopy.mockRestore();
+  });
   it('a carta revela linhas copiando imagens (poucas) e não cria canvas durante a leitura', async () => {
     const { LetterPaper } = await import('../src/art/minigames/chase/letterPaper');
     const { LETTER_PAGES, pageChars } = await import('../src/game/minigames/chase/sim/letterFilm');

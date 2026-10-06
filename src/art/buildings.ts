@@ -34,8 +34,8 @@ export function paintBuilding(g: CanvasRenderingContext2D, index: number, mercen
     g.beginPath(); g.moveTo(x,y-23); g.lineTo(x,y-2); g.moveTo(x-11,y-12); g.lineTo(x+11,y-12); g.stroke();
     shadedRR(g,x-19,y-26,6,27,1,s.accent); shadedRR(g,x+13,y-26,6,27,1,s.accent);
   };
-  win(-w/2+28,-30);
-  if(w>140)win(w/2-25,-30);
+  // Venezianas e ombreiras têm largura real: não atravessam o vão da porta.
+  for (const x of [-w/2+28,w/2-28]) if (Math.abs(x-s.door)>37) win(x,-30);
   if(s.floors===2){
     prism(g,-w/2-6,-77,w+12,5,d,dy,s.accent);
     win(-w/2+28,-106); win(w/2-28,-106);

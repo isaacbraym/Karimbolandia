@@ -114,16 +114,17 @@ registerPainter('plant', (g, _f, key) => {
   if (key === 'happy') { g.fillStyle = '#ffe06a'; for (const [x, y] of [[-10, -42], [8, -45]] as const) { g.beginPath(); g.arc(x, y, 1.6, 0, Math.PI * 2); g.fill(); } }
 });
 
-registerPainter('houseTable', (g) => {
-  contactShadow(g, 2, 2, 0.3);
-  for (const [u, v] of [[-0.85, -0.85], [0.85, -0.85], [-0.85, 0.85], [0.85, 0.85]] as const) box(g, u - 0.07, u + 0.07, v - 0.07, v + 0.07, 0, 20, { top: WOOD_D });
-  box(g, -1, 1, -1, 1, 20, 22, { top: '#9a6a44' });
+registerPainter('houseTable', (g,f) => {
+  const u=f.w/2,v=f.h/2,Q=(x:number,y:number,z:number)=>P(x*u,y*v,z);
+  contactShadow(g, f.w, f.h, 0.3);
+  for (const [x, y] of [[-.85,-.85],[.85,-.85],[-.85,.85],[.85,.85]]) box(g,x*u-.07,x*u+.07,y*v-.07,y*v+.07,0,20,{top:WOOD_D});
+  box(g, -u, u, -v, v, 20, 22, { top: '#9a6a44' });
   // toalha de chita escorrendo pelas bordas
-  poly(g, [P(-1.04, 1.04, 22.4), P(1.04, 1.04, 22.4), P(1.04, 1.04, 12), P(-1.04, 1.04, 12)], '#e8c68a', OUT, 1);
-  poly(g, [P(1.04, -1.04, 22.4), P(1.04, 1.04, 22.4), P(1.04, 1.04, 12), P(1.04, -1.04, 12)], '#c9a46a', OUT, 1);
-  poly(g, [P(-1.04, -1.04, 22.4), P(1.04, -1.04, 22.4), P(1.04, 1.04, 22.4), P(-1.04, 1.04, 22.4)], '#f0d99a', OUT, 1);
-  for (let i = 0; i < 9; i++) flower(g, P(-0.8 + (i % 3) * 0.8, -0.8 + Math.floor(i / 3) * 0.8, 22.6), 2.4, CHITA[i % 5]);
-  for (let i = 0; i < 6; i++) { const p = P(-0.8 + i * 0.32, 1.04, 17); dot(g, p, 1.6, CHITA[(i + 2) % 5]); }
+  poly(g, [Q(-1.04, 1.04, 22.4), Q(1.04, 1.04, 22.4), Q(1.04, 1.04, 12), Q(-1.04, 1.04, 12)], '#e8c68a', OUT, 1);
+  poly(g, [Q(1.04, -1.04, 22.4), Q(1.04, 1.04, 22.4), Q(1.04, 1.04, 12), Q(1.04, -1.04, 12)], '#c9a46a', OUT, 1);
+  poly(g, [Q(-1.04, -1.04, 22.4), Q(1.04, -1.04, 22.4), Q(1.04, 1.04, 22.4), Q(-1.04, 1.04, 22.4)], '#f0d99a', OUT, 1);
+  for (let i = 0; i < 9; i++) flower(g, Q(-0.8 + (i % 3) * 0.8, -0.8 + Math.floor(i / 3) * 0.8, 22.6), 2.4, CHITA[i % 5]);
+  for (let i = 0; i < 6; i++) { const p = Q(-0.8 + i * 0.32, 1.04, 17); dot(g, p, 1.6, CHITA[(i + 2) % 5]); }
 });
 
 registerPainter('cake', (g, _f, key) => {
@@ -241,16 +242,17 @@ registerPainter('piggy', (g, _f, key) => {
   for (const x of [-6, 4]) { g.fillStyle = '#d9849a'; g.fillRect(x, -2, 3, 3); }
 });
 
-registerPainter('trunk', (g, _f, key) => {
-  contactShadow(g, 1, 2, 0.28);
-  box(g, -0.4, 0.4, -0.9, 0.9, 0, 14, { top: '#8a5a38', left: '#7a4e30', right: '#5e3a24' });
-  g.strokeStyle = '#c9a45a'; g.lineWidth = 2; for (const v of [-0.55, 0.55]) { g.beginPath(); g.moveTo(...P(0.4, v, 0)); g.lineTo(...P(0.4, v, 14)); g.stroke(); }
+registerPainter('trunk', (g, f, key) => {
+  const Q=(x:number,y:number,z:number)=>P(x*f.w,y*f.h/2,z);
+  contactShadow(g, f.w, f.h, 0.28);
+  box(g, -.4*f.w, .4*f.w, -.45*f.h, .45*f.h, 0, 14, { top: '#8a5a38', left: '#7a4e30', right: '#5e3a24' });
+  g.strokeStyle = '#c9a45a'; g.lineWidth = 2; for (const v of [-0.55, 0.55]) { g.beginPath(); g.moveTo(...Q(0.4, v, 0)); g.lineTo(...Q(0.4, v, 14)); g.stroke(); }
   if (key === 'open') {
-    poly(g, [P(-0.4, -0.9, 14), P(0.4, -0.9, 14), P(0.4, -0.9, 32), P(-0.4, -0.9, 32)], '#7a4e30', OUT, 1);
-    poly(g, [P(-0.34, -0.84, 14), P(0.34, -0.84, 14), P(0.34, 0.84, 14), P(-0.34, 0.84, 14)], '#f0e0b0');
-    for (let i = 0; i < 4; i++) poly(g, [P(-0.3, -0.7 + i * 0.4, 14.4), P(0.3, -0.7 + i * 0.4, 14.4), P(0.3, -0.5 + i * 0.4, 14.4), P(-0.3, -0.5 + i * 0.4, 14.4)], CHITA[i], 'rgba(23,15,46,.4)', 0.5);
-  } else poly(g, [P(-0.44, -0.94, 14), P(0.44, -0.94, 14), P(0.44, 0.94, 14), P(-0.44, 0.94, 14)], '#9a6a44', OUT, 1);
-  dot(g, P(0.41, 0, 8), 1.8, '#e8d0a0');
+    poly(g, [Q(-0.4, -0.9, 14), Q(0.4, -0.9, 14), Q(0.4, -0.9, 32), Q(-0.4, -0.9, 32)], '#7a4e30', OUT, 1);
+    poly(g, [Q(-0.34, -0.84, 14), Q(0.34, -0.84, 14), Q(0.34, 0.84, 14), Q(-0.34, 0.84, 14)], '#f0e0b0');
+    for (let i = 0; i < 4; i++) poly(g, [Q(-0.3, -0.7 + i * 0.4, 14.4), Q(0.3, -0.7 + i * 0.4, 14.4), Q(0.3, -0.5 + i * 0.4, 14.4), Q(-0.3, -0.5 + i * 0.4, 14.4)], CHITA[i], 'rgba(23,15,46,.4)', 0.5);
+  } else poly(g, [Q(-0.44, -0.94, 14), Q(0.44, -0.94, 14), Q(0.44, 0.94, 14), Q(-0.44, 0.94, 14)], '#9a6a44', OUT, 1);
+  dot(g, Q(0.41, 0, 8), 1.8, '#e8d0a0');
 });
 
 registerPainter('chitaHammock', (g) => {

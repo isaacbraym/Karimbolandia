@@ -40,7 +40,8 @@ export function makeCommunityRoom(id: RoomId): RoomDef {
     item('feature',upper?'Cômoda do quarto':merc?(index===1?'Mesa de mapas e relatórios':'Viveiro escondido'):features[trade],upper?'dresser':merc?'campDesk':'communityFeature',1,0,2,1,
       ()=>[examine(merc?(index===1?'O mapa chama a aldeia de "área vazia". Trinta pontos de tinta desmentem o relatório.':'Entre caixas de equipamento, alguém cultiva mudas. Uma anotação diz: "Depois da missão, eu quero plantar".'):stories[trade]),
         {id:'use',label:merc?'Conferir anotações':'Conhecer o ofício',noise:2,time:1,pose:'poke',run:s=>{s.set('keepsake');s.say(`${owner} deixou tudo organizado. Aqui se faz ${merc?'muito mais que vigia':HOME_TRADES[trade].toLowerCase()}.`);}}],36);
-    const tableX=upper?2:2+index%Math.max(1,w-5),tableY=upper?h-3:2+index%Math.max(1,h-4);
+    // Mesa, cadeira e patamar formam áreas separadas; porta e circulação têm uma célula livre.
+    const tableX=2+index%Math.max(1,w-5),tableY=2;
     item('table','Mesa da família','houseTable',tableX,tableY,2,1,()=>[examine(`Na mesa de ${owner}, há ${['folhas de tecido','potes pintados','sementes catalogadas','peças de madeira','conchas do rio','partituras'][trade]}.`)],22);
     item('chair','Cadeira de visita','chair',tableX+2,tableY,1,1,()=>[{id:'sit',label:'Sentar',noise:1,time:1.5,pose:'sit',run:(s,f)=>s.settle(f.id,'sit')}],22);
     item('plant','Planta do quintal','plant',w-3,0,1,1,()=>[examine('A luz da janela alcança cada folha.'),
@@ -66,8 +67,8 @@ export function makeCommunityRoom(id: RoomId): RoomDef {
       furniture.push({id:'magazine',name:'Revista de carreira',paint:'magazine',gx:tableX+1,gy:tableY,w:1,h:1,
         solid:false,lift:26,height:3,verbs:()=>inspect('magazine')});
     }
-    if(spec.floors===2)item('stairs',upper?'Escada para a sala':'Escada para o andar superior','stairs',w-2,h-2,1,2,()=>[
-      {id:'use',label:upper?'Descer à sala':'Subir ao 2º andar',noise:3,time:.5,run:s=>s.emit({type:'floor',index:upper?0:1})}],52);
+    if(spec.floors===2)item('stairs',upper?'Escada para a sala':'Escada para o andar superior',upper?'stairsDown':'stairs',w-2,h-2,1,2,()=>[
+      {id:'use',label:upper?'Descer à sala':'Subir ao 2º andar',noise:3,time:.5,run:s=>s.emit({type:'floor',index:upper?0:1})}],upper?18:52);
     const room:RoomDef={id,title:`${title}${upper?' · 2º andar':''}`,subtitle:merc?'A rotina por trás do uniforme.':HOME_TRADES[trade],
       theme:merc?'stilt':'house',floor,rows:Array.from({length:h},()=>'.'.repeat(w)),door:{x:0,y:h-1},spawn:{x:1,y:h-1},furniture,
       npcs:upper?[]:[{id:`neighbor:${index}`,name:owner,gx:w-3,gy:1,state:'idle',brain:friendly}],pranks:[],

@@ -8,9 +8,9 @@ import { G, LEVEL_H, LevelBuilder } from './builder';
 import { addPatrolStories } from './story';
 import { expandCommunity, COMMUNITY_EXTRA, DANCE_TILE } from './community';
 import { buildAtlantis, JUNGLE_H, LAKE_X0, LAKE_X1, LAKE_TOP, LAKE_FLOOR } from './atlantis';
-import { RUN } from '../movement';
 import { addVillageRoofs } from './roofRoutes';
 import { addSecretPassages } from './passages';
+import { settleHouseYards } from './houseLayout';
 
 /** a masmorra do templo ocupa as primeiras SHIFT colunas do mapa; a selva vem depois */
 export const SHIFT = 150;
@@ -635,10 +635,11 @@ export function buildJungle(): LevelData {
 
   b.atmosphere.sort((a, c) => a.x - c.x);
   rollingGround(b);
-  b.level.scenicTrail = { x0: SHIFT * TILE, x1: b.playerStart.x + RUN * 30 };
+  b.level.scenicTrail = { x0: SHIFT * TILE, x1: b.level.pxW };
   for (const kind of ['villageHome', 'jHut']) {
     b.decos.filter(d => d.kind === kind).sort((a, z) => a.x - z.x).forEach((d, i) => { d.variant = i; });
   }
+  settleHouseYards(b);
   // Acrescenta moedas depois de todos os itens antigos, conservando seus IDs de save.
   addPatrolStories(b);
   // Atlântida por último: só acrescenta (IDs antigos de inimigos e itens continuam os mesmos)

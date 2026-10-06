@@ -6,6 +6,19 @@ registerPainter('stairs',(g)=>{
   g.strokeStyle='#674c35';g.lineWidth=3;
   for(const u of [-.45,.45]){g.beginPath();g.moveTo(...P(u,-.85,65));g.lineTo(...P(u,.85,19));g.stroke();}
 });
+registerPainter('stairsDown',(g)=>{
+  const opening=[P(-.46,-.92),P(.46,-.92),P(.46,.92),P(-.46,.92)];
+  poly(g,opening,'#20251f','#765638',2);
+  g.save();poly(g,opening);g.clip();
+  // Degraus ficam abaixo do piso e somem na sombra do vão, sem sugerir um terceiro andar.
+  for(let i=6;i>=0;i--)box(g,-.43,.43,-.85+i*.24,-.61+i*.24,-52,-7-i*6,{top:i%2?'#9b784d':'#b08e60',edge:'#463c2c'});
+  g.restore();
+  g.strokeStyle='#765638';g.lineWidth=2.5;
+  for(const u of [-.49,.49]){g.beginPath();g.moveTo(...P(u,-.92,16));g.lineTo(...P(u,.9,16));g.stroke();}
+  // Seta discreta gravada na soleira, na direção dos degraus descendentes.
+  g.strokeStyle='#e6c78d';g.lineWidth=2;const [x,y]=P(0,-.7,2);
+  g.beginPath();g.moveTo(x+5,y-3);g.lineTo(x-7,y+3);g.lineTo(x-4,y-3);g.moveTo(x-7,y+3);g.lineTo(x,y+5);g.stroke();
+});
 registerPainter('communityFeature',(g,f)=>{
   box(g,-.95,.95,-.42,.42,0,26,{top:'#ac8054'});
   const trade=Number(f.name==='Tear e novelos'?0:f.name==='Bancada de cerâmica'?1:f.name==='Arquivo de sementes'?2:f.name==='Bancada do marceneiro'?3:f.name==='Redes e remos'?4:5);

@@ -6,7 +6,7 @@ A referência fornecida pelo usuário mostra uma crista arredondada e uma entrad
 
 Há quatro descobertas opcionais adicionais: Estação Esquecida e Jardim da Resistência na cidade; Relógio da Mata e Refúgio das Raízes na floresta. Cada uma possui interior 2D, moedas, jingle de descoberta uma vez por save e duas portas de retorno à própria entrada. Não usa o fluxo dos interiores isométricos nem um minijogo. As entidades novas são anexadas; IDs anteriores de inimigos, objetos e itens permanecem estáveis. As seis moedas do antigo topo do templo mantêm seus IDs, agora sobre a crista.
 
-`src/game/level/passages.ts` procura entradas em terra firme e salas no subsolo maciço. O volume completo do morro deve ficar fora de água, fossos, paredes altas, arenas e construções exploráveis. A busca é determinística. Props, inimigos e objetos que ocupavam o chão no volume alterado são assentados na nova superfície sem trocar IDs. As novas clareiras são locais: não ampliam a faixa original dos primeiros 30 segundos para a fase inteira.
+`src/game/level/passages.ts` procura entradas em terra firme e salas no subsolo maciço. O volume completo do morro deve ficar fora de água, fossos, paredes altas, arenas e construções exploráveis. A busca é determinística. Props, inimigos e objetos que ocupavam o chão no volume alterado são assentados na nova superfície sem trocar IDs. Na entrega das passagens, as clareiras adicionais eram locais. Após a aprovação da amostra, a campanha foi ampliada conforme o [caso das paisagens da fase 2](PAISAGENS_DA_FASE_2_2026-10-06.md).
 
 ## Física demonstrada
 

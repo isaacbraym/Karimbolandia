@@ -49,6 +49,7 @@ import { ForestLight } from './forestLight';
 import { InteriorStore } from './interiorStore';
 import { drawForestLight } from '../art/forestLight';
 import { ForestTrail, drawVillageRoofs } from '../art/forestTrail';
+import { JungleLandscape } from '../art/jungleLandscape';
 import { CityStreet } from '../art/cityStreet';
 
 export interface Stats {
@@ -117,6 +118,7 @@ export interface Wreck {
 export class World {
   readonly forestLight: ForestLight;
   readonly forestTrail: ForestTrail;
+  private readonly jungleLandscape = new JungleLandscape();
   readonly cityStreet: CityStreet;
   data: LevelData;
   level: Level;
@@ -1333,6 +1335,7 @@ export class World {
       this.fx.view = { x0: c.x - m, y0: c.y - m, x1: c.x + c.w + m, y1: c.y + c.h + m };
     }
     setDecoFocus(this.player.x, this.player.y);
+    if (this.data.stage === 2 && !this.inRoom()) this.jungleLandscape.draw(g, cam, this.time);
     if (this.water.zones.length) drawWaterBack(g, this);
     if (this.data.rooms?.length) drawRoomBack(g, this);
     if (!this.inRoom()) this.forestTrail.draw(g, cam.x, cam.y, cam.w, cam.h);
@@ -1398,6 +1401,7 @@ export class World {
     for (const e of this.enemies) if (cam.visible(e.x, e.y, 80)) e.drawStatus(g);
     drawClub(g, this, 'back');
     this.player.draw(g, this);
+    if (this.data.stage === 2 && !this.inRoom()) this.jungleLandscape.draw(g, cam, this.time, true);
     if (!this.inRoom()) this.forestTrail.draw(g, cam.x, cam.y, cam.w, cam.h, true, this.time);
     if (!this.inRoom()) this.cityStreet.draw(g, cam.x, cam.y, cam.w, cam.h, this.time, true);
     drawClub(g, this, 'front');

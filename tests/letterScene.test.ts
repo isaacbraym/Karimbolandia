@@ -76,7 +76,10 @@ describe('cena do pombo-correio e do macaco', () => {
     left.moveX = -1;
     for (let i = 0; i < 30; i++) w.update(1 / 60, left);
     expect(Math.abs(w.player.x - x0)).toBeLessThan(6);
-    run(2);
+    run(1.25);
+    expect(w.letter.monkey).toBe('head');
+    expect(w.letter.letter).toBe('open');
+    run(.75);
     expect(w.letter.letter).toBe('stolen');
     run(3);
     expect(hooks.chase).toHaveBeenCalledTimes(1);

@@ -3,7 +3,6 @@ import { buildJungle, SHIFT } from '../src/game/level/jungle';
 import { buildLevel } from '../src/game/level/index';
 import { TILE, T, THEME } from '../src/game/level';
 import { scenicGround, trailProfile } from '../src/art/forestTrail';
-import { RUN } from '../src/game/movement';
 import { World } from '../src/game/world';
 import { newCtl } from './helpers/bot';
 import { villageHomeDoorX } from '../src/game/exploration';
@@ -40,14 +39,16 @@ describe('Amostra artística e telhados caminháveis', () => {
     }
   });
 
-  it('mantém a amostra de 30 segundos e clareiras locais, excluindo água, poços e plataformas', () => {
+  it('estende a trilha seca pela fase 2, excluindo água, poços, plataformas e interiores', () => {
     const data = buildJungle(), L = data.level;
-    expect(L.scenicTrail).toEqual({ x0: SHIFT * TILE, x1: data.playerStart.x + RUN * 30 });
+    expect(L.scenicTrail).toEqual({ x0: SHIFT * TILE, x1: L.pxW });
     expect(scenicGround(L, 154, 32)).toBe(true);
     expect(scenicGround(L, 238, 32)).toBe(false); // brejo
     expect(scenicGround(L, 340, 32)).toBe(false); // abismo
     expect(scenicGround(L, 400, 32)).toBe(true); // clareira local do templo reformulado
     expect(scenicGround(L, 450, 32)).toBe(false); // fora da amostra e das clareiras
+    expect(scenicGround(L, 800, 32)).toBe(true);
+    expect(scenicGround(L, 1200, 32)).toBe(true);
     expect(scenicGround(L, 154, 28)).toBe(false);
     expect(buildLevel().level.scenicTrail).toBeUndefined();
   });

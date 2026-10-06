@@ -1,5 +1,7 @@
 # Guia de desenvolvimento e lições reutilizáveis
 
+O [caso das paisagens da fase 2](PAISAGENS_DA_FASE_2_2026-10-06.md) registra a campanha completa, o pântano em profundidade, a rebobinagem, o salto do macaco e a revisão espacial das casas.
+
 O [caso dos morros e passagens secretas](MORROS_E_PASSAGENS_SECRETAS_2026-10-06.md) explica a rota curva sobre a entrada inferior, seleção de áreas seguras, suporte físico, interiores opcionais e preparação da arte em cache.
 
 O [caso dos tutoriais de mira e boxe](TUTORIAIS_MIRA_E_BOXE_2026-10-06.md) explica a janela de treino inicial, separação da simulação, cancelamento de imports e identificação permanente do modo tutorial.

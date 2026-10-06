@@ -320,7 +320,8 @@ export class ChaseScene {
     g.save();
     g.scale(s, s);
     g.translate(-Math.round(this.camX * s) / s, -Math.round(this.camY * s) / s);
-    getArt().tiles.render(g, m.course.level, this.camX, this.camY, W / s, H / s, t);
+    this.canopy.draw(g, m.course, this.camX, W / s);
+    this.drawCourse(g, m, W / s, t);
     // macaco correndo de costas (aparece quando entra na tela)
     if (sm.mx > this.camX - 60 && sm.mx < this.camX + W / s + 60) {
       drawMonkey(g, sm.mx, sm.my, 1.2, t, { facing: 1, stride: Math.sin(-t * 17), arms: 'hold', headRot: 0.1 });
@@ -333,6 +334,10 @@ export class ChaseScene {
     drawKarimbo(g, getArt().karimbo, sm.x, sm.y, pose, progress.equippedSkin);
     drawEnvelope(g, sm.x + 18, sm.y - 30, -0.4, 1.1);
     g.restore();
+    drawLayer(g, bg.leaves, W, 0, this.camX, 1.25, -H * 0.1, 1);
+    g.globalAlpha = 0.5; g.globalCompositeOperation = 'lighter';
+    g.drawImage(bg.rays, 0, 0, W, H);
+    g.globalCompositeOperation = 'source-over'; g.globalAlpha = 1;
     this.drawSpeed(g, W, H);
     (this.vhs ??= new RewindFx(W, H)).draw(g, rw.t, rw.clock);
   }

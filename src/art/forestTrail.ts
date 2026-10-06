@@ -1,14 +1,15 @@
 /** Clareira lateral: o contato físico fica DENTRO do piso, não na borda de uma faixa. */
 import { Level, TILE, T, THEME } from '../game/level';
-import { Rng } from '../core/math';
+import { Rng, mixColor } from '../core/math';
 import { makeCanvas } from './kit';
 import { windTip } from './wind';
+import { JUNGLE_REGIONS, jungleRegion } from './jungleLandscape';
 
 const SPAN = 512, TOP = 180, HEIGHT = 520, DENSITY = 1.5;
 interface Fern { x: number; y: number; size: number; variant: number }
 interface Patch { back: HTMLCanvasElement; plants: Fern[] }
 
-/** Só o chão seco da amostra. Plataformas, água, poços e o templo conservam sua arte. */
+/** Chão seco da campanha. Não preenche água nem abismos e preserva os interiores. */
 export function scenicGround(level: Level, tx: number, ty: number) {
   const range = level.scenicTrail;
   return ((!!range && tx * TILE >= range.x0 && tx * TILE < range.x1)
@@ -48,6 +49,7 @@ export class ForestTrail {
       if (!(range && range.x0 < end && range.x1 > start)
         && !L.scenicGroves.some(r => r.x0 < end && r.x1 > start)) continue;
       let patch = this.patches.get(i);
+      if (patch) { this.patches.delete(i); this.patches.set(i, patch); }
       if (!patch && !front && made < 2) { patch = this.paint(i); this.patches.set(i, patch); made++; }
       if (patch && !front) g.drawImage(patch.back, i * SPAN, L.reliefRow * TILE - TOP, SPAN, HEIGHT);
       else if (patch && front) {
@@ -72,6 +74,7 @@ export class ForestTrail {
         }
       }
     }
+    while (this.patches.size > 16) this.patches.delete(this.patches.keys().next().value!);
   }
 
   private surface(x: number) {
@@ -104,10 +107,16 @@ export class ForestTrail {
       mask.lineTo(x + TILE + .5, base + HEIGHT - TOP); mask.lineTo(x, base + HEIGHT - TOP); mask.closePath();
     }
     g.clip(mask);
-    const field = g.createLinearGradient(0, base - 120, 0, base + 280);
-    field.addColorStop(0, '#526d40'); field.addColorStop(.28, '#61814a');
-    field.addColorStop(.55, '#405a32'); field.addColorStop(1, '#142e26');
-    g.fillStyle = field; g.fillRect(worldX, base - TOP, SPAN, HEIGHT);
+    // Cor depende da coordenada global, não do índice de patch: a fronteira não vira uma emenda.
+    const color=(x:number,k:number)=>{
+      const ri=jungleRegion(x),region=JUNGLE_REGIONS[ri],start=ri?JUNGLE_REGIONS[ri-1].end*TILE:0;
+      return ri>0?mixColor(JUNGLE_REGIONS[ri-1].colors[k],region.colors[k],Math.min(1,(x-start)/350)):region.colors[k];
+    };
+    for(let dx=0;dx<SPAN;dx+=8){
+      const field=g.createLinearGradient(0,base-120,0,base+280),xx=worldX+dx+4;
+      field.addColorStop(0,color(xx,1));field.addColorStop(.28,color(xx,0));field.addColorStop(.55,color(xx,2));field.addColorStop(1,'#142e26');
+      g.fillStyle=field;g.fillRect(worldX+dx,base-TOP,8.5,HEIGHT);
+    }
     // Ondas de musgo em escala de paisagem, em vez de juntas de ladrilhos.
     for (let cell = Math.floor(worldX / 128) - 1; cell <= Math.ceil((worldX + SPAN) / 128); cell++) {
       const r = new Rng(cell * 7919 + 413);

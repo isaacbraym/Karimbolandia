@@ -10,8 +10,28 @@ import { makeCommunityRoom } from '../src/game/interior/rooms/community';
 import { captureSave, applySave } from '../src/game/save';
 import { validateSave } from '../src/core/saveValidation';
 import { newCtl } from './helpers/bot';
+import { painterOf } from '../src/art/interior/furniture';
+import { TILE_W, TILE_H } from '../src/game/interior/iso';
+import '../src/art/interior/paint/benedita';
 
 describe('Casas distintas e exploração livre', () => {
+  it('mesa e baú desenham o tampo dentro da pegada usada pela circulação',()=>{
+    for(const [paint,w,h,z] of [['houseTable',2,1,22],['houseTable',2,2,22],['trunk',1,1,14],['trunk',1,2,14]] as const){
+      let points:number[][]=[],board:number[][]=[],color='';
+      const g=new Proxy({} as CanvasRenderingContext2D,{get(_o,k){
+        if(k==='beginPath')return()=>{points=[];};
+        if(k==='moveTo'||k==='lineTo')return(x:number,y:number)=>points.push([x,y]);
+        if(k==='fill')return()=>{if(color==='#9a6a44')board=points;};
+        return()=>{};
+      },set(_o,k,v){if(k==='fillStyle')color=v;return true;}});
+      painterOf(paint).base(g,{id:paint,name:paint,paint,gx:0,gy:0,w,h,verbs:()=>[]},'');
+      expect(board).toHaveLength(4);
+      for(const [x,y] of board){
+        expect(Math.abs(x/TILE_W+(y+z)/TILE_H)).toBeLessThanOrEqual(w/2+.03);
+        expect(Math.abs((y+z)/TILE_H-x/TILE_W)).toBeLessThanOrEqual(h/2+.03);
+      }
+    }
+  });
   it('todas as portas coincidem com o caminho caminhável e podem ser oferecidas sem ameaça', () => {
     const w=new World(buildJungle());w.enemies=[];
     const spots=w.exploration.spots.filter(s=>s.interior);
@@ -31,6 +51,12 @@ describe('Casas distintas e exploração livre', () => {
     for(const id of ROOM_IDS.filter(id=>id.includes(':'))){
       const room=makeCommunityRoom(id);layouts.add(JSON.stringify([room.rows,room.furniture.map(f=>[f.paint,f.gx,f.gy]),room.palette]));
       for(const floor of room.floors!){
+        const solid = floor.furniture.filter(f => f.solid !== false && !f.wall && !f.lift);
+        for (let i = 0; i < solid.length; i++) for (let j = i + 1; j < solid.length; j++) {
+          const a=solid[i],b=solid[j];
+          expect(a.gx < b.gx+b.w && a.gx+a.w > b.gx && a.gy < b.gy+b.h && a.gy+a.h > b.gy,
+            `${floor.title}: ${a.name} atravessa ${b.name}`).toBe(false);
+        }
         const sim=new InteriorSim(floor,new InteriorStore());
         expect(sim.grid.walkable(floor.spawn.x,floor.spawn.y),floor.title).toBe(true);
         expect(findPath(sim.grid,floor.spawn,[floor.door])?.length??0,floor.title).toBeGreaterThan(0);
@@ -40,6 +66,7 @@ describe('Casas distintas e exploração livre', () => {
         }
         if(room.floors!.length===2){
           const stairs=floor.furniture.find(f=>f.id==='stairs')!;
+          expect(stairs.paint).toBe(floor.floor === 0 ? 'stairs' : 'stairsDown');
           stairs.verbs(sim,stairs)[0].run(sim,stairs);
           expect(sim.drain()).toContainEqual({type:'floor',index:floor.floor===0?1:0});
         }

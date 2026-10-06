@@ -24,7 +24,8 @@ export const LETTER_X1 = 326 * TILE;
 export const LETTER_WATER_GAP = 192;
 /** a perseguição é baixada em silêncio a partir de ~60 tiles antes */
 export const LETTER_PREFETCH_X = 145 * TILE;
-export const LETTER_T = { whistle: 0, land: 2, peck: 2.2, give: 2.5, banner: 3, vine: 4.5, grab: 5.2, dance: 5.5, fury: 6.5, flee: 7.5, jump: 7.7, chase: 8.7 } as const;
+export const LETTER_T = { whistle: 0, land: 2, peck: 2.2, give: 2.5, banner: 3, vine: 4.5,
+  leap: 5.15, head: 5.65, grab: 6.1, dance: 6.55, fury: 7.5, flee: 8.5, jump: 8.7, chase: 9.7 } as const;
 
 export type PigeonMode = 'hidden' | 'fly' | 'perch' | 'leave';
 export type LetterMode = 'none' | 'folded' | 'open' | 'stolen';
@@ -41,7 +42,7 @@ export class LetterScene {
   pigeon: PigeonMode = 'hidden';
   letter: LetterMode = 'none';
   /** macaco: modo e profundidade (0 = na trilha, 1 = enfiado no mato do fundo) */
-  monkey: 'hidden' | 'vine' | 'branch' | 'flee' = 'hidden';
+  monkey: 'hidden' | 'vine' | 'head' | 'branch' | 'flee' = 'hidden';
   readonly shouts: Shout[] = [];
   private ctl: ControlState = { ...nullControls, jump: { held: false, pressed: false, released: false } };
   private done = new Set<string>();
@@ -133,6 +134,10 @@ export class LetterScene {
     this.once('give', T.give, t, () => { this.letter = 'folded'; this.pigeon = 'leave'; });
     this.once('banner', T.banner, t, () => { this.letter = 'open'; w.hooks.onBanner?.('CARTA DA PRINCESA JÚLIA!', 'O pombo-correio entregou. Tem coração desenhado no envelope.', 2.6); w.audio('checkpoint', 0.6, p.x); });
     this.once('vine', T.vine, t, () => { this.monkey = 'vine'; w.audio('bird2', 0.7, p.x + 90); });
+    this.once('head', T.head, t, () => {
+      this.monkey = 'head'; p.earPop(1.8); w.audio('cluck', .6, p.x);
+      w.fx.sparks(p.x, p.y - 90, 5, '#e8e6b9', 50);
+    });
     this.once('grab', T.grab, t, () => {
       this.letter = 'stolen';
       w.audio('crunch', 0.8, p.x + 90);

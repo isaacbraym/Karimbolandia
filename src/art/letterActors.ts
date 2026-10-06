@@ -118,11 +118,23 @@ export function drawLetterScene(g: CanvasRenderingContext2D, w: World, sc: Lette
   if (sc.monkey !== 'hidden') {
     let mx = x0 + 110, my = y0 - 110, alpha = 1, scale = 1, stride = 0, arms: 'rest' | 'up' | 'hold' = 'hold';
     if (sc.monkey === 'vine') {
-      const u = ease(clamp01((t - T.vine) / 0.8));
-      my = y0 - 330 + 220 * u;
-      arms = t < T.grab ? 'up' : 'hold';
+      const u = ease(clamp01((t - T.vine) / (T.leap - T.vine)));
+      my = y0 - 330 + 205 * u;
+      arms = 'up';
       // cipó do alto até as mãos
-      g.strokeStyle = '#2f6a2e'; g.lineWidth = 3; g.beginPath(); g.moveTo(mx + 6, y0 - 480); g.lineTo(mx + 6 + Math.sin(t * 3) * 3, my - 26); g.stroke();
+      if (t < T.leap) {
+        g.strokeStyle = '#2f6a2e'; g.lineWidth = 3; g.beginPath(); g.moveTo(mx + 6, y0 - 480); g.lineTo(mx + 6 + Math.sin(t * 3) * 3, my - 26); g.stroke();
+      } else {
+        const jump = clamp01((t - T.leap) / (T.head - T.leap));
+        mx = x0 + 110 * (1 - jump); my = y0 - 125 + 51 * jump - Math.sin(jump * Math.PI) * 72;
+      }
+    } else if (sc.monkey === 'head') {
+      mx = p.x; my = p.feetY - 74;
+      arms = t < T.grab ? 'rest' : 'hold';
+      if (t >= T.grab) {
+        const jump = clamp01((t - T.grab) / (T.dance - T.grab));
+        mx += 175 * jump; my -= 38 * jump + Math.sin(jump * Math.PI) * 70;
+      }
     } else if (sc.monkey === 'branch') {
       mx = x0 + 175; my = y0 - 112 - Math.abs(Math.sin(t * 7)) * 8; arms = 'up';
       g.strokeStyle = OUT; g.lineWidth = 9; g.lineCap = 'round'; g.beginPath(); g.moveTo(x0 + 120, y0 - 106); g.lineTo(x0 + 240, y0 - 112); g.stroke();
@@ -133,6 +145,13 @@ export function drawLetterScene(g: CanvasRenderingContext2D, w: World, sc: Lette
       scale = 1 - 0.55 * u; alpha = 1 - 0.65 * u; stride = Math.sin(t * 14); arms = 'hold';
     }
     drawMonkey(g, mx, my, scale, t, { facing: sc.monkey === 'flee' ? 1 : -1, stride, arms, headRot: Math.sin(t * 8) * 0.15, alpha });
+    if (sc.monkey === 'head' && t < T.grab) {
+      const reach = clamp01((t-T.head-.15)/(T.grab-T.head-.15));
+      const handX=mx+8+7*reach,handY=my-8+32*reach;
+      g.lineCap='round';g.strokeStyle=OUT;g.lineWidth=7;
+      g.beginPath();g.moveTo(mx+9,my-32);g.quadraticCurveTo(mx+26,my-12,handX,handY);g.stroke();
+      g.strokeStyle='#a87645';g.lineWidth=4;g.stroke();oval(g,handX,handY,4,3,'#e5ac69');
+    }
     // a carta na mão do macaco
     if (sc.letter === 'stolen') drawSpr(g, a.folded, mx - 18 * scale + (arms === 'up' ? 24 * scale : 0), my - 30 * scale - (arms === 'up' ? 24 * scale : 0), { sx: 0.8 * scale, sy: 0.8 * scale, rot: Math.sin(t * 9) * 0.25, alpha });
   }
