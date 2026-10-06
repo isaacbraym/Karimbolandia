@@ -10,14 +10,15 @@ import type { ControlState } from '../core/input';
 import type { MinigameResult } from './minigames/types';
 import { TILE } from './level';
 import { nullControls } from './player';
+import { FIREFLY_COLUMNS } from './encounters/catalog';
 
 export const LETTER_ID = 'jungle:letter-chase';
 /**
  * A cena dispara no primeiro momento tranquilo depois das dicas de tutorial (hint:jump em 188): em
- * chão seco, sem inimigos por perto e longe da água. Começa em 205 (logo depois das dicas) e vale até
+ * chão seco, sem inimigos por perto e longe da água. Começa depois do quarto ponto dos vagalumes e vale até
  * o desfiladeiro, para não se perder se o jogador passar correndo pelos soldados.
  */
-export const LETTER_X0 = 205 * TILE;
+export const LETTER_X0 = (FIREFLY_COLUMNS.at(-1)! + 2) * TILE;
 export const LETTER_X1 = 326 * TILE;
 /** distância mínima (px) de qualquer pântano/lago para a cena acontecer */
 export const LETTER_WATER_GAP = 192;
@@ -72,6 +73,7 @@ export class LetterScene {
     const p = w.player;
     if (!this.exists || this.t >= 0 || w.encounters.completed.has(LETTER_ID)) return false;
     if (p.x < LETTER_X0 || p.x > LETTER_X1) return false;
+    if (w.encounters.active?.def.id === 'jungle:firefly-trail') return false;
     if (p.mode !== 'foot' || p.mounted || p.swimming || p.crouch || !p.body.onGround || p.hurtT > 0 || p.lockInput || p.vine) return false;
     if (p.sink > 0 || w.water.zones.some((z) => p.x > z.x - LETTER_WATER_GAP && p.x < z.x + z.w + LETTER_WATER_GAP && p.feetY > z.y - 120) || w.water.wadeDepth(p.x, p.feetY) > 0 || w.director.cine || w.finished || w.inRoom() || w.doorT >= 0 || w.village.active || w.club.active || w.thinker.active) return false;
     if (w.enemies.some((e) => e.alive && Math.abs(e.x - p.x) < 700)) return false;

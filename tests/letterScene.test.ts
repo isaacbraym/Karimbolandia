@@ -33,6 +33,22 @@ async function setup(opts: { enemies?: boolean } = {}) {
 }
 
 describe('cena do pombo-correio e do macaco', () => {
+  it('espera as quatro posições dos vagalumes e não interrompe uma tentativa ativa', async () => {
+    const { w, stand } = await setup();
+    const trail = w.encounters.trails.find(t => t.def.id === 'jungle:firefly-trail')!;
+    expect(trail.def.points).toHaveLength(4);
+    stand(207);
+    expect(w.letter.active).toBe(false);
+    trail.status = 'active'; trail.next = 3;
+    stand(211);
+    expect(w.letter.active).toBe(false);
+    expect(w.player.x).toBeGreaterThan(trail.def.points[3].x);
+    trail.reset(true);
+    expect(w.letter.canStart(w)).toBe(true);
+    w.update(1 / 60, newCtl());
+    expect(w.letter.active).toBe(true);
+  });
+
   it('o trecho de 205 a 211 é chão seco e plano, sem água nem gatilho sobreposto', async () => {
     const { w } = await setup();
     const ys: number[] = [];
@@ -49,7 +65,7 @@ describe('cena do pombo-correio e do macaco', () => {
 
   it('dispara uma vez, trava o controle, entrega a carta e pede a perseguição exatamente uma vez', async () => {
     const { w, hooks, stand, run } = await setup();
-    stand(207);
+    stand(211);
     expect(w.letter.active).toBe(true);
     const x0 = w.letter.theftX;
     run(4);
@@ -70,7 +86,7 @@ describe('cena do pombo-correio e do macaco', () => {
 
   it('vitória: conclui, dá as moedas uma vez, devolve o Karimbo ao ponto do roubo virado para a direita', async () => {
     const { w, hooks, stand, run } = await setup();
-    stand(207);
+    stand(211);
     run(10);
     const x0 = w.letter.theftX;
     const coins0 = w.tokens;
@@ -82,7 +98,7 @@ describe('cena do pombo-correio e do macaco', () => {
     expect(w.tokens - coins0).toBe(30); // ouro
     expect(hooks.banners).toContain('CARTA RECUPERADA!');
     // não repete e não paga de novo
-    stand(209);
+    stand(211);
     run(4);
     expect(hooks.chase).toHaveBeenCalledTimes(1);
     expect(w.tokens - coins0).toBe(30);
@@ -91,7 +107,7 @@ describe('cena do pombo-correio e do macaco', () => {
   it('medalhas: prata até 68 s, bronze depois', async () => {
     for (const [time, mistakes, coins] of [[60, 0, 20], [75, 1, 12], [50, 1, 20]] as const) {
       const { w, hooks, stand, run } = await setup();
-      stand(207);
+      stand(211);
       run(10);
       const c0 = w.tokens;
       hooks.chase.mock.calls[0][0]({ id: 'chase', outcome: 'win', time, mistakes });
@@ -101,13 +117,13 @@ describe('cena do pombo-correio e do macaco', () => {
 
   it('abandonar não conclui, não paga e a cena pode acontecer de novo', async () => {
     const { w, hooks, stand, run } = await setup();
-    stand(207);
+    stand(211);
     run(10);
     hooks.chase.mock.calls[0][0]({ id: 'chase', outcome: 'abort', time: 0, mistakes: 0 });
     expect(w.encounters.completed.has('jungle:letter-chase')).toBe(false);
     expect(w.letter.active).toBe(false);
     expect(w.player.lockInput).toBe(false);
-    stand(209);
+    stand(211);
     expect(w.letter.active).toBe(true);
     run(10);
     expect(hooks.chase).toHaveBeenCalledTimes(2);
@@ -115,18 +131,18 @@ describe('cena do pombo-correio e do macaco', () => {
 
   it('não dispara com inimigos perto, em cinemática, na água, a cavalo nem fora do trecho', async () => {
     const a = await setup({ enemies: true });
-    a.stand(207);
+    a.stand(211);
     expect(a.w.letter.active).toBe(false); // a fase tem soldados por perto
     const b = await setup();
     b.w.director.cine = { kind: 'nomad' } as never;
-    b.stand(207);
+    b.stand(211);
     expect(b.w.letter.active).toBe(false);
     const c = await setup();
     c.stand(180); // antes das dicas de tutorial
     expect(c.w.letter.active).toBe(false);
     const d = await setup();
     d.w.encounters.completed.add('jungle:letter-chase');
-    d.stand(207);
+    d.stand(211);
     expect(d.w.letter.active).toBe(false);
     const e = await setup();
     e.stand(240); // dentro do pântano
@@ -141,7 +157,7 @@ describe('cena do pombo-correio e do macaco', () => {
 
   it('morrer ou resetar no meio solta o controle e libera a cena para repetir', async () => {
     const { w, stand, run } = await setup();
-    stand(207);
+    stand(211);
     run(3);
     expect(w.letter.active).toBe(true);
     w.player.mode = 'dead';
@@ -155,7 +171,7 @@ describe('cena do pombo-correio e do macaco', () => {
 describe('revisão T9–T11', () => {
   it('a vitória devolve o Karimbo com os pés no mesmo chão do roubo (sem 28 px no ar)', async () => {
     const { w, hooks, stand, run } = await setup();
-    stand(207);
+    stand(211);
     run(10);
     const feet = w.letter.theftY + w.player.body.h / 2;
     hooks.chase.mock.calls[0][0]({ id: 'chase', outcome: 'win', time: 52, mistakes: 0 });
@@ -164,7 +180,7 @@ describe('revisão T9–T11', () => {
 
   it('abandonar devolve o Karimbo ao ponto do roubo (a cena recomeça do mesmo lugar)', async () => {
     const { w, hooks, stand, run } = await setup();
-    stand(207);
+    stand(211);
     run(10);
     const x0 = w.letter.theftX;
     expect(w.player.x).toBeGreaterThan(x0 + 100);
@@ -181,7 +197,7 @@ describe('revisão T9–T11', () => {
 
   it('o pulo roteirizado da fuga não se perde em quadros longos', async () => {
     const { w, stand } = await setup();
-    stand(207);
+    stand(211);
     const ctl = (w.letter as unknown as { ctl: { jump: { pressed: boolean } } }).ctl;
     let edges = 0;
     for (let i = 0; i < 20 * 12; i++) { w.update(1 / 20, newCtl()); if (ctl.jump.pressed) edges++; }

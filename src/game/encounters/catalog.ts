@@ -2,10 +2,12 @@ import { TILE, T, type LevelData } from '../level';
 import type { TrailDefinition } from './challenge';
 import { FLIGHT_HEIGHT, type EscortDefinition } from './escort';
 
+export const FIREFLY_COLUMNS = [190, 195, 202, 209] as const;
+
 /** Authored calm stretches; the ground relief determines each jump's height. */
 export function encounterCatalog(data: LevelData): TrailDefinition[] {
   const jungle = data.stage === 2;
-  const tiles = jungle ? [190, 195, 202, 209] : [24, 29, 36, 45];
+  const tiles = jungle ? FIREFLY_COLUMNS : [24, 29, 36, 45];
   const points = tiles.map(tile => {
     const x = (tile + .5) * TILE;
     const ground = data.level.groundBelow(x, data.playerStart.y - TILE * 2, TILE * 4);

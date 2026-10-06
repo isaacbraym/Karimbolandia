@@ -99,6 +99,10 @@ O principal cresceu ~80 kB (+25 kB gzip) por causa de lago/skin/cenas do mundo (
 
 ## Limites
 
+### Ordem dos vagalumes e da carta (revisão 2026-10-06)
+
+A janela antiga da carta começava na coluna 205, antes da quarta posição dos vagalumes (209,5). `FIREFLY_COLUMNS` agora é a fonte única das quatro posições, e a carta começa duas colunas depois da última (211). Uma tentativa ativa da trilha bloqueia a carta; terminar ou expirar a tentativa permite a cena no primeiro ponto seguro, sem tornar o desafio opcional obrigatório. Permanecem os bloqueios de água, combate e cinemáticas. `letterScene.test.ts` verifica a ordem, a não interrupção da quarta posição e os fluxos de vitória/abandono/retorno com a nova entrada.
+
 - Os tempos 51/64/≤ 92 s são de bots determinísticos em 1/60 s; jogador real varia. As constantes (`MONKEY_V`, `SHAKE_T`, dicas) foram calibradas **com esses bots**; mexer no percurso ou na física obriga a rodar `tests/chase.test.ts` e reavaliar.
 - Layout de toque foi verificado emulado (sem ergonomia física): o bead de validação em aparelho real cobre dois polegares, gesto de esquiva e legibilidade da carta em tela pequena.
 - Pendências menores da revisão (ver Beads): `lastLegacyEquipped` é global do módulo; o backup `.json` e a nuvem carregam `jacare` em `ownedSkins` (cliente antigo falha a validação sem apagar dados); alocações pequenas por quadro no `Input.poll` do boxe.
