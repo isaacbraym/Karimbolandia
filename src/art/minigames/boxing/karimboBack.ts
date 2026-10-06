@@ -16,6 +16,7 @@ import type { KState } from '../../../game/minigames/boxing/sim/match';
 import { PUNCHES, type PunchTier } from '../../../game/minigames/boxing/sim/rules';
 import { getBackPhotos } from './backPhotos';
 import { drawGlove, type GloveStyle, type GloveView } from './gloves';
+import { newArm, solveArm, depthScale, type Cam } from './armRig';
 import type { BoxLayout } from './layout';
 
 const OUT = '#170f2e';
@@ -186,16 +187,46 @@ function bakeFor(art: KarimboArt, skin: SkinId, bk: number): Bake | null {
 // ───────────────────────── trajetória das luvas ─────────────────────────
 const ease = (t: number) => t * t * (3 - 2 * t);
 const easeOut = (t: number) => 1 - (1 - t) * (1 - t);
-interface GloveState { x: number; y: number; sc: number; rot: number; view: GloveView; trail: number }
-const gs: [GloveState, GloveState] = [{ x: 0, y: 0, sc: 1, rot: 0, view: 'costas', trail: 0 }, { x: 0, y: 0, sc: 1, rot: 0, view: 'costas', trail: 0 }];
-const REST = { L: [-104, -48, 1], R: [84, -16, 0.96] } as const;
-const GUARD = { L: [-70, -96, 0.92], R: [68, -96, 0.92] } as const;
+/**
+ * Câmera oblíqua: a frente do Karimbo (z) aponta para cima na tela e um pouco para o lado do jacaré, como
+ * numa câmera por cima do ombro. As luvas são autoradas em coordenadas de tela + profundidade (`z`).
+ */
+const CAM: Cam = { kx: 0.28, ky: -0.5, F: 520 };
+/** comprimento dos ossos (braço, antebraço) e alongamento máximo quando o alvo está longe */
+const BONE_A = 118, BONE_B = 112, MAX_STRETCH = 1.9;
+/** em guarda os ossos ficam dobrados e curtos; esticam ao socar (o braço "cresce" na direção do alvo) */
+const BONE_REST = 0.8;
+/** altura/largura do ombro em unidades do corpo (junção do braço com o tronco) */
+const SHOULDER = { x: 90, y: 38 };
+interface GloveState { x: number; y: number; sc: number; rot: number; view: GloveView; trail: number; z: number; u: number; tier: PunchTier | null }
+const mkGs = (): GloveState => ({ x: 0, y: 0, sc: 1, rot: 0, view: 'costas', trail: 0, z: 0, u: 0, tier: null });
+const gs: [GloveState, GloveState] = [mkGs(), mkGs()];
+/** descanso (mãos baixas, relaxadas) e guarda (luvas ao lado do rosto): x, y de tela, escala, profundidade */
+const REST = { L: [-98, -52, 1, 78], R: [76, -30, 0.96, 66] } as const;
+const GUARD = { L: [-72, -92, 0.92, 104], R: [70, -92, 0.92, 104] } as const;
+/** profundidade do punho no fim de cada golpe (o ombro está em z = 0) */
+const Z_END: Record<PunchTier, number> = { jab: 232, direto: 240, cruzado: 196, gancho: 168 };
 
-/** Posição, tamanho e visão de uma luva em unidades do corpo. `T` = alvo (cabeça do jacaré) em unidades do corpo. */
+/** Extensão do golpe: 0 = descanso, 1 = braço todo; negativo = preparo (recua). */
+function punchU(pu: NonNullable<BackPose['punch']>): number {
+  let u: number;
+  if (pu.phase === 'wind') {
+    // preparo em duas metades: recua (antecipação) e ARREMESSA no restante, para a luva chegar ao alvo no instante do impacto (sem "teletransporte")
+    const back = -(pu.tier === 'jab' ? 0.12 : pu.tier === 'direto' ? 0.2 : 0.3);
+    const split = 0.45;
+    if (pu.k < split) u = back * easeOut(pu.k / split);
+    else { const q = (pu.k - split) / (1 - split); u = back + (0.96 - back) * q * q; }
+  }
+  else if (pu.phase === 'active') u = 1 + 0.04 * Math.sin(pu.k * Math.PI);
+  else u = 1 - ease(pu.k);
+  return Math.max(-0.4, u);
+}
+
+/** Posição, tamanho, profundidade e visão de uma luva em unidades do corpo. `T` = alvo (cabeça do jacaré) em unidades do corpo. */
 function glovePos(out: GloveState, side: 'L' | 'R', p: BackPose, T: { x: number; y: number }) {
   const rest = p.guard ? GUARD[side] : REST[side];
   const bob = Math.sin(p.time * 3.2 + (side === 'L' ? 0 : 1.7)) * 3;
-  out.x = rest[0]; out.y = rest[1] + bob; out.sc = rest[2]; out.rot = 0; out.view = 'costas'; out.trail = 0;
+  out.x = rest[0]; out.y = rest[1] + bob; out.sc = rest[2]; out.z = rest[3]; out.rot = 0; out.view = 'costas'; out.trail = 0; out.u = 0; out.tier = null;
   const pu = p.punch;
   if (!pu || pu.side !== side) return;
   const dir = side === 'L' ? -1 : 1;
@@ -208,43 +239,34 @@ function glovePos(out: GloveState, side: 'L' | 'R', p: BackPose, T: { x: number;
     case 'cruzado': ex = hx - dir * 30; ey = hy + 12; cx = rest[0] + dir * 170; cy = (rest[1] + ey) / 2 + 20; break;
     case 'gancho': ex = hx - dir * 8; ey = hy + 50; cx = (rest[0] + ex) / 2; cy = rest[1] + 140; endSc = 0.62; break;
   }
-  // u: 0 = descanso, 1 = extensão total; no preparo recua (antecipação)
-  let u: number;
-  if (pu.phase === 'wind') u = -(pu.tier === 'jab' ? 0.12 : pu.tier === 'direto' ? 0.2 : 0.3) * easeOut(pu.k);
-  else if (pu.phase === 'active') u = 1 + 0.04 * Math.sin(pu.k * Math.PI);
-  else u = 1 - ease(pu.k);
-  const uu = Math.max(-0.4, u);
+  const uu = punchU(pu);
   const t = Math.max(0, Math.min(1, uu));
   let x: number, y: number;
   if (pu.tier === 'jab' || pu.tier === 'direto') { x = rest[0] + (ex - rest[0]) * uu; y = rest[1] + (ey - rest[1]) * uu; }
   else { const q = 1 - t; x = q * q * rest[0] + 2 * q * t * cx + t * t * ex + (uu < 0 ? (ex - rest[0]) * uu : 0); y = q * q * rest[1] + 2 * q * t * cy + t * t * ey + (uu < 0 ? (ey - rest[1]) * uu : 0); }
   out.x = x; out.y = y;
+  out.u = uu; out.tier = pu.tier;
+  out.z = rest[3] + (Z_END[pu.tier] - rest[3]) * uu;
   out.sc = rest[2] + (endSc - rest[2]) * Math.max(0, uu) + (uu < 0 ? 0.08 * -uu : 0);
   out.rot = pu.tier === 'cruzado' ? dir * (-0.9 + 1.4 * t) * Math.sin(Math.PI * Math.min(1, t * 1.1)) : pu.tier === 'gancho' ? -dir * 0.5 * Math.sin(Math.PI * t) : dir * -0.05;
   out.view = pu.phase === 'active' ? 'quente' : pu.tier === 'cruzado' && t > 0.18 && t < 0.88 ? 'perfil' : 'costas';
-  out.trail = pu.phase === 'recover' ? 0.35 * (1 - pu.k) : pu.phase === 'active' ? 0.6 : 0.2 * Math.max(0, -uu);
+  out.trail = pu.phase === 'recover' ? 0.35 * (1 - pu.k) : pu.phase === 'active' ? 0.6 : Math.max(0.2 * Math.max(0, -uu), uu > 0.15 ? 0.55 * Math.min(1, uu) : 0);
 }
 
 // ───────────────────────── desenho ─────────────────────────
-interface Tmp { x: number; y: number }
-const elbow: Tmp = { x: 0, y: 0 };
-const T: Tmp = { x: 0, y: 0 };
+const arm = newArm();
+const W3 = { x: 0, y: 0, z: 0 };
+const T: { x: number; y: number } = { x: 0, y: 0 };
 
-/** Duas partes: ombro → cotovelo → pulso (cinemática inversa), cotovelo para baixo e para fora. */
-function armIK(sx: number, sy: number, wx: number, wy: number, side: -1 | 1, a: number, b: number) {
-  const dx = wx - sx, dy = wy - sy;
-  let d = Math.hypot(dx, dy);
-  const reach = a + b - 2;
-  if (d > reach) { d = reach; }
-  const dd = Math.max(Math.abs(a - b) + 2, d);
-  const cosA = (a * a + dd * dd - b * b) / (2 * a * dd);
-  const ang = Math.acos(Math.max(-1, Math.min(1, cosA)));
-  const base = Math.atan2(dy, dx);
-  // o cotovelo fica do lado de baixo/fora: gira conforme o lado
-  const th = base + side * ang * (dy < 0 ? 1 : -1) * -1;
-  elbow.x = sx + Math.cos(th) * a;
-  elbow.y = sy + Math.sin(th) * a;
+/** Vetor-guia do cotovelo: baixo e colado na guarda; alto e aberto no cruzado; por baixo no gancho. */
+const POLE: Record<PunchTier, [number, number, number]> = { jab: [0.25, 1, -0.1], direto: [0.25, 1, -0.1], cruzado: [1, 0.15, 0], gancho: [0.8, 0.75, -0.5] };
+function elbowPole(out: [number, number, number], sgn: -1 | 1, st: GloveState, guard: boolean) {
+  const rx = guard ? 0.12 : 0.3, rz = guard ? 0.3 : 0.1;
+  const e = st.tier ? ease(Math.max(0, Math.min(1, st.u))) : 0;
+  const t = st.tier ? POLE[st.tier] : POLE.jab;
+  out[0] = sgn * (rx + (t[0] - rx) * e); out[1] = 1 + (t[1] - 1) * e; out[2] = rz + (t[2] - rz) * e;
 }
+const pole: [number, number, number] = [0, 1, 0];
 
 /** Membro afunilado (largura w0 → w1) com contorno: dá a perspectiva do braço que se afasta da câmera. */
 function limb(g: CanvasRenderingContext2D, x0: number, y0: number, w0: number, x1: number, y1: number, w1: number, color: string) {
@@ -265,6 +287,80 @@ function limb(g: CanvasRenderingContext2D, x0: number, y0: number, w0: number, x
   draw(0, color);
 }
 
+/** Cabeça de junta (ombro e cotovelo): esconde a emenda dos dois membros sem desenhar um anel por cima. */
+function joint(g: CanvasRenderingContext2D, x: number, y: number, r: number, color: string) {
+  g.fillStyle = color; g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill();
+}
+
+/**
+ * Um braço inteiro: ombro (que avança no golpe), cotovelo (3D, empurrado pelo vetor-guia), antebraço e luva.
+ * `role`: 1 = braço que ataca, −1 = o outro (recua), 0 = sem golpe; `ext` = extensão do golpe (0..1).
+ */
+/** Geometria de um braço já projetada para a tela (unidades do corpo): o que o desenho e os testes leem. */
+export interface ArmGeom {
+  sx: number; sy: number; sz: number; ex: number; ey: number; ez: number; wx: number; wy: number; wz: number;
+  stretch: number; bone: number;
+}
+export const newArmGeom = (): ArmGeom => ({ sx: 0, sy: 0, sz: 0, ex: 0, ey: 0, ez: 0, wx: 0, wy: 0, wz: 0, stretch: 1, bone: 1 });
+/** Calcula ombro, cotovelo e punho (já em tela) de um braço. `role`: 1 ataca, −1 o outro, 0 sem golpe; `ext` = extensão do golpe 0..1. */
+export function armGeometry(out: ArmGeom, side: 'L' | 'R', st: GloveState, guard: boolean, role: -1 | 0 | 1, ext: number): ArmGeom {
+  const sgn: -1 | 1 = side === 'L' ? -1 : 1;
+  // ombro 3D: o de ataque avança e sobe, o de trás recua (giro do tronco)
+  const sz = role === 1 ? 34 * ext : role === -1 ? -14 * ext : 0;
+  const sx = sgn * SHOULDER.x, sy = SHOULDER.y - (role === 1 ? 6 * ext : 0);
+  // pulso = abaixo do punho da luva (a luva é desenhada com a base do cuff em (x, y))
+  W3.x = st.x - CAM.kx * st.z; W3.y = st.y + 8 * st.sc - CAM.ky * st.z; W3.z = st.z;
+  elbowPole(pole, sgn, st, guard);
+  const lenK = BONE_REST + (1 - BONE_REST) * Math.max(0, Math.min(1, st.u));
+  solveArm(arm, sx, sy, sz, W3.x, W3.y, W3.z, BONE_A * lenK, BONE_B * lenK, pole[0], pole[1], pole[2], MAX_STRETCH);
+  out.sx = sx + CAM.kx * sz; out.sy = sy + CAM.ky * sz; out.sz = sz;
+  out.ex = arm.ex + CAM.kx * arm.ez; out.ey = arm.ey + CAM.ky * arm.ez; out.ez = arm.ez;
+  out.wx = arm.wx + CAM.kx * arm.wz; out.wy = arm.wy + CAM.ky * arm.wz; out.wz = arm.wz;
+  out.stretch = arm.stretch; out.bone = lenK;
+  return out;
+}
+const AG = newArmGeom();
+
+/** Só para testes: pose de um golpe → luva autorada e geometria do braço (sem canvas). */
+export function armPoseForTest(side: 'L' | 'R', p: BackPose, target: { x: number; y: number }, role: -1 | 0 | 1 = 0, ext = 0) {
+  const st = mkGs();
+  glovePos(st, side, p, target);
+  const g = armGeometry(newArmGeom(), side, st, p.guard, role, role === 1 ? Math.max(0, Math.min(1, st.u)) : ext);
+  return { glove: { x: st.x, y: st.y + 8 * st.sc, z: st.z }, arm: g, stretch: g.stretch, sc: st.sc, u: st.u };
+}
+
+function drawArm(g: CanvasRenderingContext2D, side: 'L' | 'R', st: GloveState, p: BackPose, lk: SkinLook, skin: string, glove: GloveStyle, kk: number, role: -1 | 0 | 1, ext: number) {
+  const geo = armGeometry(AG, side, st, p.guard, role, ext);
+  const sz = geo.sz, sx2 = geo.sx, sy2 = geo.sy, ex = geo.ex, ey = geo.ey, wx = geo.wx, wy = geo.wy;
+  const fs = (z: number) => depthScale(z, CAM.F);
+  // o braço esticado afina (o mesmo volume em mais comprimento): sem isso vira um taco
+  const slim = 1 / (1 + 0.55 * (geo.stretch - 1));
+  const wS = 40 * fs(sz) * slim, wE = 31 * fs(geo.ez) * slim, wW = 24 * st.sc * (0.7 + 0.3 * slim);
+  const longSleeve = lk.sleeve === 'long';
+  const sleeve = lk.shirt;
+  // antebraço (mais longe) primeiro, depois o braço de cima por cima: a luva fecha o conjunto
+  limb(g, ex, ey, wE, wx, wy, wW, longSleeve ? sleeve : skin);
+  if (lk.sleeve === 'short') {
+    const mx = sx2 + (ex - sx2) * 0.5, my = sy2 + (ey - sy2) * 0.5;
+    limb(g, sx2, sy2, wS, mx, my, wS * 0.9, sleeve);
+    limb(g, mx, my, wS * 0.9, ex, ey, wE, skin);
+  } else limb(g, sx2, sy2, wS, ex, ey, wE, sleeve);
+  joint(g, ex, ey, wE * 0.5 - 0.5, lk.sleeve === 'short' ? skin : sleeve);
+  joint(g, sx2, sy2, wS * 0.5 - 0.5, sleeve);
+  if (lk.sleeve !== 'short' && lk.glow) { g.strokeStyle = lk.glow; g.lineWidth = 3; g.beginPath(); g.moveTo(sx2, sy2); g.lineTo(ex, ey); g.stroke(); }
+  // a luva acompanha o antebraço (o punho gira junto): mistura o giro autorado com a direção do osso
+  const fdx = wx - ex, fdy = wy - ey, fl = Math.hypot(fdx, fdy);
+  const bend = Math.max(-0.9, Math.min(0.9, Math.atan2(fdx, -fdy))) * Math.min(1, fl / 70) * 0.55;
+  const gx = wx, gy = wy - 8 * st.sc, rot = st.rot + bend;
+  // rastro do soco: dois fantasmas mais claros atrás
+  if (st.trail > 0.05) {
+    const rest = REST[side];
+    const px = gx - (gx - rest[0]) * 0.18, py = gy - (gy - rest[1]) * 0.18;
+    drawGlove(g, glove, 'costas', kk * 1.3, px, py, 74 * st.sc * 0.95, rot, st.trail * 0.45, side === 'R');
+  }
+  drawGlove(g, glove, st.view, kk * 1.3, gx, gy, 74 * st.sc, rot, 1, side === 'R');
+}
+
 /**
  * Desenha o Karimbo de costas no layout `L` (base do pescoço em L.karimbo). `k` = pixels de tela por
  * unidade lógica; `glove` = estilo das luvas.
@@ -281,44 +377,21 @@ export function drawKarimboBack(g: CanvasRenderingContext2D, art: KarimboArt, sk
   const front = spinS < -0.05;
   const widthK = Math.abs(spinS) < 0.12 ? 0.12 : Math.abs(spinS);
   const hurtShake = p.hurt > 0 ? Math.sin(p.time * 70) * 3 * p.hurt : 0;
-  const ax = L.karimbo.x + dodgeX + hurtShake * s;
-  const ay = L.karimbo.y + duck * 50 * s + p.hurt * 14 * s + p.fall * 150 * s;
-  // alvo em unidades do corpo (a cabeça do jacaré, onde os socos chegam)
-  T.x = (L.target.x - L.karimbo.x) / s;
-  T.y = (L.head.y - L.karimbo.y) / s;
+  // arrancada: no golpe o corpo inteiro avança um pouco para o jacaré (o ombro de ataque entra no soco)
+  const pu = p.punch;
+  const lunge = pu ? Math.max(0, punchU(pu)) : 0;
+  const dxT = L.target.x - L.karimbo.x, dyT = L.head.y - L.karimbo.y, dT = Math.hypot(dxT, dyT) || 1;
+  const lungePx = lunge * 48 * s;
+  const ax = L.karimbo.x + dodgeX + hurtShake * s + (dxT / dT) * lungePx;
+  const ay = L.karimbo.y + duck * 50 * s + p.hurt * 14 * s + p.fall * 150 * s + (dyT / dT) * lungePx;
+  // alvo em unidades do corpo (a cabeça do jacaré, onde os socos chegam), já descontada a arrancada
+  T.x = (L.target.x - ax + dodgeX) / s;
+  T.y = (L.head.y - ay + p.duck * 50 * s + p.hurt * 14 * s + p.fall * 150 * s) / s;
   g.save();
   g.translate(ax, ay);
   g.rotate(p.dodge * 0.17 + p.fall * 1.05 + (p.getup > 0 ? Math.sin(p.time * 22) * 0.04 * p.getup : 0));
   g.scale(s * (p.spin ? widthK : 1) * (1 + p.hurt * 0.05), s * (1 - duck * 0.12 + p.hurt * 0.04));
-  const ug = 1 / 1; void ug;
-
-  // ---- luvas e braços (mais longe da câmera que os ombros): desenhados ANTES do corpo
-  const sk = b.skin;
-  const sleeveColor = lk.shirt;
-  for (let i = 0; i < 2; i++) {
-    const side: 'L' | 'R' = i === 0 ? 'L' : 'R';
-    const st = gs[i];
-    glovePos(st, side, p, T);
-    const sgn: -1 | 1 = side === 'L' ? -1 : 1;
-    const sx = sgn * 92, sy = 34;
-    // pulso = abaixo do punho da luva (a luva é desenhada com a base do cuff em (x, y))
-    const wx = st.x, wy = st.y + 8 * st.sc;
-    armIK(sx, sy, wx, wy, sgn, 112, 104);
-    // braço de cima (manga) e antebraço (pele; manga longa também cobre): afunilam para longe da câmera
-    const w0 = 36, wE = 28 * (0.55 + 0.45 * st.sc), wW = 14 + 14 * st.sc;
-    const longSleeve = lk.sleeve === 'long';
-    const mx = sx + (elbow.x - sx) * 0.55, my = sy + (elbow.y - sy) * 0.55;
-    if (lk.sleeve === 'short') { limb(g, sx, sy, w0, mx, my, w0 * 0.88, sleeveColor); limb(g, mx, my, w0 * 0.88, elbow.x, elbow.y, wE, sk); }
-    else limb(g, sx, sy, w0, elbow.x, elbow.y, wE, sleeveColor);
-    limb(g, elbow.x, elbow.y, wE, wx, wy, wW, longSleeve ? sleeveColor : sk);
-    if (lk.sleeve !== 'short' && lk.glow) { g.strokeStyle = lk.glow; g.lineWidth = 3; g.beginPath(); g.moveTo(sx + sgn * -6, sy + 6); g.lineTo(elbow.x, elbow.y); g.stroke(); }
-    // rastro do soco: dois fantasmas mais claros atrás
-    if (st.trail > 0.05) {
-      const px = st.x - (st.x - REST[side][0]) * 0.18, py = st.y - (st.y - REST[side][1]) * 0.18;
-      drawGlove(g, glove, 'costas', k * s * 1.3, px, py, 74 * st.sc * 0.95, st.rot, st.trail * 0.45, side === 'R');
-    }
-    drawGlove(g, glove, st.view, k * s * 1.3, st.x, st.y, 74 * st.sc, st.rot, 1, side === 'R');
-  }
+  for (let i = 0; i < 2; i++) glovePos(gs[i], i === 0 ? 'L' : 'R', p, T);
 
   // ---- corpo (costas e ombros)
   g.drawImage(b.body, -BX, -BY, BW, BH);
@@ -361,6 +434,13 @@ export function drawKarimboBack(g: CanvasRenderingContext2D, art: KarimboArt, sk
     g.fillStyle = '#5f8a45'; g.beginPath(); g.ellipse(0, -111 + headY, 38.5, 21, 0, Math.PI, 0); g.fill();
     g.fillStyle = '#3f6430'; for (let i = -3; i <= 3; i++) { g.beginPath(); g.moveTo(i * 10 - 4, -111 + headY); g.lineTo(i * 10, -126 + headY + Math.abs(i) * 3); g.lineTo(i * 10 + 4, -111 + headY); g.closePath(); g.fill(); }
   }
+  // ---- braços e luvas (por cima do tronco E da cabeça: o braço que cruza na frente da nuca nunca some atrás dela)
+  const lead = p.punch ? (p.punch.side === 'L' ? 0 : 1) : -1;
+  const ext = lead === 0 || lead === 1 ? Math.max(0, Math.min(1, gs[lead].u)) : 0;
+  // do mais longe da câmera para o mais perto
+  const first = gs[1].z > gs[0].z ? 1 : 0;
+  for (const i of [first, 1 - first]) drawArm(g, i === 0 ? 'L' : 'R', gs[i], p, lk, b.skin, glove, k * s, i === lead ? 1 : lead >= 0 ? -1 : 0, ext);
+
   g.restore();
 }
 

@@ -16,6 +16,7 @@ import type { AttackKind, Guard } from '../../../game/minigames/boxing/sim/rules
 import { ATTACKS, BPM } from '../../../game/minigames/boxing/sim/rules';
 import type { GMode } from '../../../game/minigames/boxing/sim/match';
 import { drawGlove } from './gloves';
+import { newArm, solveArm, depthScale, type Cam } from './armRig';
 
 const OUT = '#170f2e';
 const GREEN = '#5f8a45', GREEN_D = '#46702f', GREEN_L = '#86ad5e';
@@ -224,13 +225,14 @@ const P: Pose = {
 };
 /** posição suavizada das luvas (só nas transições de guarda; os ataques escrevem direto) */
 const sm = { gx: [-26, 26], gy: [-132, -132], gs: [1, 1] };
-const GUARD: Record<Guard, [number, number, number][]> = {
-  alta: [[-25, -130, 1.0], [25, -130, 1.0]],
-  baixa: [[-36, -84, 1.0], [36, -84, 1.0]],
-  aberta: [[-74, -106, 0.95], [74, -106, 0.95]],
-  tonto: [[-56, -60, 0.9], [56, -60, 0.9]],
-  cobertura: [[-13, -118, 1.2], [13, -118, 1.2]],
-  ataque: [[-30, -118, 1.0], [30, -118, 1.0]],
+/** Luvas das guardas. A boca fica em x ±37, y −140…−104 (cabeça em −156): as luvas das guardas abertas ficam nas bochechas e NUNCA sobre ela; só a cobertura tapa o rosto de propósito. */
+export const GATOR_GUARD: Record<Guard, [number, number, number][]> = {
+  alta: [[-56, -146, 1.0], [56, -146, 1.0]],
+  baixa: [[-58, -74, 1.0], [58, -74, 1.0]],
+  aberta: [[-76, -108, 0.95], [76, -108, 0.95]],
+  tonto: [[-58, -62, 0.9], [58, -62, 0.9]],
+  cobertura: [[-18, -128, 1.2], [18, -128, 1.2]],
+  ataque: [[-60, -138, 1.0], [60, -138, 1.0]],
 };
 const ease = (t: number) => t * t * (3 - 2 * t);
 const easeOut = (t: number) => 1 - (1 - t) * (1 - t);
@@ -249,7 +251,7 @@ function computePose(p: GatorPose, dt: number) {
   P.hat = p.hatOff ? 3 : 0; P.hatX = 0; P.hatY = 0; P.hatS = 1; P.hatRot = Math.sin(beat * Math.PI * 0.5) * 0.03;
   P.headLate = false; P.stars = false; P.dust = 0; P.flash = 0;
   P.glate[0] = P.glate[1] = false;
-  const g0 = GUARD[p.guard] ?? GUARD.alta;
+  const g0 = GATOR_GUARD[p.guard] ?? GATOR_GUARD.alta;
   const k = 1 - Math.exp(-14 * dt);
   for (let i = 0; i < 2; i++) {
     sm.gx[i] += (g0[i][0] - sm.gx[i]) * k; sm.gy[i] += (g0[i][1] - sm.gy[i]) * k; sm.gs[i] += (g0[i][2] - sm.gs[i]) * k;
@@ -390,18 +392,24 @@ function computePose(p: GatorPose, dt: number) {
 }
 
 // ───────────────────────── desenho ─────────────────────────
-const elbow = { x: 0, y: 0 };
-/** Ombro → cotovelo → pulso: escolhe o cotovelo mais baixo e para fora do corpo. */
-function armIK(sx: number, sy: number, wx: number, wy: number, side: -1 | 1, a: number, b: number) {
-  const dx = wx - sx, dy = wy - sy;
-  const d = Math.max(Math.abs(a - b) + 2, Math.min(a + b - 2, Math.hypot(dx, dy)));
-  const ang = Math.acos(clamp((a * a + d * d - b * b) / (2 * a * d), -1, 1));
-  const base = Math.atan2(dy, dx);
-  const ax = sx + Math.cos(base + ang) * a, ay = sy + Math.sin(base + ang) * a;
-  const bx = sx + Math.cos(base - ang) * a, by = sy + Math.sin(base - ang) * a;
-  const sa = ay + side * ax * 0.6, sb = by + side * bx * 0.6;
-  if (sa >= sb) { elbow.x = ax; elbow.y = ay; } else { elbow.x = bx; elbow.y = by; }
+/**
+ * Braço do jacaré (de frente): a câmera está à frente e um pouco acima, então a frente do lutador (z) vem para
+ * a câmera (z < 0) e o que chega perto aparece mais embaixo. O cotovelo fica baixo e para fora da guarda.
+ */
+const CAMG: Cam = { kx: 0, ky: -0.3, F: 300 };
+const BONE_GA = 44, BONE_GB = 42, SHOULDER_G = { x: 46, y: -118 };
+const gArm = newArm();
+/** a boca (focinho + mandíbula fechada) em coordenadas do corpo do jacaré: nenhuma guarda aberta pode passar por aqui */
+export const GATOR_MOUTH = { x0: -37, x1: 37, y0: -140, y1: -104 };
+/** Geometria 2D (tela) do braço do jacaré para uma luva em (gx, gy) com escala gs: cotovelo e punho. Usada pelo desenho e pelos testes. */
+export function gatorArmGeom(sd: -1 | 1, gx: number, gy: number, gsc: number) {
+  const z = gloveZ(gsc);
+  solveArm(gArm, sd * SHOULDER_G.x, SHOULDER_G.y, 0, gx - CAMG.kx * z, gy + 6 * gsc - CAMG.ky * z, z, BONE_GA, BONE_GB, sd * 0.35, 1, -0.5, 1.5);
+  return { sx: sd * SHOULDER_G.x, sy: SHOULDER_G.y, ex: gArm.ex + CAMG.kx * gArm.ez, ey: gArm.ey + CAMG.ky * gArm.ez, wx: gArm.wx + CAMG.kx * gArm.wz, wy: gArm.wy + CAMG.ky * gArm.wz, stretch: gArm.stretch };
 }
+/** profundidade do punho: a luva da guarda fica um pouco à frente; a que voa para a câmera, bem mais */
+const gloveZ = (scale: number) => -34 - 130 * Math.max(0, scale - 0.95);
+
 function limb(g: CanvasRenderingContext2D, x0: number, y0: number, w0: number, x1: number, y1: number, w1: number, light: string, dark: string) {
   const dx = x1 - x0, dy = y1 - y0, d = Math.hypot(dx, dy) || 1, nx = -dy / d, ny = dx / d;
   const path = (grow: number) => {
@@ -517,14 +525,14 @@ export function drawGatorBoxer(g: CanvasRenderingContext2D, x: number, y: number
     drawSpr(g, b.shorts, 0, -68);
     drawSpr(g, b.torso, 0, -96);
     drawSpr(g, b.bell, 0, -128);
-    // braços (do ombro até o pulso); a luva só entra aqui se não for da passada tardia
+    // braços (ombro → cotovelo → punho em 3D); a luva só entra aqui se não for da passada tardia
     for (let i = 0; i < 2; i++) {
       const sd: -1 | 1 = i === 0 ? -1 : 1;
-      const sx = sd * 46, sy = -118;
-      const wx = P.gx[i], wy = P.gy[i] + 6 * P.gs[i];
-      armIK(sx, sy, wx, wy, sd, 40, 38);
-      limb(g, sx, sy, 28, elbow.x, elbow.y, 24, GREEN_L, GREEN);
-      limb(g, elbow.x, elbow.y, 24, wx, wy, 17 + 5 * Math.min(1.6, P.gs[i]), GREEN, GREEN_D);
+      const { sx, sy, ex, ey, wx, wy } = gatorArmGeom(sd, P.gx[i], P.gy[i], P.gs[i]);
+      const fe = depthScale(gArm.ez, CAMG.F), fw = depthScale(gArm.wz, CAMG.F);
+      limb(g, sx, sy, 28, ex, ey, 24 * fe, GREEN_L, GREEN);
+      limb(g, ex, ey, 24 * fe, wx, wy, (17 + 5 * Math.min(1.6, P.gs[i])) * fw, GREEN, GREEN_D);
+      g.fillStyle = GREEN; g.beginPath(); g.arc(ex, ey, 12 * fe - 0.4, 0, TAU); g.fill();
     }
     // chapéu de palha na nuca (atrás da cabeça: os bumbos dos olhos ficam à vista); na mão ou caído nos ataques
     if (P.hat === 0 && !P.headLate) {
