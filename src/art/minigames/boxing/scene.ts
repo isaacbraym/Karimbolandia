@@ -12,7 +12,9 @@ import { ORELHADA_TIME, COUNT_TIME } from '../../../game/minigames/boxing/sim/ru
 import type { Crowd } from '../../../game/minigames/boxing/sim/crowd';
 import { drawKarimboBack, backPoseOf } from './karimboBack';
 import { drawGatorFront, type GatorPose } from './gatorFront';
-import { drawKidsBack, drawKidsFront, drawShouts } from './kids';
+import { drawKids, drawShouts } from './kids';
+import { boxLayout, type BoxLayout } from './layout';
+import { drawRingArt, drawRingLive } from './ring';
 import { drawBoxHud } from './hud';
 import { BoxFx, txt } from './fx';
 
@@ -21,7 +23,8 @@ const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
 
 export class BoxingScene {
   readonly fx = new BoxFx();
-  private bg: HTMLCanvasElement | null = null;
+  private ringArt: ReturnType<typeof drawRingArt> | null = null;
+  private L: BoxLayout = boxLayout(667, 320);
   private W = 0;
   private H = 0;
   private lastAttack: GatorPose['lastAttack'] = null;
@@ -32,44 +35,17 @@ export class BoxingScene {
 
   constructor(private backdrop: HTMLCanvasElement | null, W: number, H: number) { this.resize(W, H); }
 
-  /** Refaz o fundo no novo tamanho (girar o aparelho, mudar a janela). */
+  /** Refaz a geometria e o ringue assado no novo tamanho (girar o aparelho, mudar a janela). */
   resize(W: number, H: number) {
     this.W = W; this.H = H;
-    const k = 2;
-    const c = makeCanvas(W * k, H * k), g = c.getContext('2d')!;
-    g.scale(k, k);
-    if (this.backdrop) {
-      g.imageSmoothingEnabled = true;
-      g.drawImage(this.backdrop, 0, 0, W, H);
-    } else {
-      const sky = g.createLinearGradient(0, 0, 0, H);
-      sky.addColorStop(0, '#3a2a6a'); sky.addColorStop(1, '#171033');
-      g.fillStyle = sky; g.fillRect(0, 0, W, H);
-    }
-    g.fillStyle = 'rgba(10,6,30,.52)'; g.fillRect(0, 0, W, H);
-    // piso do ringue (elipse de terra batida) com cordas
-    const fy = H * 0.64;
-    const fl = g.createRadialGradient(W / 2, fy, 10, W / 2, fy, W * 0.5);
-    fl.addColorStop(0, '#9a7a4e'); fl.addColorStop(0.7, '#6c5336'); fl.addColorStop(1, 'rgba(40,28,20,0)');
-    g.fillStyle = fl;
-    g.beginPath(); g.ellipse(W / 2, fy, W * 0.52, H * 0.24, 0, 0, Math.PI * 2); g.fill();
-    g.strokeStyle = 'rgba(255,230,160,.55)'; g.lineWidth = 3;
-    g.beginPath(); g.ellipse(W / 2, fy, W * 0.43, H * 0.19, 0, 0, Math.PI * 2); g.stroke();
-    // holofote em cima do jacaré
-    const sp = g.createRadialGradient(W / 2, H * 0.3, 10, W / 2, H * 0.5, W * 0.45);
-    sp.addColorStop(0, 'rgba(255,240,200,.22)'); sp.addColorStop(1, 'rgba(255,240,200,0)');
-    g.fillStyle = sp; g.fillRect(0, 0, W, H);
-    // vinheta
-    const vg = g.createRadialGradient(W / 2, H / 2, H * 0.4, W / 2, H / 2, W * 0.75);
-    vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,0,.6)');
-    g.fillStyle = vg; g.fillRect(0, 0, W, H);
-    this.bg = c;
+    this.L = boxLayout(W, H);
+    this.ringArt = drawRingArt(this.L, this.backdrop, Math.min(2, 1800 / W));
   }
 
   /** Eventos da simulação viram efeitos (o som e a torcida ficam na sessão). */
   handle(e: MatchEvent, m: BoxingMatch) {
     const W = this.W, H = this.H, u = H / 360;
-    const gx = W / 2, gy = H * 0.44;
+    const gx = this.L.target.x, gy = this.L.target.y;
     switch (e.type) {
       case 'hit':
         this.fx.burst(gx + (Math.random() - 0.5) * 40 * u, gy + (Math.random() - 0.5) * 30 * u, 8, 0, '#ffe27a', 230 * u, 2.4 * u);
@@ -112,37 +88,37 @@ export class BoxingScene {
   draw(g: CanvasRenderingContext2D, m: BoxingMatch, crowd: Crowd, W: number, H: number, k: number) {
     if (W !== this.W || H !== this.H) this.resize(W, H);
     const art = getArt();
-    const u = H / 360, t = this.time;
+    const L = this.L, u = L.u, t = this.time;
     g.save();
     g.translate(this.fx.sx, this.fx.sy);
-    if (this.bg) g.drawImage(this.bg, -8, -8, W + 16, H + 16);
-    drawKidsBack(g, crowd, W, H, t);
+    if (this.ringArt) g.drawImage(this.ringArt.bg, -10, -10, W + 20, H + 20);
+    if (this.ringArt) drawRingLive(g, L, this.ringArt, t);
+    drawKids(g, L, crowd, t, k);
+    drawShouts(g, L, crowd);
     // ---- jacaré
     const gp: GatorPose = {
       mode: m.g.mode, guard: m.g.guard, attack: m.g.attack, tele01: m.g.mode === 'tele' ? 1 - m.g.tele / Math.max(1e-6, m.g.teleMax) : 0,
       since: m.g.mode === 'tele' ? 9 : this.sinceImpact, hand: this.hand, phase: m.g.phase, flinch: Math.max(0, m.g.flinchT / 0.12), time: t, lastAttack: this.lastAttack,
     };
-    const gs = u * 0.92, gx = W / 2, gy = H * 0.66;
+    const gs = L.gator.s, gx = L.gator.x, gy = L.gator.feetY;
     const cin = m.cine;
     if (cin === 'orelhada' && m.cineT >= 1.6) {
       // lançado pelo ar: gira, voa para trás e cai
-      const L = clamp01((m.cineT - 1.6) / (ORELHADA_TIME - 1.6));
+      const Lp = clamp01((m.cineT - 1.6) / (ORELHADA_TIME - 1.6));
       g.save();
-      g.translate(gx + 240 * L * u, gy - 120 * u * Math.sin(L * Math.PI) - 40 * u * L);
-      g.rotate(L * 9);
-      drawGatorFront(g, 0, 0, gs * (1 - 0.3 * L), { ...gp, mode: 'groggy' });
+      g.translate(gx + 240 * Lp * u, gy - 120 * u * Math.sin(Lp * Math.PI) - 40 * u * Lp);
+      g.rotate(Lp * 9);
+      drawGatorFront(g, 0, 0, gs * (1 - 0.3 * Lp), { ...gp, mode: 'groggy' });
       g.restore();
-    } else if (cin === 'count' || m.g.mode === 'ko') {
+    } else if (cin === 'count' || m.g.mode === 'ko' || m.g.mode === 'down') {
       drawAlligatorKO(g, gx, gy + 6 * u, t, -1);
     } else drawGatorFront(g, gx, gy, gs, gp);
-    // ---- Karimbo de costas (embaixo, ~40% da altura)
+    // ---- Karimbo de costas (embaixo, à esquerda)
     const fall = cin === 'lose' ? ease(clamp01(m.cineT / 0.7)) : 0;
     const spin = cin === 'orelhada' ? ease(clamp01(m.cineT / 1.6)) * Math.PI * 2 : 0;
     const ears = cin === 'orelhada' ? 1 + 2.4 * ease(clamp01(m.cineT / 1.5)) : 1;
     const pose = backPoseOf(m.k, t, { spin, ears, fall });
-    drawKarimboBack(g, art.karimbo, progress.equippedSkin, W / 2, H * 0.72, u * 0.62, pose);
-    drawKidsFront(g, crowd, W, H, t);
-    drawShouts(g, crowd, W, H);
+    drawKarimboBack(g, art.karimbo, progress.equippedSkin, L.karimbo.x, L.karimbo.y, L.karimbo.s, pose);
     this.fx.draw(g);
     g.restore();
     drawBoxHud(g, m, W, H, t, k);
