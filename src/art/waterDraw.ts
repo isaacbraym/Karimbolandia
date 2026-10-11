@@ -239,17 +239,22 @@ function surfaceTexture(kind: 'lake' | 'swamp') {
   return c;
 }
 
+/** O brejo acompanha a clareira larga; sua linha frontal continua sendo a água física. */
+export const SWAMP_DEPTH = { x: GROUND_DEPTH.x, y: 84 } as const;
+export const waterSurfaceProjection = (z: WaterZone) => z.kind === 'swamp' ? SWAMP_DEPTH : GROUND_DEPTH;
+
 /** A câmara profunda reutiliza a superfície do lago: não cria um segundo espelho d'água. */
 export function waterSurfaceBounds(z: WaterZone) {
-  return z.surface === undefined ? { x: z.x, y: z.y - GROUND_DEPTH.y,
-    w: z.w + GROUND_DEPTH.x, h: GROUND_DEPTH.y } : null;
+  const depth = waterSurfaceProjection(z);
+  return z.surface === undefined ? { x: z.x, y: z.y - depth.y,
+    w: z.w + depth.x, h: depth.y } : null;
 }
 
 function drawSurfacePlane(g: CanvasRenderingContext2D, w: World, z: WaterZone, T: Tex) {
   const bounds = waterSurfaceBounds(z), cam = w.camera;
   if (!bounds || bounds.y > cam.y + cam.h + 40 || z.y < cam.y - 40
     || bounds.x > cam.x + cam.w + 40 || bounds.x + bounds.w < cam.x - 40) return;
-  const { x: dx, y: dy } = GROUND_DEPTH;
+  const { x: dx, y: dy } = waterSurfaceProjection(z);
   const x0 = Math.max(z.x, cam.x - dx - 40), x1 = Math.min(z.x + z.w, cam.x + cam.w + 40);
   g.save(); g.beginPath();
   g.moveTo(z.x, z.y); g.lineTo(z.x + z.w, z.y);
@@ -273,7 +278,8 @@ function drawSurfacePlane(g: CanvasRenderingContext2D, w: World, z: WaterZone, T
       if (x < x0 - 25 || x > x1 + 25) continue;
       const depth = .35 + (h % 47) / 100;
       const y = z.y - dy * depth + Math.sin(w.time * 1.4 + i) * .6;
-      g.drawImage(T.lily[h % 3], x + dx * depth - 17, y - 8, 34, 15.5);
+      const scale = .62 + depth * .38;
+      g.drawImage(T.lily[h % 3], x + dx * depth - 17 * scale, y - 8 * scale, 34 * scale, 15.5 * scale);
     }
   }
   g.restore();

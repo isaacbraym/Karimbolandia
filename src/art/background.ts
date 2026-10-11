@@ -5,9 +5,11 @@
  */
 import { makeCanvas, softDot, glowSprite } from './kit';
 import { Rng, clamp, lerp, mixColor, hexToRgb } from '../core/math';
+import { layerTint } from './layerTint';
 
 interface Layer {
   c: HTMLCanvasElement;
+  tint?: HTMLCanvasElement;
   w: number; // largura lógica
   h: number;
   scale: number; // px por px lógico
@@ -64,6 +66,7 @@ export class Background {
     this.layers.hwy = this.highways(2400, 160, bs);
     this.layers.near = this.nearStructures(2600, 320, bs, false);
     this.layersRuin = this.nearStructures(2600, 320, bs, true);
+    for (const layer of [...Object.values(this.layers),this.layersRuin]) layer.tint = layerTint(layer.c,'#06041e');
     const r = new Rng(9);
     for (let i = 0; i < 6; i++) this.ships.push({ x: r.range(0, 2400), y: r.range(20, 150), s: r.range(0.5, 1.3), dir: r.chance(0.5) ? 1 : -1, kind: r.int(0, 2), ph: r.range(0, 6) });
     for (let i = 0; i < 3; i++) this.lights.push({ x: r.range(60, 580), a: r.range(-2.2, -1.0), da: r.range(0.15, 0.4) * (r.chance(0.5) ? 1 : -1), hue: r.pick(['#ffd7a8', '#a8f0ff', '#ffb0e0']) });
@@ -637,10 +640,12 @@ export class Background {
     for (let x = x0; x < s.viewW; x += L.w) g.drawImage(L.c, x, y, L.w, L.h);
     g.globalAlpha = 1;
     // tinge com o "clima" (mais escuro à noite)
-    if (s.sky > 0.05) {
+    if (s.sky > 0 && L.tint) {
       g.globalAlpha = 0.32 * s.sky * alpha;
-      g.fillStyle = '#06041e';
-      g.fillRect(0, Math.max(0, y), s.viewW, s.viewH - Math.max(0, y));
+      for (let x = x0; x < s.viewW; x += L.w) g.drawImage(L.tint,x,y,L.w,L.h);
+      if (yBottom < s.viewH) {
+        g.fillStyle = '#06041e';g.fillRect(0,yBottom-1,s.viewW,s.viewH-yBottom+2);
+      }
       g.globalAlpha = 1;
     }
   }

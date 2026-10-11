@@ -6,6 +6,7 @@
 import { makeCanvas, glowSprite, softDot } from './kit';
 import { Rng, clamp, mixColor } from '../core/math';
 import type { BgState } from './background';
+import { layerTint } from './layerTint';
 
 /** Ave de um bando que cruza a tela (espécies variadas). */
 interface Bird {
@@ -20,6 +21,7 @@ interface Bird {
 
 interface Layer {
   c: HTMLCanvasElement;
+  tint?: HTMLCanvasElement;
   w: number;
   h: number;
   f: number;
@@ -119,6 +121,7 @@ export class JungleBackground {
     this.layers.push(this.canopy(2300, 300, 0.24, 0.12, 1));
     this.layers.push(this.trunks(2400, 360, 0.38, 0.18, 0));
     this.layers.push(this.trunks(2600, 400, 0.55, 0.26, 1));
+    for (const layer of this.layers) layer.tint = layerTint(layer.c,'#0e1028');
     const r = new Rng(31);
     for (let i = 0; i < 7; i++) this.birds.push({ x: r.range(0, 1400), y: r.range(30, 120), s: r.range(0.6, 1.1), v: r.range(18, 34), ph: r.range(0, 6) });
     for (let i = 0; i < 46; i++) this.motes.push({ x: r.range(0, 800), y: r.range(0, 360), vx: r.range(-6, 6), vy: r.range(-8, 3), s: r.range(0.7, 1.8), ph: r.range(0, 6) });
@@ -433,10 +436,12 @@ export class JungleBackground {
       g.fillRect(0, yBottom - 1, s.viewW, s.viewH - yBottom + 2);
     }
     for (let x = x0; x < s.viewW; x += L.w) g.drawImage(L.c, x, y, L.w, L.h);
-    if (dusk > 0.05) {
+    if (dusk > 0 && L.tint) {
       g.globalAlpha = 0.32 * dusk;
-      g.fillStyle = '#0e1028';
-      g.fillRect(0, Math.max(0, y), s.viewW, s.viewH - Math.max(0, y));
+      for (let x = x0; x < s.viewW; x += L.w) g.drawImage(L.tint,x,y,L.w,L.h);
+      if (yBottom < s.viewH) {
+        g.fillStyle = '#0e1028';g.fillRect(0,yBottom-1,s.viewW,s.viewH-yBottom+2);
+      }
       g.globalAlpha = 1;
     }
   }

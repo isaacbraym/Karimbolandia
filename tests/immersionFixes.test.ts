@@ -4,7 +4,7 @@ import { music } from '../src/core/music';
 import { Game } from '../src/game/game';
 import { CLUB_DANCE_ID } from '../src/game/club';
 import { buildJungle } from '../src/game/level/jungle';
-import { waterSurfaceBounds } from '../src/art/waterDraw';
+import { waterSurfaceBounds, SWAMP_DEPTH } from '../src/art/waterDraw';
 import { GROUND_DEPTH } from '../src/art/perspective';
 import { makeWorld, newCtl } from './helpers/bot';
 
@@ -77,7 +77,11 @@ describe('Água, saída e trilha da balada', () => {
     for (const z of data.water) {
       const plane = waterSurfaceBounds(z);
       if (z.surface !== undefined) expect(plane).toBeNull();
-      else expect(plane).toEqual({ x: z.x, y: z.y - GROUND_DEPTH.y, w: z.w + GROUND_DEPTH.x, h: GROUND_DEPTH.y });
+      else {
+        const depth = z.kind === 'swamp' ? SWAMP_DEPTH : GROUND_DEPTH;
+        expect(plane).toEqual({ x: z.x, y: z.y - depth.y, w: z.w + depth.x, h: depth.y });
+        if(z.kind === 'swamp') expect(plane!.h).toBeGreaterThan(z.h*3);
+      }
     }
     expect(JSON.stringify(data.water)).toBe(before); // física e fôlego continuam com a linha frontal
     const thinker = data.decos.find(d => d.kind === 'aThinker')!;

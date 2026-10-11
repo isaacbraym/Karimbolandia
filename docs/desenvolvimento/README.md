@@ -1,5 +1,7 @@
 # Guia de desenvolvimento e lições reutilizáveis
 
+O [caso da continuidade dos cenários](CONTINUIDADE_DOS_CENARIOS_2026-10-10.md) explica as transições espaciais de paleta, árvores opacas, margens separadas do vento, clima limitado à silhueta nas duas fases e o plano largo dos pântanos.
+
 O [caso das paisagens da fase 2](PAISAGENS_DA_FASE_2_2026-10-06.md) registra a campanha completa, o pântano em profundidade, a rebobinagem, o salto do macaco e a revisão espacial das casas.
 
 O [caso dos morros e passagens secretas](MORROS_E_PASSAGENS_SECRETAS_2026-10-06.md) explica a rota curva sobre a entrada inferior, seleção de áreas seguras, suporte físico, interiores opcionais e preparação da arte em cache.

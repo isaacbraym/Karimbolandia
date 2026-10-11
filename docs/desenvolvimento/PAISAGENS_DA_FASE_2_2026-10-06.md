@@ -1,5 +1,7 @@
 # Paisagens completas da fase 2, perseguição e casas
 
+Revisão de 10/10: o [estudo de continuidade dos cenários](CONTINUIDADE_DOS_CENARIOS_2026-10-10.md) substitui a transição por transparência e o cache descritos abaixo por composição espacial estável, margens separadas e máscaras de clima. Este documento preserva o contexto da implantação original.
+
 ## Intenção e limites
 
 Depois da aprovação da amostra, a ambientação da fase 2 foi estendida à campanha inteira. A cidade já aprovada mantém sua composição; a mata agora possui 14 regiões autoradas: orla, brejo, desfiladeiro, ruínas, lago, acampamento, casarios, roças, riacho, praça, oficinas, pomares, trilha do rio e santuário. Os morros secretos e o templo conservam suas entradas, física e desafios. Água, fossos e Atlântida continuam com seus próprios sistemas.

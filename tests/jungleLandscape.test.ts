@@ -1,10 +1,33 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { JungleLandscape, JUNGLE_REGIONS } from '../src/art/jungleLandscape';
+import { JungleLandscape, JUNGLE_REGIONS, junglePalette } from '../src/art/jungleLandscape';
 import { buildJungle } from '../src/game/level/jungle';
 import { houseFootprint } from '../src/game/level/houseLayout';
 
 afterEach(()=>vi.unstubAllGlobals());
 describe('Paisagens da campanha e reservas do casario',()=>{
+  it('atravessar a fronteira com a câmera não troca os exemplares nem dissolve árvores',()=>{
+    let canvases=0;const images:unknown[]=[],alphas:number[]=[];
+    const g=new Proxy({globalAlpha:1} as CanvasRenderingContext2D,{get(o,k){
+      if(k==='createLinearGradient')return()=>({addColorStop(){}});
+      if(k==='drawImage')return(image:unknown)=>{images.push(image);alphas.push(o.globalAlpha);};
+      return k in o?o[k as keyof typeof o]:()=>{};
+    },set(o,k,v){(o as any)[k]=v;return true;}});
+    vi.stubGlobal('document',{createElement:()=>{canvases++;return{getContext:()=>g};}});
+    const land=new JungleLandscape(),cam={x:222*32-550-1,y:520,w:1100,h:650};
+    for(let i=0;i<40;i++)land.draw(g,cam,0);
+    images.length=alphas.length=0;land.draw(g,cam,0);const before=[...images],warm=canvases;
+    cam.x+=2;images.length=alphas.length=0;land.draw(g,cam,0);
+    expect(images).toEqual(before);expect(alphas.every(a=>a===1)).toBe(true);expect(canvases).toBe(warm);
+    cam.x-=2;images.length=0;land.draw(g,cam,0);expect(images).toEqual(before);
+  });
+  it('a paleta tem continuidade nos dois extremos de cada transição e conserva as 14 regiões',()=>{
+    for(const region of JUNGLE_REGIONS.slice(0,-1))for(const layer of [0,1,2]){
+      for(const x of [region.end*32,region.end*32+350]){
+        expect(junglePalette(x-.001,layer).color).toBe(junglePalette(x+.001,layer).color);
+        expect(Math.abs(junglePalette(x-.001,layer).wet-junglePalette(x+.001,layer).wet)).toBeLessThan(.00001);
+      }
+    }
+  });
   it('aquece inclusive a transição entre regiões sem criar imagens ou gradientes por quadro',()=>{
     let canvases=0,gradients=0;
     const g=new Proxy({} as CanvasRenderingContext2D,{get(o,k){
