@@ -655,6 +655,7 @@ export function buildJungle(): LevelData {
     || !['jBush', 'jRock', 'jFern', 'jTree'].includes(d.kind));
   addSecretPassages(b);
   const data = b.build('none');
+  data.level.scenicWetlands.push(...data.water.filter(z => z.kind === 'swamp'));
   data.voidRow = LEVEL_H;
   return data;
 }

@@ -1336,9 +1336,9 @@ export class World {
     }
     setDecoFocus(this.player.x, this.player.y);
     if (this.data.stage === 2 && !this.inRoom()) this.jungleLandscape.draw(g, cam, this.time);
+    if (!this.inRoom()) this.forestTrail.draw(g, cam.x, cam.y, cam.w, cam.h);
     if (this.water.zones.length) drawWaterBack(g, this);
     if (this.data.rooms?.length) drawRoomBack(g, this);
-    if (!this.inRoom()) this.forestTrail.draw(g, cam.x, cam.y, cam.w, cam.h);
     if (!this.inRoom()) this.cityStreet.draw(g, cam.x, cam.y, cam.w, cam.h, this.time);
     this.director.drawDecos(g, 'back');
     drawClub(g, this, 'floor');

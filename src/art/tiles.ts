@@ -4,7 +4,7 @@ import { PAL } from './palette';
 import { Rng, shade, mixColor } from '../core/math';
 import { Level, T, TILE, THEME } from '../game/level';
 import { GROUND_DEPTH } from './perspective';
-import { scenicGround } from './forestTrail';
+import { scenicGround, scenicWetlandGround } from './forestTrail';
 import { cityGround } from './cityStreet';
 
 const CELL = 64; // px do atlas por tile (2x)
@@ -92,6 +92,8 @@ export function bakeTiles(): TileArt {
     if (t === T.SOLID && cityGround(level, tx, ty)) return;
     if (t === T.EMPTY && cityGround(level, tx, ty + 1)) return;
     if (t === T.SOLID && scenicGround(level, tx, ty)) return;
+    if (t === T.SOLID && scenicWetlandGround(level, tx, ty)) return;
+    if (t === T.EMPTY && level.get(tx, ty + 1) === T.SOLID && scenicWetlandGround(level, tx, ty + 1)) return;
     if (t === T.EMPTY && level.get(tx, ty + 1) === T.SOLID && scenicGround(level, tx, ty + 1)) return;
     if (t === T.ONEWAY || t === T.EMPTY && level.get(tx, ty + 1) === T.ONEWAY) {
       const top = (ty + (t === T.EMPTY ? 1 : 0)) * TILE;

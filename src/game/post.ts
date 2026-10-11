@@ -267,9 +267,9 @@ export class PostFX {
     if (this.gradeCache.H !== H || !this.gradeCache.gr || this.gradeCache.stage !== this.stage) {
       const gr = g.createLinearGradient(0, 0, 0, H);
       if (this.stage === 2) {
-        gr.addColorStop(0, 'rgba(255,226,140,0.30)');
+        gr.addColorStop(0, 'rgba(255,235,180,0.14)');
         gr.addColorStop(0.55, 'rgba(120,220,140,0.06)');
-        gr.addColorStop(1, 'rgba(30,140,120,0.22)');
+        gr.addColorStop(1, 'rgba(40,120,95,0.10)');
       } else {
         gr.addColorStop(0, 'rgba(255,60,190,0.32)');
         gr.addColorStop(0.55, 'rgba(120,80,255,0.08)');

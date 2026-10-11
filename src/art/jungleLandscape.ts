@@ -23,6 +23,7 @@ export const JUNGLE_REGIONS = [
 export const jungleRegion = (x: number) => JUNGLE_REGIONS.findIndex(r => x < r.end * 32);
 const SPAN = 512, HEIGHT = 640, TOP = 530, BLEED = 224, DENSITY = 1.25;
 const PARALLAX = [.24,.49,.76,1.07];
+export const JUNGLE_BLEND = 900;
 type Region = typeof JUNGLE_REGIONS[number];
 interface Patch { ground: HTMLCanvasElement; plants: HTMLCanvasElement }
 
@@ -30,7 +31,7 @@ interface Patch { ground: HTMLCanvasElement; plants: HTMLCanvasElement }
 export function junglePalette(x: number, layer: number) {
   const ri = jungleRegion(x), region = JUNGLE_REGIONS[ri], k = Math.min(layer,2);
   const start = ri ? JUNGLE_REGIONS[ri-1].end*32 : 150*32;
-  const t = Math.max(0,Math.min(1,(x-start)/350)), blend = t*t*(3-2*t);
+  const t = Math.max(0,Math.min(1,(x-start)/JUNGLE_BLEND)), blend = t*t*(3-2*t);
   const previous = JUNGLE_REGIONS[Math.max(0,ri-1)];
   const wet = (r: Region) => ['swamp','lake','stream','river'].includes(r.kind) ? 1 : 0;
   return { region, color: mixColor(previous.colors[k],region.colors[k],blend),

@@ -1,5 +1,7 @@
 # Guia de desenvolvimento e lições reutilizáveis
 
+O [caso das margens e composição do brejo](MARGENS_E_COMPOSICAO_DO_BREJO_2026-10-11.md) corrige a integração que ainda faltava: solo contínuo sob a água, enseadas curvas, sombra local e névoa no plano do fundo.
+
 O [caso da continuidade dos cenários](CONTINUIDADE_DOS_CENARIOS_2026-10-10.md) explica as transições espaciais de paleta, árvores opacas, margens separadas do vento, clima limitado à silhueta nas duas fases e o plano largo dos pântanos.
 
 O [caso das paisagens da fase 2](PAISAGENS_DA_FASE_2_2026-10-06.md) registra a campanha completa, o pântano em profundidade, a rebobinagem, o salto do macaco e a revisão espacial das casas.

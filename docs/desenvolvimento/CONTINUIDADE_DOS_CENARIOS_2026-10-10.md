@@ -1,5 +1,7 @@
 # Continuidade do paralaxe e profundidade dos pântanos
 
+Revisão de 11/10: o plano ampliado deste primeiro ciclo ainda deixava cortes entre água e solo. O [caso das margens e composição do brejo](MARGENS_E_COMPOSICAO_DO_BREJO_2026-10-11.md) registra a geometria orgânica atual, o leito contínuo, a passagem da névoa para o fundo e a ampliação das transições de paleta de 350 para 900 px. Os resultados abaixo são históricos do primeiro ciclo.
+
 ## Sintomas e causas demonstradas
 
 Na fase 2, chegar ao primeiro pântano expunha bordas retangulares, trocas de árvores e árvores translúcidas. A região da paisagem era escolhida por `cam.x + cam.w / 2`. Ao atravessar uma fronteira, o renderer misturava duas composições com sementes diferentes, usando alfa para a paisagem inteira. Mover ou redimensionar a câmera mudava os exemplares e sua opacidade, embora o lugar observado continuasse sendo o mesmo.

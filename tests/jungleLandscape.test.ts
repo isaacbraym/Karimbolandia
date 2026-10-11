@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { JungleLandscape, JUNGLE_REGIONS, junglePalette } from '../src/art/jungleLandscape';
+import { JungleLandscape, JUNGLE_REGIONS, JUNGLE_BLEND, junglePalette } from '../src/art/jungleLandscape';
 import { buildJungle } from '../src/game/level/jungle';
 import { houseFootprint } from '../src/game/level/houseLayout';
 
@@ -22,7 +22,7 @@ describe('Paisagens da campanha e reservas do casario',()=>{
   });
   it('a paleta tem continuidade nos dois extremos de cada transição e conserva as 14 regiões',()=>{
     for(const region of JUNGLE_REGIONS.slice(0,-1))for(const layer of [0,1,2]){
-      for(const x of [region.end*32,region.end*32+350]){
+      for(const x of [region.end*32,region.end*32+JUNGLE_BLEND]){
         expect(junglePalette(x-.001,layer).color).toBe(junglePalette(x+.001,layer).color);
         expect(Math.abs(junglePalette(x-.001,layer).wet-junglePalette(x+.001,layer).wet)).toBeLessThan(.00001);
       }

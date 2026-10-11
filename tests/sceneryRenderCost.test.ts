@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Background, type BgState } from '../src/art/background';
 import { drawDeco } from '../src/art/decor';
+import { JungleBackground } from '../src/art/jungleBg';
 
 afterEach(()=>vi.unstubAllGlobals());
 
@@ -17,6 +18,18 @@ function drawingProbe() {
 }
 
 describe('Preparo estável do cenário',()=>{
+  it('a copa muda sombra local sem recolorir o fundo inteiro; névoa fica atrás do mundo',()=>{
+    const p=drawingProbe(),images:unknown[][]=[];
+    p.g.drawImage=(...args: any[])=>images.push([...args,p.g.globalAlpha]);
+    const bg=new JungleBackground(),state:BgState={camX:7200,camY:600,viewW:1100,viewH:650,time:0,sky:.08,ruin:.5,refY:800,intensity:.6,canopy:0};
+    bg.draw(p.g,state,0);images.length=0;bg.draw(p.g,state,0);const before=[...images],warm=p.counts();
+    state.canopy=1;images.length=0;bg.draw(p.g,state,0);
+    expect(images).toEqual(before);expect(p.counts()).toEqual(warm);
+    const fog=(bg as any).fog;
+    expect(images.some(i=>i[0]===fog)).toBe(true);
+    images.length=0;bg.drawForeground(p.g,state,0);
+    expect(images.some(i=>i[0]===fog)).toBe(false);
+  });
   it('mover o céu distante reutiliza o gradiente; clima, altura e escala o invalidam',()=>{
     const p=drawingProbe(),bg=new Background();
     const state:BgState={camX:0,camY:500,viewW:1100,viewH:650,time:0,sky:.3,ruin:0,refY:800,intensity:.6};

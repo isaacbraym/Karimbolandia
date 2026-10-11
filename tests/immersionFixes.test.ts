@@ -6,6 +6,7 @@ import { CLUB_DANCE_ID } from '../src/game/club';
 import { buildJungle } from '../src/game/level/jungle';
 import { waterSurfaceBounds, SWAMP_DEPTH } from '../src/art/waterDraw';
 import { GROUND_DEPTH } from '../src/art/perspective';
+import { SWAMP_BANK } from '../src/art/swampShore';
 import { makeWorld, newCtl } from './helpers/bot';
 
 afterEach(() => vi.restoreAllMocks());
@@ -79,7 +80,8 @@ describe('Água, saída e trilha da balada', () => {
       if (z.surface !== undefined) expect(plane).toBeNull();
       else {
         const depth = z.kind === 'swamp' ? SWAMP_DEPTH : GROUND_DEPTH;
-        expect(plane).toEqual({ x: z.x, y: z.y - depth.y, w: z.w + depth.x, h: depth.y });
+        const bank = z.kind === 'swamp' ? SWAMP_BANK : 0;
+        expect(plane).toEqual({ x: z.x - bank, y: z.y - depth.y - bank, w: z.w + depth.x + bank * 2, h: depth.y + bank });
         if(z.kind === 'swamp') expect(plane!.h).toBeGreaterThan(z.h*3);
       }
     }

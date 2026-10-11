@@ -1,9 +1,9 @@
 /** Clareira lateral: o contato físico fica DENTRO do piso, não na borda de uma faixa. */
 import { Level, TILE, T, THEME } from '../game/level';
-import { Rng, mixColor } from '../core/math';
+import { Rng } from '../core/math';
 import { makeCanvas } from './kit';
 import { windTip } from './wind';
-import { JUNGLE_REGIONS, jungleRegion } from './jungleLandscape';
+import { junglePalette } from './jungleLandscape';
 
 const SPAN = 512, TOP = 180, HEIGHT = 520, DENSITY = 1.5;
 interface Fern { x: number; y: number; size: number; variant: number }
@@ -18,6 +18,14 @@ export function scenicGround(level: Level, tx: number, ty: number) {
     && (level.themeAt(tx, level.reliefRow) === THEME.EARTH
       || (level.themeAt(tx, level.reliefRow) === THEME.TEMPLE
         && level.scenicGroves.some(r => tx * TILE >= r.x0 && tx * TILE < r.x1)));
+}
+
+/** Só a lama física sob o brejo recebe o leito contínuo; plataformas seguem visíveis. */
+export function scenicWetlandGround(level: Level, tx: number, ty: number) {
+  const theme = level.themeAt(tx, ty);
+  return ty >= level.reliefRow && ty * TILE < level.reliefRow * TILE + HEIGHT - TOP
+    && (theme === THEME.MUD || theme === THEME.EARTH)
+    && level.scenicWetlands.some(z => tx * TILE >= z.x && tx * TILE < z.x + z.w);
 }
 
 /** Perfil global suave: a curva e a largura não reiniciam nas bordas dos patches. */
@@ -35,6 +43,12 @@ export class ForestTrail {
   private revision = -1;
   private readonly fernSprites: HTMLCanvasElement[] = [];
   constructor(private readonly level: Level) {}
+
+  /** O mesmo solo sustenta margens e leito raso; lagos e abismos continuam separados. */
+  hasSoil(x: number) {
+    return scenicGround(this.level, Math.floor(x / TILE), this.level.reliefRow)
+      || this.level.scenicWetlands.some(z => x >= z.x && x < z.x + z.w);
+  }
 
   draw(g: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, front = false, time = 0) {
     const L = this.level, range = L.scenicTrail;
@@ -66,10 +80,11 @@ export class ForestTrail {
       }
       else if (!front) {
         // Um viewport muito largo nunca fica sem chão enquanto o próximo bake espera.
-        g.fillStyle = '#4b693e';
         for (let col = i * SPAN / TILE; col < (i + 1) * SPAN / TILE; col++) {
-          if (!scenicGround(L, col, L.reliefRow)) continue;
-          const top = this.surface(col * TILE + 16) - 50;
+          if (!this.hasSoil(col * TILE + 16)) continue;
+          const xx = col * TILE + 16, p = trailProfile(L, xx);
+          const top = p.y - 7 - Math.sin(xx * .0039) * 13 - this.fringe(xx);
+          g.fillStyle = junglePalette(xx, 1).color;
           g.fillRect(col * TILE, top, TILE + .5, L.reliefRow * TILE + HEIGHT - TOP - top);
         }
       }
@@ -80,6 +95,17 @@ export class ForestTrail {
   private surface(x: number) {
     const L = this.level;
     return L.reliefSurface(x) ?? L.groundBelow(x, (L.reliefRow - 2) * TILE) ?? L.reliefRow * TILE;
+  }
+
+  private fringe(x: number) {
+    const normal = 84 + Math.sin(x * .011) * 17 + Math.sin(x * .027) * 7;
+    let wet = 0;
+    for (const z of this.level.scenicWetlands) {
+      const distance = Math.max(z.x - x, x - z.x - z.w, 0);
+      const t = Math.max(0, 1 - distance / 160);
+      wet = Math.max(wet, t * t * (3 - 2 * t));
+    }
+    return normal + (112 + Math.sin(x * .011) * 4 - normal) * wet;
   }
 
   private paint(index: number): Patch {
@@ -94,13 +120,13 @@ export class ForestTrail {
     // Máscara segue a topologia: nenhuma clareira pinta água ou cobre um abismo.
     const mask = new Path2D();
     for (let col = Math.floor(worldX / TILE); col < Math.ceil((worldX + SPAN) / TILE); col++) {
-      if (!scenicGround(L, col, L.reliefRow)) continue;
+      if (!this.hasSoil(col * TILE + 16)) continue;
       const x = col * TILE;
       const backSurface = (xx: number) => {
         const p = trailProfile(L, xx);
         return p.y - 7 - Math.sin(xx * .0039) * 13;
       };
-      const fringe = (xx: number) => 84 + Math.sin(xx * .011) * 17 + Math.sin(xx * .027) * 7;
+      const fringe = (xx: number) => this.fringe(xx);
       mask.moveTo(x, backSurface(x) - fringe(x));
       for (let xx = x + 4; xx <= x + TILE; xx += 4) mask.lineTo(xx, backSurface(xx) - fringe(xx));
       mask.lineTo(x + TILE + .5, backSurface(x + TILE + .5) - fringe(x + TILE + .5));
@@ -108,10 +134,7 @@ export class ForestTrail {
     }
     g.clip(mask);
     // Cor depende da coordenada global, não do índice de patch: a fronteira não vira uma emenda.
-    const color=(x:number,k:number)=>{
-      const ri=jungleRegion(x),region=JUNGLE_REGIONS[ri],start=ri?JUNGLE_REGIONS[ri-1].end*TILE:0;
-      return ri>0?mixColor(JUNGLE_REGIONS[ri-1].colors[k],region.colors[k],Math.min(1,(x-start)/350)):region.colors[k];
-    };
+    const color=(x:number,k:number)=>junglePalette(x,k).color;
     for(let dx=0;dx<SPAN;dx+=8){
       const field=g.createLinearGradient(0,base-120,0,base+280),xx=worldX+dx+4;
       field.addColorStop(0,color(xx,1));field.addColorStop(.28,color(xx,0));field.addColorStop(.55,color(xx,2));field.addColorStop(1,'#142e26');

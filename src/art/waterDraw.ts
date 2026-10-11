@@ -11,12 +11,13 @@ import { getJungle, type FishArt } from './jungle';
 import { glowSprite, makeCanvas, softDot } from './kit';
 import { Rng } from '../core/math';
 import { GROUND_DEPTH } from './perspective';
+import { SWAMP_DEPTH, SWAMP_BANK, swampShoreArt, swampSurfaceContains } from './swampShore';
+export { SWAMP_DEPTH } from './swampShore';
 import { drawLifeFish, getLifeArt } from './lake/lakeLife';
 import { drawThinkerFx } from './lake/thinkerFx';
 
 interface Tex {
   lake: HTMLCanvasElement;
-  swamp: HTMLCanvasElement;
   caustic: HTMLCanvasElement;
   surface: HTMLCanvasElement;
   bubble: HTMLCanvasElement;
@@ -24,7 +25,7 @@ interface Tex {
   ray: HTMLCanvasElement;
   far: HTMLCanvasElement;
   weed: HTMLCanvasElement;
-  top: Record<'lake' | 'swamp', HTMLCanvasElement>;
+  top: HTMLCanvasElement;
   /** "neve" em suspensão: duas texturas em mosaico com paralaxe diferente */
   snow: HTMLCanvasElement[];
 }
@@ -43,7 +44,6 @@ function grad(h: number, stops: [number, string][]) {
 function textures(): Tex {
   if (tex) return tex;
   const lake = grad(256, [[0, '#4fb3a8'], [0.12, '#2f8f94'], [0.45, '#1a5f78'], [0.8, '#0e3552'], [1, '#081c33']]);
-  const swamp = grad(32, [[0, 'rgba(120,128,60,0.62)'], [0.3, 'rgba(70,84,36,0.82)'], [1, 'rgba(38,46,20,0.94)']]);
   // cáusticas: rede de linhas claras que se repete sem emenda
   const caustic = makeCanvas(128, 128);
   {
@@ -196,9 +196,9 @@ function textures(): Tex {
       g.fill();
     }
   }
-  const top = { lake: surfaceTexture('lake'), swamp: surfaceTexture('swamp') };
+  const top = surfaceTexture();
   const snow = [snowTexture(61, 70, 3.2), snowTexture(62, 46, 5)];
-  tex = { lake, swamp, caustic, surface, bubble, lily, ray, far, weed, top, snow };
+  tex = { lake, caustic, surface, bubble, lily, ray, far, weed, top, snow };
   return tex;
 }
 
@@ -221,11 +221,11 @@ function snowTexture(seed: number, count: number, maxR: number) {
 }
 
 /** Textura periódica assada uma vez; o cisalhamento acompanha a projeção dos tiles. */
-function surfaceTexture(kind: 'lake' | 'swamp') {
+function surfaceTexture() {
   const c = makeCanvas(256, 64), g = c.getContext('2d')!;
   const gr = g.createLinearGradient(0, 0, 0, 64);
-  gr.addColorStop(0, kind === 'lake' ? '#3b9693' : '#526b35');
-  gr.addColorStop(1, kind === 'lake' ? '#64b9a8' : '#7b8b47');
+  gr.addColorStop(0, '#3b9693');
+  gr.addColorStop(1, '#64b9a8');
   g.fillStyle = gr; g.fillRect(0, 0, 256, 64);
   for (let row = 0; row < 5; row++) {
     g.strokeStyle = row % 2 ? 'rgba(225,255,221,.25)' : 'rgba(15,58,46,.24)';
@@ -240,14 +240,14 @@ function surfaceTexture(kind: 'lake' | 'swamp') {
 }
 
 /** O brejo acompanha a clareira larga; sua linha frontal continua sendo a água física. */
-export const SWAMP_DEPTH = { x: GROUND_DEPTH.x, y: 84 } as const;
 export const waterSurfaceProjection = (z: WaterZone) => z.kind === 'swamp' ? SWAMP_DEPTH : GROUND_DEPTH;
 
 /** A câmara profunda reutiliza a superfície do lago: não cria um segundo espelho d'água. */
 export function waterSurfaceBounds(z: WaterZone) {
   const depth = waterSurfaceProjection(z);
-  return z.surface === undefined ? { x: z.x, y: z.y - depth.y,
-    w: z.w + depth.x, h: depth.y } : null;
+  const bank = z.kind === 'swamp' ? SWAMP_BANK : 0;
+  return z.surface === undefined ? { x: z.x - bank, y: z.y - depth.y - bank,
+    w: z.w + depth.x + bank * 2, h: depth.y + bank } : null;
 }
 
 function drawSurfacePlane(g: CanvasRenderingContext2D, w: World, z: WaterZone, T: Tex) {
@@ -256,6 +256,24 @@ function drawSurfacePlane(g: CanvasRenderingContext2D, w: World, z: WaterZone, T
     || bounds.x > cam.x + cam.w + 40 || bounds.x + bounds.w < cam.x - 40) return;
   const { x: dx, y: dy } = waterSurfaceProjection(z);
   const x0 = Math.max(z.x, cam.x - dx - 40), x1 = Math.min(z.x + z.w, cam.x + cam.w + 40);
+  if (z.kind === 'swamp') {
+    const art = swampShoreArt(z);
+    g.drawImage(art.back, z.x - SWAMP_BANK, z.y - art.top, art.width, art.top);
+    const n = Math.floor(z.w / 100);
+    for (let i = 0; i < n; i++) {
+      const h = (z.id * 7919 + i * 104729) >>> 0;
+      const x = z.x + 25 + h % Math.max(1, z.w - 50), depth = .35 + (h % 47) / 100;
+      const y = z.y - dy * depth + Math.sin(w.time * 1.4 + i) * .6, px = x + dx * depth;
+      if (x < x0 - 25 || x > x1 + 25 || !swampSurfaceContains(z, px, y, 10)) continue;
+      const scale = .62 + depth * .38;
+      g.drawImage(T.lily[h % 3], px - 17 * scale, y - 8 * scale, 34 * scale, 15.5 * scale);
+      // Ondulação animada pequena, sobre água aberta, acompanhando cada vitória-régia.
+      g.globalAlpha = .17;
+      g.drawImage(T.surface, 0, 0, 80, 24, px - 24, y + 2, 48, 5);
+      g.globalAlpha = 1;
+    }
+    return;
+  }
   g.save(); g.beginPath();
   g.moveTo(z.x, z.y); g.lineTo(z.x + z.w, z.y);
   g.lineTo(z.x + z.w + dx, z.y - dy); g.lineTo(z.x + dx, z.y - dy); g.closePath(); g.clip();
@@ -263,25 +281,13 @@ function drawSurfacePlane(g: CanvasRenderingContext2D, w: World, z: WaterZone, T
   // Fase em coordenadas do mundo: mover a câmera não desloca ondas ou reflexos.
   const off = (w.time * 13) % 256;
   for (let x = Math.floor((x0 - off) / 256) * 256 + off; x < x1; x += 256)
-    g.drawImage(T.top[z.kind], x, -dy, 256, dy);
-  g.globalCompositeOperation = 'lighter'; g.globalAlpha = z.kind === 'lake' ? .22 : .12;
+    g.drawImage(T.top, x, -dy, 256, dy);
+  g.globalCompositeOperation = 'lighter'; g.globalAlpha = .22;
   const reverse = (-w.time * 9) % 128;
   for (let x = Math.floor((x0 - reverse) / 128) * 128 + reverse; x < x1; x += 128)
     g.drawImage(T.caustic, x, -dy, 128, dy);
   g.globalCompositeOperation = 'source-over'; g.globalAlpha = 1;
   g.restore();
-  if (z.kind === 'swamp') {
-    const n = Math.floor(z.w / 100);
-    for (let i = 0; i < n; i++) {
-      const h = (z.id * 7919 + i * 104729) >>> 0;
-      const x = z.x + 25 + h % Math.max(1, z.w - 50);
-      if (x < x0 - 25 || x > x1 + 25) continue;
-      const depth = .35 + (h % 47) / 100;
-      const y = z.y - dy * depth + Math.sin(w.time * 1.4 + i) * .6;
-      const scale = .62 + depth * .38;
-      g.drawImage(T.lily[h % 3], x + dx * depth - 17 * scale, y - 8 * scale, 34 * scale, 15.5 * scale);
-    }
-  }
   g.restore();
 }
 
@@ -517,27 +523,30 @@ export function drawWaterFront(g: CanvasRenderingContext2D, w: World) {
       g.restore();
     } else {
       // pântano: água turva cobrindo as pernas
-      const sy = 0;
-      g.drawImage(T.swamp, 0, sy, 2, 32, z.x, z.y, z.w, z.h + 1);
+      const shore = swampShoreArt(z);
+      g.drawImage(shore.front, z.x, z.y, z.w, z.h + SWAMP_BANK);
       // lentilha-d'água e vitórias-régias boiando
-      g.globalAlpha = 0.85;
-      for (let x = z.x; x < z.x + z.w; x += 256) g.drawImage(T.weed, 0, 0, Math.min(256, z.x + z.w - x), 6, x, z.y - 2, Math.min(256, z.x + z.w - x), 6);
-      g.globalAlpha = 1;
       const n = Math.floor(z.w / 70);
       for (let i = 0; i < n; i++) {
         const h = (z.id * 7919 + i * 104729) >>> 0;
         const lx = z.x + 20 + (h % Math.max(1, z.w - 40));
         if (lx < cam.x - 40 || lx > cam.x + cam.w + 40) continue;
         const bob = Math.sin(t * 1.4 + i * 2.1) * 0.8;
+        // Lentilhas e reflexos em grupos, sem uma régua luminosa atravessando o brejo inteiro.
+        g.globalAlpha = .7;
+        g.drawImage(T.weed, h % 160, 0, 32, 6, lx - 16, z.y - 1 + bob, 32, 5);
+        g.globalAlpha = .18;
+        g.drawImage(T.surface, 0, 0, 80, 24, lx - 20, z.y + 1 + bob, 40, 5);
+        g.globalAlpha = 1;
         const L = T.lily[h % 3];
         g.drawImage(L, lx - 18, z.y - 8 + bob, 36, 16.5);
       }
     }
     // superfície com reflexos (lago e pântano)
-    if (z.surface === undefined && z.y > cam.y - 30 && z.y < cam.y + cam.h + 30) {
+    if (z.kind === 'lake' && z.surface === undefined && z.y > cam.y - 30 && z.y < cam.y + cam.h + 30) {
       const sx0 = Math.max(z.x, cam.x - 40);
       const sx1 = Math.min(z.x + z.w, cam.x + cam.w + 40);
-      const alpha = z.kind === 'lake' ? 1 : 0.45;
+      const alpha = 1;
       for (let pass = 0; pass < 2; pass++) {
         const off = ((pass ? -t * 7 : t * 11) % 256 + 256) % 256;
         g.globalAlpha = alpha * (pass ? 0.5 : 0.9);

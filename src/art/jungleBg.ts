@@ -7,6 +7,7 @@ import { makeCanvas, glowSprite, softDot } from './kit';
 import { Rng, clamp, mixColor } from '../core/math';
 import type { BgState } from './background';
 import { layerTint } from './layerTint';
+const SUN_COLORS = ['#fff4c0', '#ffb070'] as const;
 
 /** Ave de um bando que cruza a tela (espécies variadas). */
 interface Bird {
@@ -389,7 +390,8 @@ export class JungleBackground {
   draw(g: CanvasRenderingContext2D, s: BgState, dt: number) {
     const W = s.viewW;
     const H = s.viewH;
-    const dusk = clamp(s.sky + (s.canopy ?? 0) * .3, 0, 1);
+    // Sombra de copa é local (ForestLight); não recolore toda a floresta ao passar sob uma árvore.
+    const dusk = clamp(s.sky, 0, 1);
     // céu
     g.drawImage(this.day, 0, 0, 2, 256, 0, 0, W, H);
     if (dusk > 0.01) {
@@ -399,12 +401,13 @@ export class JungleBackground {
     }
     // sol difuso na névoa
     {
-      const sun = glowSprite(dusk > 0.5 ? '#ffb070' : '#fff4c0', 32);
       g.globalCompositeOperation = 'lighter';
-      g.globalAlpha = 0.8 - dusk * 0.4;
       const sx = W * 0.7 - s.camX * 0.004;
       const sy = H * (0.18 + dusk * 0.3) - (s.camY - s.refY) * 0.01;
-      g.drawImage(sun.c, sx - 160, sy - 160, 320, 320);
+      for (let i = 0; i < SUN_COLORS.length; i++) {
+        g.globalAlpha = (0.8 - dusk * 0.4) * (i ? dusk : 1 - dusk);
+        g.drawImage(glowSprite(SUN_COLORS[i], 32).c, sx - 160, sy - 160, 320, 320);
+      }
       g.globalAlpha = 1;
       g.globalCompositeOperation = 'source-over';
     }
@@ -433,6 +436,12 @@ export class JungleBackground {
         g.drawImage(this.mist, 0, 0, 2, 64, -10, y, W + 20, 70 + i * 10);
         g.globalAlpha = 1;
       }
+    }
+    // Névoa no plano da mata: o solo e os personagens são compostos depois dela.
+    if (!s.under || s.under <= .5) {
+      g.globalAlpha = 0.35 + s.ruin * 0.5;
+      g.drawImage(this.fog, 0, 0, 2, 64, 0, H * 0.7, W, H * 0.3);
+      g.globalAlpha = 1;
     }
   }
 
@@ -491,7 +500,7 @@ export class JungleBackground {
       g.drawImage(this.shaft, x, -20, 150, H + 40);
     }
     // pólen / esporos dourados
-    const dot = softDot(dusk > 0.55 ? '#c8ff7a' : '#fff2b0', 16);
+    const dot = softDot('#fff2b0', 16), nightDot = softDot('#c8ff7a', 16);
     for (const m of this.motes) {
       m.x += (m.vx + Math.sin(t * 0.6 + m.ph) * 6) * dt;
       m.y += (m.vy + Math.cos(t * 0.8 + m.ph) * 4) * dt;
@@ -501,9 +510,11 @@ export class JungleBackground {
       // a câmera subindo/descendo (pulo) também desloca o pólen: ele fica "no ar", não grudado na tela
       const my = (((m.y - (s.camY - s.refY) * 0.6) % (H + 12)) + H + 12) % (H + 12) - 6;
       const tw = 0.5 + 0.5 * Math.sin(t * 2 + m.ph * 3);
-      g.globalAlpha = (dusk > 0.55 ? 0.8 : 0.45) * tw;
-      const r = m.s * (dusk > 0.55 ? 2.4 : 1.8);
+      g.globalAlpha = (.45 + dusk * .35) * tw * (1 - dusk);
+      const r = m.s * (1.8 + dusk * .6);
       g.drawImage(dot.c, x - r, my - r, r * 2, r * 2);
+      g.globalAlpha = (.45 + dusk * .35) * tw * dusk;
+      g.drawImage(nightDot.c, x - r, my - r, r * 2, r * 2);
     }
     g.globalAlpha = 1;
     g.globalCompositeOperation = 'source-over';
@@ -527,10 +538,6 @@ export class JungleBackground {
     g.globalAlpha = 1;
     // araras cruzando a tela
     this.drawFlock(g, s, dt);
-    // neblina rasteira
-    g.globalAlpha = 0.35 + s.ruin * 0.5;
-    g.drawImage(this.fog, 0, 0, 2, 64, 0, H * 0.7, W, H * 0.3);
-    g.globalAlpha = 1;
   }
 
   private drawFlock(g: CanvasRenderingContext2D, s: BgState, dt: number) {

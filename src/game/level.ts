@@ -31,6 +31,8 @@ export class Level {
   reliefRow = 32;
   scenicTrail?: { x0: number; x1: number };
   readonly scenicGroves: { x0: number; x1: number }[] = [];
+  /** Leitos rasos que compartilham o solo visual da trilha, sem substituir colisões. */
+  readonly scenicWetlands: WaterZone[] = [];
   scenicStreet?: { x0: number; x1: number };
   readonly roofs: RoofSurface[] = [];
   readonly mounds: MoundSurface[] = [];
