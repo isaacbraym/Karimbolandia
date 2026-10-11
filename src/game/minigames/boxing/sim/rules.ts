@@ -1,8 +1,8 @@
 /**
  * Regras do Boxe 2.0 (simulação headless): tabelas de golpes, guardas, ataques do jacaré com cor de
  * defesa, rounds, quedas, estrelas, Fúria e dificuldade. Os números nascem do plano
- * (docs/boxe-jacare/PLANO_BOXE_2.md) e são calibrados por bots (tests/boxing.test.ts): quem lê os sinais
- * vence, quem só martela perde, quem só se esquiva perde por pontos.
+ * (docs/boxe-jacare/PLANO_BOXE_2.md). O dano foi aumentado em nove vezes a pedido do usuário;
+ * tests/boxing.test.ts verifica os impactos, a defesa e partidas curtas com bots.
  *
  * Os tempos de telegrafia são múltiplos de meia batida (132 bpm): os golpes do jacaré caem no ritmo da
  * música e do coro, o que também ajuda a prever o próximo.
@@ -12,6 +12,9 @@ import type { DifficultyId } from '../../../../core/difficulty';
 export const BPM = 132;
 export const BEAT = 60 / BPM;
 export const HALF = BEAT / 2;
+
+/** Pedido de 11/10/2026: golpes dos dois lutadores causam nove vezes o dano anterior. */
+const DAMAGE_MULT = 9;
 
 // ───────────────────────── golpes do Karimbo ─────────────────────────
 export type Punch = 'jab' | 'direto' | 'cruzE' | 'cruzD' | 'ganchoE' | 'ganchoD';
@@ -32,12 +35,12 @@ export interface PunchDef {
 }
 
 export const PUNCHES: Record<Punch, PunchDef> = {
-  jab: { side: 'L', tier: 'jab', dmg: 5, energy: 5, wind: 0.06, active: 0.06, recover: 0.14, stop: 0.034 },
-  direto: { side: 'R', tier: 'direto', dmg: 9, energy: 8, wind: 0.10, active: 0.07, recover: 0.20, stop: 0.05 },
-  cruzE: { side: 'L', tier: 'cruzado', dmg: 14, energy: 12, wind: 0.16, active: 0.08, recover: 0.28, stop: 0.084 },
-  cruzD: { side: 'R', tier: 'cruzado', dmg: 15, energy: 13, wind: 0.17, active: 0.08, recover: 0.30, stop: 0.084 },
-  ganchoE: { side: 'L', tier: 'gancho', dmg: 18, energy: 16, wind: 0.22, active: 0.08, recover: 0.36, stop: 0.117 },
-  ganchoD: { side: 'R', tier: 'gancho', dmg: 19, energy: 17, wind: 0.23, active: 0.08, recover: 0.38, stop: 0.117 },
+  jab: { side: 'L', tier: 'jab', dmg: 5 * DAMAGE_MULT, energy: 5, wind: 0.06, active: 0.06, recover: 0.14, stop: 0.034 },
+  direto: { side: 'R', tier: 'direto', dmg: 9 * DAMAGE_MULT, energy: 8, wind: 0.10, active: 0.07, recover: 0.20, stop: 0.05 },
+  cruzE: { side: 'L', tier: 'cruzado', dmg: 14 * DAMAGE_MULT, energy: 12, wind: 0.16, active: 0.08, recover: 0.28, stop: 0.084 },
+  cruzD: { side: 'R', tier: 'cruzado', dmg: 15 * DAMAGE_MULT, energy: 13, wind: 0.17, active: 0.08, recover: 0.30, stop: 0.084 },
+  ganchoE: { side: 'L', tier: 'gancho', dmg: 18 * DAMAGE_MULT, energy: 16, wind: 0.22, active: 0.08, recover: 0.36, stop: 0.117 },
+  ganchoD: { side: 'R', tier: 'gancho', dmg: 19 * DAMAGE_MULT, energy: 17, wind: 0.23, active: 0.08, recover: 0.38, stop: 0.117 },
 };
 
 export type Guard = 'alta' | 'baixa' | 'aberta' | 'tonto' | 'cobertura' | 'ataque';
@@ -84,13 +87,13 @@ export interface AttackDef {
   label: string;
 }
 export const ATTACKS: Record<AttackKind, AttackDef> = {
-  patada: { tele: BEAT, dmg: 8, color: 'amarelo', guard: true, duck: false, counter: 0.5, label: 'PATADA' },
-  cabecada: { tele: HALF * 3, dmg: 10, color: 'laranja', guard: false, duck: true, counter: 0.6, label: 'CABEÇADA' },
-  rabada: { tele: HALF * 3, dmg: 14, color: 'vermelho', guard: false, duck: false, counter: 0.8, label: 'RABADA' },
-  mordidona: { tele: BEAT * 2, dmg: 22, color: 'vermelho', guard: false, duck: false, counter: 1.2, label: 'MORDIDONA' },
-  chapelada: { tele: HALF * 3, dmg: 8, color: 'amarelo', guard: true, duck: false, counter: 0.5, more: [{ gap: BEAT, dmg: 6 }], label: 'CHAPELADA' },
-  giro: { tele: BEAT, dmg: 9, color: 'vermelho', guard: false, duck: false, counter: 1.5, more: [{ gap: HALF * 3, dmg: 9 }, { gap: HALF * 3, dmg: 9 }], sides: [-1, 1, -1], label: 'GIRO DA RODA' },
-  contrape: { tele: 0.30, dmg: 10, color: 'amarelo', guard: true, duck: false, counter: 0.5, label: 'CONTRAPÉ' },
+  patada: { tele: BEAT, dmg: 8 * DAMAGE_MULT, color: 'amarelo', guard: true, duck: false, counter: 0.5, label: 'PATADA' },
+  cabecada: { tele: HALF * 3, dmg: 10 * DAMAGE_MULT, color: 'laranja', guard: false, duck: true, counter: 0.6, label: 'CABEÇADA' },
+  rabada: { tele: HALF * 3, dmg: 14 * DAMAGE_MULT, color: 'vermelho', guard: false, duck: false, counter: 0.8, label: 'RABADA' },
+  mordidona: { tele: BEAT * 2, dmg: 22 * DAMAGE_MULT, color: 'vermelho', guard: false, duck: false, counter: 1.2, label: 'MORDIDONA' },
+  chapelada: { tele: HALF * 3, dmg: 8 * DAMAGE_MULT, color: 'amarelo', guard: true, duck: false, counter: 0.5, more: [{ gap: BEAT, dmg: 6 * DAMAGE_MULT }], label: 'CHAPELADA' },
+  giro: { tele: BEAT, dmg: 9 * DAMAGE_MULT, color: 'vermelho', guard: false, duck: false, counter: 1.5, more: [{ gap: HALF * 3, dmg: 9 * DAMAGE_MULT }, { gap: HALF * 3, dmg: 9 * DAMAGE_MULT }], sides: [-1, 1, -1], label: 'GIRO DA RODA' },
+  contrape: { tele: 0.30, dmg: 10 * DAMAGE_MULT, color: 'amarelo', guard: true, duck: false, counter: 0.5, label: 'CONTRAPÉ' },
 };
 
 // ───────────────────────── Karimbo ─────────────────────────
@@ -125,7 +128,7 @@ export const BUFFER_TIME = 0.3;
 // ───────────────────────── estrelas de orelha e Fúria ─────────────────────────
 export const MAX_STARS = 3;
 /** dano da ORELHADA carregada: base × (1 + estrelas), ignora a guarda */
-export const CARGA_DMG = 32;
+export const CARGA_DMG = 32 * DAMAGE_MULT;
 export const CARGA_WIND = 0.45;
 export const CARGA_TIME = 0.9;
 export const FURY_MAX = 100;
@@ -140,7 +143,7 @@ export const FURY_SPEED = 0.77;
 export const FURY_DMG = 1.25;
 
 // ───────────────────────── jacaré e a luta ─────────────────────────
-/** calibrado por varredura de bots: o leitor perfeito termina em ~115 s (round 2), um jogador mais lento em ~150 s; cada soco que passa tira cerca de 1–2% da barra (o dano subiu 35% e a guarda alta deixa passar 30% dos retos depois do relato "a vida quase não desce") */
+/** A vida foi preservada ao aumentar os danos em nove vezes para encurtar a luta. */
 export const G_HP = 1000;
 export const ROUNDS = 3;
 export const ROUND_TIME = 60;

@@ -29,6 +29,18 @@ function fight(opts: ConstructorParameters<typeof BoxingMatch>[2] = {}, difficul
 const untilTele = (m: BoxingMatch, left: number) => { while (m.g.mode === 'tele' && m.g.tele > left) m.step(DT, pad()); };
 
 describe('boxe v2: golpes e guarda do jacaré', () => {
+  it('aplica nove vezes os danos anteriores em todos os socos e na orelhada carregada', () => {
+    const expected = { jab: 45, direto: 81, cruzE: 126, cruzD: 135, ganchoE: 162, ganchoD: 171 };
+    for (const p of PUNCH_BUTTONS) {
+      const m = fight();
+      m.g.mode = 'recover'; m.g.guard = 'aberta'; m.g.recoverT = 99;
+      m.step(DT, pad([p])); stepN(m, 0.8);
+      expect(m.events.find((e) => e.type === 'hit')?.amount, p).toBe(expected[p]);
+      expect(G_HP - m.g.hp, p).toBe(expected[p]);
+    }
+    expect(CARGA_DMG).toBe(288);
+  });
+
   it('os seis botões fazem seis golpes distintos com o dano da tabela', () => {
     const seen = new Set<Punch>();
     for (const p of PUNCH_BUTTONS) {
@@ -98,13 +110,13 @@ describe('boxe v2: golpes e guarda do jacaré', () => {
       stepN(m, 0.8);
       return (hp0 - m.g.hp) / m.g.maxHp;
     };
-    // com a guarda aberta nenhum soco tira menos de 0,4% e o gancho passa de 1,5%
-    for (const p of ['jab', 'direto', 'cruzE', 'cruzD', 'ganchoE', 'ganchoD'] as Punch[]) expect(open(p), p).toBeGreaterThan(0.004);
-    expect(open('ganchoD')).toBeGreaterThan(0.015);
-    // e mesmo contra a guarda alta (o estado mais comum) um reto já passa de 0,12% e o cruzado de 1%
+    // com a guarda aberta o jab tira 4,5% e o gancho direito 17,1%
+    expect(open('jab')).toBeCloseTo(0.045);
+    expect(open('ganchoD')).toBeCloseTo(0.171);
+    // contra a guarda alta, mantêm-se as frações de defesa sobre o novo dano
     const high = (p: Punch) => { const m = fight(); m.g.mode = 'guard'; m.g.guard = 'alta'; m.g.thinkT = 99; const hp0 = m.g.hp; m.step(DT, pad([p])); stepN(m, 0.8); return (hp0 - m.g.hp) / m.g.maxHp; };
-    expect(high('jab')).toBeGreaterThan(0.0012);
-    expect(high('cruzD')).toBeGreaterThan(0.008);
+    expect(high('jab')).toBeCloseTo(0.0135);
+    expect(high('cruzD')).toBeCloseTo(0.081);
   });
 
   it('sem energia os golpes ficam 40% mais lentos; defender devolve energia', () => {
@@ -123,6 +135,24 @@ describe('boxe v2: golpes e guarda do jacaré', () => {
 });
 
 describe('boxe v2: defesa honesta, cores e defesa perfeita', () => {
+  it('multiplica por nove cada impacto do jacaré, inclusive os seguintes da chapelada e do giro', () => {
+    const expected: Record<AttackKind, number[]> = {
+      patada: [72], cabecada: [90], rabada: [126], mordidona: [198], chapelada: [72, 54], giro: [81, 81, 81], contrape: [90],
+    };
+    for (const kind of Object.keys(expected) as AttackKind[]) {
+      const m = fight();
+      priv(m).startAttack(kind);
+      const hits = () => m.events.filter((e) => e.type === 'gatorHit');
+      // Renova apenas a vida da fixture para medir toda a sequência, mesmo após um golpe letal.
+      for (let i = 0; i < 300 && hits().length < expected[kind].length; i++) {
+        m.k.hp = K_HP;
+        m.step(DT, pad());
+      }
+      expect(hits().map((e) => e.amount), kind).toEqual(expected[kind]);
+      expect(m.stats.damageTaken, kind).toBe(expected[kind].reduce((a, b) => a + b, 0));
+    }
+  });
+
   it('a esquiva é honesta: cobre o impacto se começou até 0,32 s antes, e NÃO cobre se terminou antes', () => {
     const ok = fight();
     priv(ok).startAttack('patada');
@@ -192,7 +222,11 @@ describe('boxe v2: defesa honesta, cores e defesa perfeita', () => {
     const early = run('patada', 0.4);
     expect(early.dmg).toBeCloseTo(ATTACKS.patada.dmg * 0.25);
     expect(early.perfect).toBe(false);
-    expect(run('rabada', 0.1).dmg).toBeCloseTo(ATTACKS.rabada.dmg);
+    const lethal = run('rabada', 0.1);
+    expect(lethal.dmg).toBe(K_HP);
+    expect(lethal.m.k.hp).toBe(0);
+    expect(lethal.m.flow).toBe('kdK');
+    expect(lethal.m.events.find((e) => e.type === 'gatorHit')?.amount).toBe(126);
   });
 
   it('o giro exige esquivar PARA O LADO OPOSTO de cada golpe (esq, dir, esq → dir, esq, dir)', () => {
@@ -326,7 +360,9 @@ describe('boxe v2: rounds, quedas, estrelas e Fúria', () => {
     expect(m.cine).toBe('carga');
     stepN(m, 1.2);
     expect(m.stars).toBe(0);
-    expect(m.g.maxHp - m.g.hp).toBeCloseTo(CARGA_DMG * 4);
+    expect(m.events.filter((e) => e.type === 'hit').at(-1)?.amount).toBe(1152);
+    expect(m.g.hp).toBe(0);
+    expect(m.flow).toBe('kdG');
     // levar golpe zera as estrelas
     const h = fight();
     h.stars = 2;
@@ -456,20 +492,22 @@ describe('boxe v2: nota', () => {
 describe('boxe v2: equilíbrio com bots', () => {
   const hpOf = (d: DifficultyId) => Math.round(G_HP * ({ facil: 0.85, normal: 1, dificil: 1.15 } as const)[d]);
 
-  it('o leitor perfeito (defende pela cor, pune e varia) vence no normal pela ORELHADA, nem rápido demais nem arrastado', () => {
+  it('o leitor vence no normal pela ORELHADA em menos de um minuto, mantendo as três quedas', () => {
     const { m, t } = play(reader());
     expect(m.result?.outcome).toBe('win');
     expect(m.result?.by).toBe('orelhada');
-    expect(t).toBeGreaterThan(100); // a luta tem corpo: o golpe final não chega no round 1
-    expect(t).toBeLessThan(260);
-    expect(m.result?.grade).toMatch(/[SA]/); // quase sem apanhar: nota alta
+    expect(t).toBeGreaterThan(20); // inclui três quedas, contagem e acabamento
+    expect(t).toBeLessThan(60);
+    expect(m.kdG).toBe(3);
+    expect(m.round).toBe(1);
+    expect(m.kdK).toBe(0);
   });
 
-  it('um jogador médio (reage em 0,28 s) vence no normal, no round 2 ou 3; no fácil até o bem lento (0,34 s) vence', () => {
+  it('o leitor médio vence no normal em menos de um minuto; no fácil até o bem lento vence', () => {
     const n = play(reader(0.28), 'normal');
     expect(n.m.result?.outcome).toBe('win');
-    expect(n.t).toBeGreaterThan(125); // mais lento que o leitor perfeito (~115 s)
-    expect(n.t).toBeLessThan(330);
+    expect(n.t).toBeGreaterThan(play(reader()).t);
+    expect(n.t).toBeLessThan(60);
     expect(play(reader(0.34), 'facil').m.result?.outcome).toBe('win');
   });
 
@@ -480,11 +518,13 @@ describe('boxe v2: equilíbrio com bots', () => {
     expect(d.m.stats.damageTaken).toBeGreaterThanOrEqual(e.m.stats.damageTaken);
   });
 
-  it('o martelador (só soca, nunca defende) perde por TKO, em qualquer dificuldade', () => {
+  it('o martelador também termina rápido, mas toma mais dano e cai mais que o leitor', () => {
     for (const d of ['facil', 'normal', 'dificil'] as const) {
-      const r = play(hammer, d).m.result;
-      expect(r?.outcome, d).toBe('lose');
-      expect(r?.by, d).toBe('tko');
+      const h = play(hammer, d), r = play(reader(0.14), d);
+      expect(h.m.over, d).toBe(true);
+      expect(h.t, d).toBeLessThan(60);
+      expect(h.m.stats.damageTaken, d).toBeGreaterThan(r.m.stats.damageTaken);
+      expect(h.m.kdK, d).toBeGreaterThan(r.m.kdK);
     }
   });
 
@@ -516,8 +556,9 @@ describe('boxe v2: equilíbrio com bots', () => {
       return { hp: K_HP - m.k.hp, tele };
     };
     const a = take('facil'), b = take('normal'), c = take('dificil');
-    expect(a.hp).toBeCloseTo(8 * 0.7);
-    expect(c.hp).toBeCloseTo(8 * 1.25);
+    expect(a.hp).toBeCloseTo(72 * 0.7);
+    expect(b.hp).toBe(72);
+    expect(c.hp).toBeCloseTo(72 * 1.25);
     expect(a.tele).toBeGreaterThan(b.tele);
     expect(c.tele).toBeLessThan(b.tele);
   });
@@ -528,6 +569,6 @@ describe('boxe v2: equilíbrio com bots', () => {
     const m = fight({ champion: true });
     priv(m).startAttack('patada');
     stepN(m, 1.5);
-    expect(K_HP - m.k.hp).toBeCloseTo(8 * 1.1);
+    expect(K_HP - m.k.hp).toBeCloseTo(72 * 1.1);
   });
 });
