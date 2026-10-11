@@ -222,12 +222,15 @@ export class JungleBackground {
     const leafL = k ? '#2d643c' : '#3f7d52';
     const leafD = k ? '#123020' : '#20462f';
     // copa contínua no alto
-    for (let x = -40; x < W + 40; x += r.range(40, 70)) crown(g, new Rng(Math.floor(x * 7 + 3 + k)), x, r.range(10, 40), r.range(46, 80), leafC, leafL, leafD);
+    for (let x = 0; x < W; x += r.range(40, 70)) {
+      const y = r.range(10,40), rad = r.range(46,80), seed = Math.floor(x*7+3+k);
+      for (const ox of [-W,0,W]) if (x+ox > -160 && x+ox < W+160)
+        crown(g,new Rng(seed),x+ox,y,rad,leafC,leafL,leafD);
+    }
     // troncos
     const n = k ? 7 : 11;
-    for (let i = 0; i < n; i++) {
-      const x = (i + r.range(0.1, 0.9)) * (W / n);
-      const tw = (k ? r.range(26, 44) : r.range(14, 26));
+    const trunk = (x: number, tw: number, seed: number) => {
+      const r = new Rng(seed);
       g.fillStyle = bark;
       g.beginPath();
       g.moveTo(x - tw / 2, 20);
@@ -266,6 +269,11 @@ export class JungleBackground {
         g.ellipse(x + r.range(-tw * 0.4, tw * 0.4), yy, r.range(5, 10), r.range(3, 5), 0, 0, Math.PI * 2);
         g.fill();
       }
+    };
+    for (let i = 0; i < n; i++) {
+      const x = (i+r.range(.1,.9))*(W/n), tw = k?r.range(26,44):r.range(14,26);
+      for (const ox of [-W,0,W]) if (x+ox+tw*2.2 >= 0 && x+ox-tw*2.2 <= W)
+        trunk(x+ox,tw,70+k+i*977);
     }
     // lianas penduradas entre os troncos
     g.strokeStyle = leafD;
@@ -274,15 +282,19 @@ export class JungleBackground {
       const x0 = r.range(0, W);
       const x1 = x0 + r.range(60, 180);
       const sag = r.range(40, 120);
-      g.beginPath();
-      g.moveTo(x0, 40);
-      g.quadraticCurveTo((x0 + x1) / 2, 40 + sag, x1, 40);
-      g.stroke();
+      for (const ox of [-W,0,W]) if (x1+ox >= 0 && x0+ox <= W) {
+        g.beginPath();g.moveTo(x0+ox,40);
+        g.quadraticCurveTo((x0+x1)/2+ox,40+sag,x1+ox,40);g.stroke();
+      }
     }
     // samambaias e arbustos no chão
     for (let x = 0; x < W; x += r.range(10, 22)) {
       const h = r.range(14, 34) * (k ? 1.4 : 1);
-      for (let j = 0; j < 5; j++) leaf(g, x, H, h, -Math.PI / 2 + (j - 2) * 0.45 + r.range(-0.15, 0.15), 4 + (k ? 2 : 0), j % 2 ? leafC : leafD);
+      for (let j = 0; j < 5; j++) {
+        const ang = -Math.PI/2+(j-2)*.45+r.range(-.15,.15);
+        for (const ox of [-W,0,W]) if (x+ox > -h && x+ox < W+h)
+          leaf(g,x+ox,H,h,ang,4+(k?2:0),j%2?leafC:leafD);
+      }
     }
     return { c, w: W, h: H, f, fy, foot: k ? '#10241a' : '#1b3426', haze: k ? '#8fb79a' : '#a6c8ad' };
   }

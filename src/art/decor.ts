@@ -1,6 +1,6 @@
 /** Decoração de cenário (atrás e na frente do gameplay). Tudo procedural e barato. */
 import { barkTrunk, CITY_LEAVES, foliage } from './foliage';
-import { glowSprite, softDot, drawSpr, OUT } from './kit';
+import { glowSprite, softDot, drawSpr, OUT, makeCanvas } from './kit';
 import { Rng, clamp, shade } from '../core/math';
 import type { DecoSpawn } from '../game/level';
 import { getArt } from './index';
@@ -15,6 +15,23 @@ import { drawWindFlag, drawWindSprite, windAt, windFlex, windTip } from './wind'
 
 const rngCache = new Map<string, Rng>();
 const seedOf = (d: DecoSpawn) => Math.floor(d.x * 7.13 + d.y * 3.1);
+let hologramFill: HTMLCanvasElement | null = null;
+let billboardFill: HTMLCanvasElement | null = null;
+
+/** Gradientes fixos dos painéis; o brilho e as linhas continuam animados ao vivo. */
+function panelFill(kind: 'hologram' | 'billboard') {
+  const old = kind === 'hologram' ? hologramFill : billboardFill;
+  if (old) return old;
+  const hologram = kind === 'hologram', w = hologram ? 68 : 96, h = hologram ? 70 : 52;
+  const bleed = hologram ? 1 : 0;
+  const c = makeCanvas((w+bleed*2)*4,(h+bleed*2)*4), g = c.getContext('2d')!;g.scale(4,4);
+  const gradient = g.createLinearGradient(bleed,bleed,hologram?bleed:w,h+bleed);
+  gradient.addColorStop(0,hologram?'rgba(60,240,255,0.55)':'#ff3fb4');
+  gradient.addColorStop(1,hologram?'rgba(60,240,255,0.08)':'#39f0ff');
+  g.fillStyle=gradient;g.fillRect(0,0,w+bleed*2,h+bleed*2);
+  if(hologram)hologramFill=c;else billboardFill=c;
+  return c;
+}
 
 function neon(g: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, color: string, flick: number) {
   const spr = glowSprite(color, 32);
@@ -456,11 +473,15 @@ function paintDeco(g: CanvasRenderingContext2D, kind: string, seed: number, t: n
       const flick = 0.75 + 0.25 * Math.sin(t * 6 + seed);
       g.globalCompositeOperation = 'lighter';
       g.globalAlpha = 0.5 * flick;
-      const gr = g.createLinearGradient(0, -90, 0, -20);
-      gr.addColorStop(0, 'rgba(60,240,255,0.55)');
-      gr.addColorStop(1, 'rgba(60,240,255,0.08)');
-      g.fillStyle = gr;
-      g.fillRect(-34, -90, 68, 70);
+      if(typeof document !== 'undefined') {
+        // A amostragem da imagem não pode apagar a borda luminosa; o recorte define seu volume.
+        g.save();g.beginPath();g.rect(-34,-90,68,70);g.clip();
+        g.drawImage(panelFill('hologram'),-35,-91,70,72);g.restore();
+      }
+      else {
+        const gr=g.createLinearGradient(0,-90,0,-20);gr.addColorStop(0,'rgba(60,240,255,0.55)');gr.addColorStop(1,'rgba(60,240,255,0.08)');
+        g.fillStyle=gr;g.fillRect(-34,-90,68,70);
+      }
       g.globalAlpha = 0.9 * flick;
       g.strokeStyle = '#7ff9ff';
       g.lineWidth = 1.2;
@@ -1059,12 +1080,11 @@ function paintDeco(g: CanvasRenderingContext2D, kind: string, seed: number, t: n
       g.fillStyle = '#0d0722';
       g.fillRect(-52, -120, 104, 60);
       const flick = 0.8 + 0.2 * Math.sin(t * 3 + seed);
-      const gr = g.createLinearGradient(-48, -116, 48, -64);
-      gr.addColorStop(0, '#ff3fb4');
-      gr.addColorStop(1, '#39f0ff');
-      g.fillStyle = gr;
       g.globalAlpha = flick;
-      g.fillRect(-48, -116, 96, 52);
+      if(typeof document !== 'undefined') g.drawImage(panelFill('billboard'),-48,-116,96,52);
+      else {
+        const gr=g.createLinearGradient(-48,-116,48,-64);gr.addColorStop(0,'#ff3fb4');gr.addColorStop(1,'#39f0ff');g.fillStyle=gr;g.fillRect(-48,-116,96,52);
+      }
       g.globalAlpha = 1;
       g.fillStyle = '#fff';
       g.font = '400 16px "Lilita One", Impact, sans-serif';

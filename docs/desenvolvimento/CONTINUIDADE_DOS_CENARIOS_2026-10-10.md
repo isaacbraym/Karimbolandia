@@ -43,4 +43,16 @@ Cadência em uma página nova do Chrome headless 155 no Windows, viewport 1440 �
 
 Para reproduzir, abrir `tools/ambientacao.html?trecho=243`, visitar as fronteiras e voltar, variar o tamanho da janela e usar `?cidade` para a fase 1. Comparar o mesmo lugar e horário, e deixar o cache aquecer antes de medir desenho estável. Verificar câmera alta/baixa, margens secas, água rasa e Atlântida separadamente.
 
+## Segundo ciclo: faixa periódica e efeitos da cidade
+
+A revisão das faixas repetidas encontrou copas, raízes, cipós e samambaias de `JungleBackground.trunks` cortados nas extremidades do bake. Agora os mesmos exemplares, com a mesma semente e geometria, são continuados por cópias deslocadas uma largura de faixa. Comparando a primeira e última coluna das duas faixas de troncos, a diferença média por componente caiu de 15,32 para 2,35 e de 5,65 para 2,53. Essas colunas são amostras vizinhas, portanto não precisam ser idênticas; o importante é conservar o objeto que atravessa a emenda. A identidade das árvores e os detalhes de casca permanecem determinísticos.
+
+Na cidade, cada atualização do cache distante recriava o mesmo gradiente do céu, mesmo que apenas as estrelas e o planeta tivessem mudado de posição. O gradiente agora é reutilizado e invalidado por clima, altura lógica ou escala. Seis comparações aquecidas de câmera, altura, clima e densidade apresentaram zero componentes RGBA alterados em relação ao renderer anterior. O aquecimento inclui leitura de pixels: uma primeira leitura pode modificar o caminho gráfico do canvas e contaminar uma comparação fria.
+
+Hologramas e letreiros também recriavam gradientes de cores fixas. Agora preparam apenas o painel e continuam animando brilho, texto, varredura e bordas ao vivo. A borda do holograma tem margem de amostragem e recorte geométrico, evitando que o filtro leia transparência fora da imagem. As texturas pequenas usam densidade 4; não alteram a suavização do canvas principal.
+
+Comparando os dois painéis em três instantes sobre um fundo opaco de 640 × 640 px, a diferença média por componente foi inferior a 0,005 na escala de 0 a 255. O letreiro teve diferença máxima de 2; o holograma teve até 42 componentes acima de 8 nos instantes com maior brilho, concentrados no contorno. Há pequenas diferenças de rasterização ao substituir preenchimento vetorial por cópia de imagem; não se alega igualdade absoluta nesses painéis.
+
+No trecho 250 da cidade, 120 desenhos aquecidos antes criavam 390 gradientes: 240 de hologramas, 120 de letreiros e 30 do céu. Após o segundo ciclo, o mesmo ensaio registrou zero. `sceneryRenderCost.test.ts` protege a reutilização e a invalidação do clima. A suíte final passou com 879 testes em 98 arquivos, além de typecheck e build. A medição posterior do pântano, ainda em Chrome headless local, registrou P95 8,5 ms, P99 16,8 ms, máximo 50,1 ms e 0,83% acima de 20,8 ms em 360 callbacks: não demonstra ganho de FPS físico.
+
 As ferramentas e capturas deste ensaio ficam em `tools/_work/scenery-*`, fora do Git. Nenhuma captura foi transmitida pelo túnel. Os resultados de pixels, cache e navegador não constituem aprovação visual manual nem prova de fluidez em celular físico.

@@ -554,6 +554,10 @@ export class Background {
   private farSky = -1;
   private farAge = 99;
   private farK = 0;
+  private farGradient: CanvasGradient | null = null;
+  private farGradientSky = -1;
+  private farGradientH = -1;
+  private farGradientK = -1;
   private drawFarCached(g: CanvasRenderingContext2D, s: BgState) {
     const W = s.viewW;
     const H = s.viewH;
@@ -587,10 +591,14 @@ export class Background {
   private paintFar(g: CanvasRenderingContext2D, s: BgState) {
     const W = s.viewW;
     const H = s.viewH;
-    const cols = this.skyColors(s.sky);
-    const gr = g.createLinearGradient(0, 0, 0, H * 0.92);
-    cols.forEach((c, i) => gr.addColorStop(i / (cols.length - 1), c));
-    g.fillStyle = gr;
+    const k = g.getTransform().a;
+    // Mover estrelas/planeta no cache distante não muda o gradiente do céu.
+    if (!this.farGradient || this.farGradientSky !== s.sky || this.farGradientH !== H || this.farGradientK !== k) {
+      const cols = this.skyColors(s.sky), gr = g.createLinearGradient(0,0,0,H*.92);
+      cols.forEach((c,i)=>gr.addColorStop(i/(cols.length-1),c));
+      this.farGradient=gr;this.farGradientSky=s.sky;this.farGradientH=H;this.farGradientK=k;
+    }
+    g.fillStyle = this.farGradient;
     g.fillRect(0, 0, W, H);
     // estrelas (mais visíveis quando escuro)
     const starA = clamp(0.25 + s.sky * 0.85, 0, 1);
