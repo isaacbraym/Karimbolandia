@@ -65,20 +65,24 @@ export function validateRewards(v: unknown): Rewards | null {
   if (v.over !== undefined && (!isSkinId(v.over) || !isLegacySkin(v.over))) return null;
   return { skins: [...v.skins] as SkinId[], ...(v.equipped !== undefined ? { equipped: v.equipped as SkinId } : {}), ...(v.over !== undefined ? { over: v.over as SkinId } : {}) };
 }
-/** Última skin "legada" vestida (vai para o perfil principal enquanto uma skin de recompensa estiver equipada). */
-let lastLegacyEquipped: SkinId = 'classic';
 /** Cópia do progresso sem nenhuma skin de recompensa: é o que vai para o perfil principal e para a carteira. */
 export function legacyView(p: Progress): Progress {
   const equippedIsLegacy = isLegacySkin(p.equippedSkin);
-  if (equippedIsLegacy) lastLegacyEquipped = p.equippedSkin;
   const owned = p.ownedSkins.filter(isLegacySkin);
-  const equippedSkin = equippedIsLegacy ? p.equippedSkin : (owned.includes(lastLegacyEquipped) || lastLegacyEquipped === 'classic') ? lastLegacyEquipped : 'classic';
+  let equippedSkin = p.equippedSkin;
+  if (!equippedIsLegacy) {
+    // A carteira desta conta é a mesma fonte usada na leitura do progresso.
+    // Consultá-la também após reload evita misturar a seleção de outra conta.
+    const previous = readStored(profileKey(KEY_W), validateWallet) ?? readStored(profileKey(KEY_P), validateProgress);
+    const over = previous && isLegacySkin(previous.equippedSkin)
+      ? previous.equippedSkin : readStored(profileKey(KEY_R), validateRewards)?.over ?? 'classic';
+    equippedSkin = over === 'classic' || owned.includes(over) ? over : 'classic';
+  }
   return { ...p, ownedSkins: owned, equippedSkin };
 }
-export function rewardsOf(p: Progress): Rewards {
-  const view = legacyView(p);
+export function rewardsOf(p: Progress, over = legacyView(p).equippedSkin): Rewards {
   const skins = p.ownedSkins.filter((s) => !isLegacySkin(s));
-  return { skins, ...(!isLegacySkin(p.equippedSkin) ? { equipped: p.equippedSkin } : {}), over: view.equippedSkin };
+  return { skins, ...(!isLegacySkin(p.equippedSkin) ? { equipped: p.equippedSkin } : {}), over };
 }
 
 export const defaultSettings = (): Settings => ({
@@ -228,7 +232,7 @@ export const saveProgress = () => {
   const wallet = writeStored(profileKey(KEY_W), validateWallet(view)!, validateWallet);
   const records = writeStored(profileKey(KEY_P), view, validateProgress);
   // só grava a chave de recompensas quando há algo a guardar (ou já existe): perfis sem o traje ficam idênticos aos de antes
-  const rw = rewardsOf(progress);
+  const rw = rewardsOf(progress, view.equippedSkin);
   const rewards = rw.skins.length || readStored(profileKey(KEY_R), validateRewards) ? writeStored(profileKey(KEY_R), rw, validateRewards) : true;
   return coins && gear && wallet && records && rewards;
 };
